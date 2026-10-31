@@ -2,7 +2,7 @@
 
 dev-kit は、課題に応じた開発ループ（harness）を組み立てるための語彙を提供する。完成済みのループを配布するものではない。必要なループは課題ごとに異なるため、kit が提供するのは、ループを構成するプリミティブと部品、そして課題からループ計画を作る手順に限る。
 
-作業はこのリポジトリ内で完結させる。設計の素材となる調査ノートは、ローカル専用の `.local/research/` に置く。各プリミティブがどの参照先に登場したかは、`docs/selection.md` にまとめる。
+作業はこのリポジトリ内で完結させる。設計の素材となる調査ノートは、ローカル専用の `.local/research/` に置く。各プリミティブがどの参照先に登場したかの対応と、素材の調査ノートは `.local/research/` にある。
 
 ## 前提にする考え
 
@@ -339,8 +339,7 @@ harness の変更は、どのリポジトリでも「止まって聞く」に分
 dev-kit/
 ├── README.md
 ├── docs/
-│   ├── design.md
-│   └── selection.md
+│   └── design.md
 ├── principles/
 │   ├── engineering.md  design.md  testing.md  verification.md
 │   ├── working.md  ui.md  writing.md
@@ -385,3 +384,31 @@ dev-kit/
 8. `assemblies/issue-pr/`、振り返り、harness の検査、skill の試験、`tools/` を作る。
 
 kit 全体を先に完成させようとせず、部品を1つ作るごとに試験まで用意してから、次の部品に進む。
+
+参照先の略称: sofi(手持ちの運用)、p4cloud(手持ちのレビュー原則)、pstack(cursor/plugins の pstack)、harness(walkinglabs/learn-harness-engineering)、CCGS(Claude-Code-Game-Studios)、emil(emilkowalski/skills)、Motionsites(Motionsites-AI/claude-skill)。
+
+## 採らなかったもの
+
+| もの | 出典 | 理由 |
+|---|---|---|
+| 49の agent と3階層の director、team-* skill | CCGS | 1人の規模では、agent が並列でもレビューは人が1つずつ行う(harness L14 の Orchestration Tax)。gate を観点ファイルにする形だけ採る |
+| registry の YAML、sprint・epic・story の流れ、63のテンプレート | CCGS | 維持の手間に見合わない。状態は ledger で足りる |
+| 設定の注入(yaml-helper の2100行) | CCGS | 重い |
+| arena・swarm・orchestrate・autopilot・shipping | pstack | チームとクラウドの VM が前提。2案の比較は段2の check で代わりになる |
+| モデル名の指定と、各 skill に繰り返される代替の段落 | pstack | router の表1つで足りる |
+| statechart と形式検証 | pstack | 日常の開発では使わない |
+| automate-me・recall | pstack | 会話の記録に依存する。kit が動いてから考える |
+| feature list の厚い版、OpenTelemetry、graph engineering の用語 | harness | 1人の規模では重い。段階の考え方だけプリミティブ11「段を下る」に入れた |
+| 講義の中の数値 | harness | 作者自身が仮想の数値と書いている |
+| media shelf、examples の本文、spec のテンプレート本体 | Motionsites | LP 専用で、examples と media は再配布できない |
+| アニメーション系 skill の中身 | emil | フロントエンド専用。必要になったら ui の追加として扱う |
+| gh stack、ブランチ名、drizzle、mise、Biome、ラベルの運用 | sofi | リポジトリ固有。issue-pr の例の中で示すだけにする |
+| worklog(Slack への作業報告) | sofi | 個人の運用で、ループの役割に当たらない |
+
+## 後回しにしたもの
+
+- 個人の pattern library(Motionsites の examples の索引の形)
+- 会話の記録から自分用の playbook を作る(pstack automate-me)
+- 原則の英語版(Codex に原則を渡すときに要るかどうかで決める)
+- フロントエンドの追加(emil のアニメーション基準、Motionsites の spec の精度の規則)
+- view の Web アプリ化(HTML 1枚で足りなくなってから)
