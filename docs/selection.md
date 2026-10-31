@@ -16,8 +16,9 @@
 | 6 分類して振り分ける | sofi の workflow(止まって聞く / 仮決定 / 見なくてよい)と dev-lesson(lint → 原則 → skill)、dev-review(needs-decision / auto-fixable)。pstack の poteto-mode(状況 → playbook)、setup-pstack(役割 → モデル)、reflect の synthesizer(採る / 却下 / 後回し)、correct。CCGS の verdict 語彙と rigor。codex の P0/P1 だけ報告する |
 | 7 強制の階段 | sofi の dev-lesson と design 原則11(型で表す)。pstack の correct(architecture > types/lint > test > docs)、encode-lessons-in-structure、build-the-lever。harness L10 の Review Feedback Promotion と実行可能な architecture rule。CCGS の hook による強制 |
 | 8 外に置いた状態 | harness の feature_list / progress / DECISIONS.md / session-handoff、「ファイルが記憶」。CCGS の session-state(STATUS / CHECKPOINT)と hook での再注入、registry、規則の付記。pstack の show-me-your-work の TSV、rule と enforcer の表。sofi の docs/decisions(追記のみ、supersedes)と「Issue/PR に書いていない結果は無いもの」 |
-| 9 骨組み先行・必要なときだけ読む | CCGS の incremental writing、checkpoint は25行、gate 定義を subagent に読ませる、validate-read(丸読みを拒む)、brief はパスで渡す。harness L04(entry file は router、50〜200行)と context-engineering の SELECT/WRITE/COMPRESS/ISOLATE。pstack の guard-the-context-window、references に prompt template。Motionsites の3段の索引。emil の SKILL + RECIPES の分割 |
-| 10 段を下る | sofi の design 原則2(戻せない決定を先に)、dev-design(詳細は実装の直前に書く)、workflow(目的を満たせないなら止めて報告)。pstack の foundational-thinking(データの形を先に)、model-the-domain、attack-the-premise(同じ前提で2回落ちたら前提を疑う)、architect の Ground → Sketch → Agree。harness L06(初期化を分ける)、L14(graph は段階の blueprint)。CCGS の pipeline(concept → design → architecture → stories → dev)と rigor による段の省略 |
+| 9 骨組み先行 | CCGS の incremental writing(骨組みを先に書き、節ごとに保存する)、checkpoint は25行。harness の context-engineering の WRITE/COMPRESS |
+| 10 必要なときだけ読む | CCGS の gate 定義を subagent に読ませる、validate-read(丸読みを拒む)、brief はパスで渡す。harness L04(entry file は router、50〜200行)と SELECT/ISOLATE。pstack の guard-the-context-window、references に prompt template。Motionsites の3段の索引。emil の SKILL + RECIPES の分割 |
+| 11 段を下る | sofi の design 原則2(戻せない決定を先に)、dev-design(詳細は実装の直前に書く)、workflow(目的を満たせないなら止めて報告)。pstack の foundational-thinking(データの形を先に)、model-the-domain、attack-the-premise(同じ前提で2回落ちたら前提を疑う)、architect の Ground → Sketch → Agree。harness L06(初期化を分ける)、L14(graph は段階の blueprint)。CCGS の pipeline(concept → design → architecture → stories → dev)と rigor による段の省略 |
 
 ## 原子になっていない構造(kit 側で新しく決めたもの)
 
@@ -26,6 +27,8 @@
 | ループ計画 | 段・check・担当・人のゲートを課題ごとに決め、ledger に置く | pstack の figure-it-out(合う playbook がなければ手順を組む)、harness L14 の graph.md、Workflow の script |
 | 理解負債と view | 人が最後に見た時点からの差分を、層で描画する。報告をモデルに書かせない | pstack の ketchup(前回から何が変わり、何が自分を待っているか)。ただし1チャット向け |
 | 図を帳簿から生成する | 構造をデータで持ち、図は生成物にする | sofi の docs/README.md「図と本文を食い違わせない」は対症療法。artifact-diagramming の「仕組みを描く、矢印にラベル」 |
+| runtime(実行) | 文章上の指定を、発火・停止・隔離・再開の作用にする部品。段の実行の記録と再開時の照合で二重適用を防ぐ | CCGS の hooks、harness の Claude Code 分析(hook = when)、pstack の worktree 隔離。Codex のレビュー(2026-10-31)が「6部品では効かせられない」と指摘したもの |
+| 矛盾の検出と前提の批評を分ける | 観点ファイルを2つに分け、blocking の定義を観点ごとに持つ | Codex にレビューさせた経験(2026-10-31)。1つの依頼に混ぜると、見つけやすい矛盾で指摘が埋まった。対案を作らせる形にすると、形に効く指摘だけが残った |
 
 ## 原則に足すもの(出典)
 
