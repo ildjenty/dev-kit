@@ -1,12 +1,12 @@
-# 参照先と原子の対応
+# 参照先とプリミティブの対応
 
-`docs/design.md` の原子が、どの参照先のどの仕組みに現れていたか。部品は原子の組み合わせなので、部品ごとの出典は書かない。調査ノートは `.local/research/`(ローカルのみ)。
+`docs/design.md` のプリミティブが、どの参照先のどの仕組みに現れていたか。部品はプリミティブの組み合わせなので、部品ごとの出典は書かない。調査ノートは `.local/research/`(ローカルのみ)。
 
 出典の略称: sofi(手持ちの運用)、p4cloud(手持ちのレビュー原則)、pstack(cursor/plugins の pstack)、harness(walkinglabs/learn-harness-engineering)、CCGS(Claude-Code-Game-Studios)、emil(emilkowalski/skills)、Motionsites(Motionsites-AI/claude-skill)、codex(openai/codex-plugin-cc)。
 
-## 原子ごとの出典
+## プリミティブごとの出典
 
-| 原子 | どこに現れていたか |
+| プリミティブ | どこに現れていたか |
 |---|---|
 | 1 根拠つきの判定 | CCGS の `NOT ASSESSED` と skill-authoring の5つの義務。harness の pass-state(検証成功のみで passing)と DoD。pstack の why の確信度5段階、blast-radius の5段階、prove-it-works、explain-the-number。sofi の verification(観測と推論を分ける)。Motionsites の review(見ていないページは判断できない) |
 | 2 文脈の分離 | harness L13・L14 の maker/checker 分離(verify node は fresh context)。pstack の interrogate、arena の別系統の judge、comment-sicko、eval playbook(期待結果を見せない)。CCGS の director gate(subagent に読ませる)と「architecture-review は別セッションで」。sofi の evals(依頼と入力だけ渡す)。codex のレビュー |
@@ -20,7 +20,7 @@
 | 10 必要なときだけ読む | CCGS の gate 定義を subagent に読ませる、validate-read(丸読みを拒む)、brief はパスで渡す。harness L04(entry file は router、50〜200行)と SELECT/ISOLATE。pstack の guard-the-context-window、references に prompt template。Motionsites の3段の索引。emil の SKILL + RECIPES の分割 |
 | 11 段を下る | sofi の design 原則2(戻せない決定を先に)、dev-design(詳細は実装の直前に書く)、workflow(目的を満たせないなら止めて報告)。pstack の foundational-thinking(データの形を先に)、model-the-domain、attack-the-premise(同じ前提で2回落ちたら前提を疑う)、architect の Ground → Sketch → Agree。harness L06(初期化を分ける)、L14(graph は段階の blueprint)。CCGS の pipeline(concept → design → architecture → stories → dev)と rigor による段の省略 |
 
-## 原子になっていない構造(kit 側で新しく決めたもの)
+## プリミティブになっていない構造(kit 側で新しく決めたもの)
 
 | もの | 中身 | 近い種 |
 |---|---|---|
@@ -54,7 +54,7 @@
 | モデル名の指定と、各 skill に繰り返される代替の段落 | pstack | router の表1つで足りる |
 | statechart と形式検証 | pstack | 日常の開発では使わない |
 | automate-me・recall | pstack | 会話の記録に依存する。kit が動いてから考える |
-| feature list の厚い版、OpenTelemetry、graph engineering の用語 | harness | 1人の規模では重い。段階の考え方だけ原子10に入れた |
+| feature list の厚い版、OpenTelemetry、graph engineering の用語 | harness | 1人の規模では重い。段階の考え方だけプリミティブ10に入れた |
 | 講義の中の数値 | harness | 作者自身が仮想の数値と書いている |
 | media shelf、examples の本文、spec のテンプレート本体 | Motionsites | LP 専用で、examples と media は再配布できない |
 | アニメーション系 skill の中身 | emil | フロントエンド専用。必要になったら ui の追加として扱う |
