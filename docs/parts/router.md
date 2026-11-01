@@ -30,8 +30,8 @@ router は、少数の分類と規則をまとめた表である。
 - **分類・ルーティング先**: 採用 / 却下 / 保留
 - **適用場面**: 振り返りで出た案を分類するとき。
 
-「作業を停止して確認する」に分類する事項は [`principles/working.md`](../../principles/working.md) の原則10に従う。
+「作業を停止して確認する」に分類する事項は [`principles/working.md`](../../principles/working.md) の原則6に従う。
 
 **計画に人によるレビューゲートを設けるときも、この分類に基づいて理由を書く。** 元に戻せない変更だけが対象ではない。
 
-判断の基準と可逆な変更の扱いは `principles/working.md` の原則10、check の失敗が続いたときの前提の見直しは [`principles/harness.md`](../../principles/harness.md) の原則3、違反が再発したときの強制手段の見直しは `principles/harness.md` の原則4に従う。
+判断の基準と可逆な変更の扱いは `principles/working.md` の原則6、check の失敗が続いたときの前提の見直しは [`principles/harness.md`](../../principles/harness.md) の原則3、違反が再発したときの強制手段の見直しは `principles/harness.md` の原則4に従う。

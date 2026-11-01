@@ -2,14 +2,14 @@
 
 ## コードの構造
 
-- **通信の型（リクエスト・レスポンス）を内部で再利用しない。**: [`principles/design.md`](../principles/design.md) の原則3。手段: 未実装。
-- **提供側と下位レイヤーは、利用側と上位レイヤーの具体的な実装に依存しない。利用側に定義した抽象（ポート）への依存は許す。**: [`principles/design.md`](../principles/design.md) の原則4。手段: 未実装。
-- **ドメインからフレームワーク・インフラ・アプリの設定の型を import しない。**: [`principles/design.md`](../principles/design.md) の原則4。手段: 未実装。
-- **静的な依存関係に循環参照を含めない。**: [`principles/design.md`](../principles/design.md) の原則4。手段: 未実装。
-- **ドメインの型にフレームワークの型やアノテーションを含めない。**: [`principles/design.md`](../principles/design.md) の原則8。手段: 未実装。
-- **モジュールの公開入口を経由せずに内部のパスを直接 import しない。**: [`principles/design.md`](../principles/design.md) の原則12。手段: 未実装。
-- **引数をそのまま渡すだけの関数を置かない。**: [`principles/design.md`](../principles/design.md) の原則15。手段: 未実装。
-- **実行期間が重なる並列の作業は、異なる worktree で行う。**: [`principles/design.md`](../principles/design.md) の原則16。手段: 未実装。
+- **通信の型（リクエスト・レスポンス）を内部で再利用しない。**: [`principles/structure.md`](../principles/structure.md) の原則2。手段: 未実装。
+- **提供側と下位レイヤーは、利用側と上位レイヤーの具体的な実装に依存しない。利用側に定義した抽象（ポート）への依存は許す。**: [`principles/structure.md`](../principles/structure.md) の原則3。手段: 未実装。
+- **ドメインからフレームワーク・インフラ・アプリの設定の型を import しない。**: [`principles/structure.md`](../principles/structure.md) の原則3。手段: 未実装。
+- **静的な依存関係に循環参照を含めない。**: [`principles/structure.md`](../principles/structure.md) の原則3。手段: 未実装。
+- **ドメインの型にフレームワークの型やアノテーションを含めない。**: [`principles/structure.md`](../principles/structure.md) の原則5。手段: 未実装。
+- **モジュールの公開入口を経由せずに内部のパスを直接 import しない。**: [`principles/structure.md`](../principles/structure.md) の原則6。手段: 未実装。
+- **引数をそのまま渡すだけの関数を置かない。**: [`principles/structure.md`](../principles/structure.md) の原則7。手段: 未実装。
+- **実行期間が重なる並列の作業は、異なる worktree で行う。**: [`principles/data.md`](../principles/data.md) の原則6。手段: 未実装。
 
 ## コメントと lint
 
