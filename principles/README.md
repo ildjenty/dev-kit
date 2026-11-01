@@ -2,17 +2,15 @@
 
 check の観点ファイルでは、これらの原則を評価基準とする。
 
-| 文書 | 参照する場面 |
-|---|---|
-| [engineering.md](engineering.md) | コードを書くとき |
-| [design.md](design.md) | 構造（モジュール、配置、依存、データ構造）を決めるとき |
-| [testing.md](testing.md) | テストを書くとき、既存のコードを変える前 |
-| [verification.md](verification.md) | ツール・API・バージョン・原因・計測値について述べるとき |
-| [working.md](working.md) | 作業の進め方を決めるとき |
-| [harness.md](harness.md) | メタループでループの仕組み（部品、組み立て、計画）を変更するとき、観点「harness」の check を行うとき |
-| [ui.md](ui.md) | 画面を設計する・作るとき |
-| [writing.md](writing.md) | 人が読む文章（報告、PR 本文、文書）を書くとき |
-| review.md | レビュー時に参照する1枚の文書。上の文書の各原則の「blocking」と「根拠」の行から生成する（生成の仕組みは `tools/` で作る。それまでは手動で整合させる） |
+- **[engineering.md](engineering.md)**: コードを書くとき
+- **[design.md](design.md)**: 構造（モジュール、配置、依存、データ構造）を決めるとき
+- **[testing.md](testing.md)**: テストを書くとき、既存のコードを変える前
+- **[verification.md](verification.md)**: ツール・API・バージョン・原因・計測値について述べるとき
+- **[working.md](working.md)**: 作業の進め方を決めるとき
+- **[harness.md](harness.md)**: メタループでループの仕組み（部品、組み立て、計画）を変更するとき、観点「harness」の check を行うとき
+- **[ui.md](ui.md)**: 画面を設計する・作るとき
+- **[writing.md](writing.md)**: 人が読む文章（報告、PR 本文、文書）を書くとき
+- **review.md**: レビュー時に参照する1枚の文書。上の文書の各原則の「blocking」と「根拠」の行から生成する（生成の仕組みは `tools/` で作る。それまでは手動で整合させる）
 
 ## 原則のフォーマット
 
