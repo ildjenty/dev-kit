@@ -75,7 +75,7 @@
 ## harness
 
 - **ステージ**: メタ
-- **確認事項**: [`principles/harness.md`](../principles/harness.md) の各原則の blocking に該当するか。skill に description があるか。参照先が存在するか。150行以内か。check が `NOT ASSESSED` を返せるか。原則が所定の形式を満たすか。skill・playbook・checkpoint に同じ処理の実装が重複していないか（`principles/working.md` の原則5）。Fresh Session Test として、新しいセッションがリポジトリだけを読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるかを確かめる。部品間の接続（保存先と読み込み先の一致など）は、組み立ての試験で確かめる。
+- **確認事項**: [`principles/harness.md`](../principles/harness.md) の各原則の blocking に該当するか。skill に description があるか。参照先が存在するか。check が `NOT ASSESSED` を返せるか。原則が所定の形式を満たすか。skill・playbook・checkpoint に同じ処理の実装が重複していないか（`principles/working.md` の原則5）。Fresh Session Test として、新しいセッションがリポジトリだけを読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるかを確かめる。部品間の接続（保存先と読み込み先の一致など）は、組み立ての試験で確かめる。
 - **blocking**: 答えられない問いがある。harness.md の blocking に該当する。
 
 ## skill の試験
