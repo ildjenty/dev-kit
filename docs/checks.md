@@ -45,7 +45,7 @@
 ## 差分
 
 - **ステージ**: 5
-- **確認事項**: [`principles/engineering.md`](../principles/engineering.md) の原則1・5・6 と、各原則の blocking に従う（`principles/review.md` の生成後はそれを使う）。PR 本文と報告は、[`principles/writing.md`](../principles/writing.md) の原則1・4・9の blocking に従う。
+- **確認事項**: [`principles/engineering.md`](../principles/engineering.md) の原則1・5 と、[`principles/working.md`](../principles/working.md) の原則12、および各原則の blocking に従う（`principles/review.md` の生成後はそれを使う）。PR 本文と報告は、[`principles/writing.md`](../principles/writing.md) の原則1・4・9の blocking に従う。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## 動作検証
