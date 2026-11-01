@@ -1,6 +1,6 @@
 # principles
 
-check の観点ファイルでは、これらの原則を評価基準とする。
+check の観点ファイルでは、これらの原則を評価基準とする。機械で決定的に判定する規則は、[部品の契約](../docs/design.md#部品)と[規則と強制手段](../docs/rules.md)に定める。
 
 - **[engineering.md](engineering.md)**: コードを書くとき
 - **[design.md](design.md)**: 構造（モジュール、配置、依存、データ構造）を決めるとき

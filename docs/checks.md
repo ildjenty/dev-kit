@@ -15,7 +15,7 @@
 ## 構造
 
 - **ステージ**: 2
-- **確認事項**: 各配置を責務に基づいて正当化できるか。同じ目的をより単純に満たす構造を1つ作り、元の案の余分な部分を示す。[`principles/design.md`](../principles/design.md) の各原則の違反・兆候（浅いモジュール、通過するだけの関数、実行順で分割したモジュール、同じ状態への複数の書き手、同じ処理を行う2つの経路）を確認する。
+- **確認事項**: 各配置を責務に基づいて正当化できるか。同じ目的をより単純に満たす構造を1つ作り、元の案の余分な部分を示す。[`principles/design.md`](../principles/design.md) の各原則の違反・兆候（浅いモジュール、実行順で分割したモジュール、同じ状態への複数の書き手、同じ処理を行う2つの経路）を確認する。
 - **blocking**: 正当化できない配置がある。または、より単純な構造がある。
 
 ## 整合
@@ -45,19 +45,19 @@
 ## 差分
 
 - **ステージ**: 5
-- **確認事項**: [`principles/engineering.md`](../principles/engineering.md) の原則1・5 と、[`principles/working.md`](../principles/working.md) の原則12、および各原則の blocking に従う。PR 本文と報告は、[`principles/writing.md`](../principles/writing.md) の原則1・4・9の blocking に従う。
+- **確認事項**: [`principles/engineering.md`](../principles/engineering.md) の原則1・5 と、[`principles/working.md`](../principles/working.md) の原則12、および各原則の blocking に従う。PR 本文と報告は、[form](parts/form.md) の PR 本文の契約と [規則と強制手段](rules.md#文章と記録)、および [`principles/writing.md`](../principles/writing.md) の原則1・4・9の blocking に従う。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## 動作検証
 
 - **ステージ**: 5
-- **確認事項**: 起動、操作、証拠の取得、後片付けを確認する。画面はスクリーンショットを画像として見る。コンソールエラー、ページ全体の意図しない横スクロール（要素内の `overflow-x: auto` は許す）、読めない文字、プレースホルダ（[principles/ui.md](../principles/ui.md) の原則11の違反・兆候を参照）を停止条件とする。長い名前、0件、大量のデータ、多言語など、問題が起きやすいデータも使う。
+- **確認事項**: 起動、操作、証拠の取得、後片付けを確認し、[規則と強制手段](rules.md#画面) の画面の規則に従う。画面はスクリーンショットを画像として見る。コンソールエラー、ページ全体の意図しない横スクロール（要素内の `overflow-x: auto` は許す）、読めない文字、プレースホルダ（[principles/ui.md](../principles/ui.md) の原則10の違反・兆候を参照）を停止条件とする。長い名前、0件、大量のデータ、多言語など、問題が起きやすいデータも使う。
 - **blocking**: 停止条件に該当する。確認できなかった場合は `NOT ASSESSED` とする。
 
 ## 終了時の状態
 
 - **ステージ**: 5（Stop）
-- **確認事項**: [`principles/working.md`](../principles/working.md) の原則11に従う。
+- **確認事項**: [runtime](parts/runtime.md) の終了条件と [`principles/working.md`](../principles/working.md) の原則11に従う。
 - **blocking**: 1つでも満たさない。
 
 ## 計画
@@ -75,8 +75,8 @@
 ## harness
 
 - **ステージ**: メタ
-- **確認事項**: [`principles/harness.md`](../principles/harness.md) の各原則の blocking に該当するか。skill に description があるか。参照先が存在するか。check が `NOT ASSESSED` を返せるか。原則が所定の形式を満たすか。skill・playbook・checkpoint に同じ処理の実装が重複していないか（`principles/working.md` の原則5）。Fresh Session Test として、新しいセッションがリポジトリだけを読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるかを確かめる。部品間の接続（保存先と読み込み先の一致など）は、組み立ての試験で確かめる。
-- **blocking**: 答えられない問いがある。harness.md の blocking に該当する。
+- **確認事項**: [`principles/harness.md`](../principles/harness.md) の各原則の blocking と、[check](parts/check.md)・[ledger](parts/ledger.md)・[router](parts/router.md)・[runtime](parts/runtime.md) の契約に該当するか。skill に description があるか。参照先が存在するか。check が `NOT ASSESSED` を返せるか。原則が所定の形式を満たすか。skill・playbook・checkpoint に同じ処理の実装が重複していないか（`principles/working.md` の原則5）。Fresh Session Test として、新しいセッションがリポジトリだけを読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるかを確かめる。部品間の接続は runtime の組み立ての試験に従い、保存した checkpoint を別セッションで読み戻し、保存先・読み込み先と版・内容を照合する。
+- **blocking**: 答えられない問いがある。harness.md の blocking または部品の契約に違反する。
 
 ## skill の試験
 
