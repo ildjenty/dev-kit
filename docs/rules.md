@@ -3,7 +3,7 @@
 ## コードの構造
 
 - **通信の型（リクエスト・レスポンス）を内部で再利用しない。**: [`principles/design.md`](../principles/design.md) の原則3。手段: 未実装。
-- **提供側は利用側に依存せず、下位レイヤーは上位レイヤーに依存しない。**: [`principles/design.md`](../principles/design.md) の原則4。手段: 未実装。
+- **提供側と下位レイヤーは、利用側と上位レイヤーの具体的な実装に依存しない。利用側に定義した抽象（ポート）への依存は許す。**: [`principles/design.md`](../principles/design.md) の原則4。手段: 未実装。
 - **ドメインからフレームワーク・インフラ・アプリの設定の型を import しない。**: [`principles/design.md`](../principles/design.md) の原則4。手段: 未実装。
 - **静的な依存関係に循環参照を含めない。**: [`principles/design.md`](../principles/design.md) の原則4。手段: 未実装。
 - **ドメインの型にフレームワークの型やアノテーションを含めない。**: [`principles/design.md`](../principles/design.md) の原則8。手段: 未実装。

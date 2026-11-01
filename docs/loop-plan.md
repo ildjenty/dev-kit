@@ -2,7 +2,7 @@
 
 ループ計画は課題ごとに作る。kit 内で固定の手順とするのは、計画を作る手順だけである。それ以外の手順は、計画のデータとして表す。計画は [brief](parts/brief.md) の一種として、版を付けて [ledger](parts/ledger.md) に保存する。
 
-1ラウンドは、brief を受けた作業 → [check](parts/check.md) → [router](parts/router.md) の一往復である。router が「直す」を返して作業に戻るたびに、ラウンド数が1つ増える。
+1ラウンドは、brief を受けた作業 → [check](parts/check.md) → [router](parts/router.md) の一往復である。router が「修正する」を返して作業に戻るたびに、ラウンド数が1つ増える。
 
 ## フォーマット
 
