@@ -2,14 +2,14 @@
 
 ## コードの構造
 
-- **通信の型（リクエスト・レスポンス）を内部で再利用しない。**: [`principles/structure.md`](../principles/structure.md) の原則2。手段: 未実装。
+- **通信の型（リクエスト・レスポンス）を内部で再利用しない。**: [`principles/structure.md`](../principles/structure.md) の原則6。手段: 未実装。
 - **提供側と下位レイヤーは、利用側と上位レイヤーの具体的な実装に依存しない。利用側に定義した抽象（ポート）への依存は許す。**: [`principles/structure.md`](../principles/structure.md) の原則3。手段: 未実装。
-- **ドメインからフレームワーク・インフラ・アプリの設定の型を import しない。**: [`principles/structure.md`](../principles/structure.md) の原則3。手段: 未実装。
+- **ドメインからフレームワーク・インフラ・アプリの設定の型を import しない。**: [`principles/structure.md`](../principles/structure.md) の原則5・6。手段: 未実装。
 - **静的な依存関係に循環参照を含めない。**: [`principles/structure.md`](../principles/structure.md) の原則3。手段: 未実装。
 - **ドメインの型にフレームワークの型やアノテーションを含めない。**: [`principles/structure.md`](../principles/structure.md) の原則5。手段: 未実装。
 - **モジュールの公開入口を経由せずに内部のパスを直接 import しない。**: [`principles/structure.md`](../principles/structure.md) の原則6。手段: 未実装。
 - **引数をそのまま渡すだけの関数を置かない。**: [`principles/structure.md`](../principles/structure.md) の原則7。手段: 未実装。
-- **実行期間が重なる並列の作業は、異なる worktree で行う。**: [`principles/data.md`](../principles/data.md) の原則6。手段: 未実装。
+- **実行期間が重なる並列の作業は、異なる worktree で行う。**: [runtime](parts/runtime.md) の「隔離」。共有状態と共通の不変条件の扱いは [`principles/data.md`](../principles/data.md) の原則6。手段: 未実装。
 
 ## コメントと lint
 
@@ -35,7 +35,7 @@
 - **機械が読む固定フォーマット（終了ブロック、PR 本文の Verification）は、結論と判断材料を先に書く文章構成の検査から除外する。**: [`principles/writing.md`](../principles/writing.md) の原則1。手段: 未実装。
 - **人の回答を受け取ったら、番号で指定された場合も選択肢の名前で言い直してから実行する。**: [`principles/writing.md`](../principles/writing.md) の原則7。手段: 未実装。
 - **人に判断を求める質問には、選択肢、推奨案、その理由を添える。**: [`principles/writing.md`](../principles/writing.md) の原則7。手段: 未実装。
-- **PR 本文とレビューコメントに「私は」と記述しない。**: [`principles/writing.md`](../principles/writing.md) の原則1。手段: 未実装。
+- **PR 本文とレビューコメントに「私は」と記述しない。**: [`principles/writing.md`](../principles/writing.md) の原則2。手段: 未実装。
 
 ## 画面
 

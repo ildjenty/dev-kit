@@ -1,6 +1,6 @@
 # form — 固定フォーマット
 
-form は、後続の[ステージ](../stages.md)、hook、人が読み取れる固定フォーマットである。実行前に定義する規格であり、実行に伴って内容が変化する [ledger](ledger.md) とは区別する。skill などの文書を作るときは、[`principles/context.md`](../../principles/context.md) の原則1に従い、構成を先に作る。
+form は、後続の[ステージ](../stages.md)、hook、人が読み取れる固定フォーマットである。実行前に定義する規格であり、実行に伴って内容が変化する [ledger](ledger.md) とは区別する。skill など、失うと再現できない長い文書を作るときは、[`principles/context.md`](../../principles/context.md) の原則1に従い、構成を先に作って節ごとに保存する。短い更新を一度に確認したほうが判断しやすい場合は、その適用除外に従う。
 
 - **skill の構成**: frontmatter には `name` / `description` / `argument-hint` / `disable-model-invocation` / `allowed-tools` を置く。description は「何をするか → スコープ → Use when "言い回し" → For X use Y」の順にし、起動トリガーとなる語句を前に置く。本文は、スコープの明示、最悪の失敗、Hard Rules、手順、Never・Instead 表、必須出力、終了ブロックで構成する。責務は1つに絞り、対象外の作業と、それを担当する skill を示す。手順では原則を参照し、書き写さない。必須出力には、却下したものと省略したものを含める。参照資料は `references/` に分けて索引から開く。リポジトリ固有の事実は含めない。
 - **playbook**: スコープを示す「〜を担当する」という記述、番号付きの手順、末尾の報告項目で構成する。使用時には手順を todo に転記し、実施しない手順には `skip: 理由` を残す。
