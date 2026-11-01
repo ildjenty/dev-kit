@@ -15,7 +15,7 @@
 ## 構造
 
 - **ステージ**: 2
-- **確認事項**: 各配置を責務に基づいて正当化できるか。同じ目的をより単純に満たす構造を1つ作り、元の案の余分な部分を示す。[`principles/design.md`](../principles/design.md) の各原則の違反・兆候（浅いモジュール、実行順で分割したモジュール、同じ状態への複数の書き手、同じ処理を行う2つの経路）を確認する。
+- **確認事項**: 各配置を責務に基づいて正当化できるか。同じ目的をより単純に満たす構造を1つ作り、元の案の余分な部分を示す。[`principles/design.md`](../principles/design.md) の各原則の違反・兆候（浅いモジュール、実行順で分割したモジュール、同じ状態への複数の書き手、同じ処理を行う2つの経路）を確認する。既存の同種の処理を探し、揃えているか。揃えない理由が示されているか（[`principles/design.md`](../principles/design.md) の原則20）。
 - **blocking**: 正当化できない配置がある。または、より単純な構造がある。
 
 ## 整合
@@ -45,7 +45,7 @@
 ## 差分
 
 - **ステージ**: 5
-- **確認事項**: [`principles/engineering.md`](../principles/engineering.md) の原則1・5 と、[`principles/working.md`](../principles/working.md) の原則12、および各原則の blocking に従う。PR 本文と報告は、[form](parts/form.md) の PR 本文の契約と [規則と強制手段](rules.md#文章と記録)、および [`principles/writing.md`](../principles/writing.md) の原則1・4・9の blocking に従う。
+- **確認事項**: [`principles/engineering.md`](../principles/engineering.md) の原則1・5 と、[`principles/working.md`](../principles/working.md) の原則12、および各原則の blocking に従う。差分が周囲の同種の処理の流儀と違っていないか。違うなら理由が示されているか（[`principles/design.md`](../principles/design.md) の原則20）。PR 本文と報告は、[form](parts/form.md) の PR 本文の契約と [規則と強制手段](rules.md#文章と記録)、および [`principles/writing.md`](../principles/writing.md) の原則1・4・9の blocking に従う。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## 動作検証
