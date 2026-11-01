@@ -33,16 +33,16 @@
 - **性能の結論は「速い / 遅い / 差がない / 判定できない」のいずれかとする。**: [`principles/verification.md`](../principles/verification.md) の原則4。手段: 未実装。
 - **性能報告には、実行回数、ばらつき、制限要因（limiter）を記載する。**: [`principles/verification.md`](../principles/verification.md) の原則4。手段: 未実装。
 - **機械が読む固定フォーマット（終了ブロック、PR 本文の Verification）は、結論と判断材料を先に書く文章構成の検査から除外する。**: [`principles/writing.md`](../principles/writing.md) の原則1。手段: 未実装。
-- **人の回答を受け取ったら、番号で指定された場合も選択肢の名前で言い直してから実行する。**: [`principles/writing.md`](../principles/writing.md) の原則8。手段: 未実装。
-- **人に判断を求める質問には、選択肢、推奨案、その理由を添える。**: [`principles/writing.md`](../principles/writing.md) の原則8。手段: 未実装。
-- **PR 本文とレビューコメントに「私は」と記述しない。**: [`principles/writing.md`](../principles/writing.md) の原則9。手段: 未実装。
+- **人の回答を受け取ったら、番号で指定された場合も選択肢の名前で言い直してから実行する。**: [`principles/writing.md`](../principles/writing.md) の原則7。手段: 未実装。
+- **人に判断を求める質問には、選択肢、推奨案、その理由を添える。**: [`principles/writing.md`](../principles/writing.md) の原則7。手段: 未実装。
+- **PR 本文とレビューコメントに「私は」と記述しない。**: [`principles/writing.md`](../principles/writing.md) の原則1。手段: 未実装。
 
 ## 画面
 
-- **画像や埋め込みの読み込み後に、レイアウトを動かさない。**: [`principles/ui.md`](../principles/ui.md) の原則8。手段: 未実装。
-- **文字と背景のコントラストは4.5:1 以上とする。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
-- **タッチ端末にホバー効果を適用しない。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
-- **モバイルの入力欄のフォントは16px 以上とする。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
-- **メニューを開いている間は背景をスクロールさせない。**: [`principles/ui.md`](../principles/ui.md) の原則10。手段: 未実装。
-- **アニメーションの各フレームで再描画を発生させない。**: [`principles/ui.md`](../principles/ui.md) の原則10。手段: 未実装。
-- **確認対象のページ・状態・版に対応するスクリーンショットを撮影し、取得の記録を残す。**: [`principles/ui.md`](../principles/ui.md) の原則10。手段: 未実装。
+- **画像や埋め込みの読み込み後に、レイアウトを動かさない。**: [`principles/ui.md`](../principles/ui.md) の原則7。手段: 未実装。
+- **文字と背景のコントラストは4.5:1 以上とする。**: [`principles/ui.md`](../principles/ui.md) の原則8。手段: 未実装。
+- **タッチ端末にホバー効果を適用しない。**: [`principles/ui.md`](../principles/ui.md) の原則8。手段: 未実装。
+- **モバイルの入力欄のフォントは16px 以上とする。**: [`principles/ui.md`](../principles/ui.md) の原則8。手段: 未実装。
+- **メニューを開いている間は背景をスクロールさせない。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
+- **アニメーションの各フレームで再描画を発生させない。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
+- **確認対象のページ・状態・版に対応するスクリーンショットを撮影し、取得の記録を残す。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。

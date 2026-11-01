@@ -45,13 +45,13 @@
 ## 差分
 
 - **ステージ**: 5
-- **確認事項**: [`principles/engineering.md`](../principles/engineering.md) の原則1・5 と、[`principles/working.md`](../principles/working.md) の原則7、および各原則の blocking に従う。差分が周囲の同種の処理の流儀と違っていないか。違うなら理由が示されているか（[`principles/designing.md`](../principles/designing.md) の原則7）。PR 本文と報告は、[form](parts/form.md) の PR 本文の契約と [規則と強制手段](rules.md#文章と記録)、および [`principles/writing.md`](../principles/writing.md) の原則1・4・9の blocking に従う。
+- **確認事項**: [`principles/engineering.md`](../principles/engineering.md) の原則1・5 と、[`principles/working.md`](../principles/working.md) の原則7、および各原則の blocking に従う。差分が周囲の同種の処理の流儀と違っていないか。違うなら理由が示されているか（[`principles/designing.md`](../principles/designing.md) の原則7）。PR 本文と報告は、[form](parts/form.md) の PR 本文の契約と [規則と強制手段](rules.md#文章と記録)、および [`principles/writing.md`](../principles/writing.md) の原則1と [`principles/verification.md`](../principles/verification.md) の原則1の blocking に従う。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## 動作検証
 
 - **ステージ**: 5
-- **確認事項**: 起動、操作、証拠の取得、後片付けを確認し、[規則と強制手段](rules.md#画面) の画面の規則に従う。画面はスクリーンショットを画像として見る。コンソールエラー、ページ全体の意図しない横スクロール（要素内の `overflow-x: auto` は許す）、読めない文字、プレースホルダ（[principles/ui.md](../principles/ui.md) の原則10の違反・兆候を参照）を停止条件とする。長い名前、0件、大量のデータ、多言語など、問題が起きやすいデータも使う。
+- **確認事項**: 起動、操作、証拠の取得、後片付けを確認し、[規則と強制手段](rules.md#画面) の画面の規則に従う。画面はスクリーンショットを画像として見る。コンソールエラー、ページ全体の意図しない横スクロール（要素内の `overflow-x: auto` は許す）、読めない文字、プレースホルダ（[principles/ui.md](../principles/ui.md) の原則9の違反・兆候を参照）を停止条件とする。長い名前、0件、大量のデータ、多言語など、問題が起きやすいデータも使う。
 - **blocking**: 停止条件に該当する。確認できなかった場合は `NOT ASSESSED` とする。
 
 ## 終了時の状態
