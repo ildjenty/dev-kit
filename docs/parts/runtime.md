@@ -1,6 +1,6 @@
 # runtime — 実行
 
-runtime は単一のバイナリであり、利用側に言語の実行環境を用意させない。同じバイナリが、外側でループ計画を読み、ステージを順に回す workflow と、実行ホストである Claude Code のセッション内から呼ばれる hook の2つの面を持つ。文章で指定した規則を、処理のトリガー、停止、隔離、再開という実際の動作に結び付ける。
+runtime は単一のバイナリであり、利用側に言語の実行環境を用意させない。同じバイナリが、外側でループ計画を読み、ステージを順に回す workflow と、実行ホスト（Claude Code または Codex CLI）のセッション内から呼ばれる hook の2つの面を持つ。文章で指定した規則を、処理のトリガー、停止、隔離、再開という実際の動作に結び付ける。
 
 - **hook**: SessionStart で checkpoint を注入する。compaction 後も同様とする。Stop では「終了時の状態」の [check](check.md) を実行し、通らなければ完了を報告させない。Read では大きな文書の全文読み込みを拒否し、見出しを返す。SubagentStop では、出力予定のファイルが実在するかを確認する。skill を編集した場合は、harness の check を促す。共通処理として、標準入力の JSON、無関係な呼び出しの早期終了、`{decision: "block", reason}` と警告の出力、`stop_hook_active` によるループ防止、出力文字数の上限、ルートの解決を扱う。
 - **workflow**: 外側で計画を読み、[ステージ](../stages.md)を順に回す主体である。各ステージの担当（Claude Code のセッションやサブエージェント、Codex、人）を起動し、[brief](brief.md) を渡し、結果を受け取り、check と [router](router.md) を実行する。各ステージは brief → 作業 → check → router の順で進める。人によるレビューゲートに達したら終了し、結果をメインの会話に返す。人の判断は workflow の外で行う。
@@ -33,6 +33,24 @@ runtime は単一のバイナリであり、利用側に言語の実行環境を
 - **実行の記録**: ledger、checkpoint、ループ計画、検出試験の記録である。既定は gitignore された記録ディレクトリに置く。リポジトリ内に置いて git 管理にする設定も許す。
 - **生成物**: view の HTML と worktree である。git 管理に入れない。
 
+## ホストの差分と共通の仕組み
+
+- **対象ホスト**: Claude Code と Codex CLI のどちらも対象とし、どちらかを既定にしない。
+- **hook の形式**: イベント名、標準入力の JSON（`session_id`、`transcript_path`、`cwd`、`hook_event_name`）、出力の JSON（`decision: "block"` と `reason`、`hookSpecificOutput.additionalContext` など）、終了コード（0 は成功、2 はブロック）は両ホストで共通である。plugin の hooks.json も同じ形式であり、両ホストが読む。
+- **kit が使う hook**: 両ホストに SessionStart、Stop、PreToolUse、SubagentStop、PostToolUse がある。SessionStart は `startup`・`resume`・`compact` の `source` で checkpoint を注入し、compaction 後の再注入も担う。Stop は `decision: "block"` と `reason` で終了を止め、`stop_hook_active` でループを防ぐ。PreToolUse は危険な操作の deny、SubagentStop は成果物の実在確認、PostToolUse は記録に使う。
+- **非対話での hook**: 非対話の起動でも hook は動く。Claude Code の `-p` は文書に明記されている。Codex の `codex exec` は文書に記載がないが、信頼済みの Stop hook が動くことは実機で確認された。
+- **担当の起動に使う機能**: 両ホストとも標準入力でプロンプトを受け、JSON Schema で出力の形を強制できる。check の判定である `PASS`・`FAIL`・`NOT ASSESSED` と指摘をスキーマで縛ることができ、セッション ID で再開できる。
+- **hook の出力上限**: Claude Code は1万字、Codex は約2,500トークンである。注入する checkpoint は小さい方の上限に収め、本文はファイルへの参照にする。
+- **PreToolUse の判断**: 人に聞く ask と後回しにする defer は Claude Code だけが持つ。Codex は allow と deny だけである。
+- **hook の信頼**: Claude Code の非対話では hook が無条件に実行される。Codex は hook ごとにハッシュで信頼するまで実行されず、managed の hook は方針で信頼される。インストーラが信頼の手順を案内するか、チームでは managed の設定に寄せる。
+- **隔離の方法**: Claude Code はサブエージェントを worktree で隔離できる。Codex のサブエージェントは権限を親から継承して変更できず、worktree の記載がないため、Codex の隔離は `codex exec --worktree` の別プロセスで行う。
+- **指示ファイル**: Codex は AGENTS.md を読み、CLAUDE.md を読まない。Claude Code は両方を読む。
+- **skill の形式と配置**: SKILL.md の `name` と `description` は共通であり、Claude Code 固有の項目は Codex が無視する。ホストが定める置き場所は、Claude Code が `.claude/skills`、Codex が `.agents/skills` である。
+- **ホスト固有のイベント**: TaskCompleted、ConfigChange、PostCompact の要約は Claude Code だけにある。Codex では PostToolUse のパス一致などで代替する。
+- **hook の共通化**: runtime の hook の面は、kit のバイナリの同じサブコマンドをホストごとの設定ファイルに登録する形にする。イベントの有無と出力上限の差は、サブコマンドが `hook_event_name` とホストを見て吸収する。
+- **担当の起動の共通化**: brief を標準入力で渡し、結果を JSON Schema で縛った出力と結果ファイルで受け取る薄いアダプタを、ホストごとに持つ。
+- **ホストの能力の検出試験**: hook が使えるかは、インストーラが各ホストで検出試験をして確かめる。[`principles/harness.md`](../../principles/harness.md) の原則2をホストの能力に当てる。検出試験を通っていないホストでは、Stop ゲートと checkpoint の注入を hook に頼らず、起動した親プロセス側で結果を検査する。
+
 ## 決定候補
 
 - **記録の単位**: ledger と checkpoint を分ける単位の候補は、リポジトリ単位、ブランチ単位、worktree 単位、ブランチや worktree と対応づける作業 ID 単位である。候補を分ける観点は、同じリポジトリで複数人が別々のループを回すこと、再開時の照合の鍵、worktree を使った隔離との整合である。
@@ -40,4 +58,6 @@ runtime は単一のバイナリであり、利用側に言語の実行環境を
 - **判定者の独立と人のレビューの重なり**: 候補は、check を PR レビューの前段とし、人のレビューは check の結果を読んでから行うこと、人のレビューゲートを check の一種として扱うことである。候補を分ける観点は、harness の原則1の作成者の説明に依存しない判定と、PR レビューがすでに人の判定であることである。
 - **計画ファイルの形式**: 候補は、YAML・TOML・JSON のいずれかを正本にし、人向けには view が描画すること、Markdown の中に構造化ブロックを置くことである。候補を分ける観点は、[`principles/data.md`](../../principles/data.md) の原則1に従って正本が1か所であること、人のレビューのしやすさ、散文と構造が食い違ったときの扱いである。推奨は、構造化データを正本にし、人は view で読むことである。
 - **実装言語**: 候補は Go と Rust である。候補を分ける観点は、単一バイナリと cross-compile はどちらも可能であること、エージェントに実装させたときの壊れにくさ、data の原則3の不正な状態を型で防ぐことへの忠実さ、実装の規模が小さいことである。推奨は Go である。
-- **担当の起動方法**: 各ステージの担当（Claude Code、Codex、人）の起動と結果の受け取り方の候補は、子プロセスとして起動し、標準入出力で brief と結果をやり取りすること、ホストのセッション内で skill から runtime を呼ぶことである。候補を分ける観点は、計画の順序を守る保証、人との対話の扱い、hook との整合である。
+- **担当の起動方法**: 各ステージの担当（Claude Code、Codex、人）の起動と結果の受け取り方の候補は、子プロセスとして起動し、標準入出力で brief と結果をやり取りすること、ホストのセッション内で skill から runtime を呼ぶことである。候補を分ける観点は、計画の順序を守る保証、人との対話の扱い、hook との整合である。調査結果からの推奨は、子プロセスとして起動し、標準入力で brief を渡し、JSON Schema で縛った出力と結果ファイルで受け取ることである。両ホストで同じ形にでき、計画の順序を runtime が守れるためである。hook はゲートと注入の補助に使い、動かないホストでは親プロセス側の検査で代替する。
+- **指示ファイルの正本**: 候補は、AGENTS.md を正本にして Claude Code もそれを読むこと、CLAUDE.md と AGENTS.md の両方を kit が生成することである。候補を分ける観点は、Codex が CLAUDE.md を読まないことと、索引の内容がホストで変わらないことである。推奨は、AGENTS.md を正本にすることである。
+- **skill の配置**: 候補は、共通の正本から両ホストの置き場所へ配置すること（シンボリックリンクを含む）、ホストごとに別に置くことである。候補を分ける観点は、同じ版を使うことと、ホスト固有の項目の扱いである。推奨は、共通の正本から両方へ配置することである。
