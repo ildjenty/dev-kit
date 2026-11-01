@@ -18,6 +18,5 @@
 - 元に戻せないものの一覧と、外部への書き込みの一覧：[router](parts/router.md) の「作業を停止して確認する」の具体的な対象とする。不可逆な決定の例は、スキーマ、識別子、公開 API である。マルチテナントならテナントの単位も含める。
 - リポジトリ固有の[観点ファイル](checks.md)と playbook。
 - 規則と強制手段の表。
-- 部品のコピー（`.claude/kit/`）と、その版。kit との差分を確認するスクリプトは `tools/` に置く。plugin や symlink による参照ではリポジトリ固有の書き換えができず、単なるコピーでは改善が kit に戻らない。そのため、コピー・版・差分を組み合わせる。
 
-`assemblies/` には、2つの組み立て例を置く。`minimal` はステージ5だけの計画に Stop の check と checkpoint を備えたものとし、`issue-pr` は Issue から PR までをステージ0〜5で進めるものとする。組み立て後は、Fresh Session Test で確認する。
+組み立て後は、Fresh Session Test で確認する。
