@@ -487,8 +487,7 @@ harness の変更は `principles/working.md` の原則10の停止事項に含ま
 dev-kit/
 ├── README.md
 ├── docs/
-│   ├── design.md
-│   └── decisions.md
+│   └── design.md
 ├── principles/
 │   ├── engineering.md  design.md  testing.md  verification.md
 │   ├── working.md  ui.md  writing.md  harness.md
