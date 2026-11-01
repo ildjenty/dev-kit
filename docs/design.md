@@ -21,3 +21,5 @@ dev-kit は、課題に応じた開発ループ（harness）を組み立てる�
 - [form](parts/form.md) — 固定フォーマット
 - [view](parts/view.md) — 人向けの表示
 - [runtime](parts/runtime.md) — 実行
+
+runtime と kit の固定物のモジュール・配置・依存は [architecture.md](architecture.md) で定める。
