@@ -491,7 +491,7 @@ dev-kit/
 │   └── decisions.md
 ├── principles/
 │   ├── engineering.md  design.md  testing.md  verification.md
-│   ├── working.md  ui.md  writing.md
+│   ├── working.md  ui.md  writing.md  harness.md
 │   └── review.md          ← 生成物
 ├── parts/
 │   ├── brief/  check/  router/  ledger/  form/  view/  runtime/
