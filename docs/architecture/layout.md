@@ -31,7 +31,6 @@ dev-kit/
     rules/               規則の既定
     schemas/             JSON Schema
     skills/              skill の正本(devkit の進め方)
-    instructions/        AGENTS.md の断片
     hosts/               ホスト設定、サブエージェント定義、rules の断片
     examples/            検出試験の違反例・適合例・許容例
   principles/            既存の原則。埋め込み対象
@@ -48,7 +47,6 @@ dev-kit/
 <repo>/
   devkit.toml                kit のバージョン、登録コマンド、外部操作、deny、分類表の追記。git 管理
   .githooks/pre-commit       init が用意。既存の hook の仕組みがあれば作らない。git 管理
-  AGENTS.md                  指示の正本(既存のものに kit の案内を1行足す)。git 管理
   .claude/settings.json      hook の登録、excludedCommands、記録・結果・観測・展開先への Edit の deny、Bash(devkit *) の allow の提案。init が項目を足す。git 管理
   .claude/agents/devkit-*.md 判定者・計画者のサブエージェント定義。init が書く。git 管理
   .claude/skills/devkit -> ../../.agents/skills/devkit   skill 単位のリンク。git 管理
@@ -84,7 +82,7 @@ pre-commit の共有と導入は[完了条件](guarantees.md#完了条件)に従
 
 ## 指示ファイルとホスト設定
 
-AGENTS.md は既存のものに kit の案内を1行足すだけとし、CLAUDE.md は生成しない。skill の正本は `.agents/skills/devkit/` とし、`.claude/skills/devkit` を git 管理のシンボリックリンクにする。playbook は skill に統合する。
+kit はリポジトリの AGENTS.md と CLAUDE.md に触れない。devkit の動かし方(開始・`next`・`submit`・問いの見せ方・サブエージェントの起動)はすべて kit の skill に閉じ、人は `/devkit` の skill で始める。指示ファイルはリポジトリ自身のものであり、判定者の規範としては読む。skill の正本は `.agents/skills/devkit/` とし、`.claude/skills/devkit` を git 管理のシンボリックリンクにする。playbook は skill に統合する。
 
 判定者・計画者は `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` で定義し、`init` が既定の定義を書く。名前には `devkit-` の接頭辞を付け、Codex の組み込み名と重複させない。
 

@@ -22,7 +22,7 @@
 16. deny は [PreToolUse](hooks.md#pretooluse)、読み出し元は[規範の固定](guarantees.md#規範の固定)に従う。
 17. 束縛の有無による処理は [hook の共通処理](hooks.md#共通処理)、稼働確認は[再開と hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)に従う。
 18. 再開用の現在地は [checkpoint](data.md#checkpoint)、注入の上限は[性能と出力](guarantees.md#性能と出力の上限)に従う。
-19. 指示ファイルと skill、playbook の扱いは[指示とホスト設定](layout.md#指示ファイルとホスト設定)に従う。
+19. kit はリポジトリの AGENTS.md と CLAUDE.md に触れず、devkit の動かし方は kit の skill に閉じる。skill と playbook の配置は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。
 20. 固定物は [kit](modules.md#kit)、埋め込みは[ルートパッケージ](modules.md#ルートパッケージ)に従う。
 21. 表示は [view](modules.md#view)、閲覧と確認済みの集合は[状態変更](data.md#決定と証拠-decision--evidence)、問いの停止範囲は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
 22. 構造の資産は[構造の記録](data.md#構造の記録-structure)に従う。
