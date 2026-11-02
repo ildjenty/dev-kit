@@ -1,63 +1,60 @@
 # runtime — 実行
 
-runtime は単一のバイナリであり、利用側に言語の実行環境を用意させない。同じバイナリが、外側でループ計画を読み、ステージを順に回す workflow と、実行ホスト（Claude Code または Codex CLI）のセッション内から呼ばれる hook の2つの面を持つ。文章で指定した規則を、処理のトリガー、停止、隔離、再開という実際の動作に結び付ける。
+runtime は単一バイナリの `devkit` として、Claude Code または Codex CLI のセッション内でループを進める。作業者はセッション自身であり、CLI が進行を判断し、同じバイナリの hook がホストイベントを観測する([全体構成](../architecture.md#全体構成))。
 
-- **hook**: SessionStart で checkpoint を注入する。compaction 後も同様とする。Stop では「終了時の状態」の [check](check.md) を実行し、通らなければ完了を報告させない。Read では大きな文書の全文読み込みを拒否し、見出しを返す。SubagentStop では、出力予定のファイルが実在するかを確認する。skill を編集した場合は、harness の check を促す。共通処理として、標準入力の JSON、無関係な呼び出しの早期終了、`{decision: "block", reason}` と警告の出力、`stop_hook_active` によるループ防止、出力文字数の上限、ルートの解決を扱う。
-- **workflow**: 外側で計画を読み、[ステージ](../stages.md)を順に回す主体である。各ステージの担当（Claude Code のセッションやサブエージェント、Codex、人）を起動し、[brief](brief.md) を渡し、結果を受け取り、check と [router](router.md) を実行する。各ステージは brief → 作業 → check → router の順で進める。人によるレビューゲートに達したら終了し、結果をメインの会話に返す。人の判断は workflow の外で行う。
-- **ループ計画**: ステージ、担当、観点ファイル、レビューゲート、router の分類をキーにして次のステージを決める遷移表、最大ラウンドなどの計数の上限、戻り先を持つ状態機械のデータである。計画に条件式やテンプレート言語を書かせず、runtime は分類と計数だけを評価する。「check の `FAIL` が続いたらこうする」という条件は、エージェントが計画を書き直すことで表す。
-- **設定**: リポジトリ側に置く単一の設定ファイルを、すべての置き場所の正本とする。runtime はパスをハードコードせず、設定ファイルから引く。設定で変えられるのは置き場所と git 管理の可否だけであり、動作は変えない。動作を設定で分けると、組み立ての試験が設定の組み合わせ分だけ必要になるためである。
-- **インストーラ**: バイナリを置き、設定ファイルを生成する。配布の方法は未決定である。
-- **ステージの実行記録**: 各ステージの開始と完了に加え、実行状態、状態を観測した時刻、停止理由、次に動く主体を、実行 ID とともに [ledger](ledger.md) に記録する。異常終了したときも記録が残るよう、Stop hook で状態を書く。外部への書き込み（API、デプロイ、投稿）には冪等キーを付け、結果を記録してから次に進む。
-- **記録範囲の照合**: 実行の区切り（ステージの完了、Stop）で、変更された成果物と実行記録を ledger の記録と照合し、結果を「記録範囲の照合」の記録に書く。照合できなかった範囲は未照合として残す。
-- **再開**: 人が判断した後、または中断した後に、設定ファイルから引いた置き場所の計画と ledger から作業を再開する。計画を作り直した場合は、ledger に記録された新しいバージョンと差分を照合し、計画の check を通したバージョンから続ける。再開時には、開始の記録があり、完了の記録がないステージを照合する。外部への書き込みは、冪等キーによって実行済みかを確認してから再実行し、二重適用を防ぐ。
-- **隔離**: 並列作業や試作は worktree で行う。返答の冒頭に worktree のパスとブランチを記載させる。共有状態の扱いは [`principles/data.md`](../../principles/data.md) の原則6に従う。
-- **作業の排他**: 1つのエージェントが自分で進める作業は、ステージ4で分けたステップまたはそれに相当する単位で数え、未検証の作業がある間は関連する別の作業も新たに始めず、検証を通過してから次に移る。
-- **委任の区別と依存**: brief ID・担当・worktree で分離した委任作業は別に数え、委任の結果を受け取るまで、その結果に依存する作業を始めない。
-- **harness の改善**: 作業の途中で harness・skill・hook を修正せず、改善は別の課題として扱う。
-- **メタループの編集対象**: 観点ファイル、部品のテンプレート、規則、router の分類表はデータであり、メタループが編集する対象である。分類表の語彙を増やす場合もメタループの変更として扱い、[`principles/harness.md`](../../principles/harness.md) の原則2の検出試験を要する。メタループが観点や規則を変えた場合は、リポジトリの資産として通常の変更で git 管理に入れる。
-- **終了条件**: 現在の対象のバージョンに結び付くビルドとテストの成功、現在の作業 ID に対応する進捗記録、および [`principles/context.md`](../../principles/context.md) の原則5を Stop の check で確認する。
-- **前のステージに戻る**: router が「前のステージに戻る」と判断した場合、計画の戻り先に従い、次の実行前に計画の作り直しを行う。
-- **計画の作り直し**: runtime の一級の操作である。前提が崩れて router が「前のステージに戻る」と判断したとき、またはエージェントが提案したとき、エージェントが計画の残りを新しいバージョンとして作る。バージョン、差分、作り直した理由を ledger に記録し、計画の check を通してから続行する。
-- **注意事項**: PreCompact の出力は Claude に届かない。SessionEnd は異常終了時にトリガーされないため、Stop を使う。終了コードが 0 の場合、stderr は誰にも届かない。hook の出力は約1万字で切られる。
+## 責務
 
-組み立ての試験では、設定ファイルから引いた置き場所で保存先と再開時の読み込み先が一致し、保存した checkpoint のバージョンと内容が別のセッションの SessionStart および compaction 後の入力に注入されることを照合する。計画の作り直しのバージョンと差分が ledger に残ることも確認する。
+- **進行**: [engine](../architecture/modules.md#engine) が計画と ledger から次の指示を計算し、結果を受理して状態機械を進める。brief・check・router・ledger・form・view との分担と runtime を構成する実装モジュールは、[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従う。
+- **判定者・計画者との接続**: セッションのエージェントがサブエージェントを起動し、hook が最終メッセージと来歴を採取して CLI に渡す。起動の定型と結果の受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+- **git と外部操作**: git 操作は [workspace](../architecture/modules.md#workspace)、承認された外部への書き込みと回復は [external](../architecture/modules.md#external) が担う。
+- **組み立て**: [cmd/devkit](../architecture/modules.md#cmddevkit) が workspace を使ってルートとブランチを解決し、設定と固定物を各モジュールへ渡す。ホストイベントの変換と出力の整形は [host/event](../architecture/modules.md#hostevent) が担う。
+- **導入**: [install の `init`](../architecture/modules.md#install) が利用側の配置と設定を用意する。バイナリの配置を含む配布方法は[仮決定](../architecture/decisions.md#仮決定)にある未決定事項として扱う。
 
-試験では、中断からの再開時に完了記録のないステージを正しく照合できること、外部書き込みの直後に中断しても二重適用しないこと、Stop ゲートを通過できない状態では完了を報告しないことを確認する。
+## 入力と出力
 
-サブエージェントへの依頼は brief の形式で渡す。結果に依存する作業の開始は「委任の区別と依存」に従い、結果の統合は [`principles/context.md`](../../principles/context.md) の原則4、人の判断が必要な事項の扱いは [`principles/working.md`](../../principles/working.md) の原則6に従う。
+- **ループの雛形 / 計画**: 利用者が組む[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)と、計画者が課題ごとに作る[計画](../architecture/data.md#計画-plan)を扱う。次の行動の判断に使う入力と完了条件の照合は [router](../architecture/modules.md#router)に従う。
+- **終了ブロックと成果物**: `submit` が[進捗の終了ブロック](../architecture/data.md#進捗-progress)を受け取り、返却後の対象のバージョンと成果物を記録する。入力 JSON の場所と拒否条件は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
+- **判定結果**: サブエージェントの結果ファイル、判定コマンド(`[judges]`)の結果、`command:` の check の実行結果を受理する。対象のバージョン・規範・来歴の照合と集約は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)、実行順は[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
+- **人の入力と訂正**: [UserPromptSubmit](../architecture/hooks.md#userpromptsubmit) の観測を根拠に、CLI が回答を受理する。選択肢と文章の回答、訂正期限は[回答の受理](../architecture/guarantees.md#回答の受理)、問いの提示と再開は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
+- **設定と固定物**: `devkit.toml` の解析・検証と、判定コマンド(`[judges]`)・検証コマンド(`[commands]`)を含む設定項目は [config](../architecture/modules.md#config)、固定物の供給とバージョンの照合は [kit](../architecture/modules.md#kit)に従う。
+- **指示と表示**: CLI は次の指示と brief、問い、状態、操作の結果を返す。出力の全文と要点・ファイルのパスの切り替えは[性能と出力の上限](../architecture/guarantees.md#性能と出力の上限)に従う。
+
+## 保証
+
+- **完了条件**: 作業者の完了の主張と、CLI による完了の確定を区別する。必須 check、検出試験、判定前の pre-commit、完了時の `git commit` と失敗時の扱いは[完了条件](../architecture/guarantees.md#完了条件)、ステージの check の実行は [engine](../architecture/modules.md#engine)に従う。
+- **対象と規範**: 判定を[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)に結び付け、[規範の固定](../architecture/guarantees.md#規範の固定)と[Judgment の有効性](../architecture/data.md#check-の結果-judgment)に従って照合する。判定対象の展開と commit 直前の照合は、[展開と永続化](../architecture/guarantees.md#判定対象の展開と完了時の永続化)・[対象の照合](../architecture/guarantees.md#commit-直前の対象の照合)に従う。
+- **実行の記録と観測**: ledger への書き込みは CLI、hook の書き込みは生成物に分担する。公開方法と排他は[記録の書き込みと排他](../architecture/data.md#記録の書き込みと排他)・[作業の排他制御](../architecture/data.md#作業の排他制御)、網羅性の表示は [view の成果物を記録した範囲](../architecture/modules.md#view)に従う。
+- **再開**: 計画と ledger から現在地を復元し、[セッションとブランチ](../architecture/data.md#セッションとブランチ)に従って作業を特定する。直前の観測による進行の可否は[再開と hook の稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)、注入する現在地は ledger から組み立てる [checkpoint](../architecture/data.md#checkpoint)に従う。
+- **外部操作**: 実行の承認と、成功済み・実行中・結果不明の操作への再送を区別する。成功済みの記録の返却と、実行中・結果不明からの照会または人への確認は、[外部操作の承認](../architecture/guarantees.md#外部操作の承認)・[外部操作の二重適用](../architecture/guarantees.md#外部操作の二重適用)に従う。
+- **再計画**: router が「前のステージに戻る」と判断した後は、計画者が残りの計画を作り直す。旧 StageRun の再計画待ち、計画の check と必要な承認、新しいバージョンへの切り替えは[計画のバージョン](../architecture/data.md#計画のバージョン)と [router の判断](../architecture/flow.md#router-の判断)に従う。
+- **隔離と委任**: サブエージェントの起動と隔離、worktree の扱いは[ホストと git に任せる範囲](../architecture/guarantees.md#実装対象外の機能)、並行作業の配置は[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。
+- **harness の改善とメタループの編集**: メタループの編集を宣言したステージと、それ以外のステージの確認対象は[人への確認対象](../architecture/guarantees.md#人への確認対象)に従う。検出試験は[判定者が担当する観点ファイル](../architecture/guarantees.md#検出試験)を対象とする。
+- **互換性**: バイナリ・固定物・記録形式のバージョンの不一致と、読めない記録は[ロールアウト](../architecture/guarantees.md#ロールアウト)に従って報告する。
 
 ## ファイルの分類と既定の置き場所
 
-- **kit が持ち込む固定物**: バイナリ、テンプレート、観点ファイル、規則、分類表である。リポジトリ内にコピーするか、外部を参照するかはインストーラで選ぶ。チームでは、リポジトリ内に入れて全員が同じバージョンを使うことを既定とする。
-- **リポジトリが育てるもの**: リポジトリ側の観点ファイル、skill、playbook、CLAUDE.md の索引である。git 管理を既定とする。
-- **実行の記録**: ledger、checkpoint、ループ計画、検出試験の記録である。既定は gitignore された記録ディレクトリに置く。リポジトリ内に置いて git 管理にする設定も許す。
-- **生成物**: view の HTML と worktree である。git 管理に入れない。
+育てるもの / 固定物 / 実行の記録 / 生成物の分類と所有者、更新と生存期間は[所有と生存期間](../architecture/data.md#所有と生存期間)に従う。配置は[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に固定し、固定物はリポジトリ内のコピーから供給し、実行の記録と生成物は git 管理から除外した `.devkit/run/` に置く。
 
 ## ホストの差分と共通の仕組み
 
-- **対象ホスト**: Claude Code と Codex CLI のどちらも対象とし、どちらかを既定にしない。
-- **hook の形式**: イベント名、標準入力の JSON（`session_id`、`transcript_path`、`cwd`、`hook_event_name`）、出力の JSON（`decision: "block"` と `reason`、`hookSpecificOutput.additionalContext` など）、終了コード（0 は成功、2 はブロック）は両ホストで共通である。plugin の hooks.json も同じ形式であり、両ホストが読む。
-- **kit が使う hook**: 両ホストに SessionStart、Stop、PreToolUse、SubagentStop、PostToolUse がある。SessionStart は `startup`・`resume`・`compact` の `source` で checkpoint を注入し、compaction 後の再注入も担う。Stop は `decision: "block"` と `reason` で終了を止め、`stop_hook_active` でループを防ぐ。PreToolUse は危険な操作の deny、SubagentStop は成果物の実在確認、PostToolUse は記録に使う。
-- **非対話での hook**: 非対話の起動でも hook は動く。Claude Code の `-p` は文書に明記されている。Codex の `codex exec` は文書に記載がないが、信頼済みの Stop hook が動くことは実機で確認された。
-- **担当の起動に使う機能**: 両ホストとも標準入力でプロンプトを受け、JSON Schema で出力の形を強制できる。check の判定である `PASS`・`FAIL`・`NOT ASSESSED` と指摘をスキーマで縛ることができ、セッション ID で再開できる。
-- **hook の出力上限**: Claude Code は1万字、Codex は約2,500トークンである。注入する checkpoint は小さい方の上限に収め、本文はファイルへの参照にする。
-- **PreToolUse の判断**: 人に聞く ask と後回しにする defer は Claude Code だけが持つ。Codex は allow と deny だけである。
-- **hook の信頼**: Claude Code の非対話では hook が無条件に実行される。Codex は hook ごとにハッシュで信頼するまで実行されず、managed の hook は方針で信頼される。インストーラが信頼の手順を案内するか、チームでは managed の設定に寄せる。
-- **隔離の方法**: Claude Code はサブエージェントを worktree で隔離できる。Codex のサブエージェントは権限を親から継承して変更できず、worktree の記載がないため、Codex の隔離は `codex exec --worktree` の別プロセスで行う。
-- **指示ファイル**: Codex は AGENTS.md を読み、CLAUDE.md を読まない。Claude Code は両方を読む。
-- **skill の形式と配置**: SKILL.md の `name` と `description` は共通であり、Claude Code 固有の項目は Codex が無視する。ホストが定める置き場所は、Claude Code が `.claude/skills`、Codex が `.agents/skills` である。
-- **ホスト固有のイベント**: TaskCompleted、ConfigChange、PostCompact の要約は Claude Code だけにある。Codex では PostToolUse のパス一致などで代替する。
-- **hook の共通化**: runtime の hook の面は、kit のバイナリの同じサブコマンドをホストごとの設定ファイルに登録する形にする。イベントの有無と出力上限の差は、サブコマンドが `hook_event_name` とホストを見て吸収する。
-- **担当の起動の共通化**: brief を標準入力で渡し、結果を JSON Schema で縛った出力と結果ファイルで受け取る薄いアダプタを、ホストごとに持つ。
-- **ホストの能力の検出試験**: hook が使えるかは、インストーラが各ホストで検出試験をして確かめる。[`principles/harness.md`](../../principles/harness.md) の原則2をホストの能力に当てる。検出試験を通っていないホストでは、Stop ゲートと checkpoint の注入を hook に頼らず、起動した親プロセス側で結果を検査する。
+対象ホストは Claude Code と Codex CLI とし、どちらも既定にしない。共通の処理とホストごとの差は、[hook の共通処理](../architecture/hooks.md#共通処理)と [host/event](../architecture/modules.md#hostevent)に従う。
 
-## 決定候補
+- **kit が使う hook**: SessionStart・Stop・PreToolUse・SubagentStop・UserPromptSubmit の5イベントを使う。各イベントの入力・判断・出力・書く生成物は [hook](../architecture/hooks.md)に従う。
+- **停止の補助**: Stop は次の指示と観測内の継続回数・上限から停止の可否を決める。完了条件の判定とは分け、[Stop](../architecture/hooks.md#stop)の契約に従う。
+- **checkpoint の注入**: [SessionStart](../architecture/hooks.md#sessionstart) が起動・再開・compaction 後に現在地を注入する。上限内の本文と、超過時の要約・`devkit status` の案内の切り替えは[性能と出力の上限](../architecture/guarantees.md#性能と出力の上限)に従う。
+- **登録と実行権限**: hook の登録先、ホスト設定への追記、`devkit` の sandbox の外での実行は[権限の境界](../architecture/guarantees.md#権限の境界)に従う。設定と信頼状態は [doctor](../architecture/modules.md#doctor-の確認項目)、hook の実際の稼働は[セッションの観測](../architecture/data.md#セッションの観測-sessionobservation)と[稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)で確かめる。
+- **指示ファイルと skill**: kit の操作手順と skill の配置、リポジトリの AGENTS.md・CLAUDE.md との境界は[指示ファイルとホスト設定](../architecture/layout.md#指示ファイルとホスト設定)に従う。
 
-- **記録の単位**: ledger と checkpoint を分ける単位の候補は、リポジトリ単位、ブランチ単位、worktree 単位、ブランチや worktree と対応づける作業 ID 単位である。候補を分ける観点は、同じリポジトリで複数人が別々のループを回すこと、再開時の照合の鍵、worktree を使った隔離との整合である。
-- **「停止して確認する」の相手**: 候補は、作業を依頼した人、レビュアー、決定権者を brief に持たせること、router の分類に「誰に」を足すことである。候補を分ける観点は、チームでは依頼者と承認者が異なりうることと、未回答を同意にしないという承認の規則である。
-- **判定者の独立と人のレビューの重なり**: 候補は、check を PR レビューの前段とし、人のレビューは check の結果を読んでから行うこと、人のレビューゲートを check の一種として扱うことである。候補を分ける観点は、harness の原則1の作成者の説明に依存しない判定と、PR レビューがすでに人の判定であることである。
-- **計画ファイルの形式**: 候補は、YAML・TOML・JSON のいずれかを正本にし、人向けには view が描画すること、Markdown の中に構造化ブロックを置くことである。候補を分ける観点は、[`principles/data.md`](../../principles/data.md) の原則1に従って正本が1か所であること、人のレビューのしやすさ、散文と構造が食い違ったときの扱いである。推奨は、構造化データを正本にし、人は view で読むことである。
-- **実装言語**: 候補は Go と Rust である。候補を分ける観点は、単一バイナリと cross-compile はどちらも可能であること、エージェントに実装させたときの壊れにくさ、data の原則3の不正な状態を型で防ぐことへの忠実さ、実装の規模が小さいことである。推奨は Go である。
-- **担当の起動方法**: 各ステージの担当（Claude Code、Codex、人）の起動と結果の受け取り方の候補は、子プロセスとして起動し、標準入出力で brief と結果をやり取りすること、ホストのセッション内で skill から runtime を呼ぶことである。候補を分ける観点は、計画の順序を守る保証、人との対話の扱い、hook との整合である。調査結果からの推奨は、子プロセスとして起動し、標準入力で brief を渡し、JSON Schema で縛った出力と結果ファイルで受け取ることである。両ホストで同じ形にでき、計画の順序を runtime が守れるためである。hook はゲートと注入の補助に使い、動かないホストでは親プロセス側の検査で代替する。
-- **指示ファイルの正本**: 候補は、AGENTS.md を正本にして Claude Code もそれを読むこと、CLAUDE.md と AGENTS.md の両方を kit が生成することである。候補を分ける観点は、Codex が CLAUDE.md を読まないことと、索引の内容がホストで変わらないことである。Claude Code が AGENTS.md を直接読むのは、作業ディレクトリとその上に CLAUDE.md も CLAUDE.local.md もないときに限られ、CLAUDE.md から `@AGENTS.md` として取り込む形なら常に読まれる。推奨は、AGENTS.md を正本にし、Claude Code 向けには AGENTS.md を取り込むだけの CLAUDE.md を置くことである。
-- **skill の配置**: 候補は、共通の正本から両ホストの置き場所へ配置すること（シンボリックリンクを含む）、ホストごとに別に置くことである。候補を分ける観点は、同じバージョンを使うことと、ホスト固有の項目の扱いである。推奨は、共通の正本から両方へ配置することである。
+## 試験項目
+
+- [engine の試験](../architecture/contract-changes.md#engine)に従い、操作列による遷移、指示の再現性と重複、古い結果の拒否、セッションとブランチの束縛、hook の稼働不足時の受理境界を確認する。
+- [hook の試験](../architecture/contract-changes.md#hook)に従い、両ホストの固定イベント JSON で5イベントを確認する。束縛のないセッション、サブエージェント内、Stop の継続回数、起動の定型、判定者の来歴、人の入力と訂正の観測を含める。
+- [結合試験](../architecture/contract-changes.md#結合試験)に従い、固定配置での保存と再開、ledger から組み立てた checkpoint の別セッション・compaction 後の注入、待ち状態と他の skill・plugin との共存を確認する。
+- [engine](../architecture/contract-changes.md#engine) と [workspace](../architecture/contract-changes.md#workspace) の試験に従い、`command:` の check・pre-commit・判定の実行順、必須コマンド失敗時の起動抑止、commit 直前の照合、コミットの成否と次の brief への接続を確認する。
+- [plan](../architecture/contract-changes.md#plan) と [engine](../architecture/contract-changes.md#engine) の試験に従い、計画の作り直しのバージョンと差分、check と承認、旧 StageRun の再計画待ちと切り替えを確認する。
+- [external の試験](../architecture/contract-changes.md#external)に従い、承認と実行の順序、実行直後の中断、成功済み・実行中・結果不明への再送で二重適用しないことを確認する。
+- [ledger/fsstore](../architecture/contract-changes.md#ledgerfsstore)・[install](../architecture/contract-changes.md#install)・[kit](../architecture/contract-changes.md#kit) の試験に従い、記録と生成物の公開・排他、導入の冪等性と既存設定の保持、doctor、固定物とバージョンの照合を確認する。
+
+## 設計上の決定
+
+採用する構成と未決定事項は[仮決定](../architecture/decisions.md#仮決定)、外側のプロセスによる担当の起動など採用しない構成は[不採用の案](../architecture/decisions.md#不採用の案)、確認が必要なホストの挙動は[未確認の前提](../architecture/decisions.md#未確認の前提)に従う。

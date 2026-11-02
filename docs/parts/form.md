@@ -1,14 +1,42 @@
 # form — 固定フォーマット
 
-form は、後続の[ステージ](../stages.md)、hook、人が読み取れる固定フォーマットである。実行前に定義する規格であり、実行に伴って内容が変化する [ledger](ledger.md) とは区別する。skill など、失うと再現できない長い文書を作るときは、[`principles/context.md`](../../principles/context.md) の原則1に従い、構成を先に作って節ごとに保存する。短い更新を一度に確認したほうが判断しやすい場合は、その適用除外に従う。
+form は固定フォーマットの型と、スキーマ・テンプレートの適用、Markdown の描画を提供する。形式と意味論の境界は [form の契約](../architecture/modules.md#form)に従う。
 
-- **skill の構成**: frontmatter には `name` / `description` / `argument-hint` / `disable-model-invocation` / `allowed-tools` を置く。description は「何をするか → スコープ → Use when "言い回し" → For X use Y」の順にし、起動トリガーとなる語句を前に置く。本文は、スコープの明示、最悪の失敗、Hard Rules、手順、禁止する行為とその代わりに行う行為の対、必須出力、終了ブロックで構成する。責務は1つに絞り、対象外の作業と、それを担当する skill を示す。手順では原則を参照し、書き写さない。必須出力には、却下したものと省略したものを含める。参照資料は `references/` に分けて索引から開く。リポジトリ固有の事実は含めない。
-- **playbook**: スコープを示す「〜を担当する」という記述、番号付きの手順、末尾の報告項目で構成する。使用時には手順を todo に転記し、実施しない手順には `skip: 理由` を残す。
-- **[観点ファイル](../checks.md)**: blocking の定義、確認事項、報告しない事項、出力形式を記載する。
-- **終了ブロック**: 判定、次のアクション、変更したファイルを記載する。次のステージと hook が読む。
-- **人への確認事項**: 質問、短い名前を付けた選択肢、推奨案と理由、作業を停止して確認する理由（[router](router.md) の分類）、回答で進むステージ、未回答のとき止まる範囲と独立して進められる範囲、根拠へのリンクを示す。コンテキストを再構成しなければ答えられない質問は、設計上の失敗として扱う。
-- **PR 本文**: 構成はこの契約を正本とし、記載内容は [`principles/writing.md`](../../principles/writing.md) の原則1に従う。リポジトリ固有のフォーマットがあればそれに従い、なければ Why / What changed / Scope / Tradeoffs / Blast Radius / Verification の順とし、Why は1〜3文、Scope は必須、Verification は必須で実行したコマンドと結果を記載する。
-- **設計案**: 不可逆な決定の一覧、または「該当なし」を必須とする。
-- **コマンドの使い方**: CLAUDE.md の索引からたどれる場所に置く。
-- **文書の保存**: 承認された節は、節の ID とバージョンに対応する成果物としてファイルに保存する。
+## 入力と出力
+
+- **入力**: kit が供給するスキーマとテンプレート、および適用・描画する値を受け取る。スキーマとテンプレート本体の正本と供給は [form](../architecture/modules.md#form)と [kit](../architecture/modules.md#kit)に従う。
+- **出力**: 固定フォーマットの定義、スキーマ・テンプレートを適用した結果、人向けの Markdown を返す。
+
+## 固定フォーマット
+
+- **終了ブロック**: `devkit submit` に渡すラウンドの進捗を扱う。項目と終了の種別は[進捗](../architecture/data.md#進捗-progress)に従う。
+- **判定者の結果**: 最終メッセージの JSON の形式を扱う。判定と指摘の項目は [Judgment](../architecture/data.md#check-の結果-judgment)と [Finding](../architecture/data.md#指摘-finding)、受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+- **計画**: ループの雛形と計画の JSON Schema を扱う。内容と例は[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)・[計画](../architecture/data.md#計画-plan)と[雛形と計画の例](../architecture/examples.md#雛形と計画)を参照する。
+- **指示**: `next` が返す指示の JSON Schema を扱う。識別と種別は[指示](../architecture/data.md#指示-instruction)に従う。
+- **決定と証拠**: `note` で渡す決定と証拠の JSON Schema を扱う。項目は[決定と証拠](../architecture/data.md#決定と証拠-decision--evidence)に従う。
+
+### 人への確認事項
+
+問いは、判断に必要な選択肢、推奨案と理由、停止理由、回答後のステージ、範囲、根拠をまとめて示す。項目と回答の定型の案内は[問い](../architecture/data.md#問い-question)、選択肢と文章の回答・訂正期限は[回答の受理](../architecture/guarantees.md#回答の受理)に従う。
+
+「停止する範囲」と「進められる範囲」の表示と実際の停止の関係は、[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
+
+## テンプレート
+
+- **skill の構成とコマンドの使い方**: 供給されたテンプレートを適用し、devkit のコマンドの使い方は kit の skill に置く。playbook の skill への統合と配置は[指示ファイルとホスト設定](../architecture/layout.md#指示ファイルとホスト設定)に従う。
+- **観点ファイル**: 供給されたテンプレートを適用する。扱う項目は [check の契約](../architecture/modules.md#check)、例は[観点と検出試験](../architecture/examples.md#観点と検出試験)を参照する。
+- **PR 本文**: 供給されたテンプレートに計画の要約と共有に必要な決定を含める。共有する情報は[資産の更新と共有](../architecture/data.md#資産の更新と共有)、記載内容は [`principles/writing.md`](../../principles/writing.md) の原則1に従う。
+- **設計案**: 供給されたテンプレートを適用し、不可逆な決定の一覧、または「該当なし」を含める。
 - **原則**: [`principles/README.md`](../../principles/README.md) の「原則のフォーマット」に従う。
+
+## 保証
+
+form は入出力を行わず、計画や判定の意味論、HTML の生成を担当しない。責務の境界は [form の契約](../architecture/modules.md#form)に従う。
+
+終了ブロック・計画・note の入力 JSON の場所と受理条件は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)、成果物の記録は[作業結果の提出](../architecture/flow.md#作業結果の提出)と[成果物](../architecture/data.md#成果物-artifact-record)に従う。
+
+## 試験項目
+
+- 供給されたスキーマ・テンプレートの適用と Markdown の描画。
+- 終了ブロック、計画、判定者の結果、指示、問い、決定と証拠の形式との整合。
+- 問いの回答案内と、表示する範囲の整合。

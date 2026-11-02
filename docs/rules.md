@@ -9,7 +9,7 @@
 - **ドメインの型にフレームワークの型やアノテーションを含めない。**: [`principles/structure.md`](../principles/structure.md) の原則5。手段: 未実装。
 - **モジュールの公開入口を経由せずに内部のパスを直接 import しない。**: [`principles/structure.md`](../principles/structure.md) の原則6。手段: 未実装。
 - **引数をそのまま渡すだけの関数を置かない。**: [`principles/structure.md`](../principles/structure.md) の原則7。手段: 未実装。
-- **実行期間が重なる並列の作業は、異なる worktree で行う。**: [runtime](parts/runtime.md) の「隔離」。共有状態と共通の不変条件の扱いは [`principles/data.md`](../principles/data.md) の原則6。手段: 未実装。
+- **実行期間が重なる並列の作業は、異なる worktree で行う。**: [利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)。共有状態と共通の不変条件の扱いは [`principles/data.md`](../principles/data.md) の原則6。手段: 未実装。
 
 ## コメントと lint
 
@@ -33,7 +33,7 @@
 - **性能の結論は「速い / 遅い / 差がない / 判定できない」のいずれかとする。**: [`principles/verification.md`](../principles/verification.md) の原則4。手段: 未実装。
 - **性能報告には、実行回数、ばらつき、制限要因（limiter）を記載する。**: [`principles/verification.md`](../principles/verification.md) の原則4。手段: 未実装。
 - **機械が読む固定フォーマット（終了ブロック、PR 本文の Verification）は、結論と判断材料を先に書く文章構成の検査から除外する。**: [`principles/writing.md`](../principles/writing.md) の原則1。手段: 未実装。
-- **人の回答を受け取ったら、番号で指定された場合も選択肢の名前で言い直してから実行する。**: [`principles/writing.md`](../principles/writing.md) の原則7。手段: 未実装。
+- **選択肢の回答が定型に一致しなければ実行せず、所定の1行での再入力を求める。**: 定型と受理条件は[回答の受理](architecture/guarantees.md#回答の受理)に従う。手段: 未実装。
 - **人に判断を求める質問には、選択肢、推奨案、その理由を添える。**: [`principles/writing.md`](../principles/writing.md) の原則7。手段: 未実装。
 - **PR 本文とレビューコメントに「私は」と記述しない。**: [`principles/writing.md`](../principles/writing.md) の原則2。手段: 未実装。
 

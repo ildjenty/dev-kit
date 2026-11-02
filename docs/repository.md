@@ -4,24 +4,25 @@
 
 ## 実行の仕組みとの対応
 
-- **CLAUDE.md**: 情報の所在を示す索引と、開始・終了時の手順を置く。開始時は、checkpoint を読む → 検証を実行する → 壊れていれば記録し、現在の課題に修復が必要かを判断する → 計画の次の[ステージ](stages.md)へ進む、という順にする。現在の課題に不要な修復は、別の課題として扱うか作業を停止し、報告せずに着手しない。終了時は、checkpoint を更新する → リスクを記録する → 安全なら commit する、という順にする。
-- **skill**: 計画の作成、playbook、教訓の記録先の選択、振り返り、動作検証の手順を持つ。
-- **[runtime](parts/runtime.md)**: 利用側に言語の実行環境を用意させない単一のバイナリである。ホストは Claude Code と Codex CLI のどちらも対象であり、どちらかを既定にしない。同じバイナリが、外側で計画を読み、担当を起動して brief を渡し、結果を受け取り、check と router を実行する workflow と、ホストのセッション内から呼ばれ、checkpoint の注入、Stop ゲート、記録範囲の照合を行う hook の面を持つ。各ステージの実行記録、再開、隔離も担う。
-- **サブエージェント・Codex**: 別のコンテキストや別系統のエンジンによる [check](parts/check.md) と作業を担う。担当は計画で決める。
+- **skill**: 開始・`next`・`submit`・問いの見せ方・判定者と計画者のサブエージェントの起動、振り返り、教訓の反映先の選択を扱う。配置と指示ファイルとの関係は[指示ファイルとホスト設定](architecture/layout.md#指示ファイルとホスト設定)、手順は[skill の手順](architecture/contract-changes.md#skill-の手順)に従う。
+- **[runtime](parts/runtime.md)**: Claude Code と Codex CLI のセッションから呼ぶ単一バイナリの `devkit` が、CLI による進行と hook による観測を担う。責務の分担は[全体構成](architecture.md#全体構成)、作業の提出と完了は[作業結果の提出](architecture/flow.md#作業結果の提出)と[完了条件](architecture/guarantees.md#完了条件)に従う。
+- **作業者・判定者・計画者**: 作業者はセッション自身であり、判定者・計画者はサブエージェントとして起動する。別系統のエンジンによる判定は判定コマンド(`[judges]`)で扱い、担当と check の実行主体は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)と[計画](architecture/data.md#計画-plan)に従う。計画の作成は[作業の開始](architecture/flow.md#作業の開始)で計画者が担う。
 
-人の判断は workflow の外で行う。判断が済んだら、runtime が計画と [ledger](parts/ledger.md) を使って続きを実行する。計画を作り直した場合は、計画の check を通した新しいバージョンから続ける。
+人への問いと回答はセッションのチャットで扱い、CLI が受理して進行を再開する([人の回答と再開](architecture/flow.md#人の回答と再開))。計画の作り直しと切り替えは[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
 
 ## リポジトリ側の構成
 
 各リポジトリには、次のものを用意する。
 
-- **指示ファイル（CLAUDE.md または AGENTS.md。正本は runtime の決定候補）**: 索引と、開始・終了時の手順を置く。
-- **配置ガイド**: 各パッケージの README または CLAUDE.md に、そこに置くもの、置かないもの、置かない場合の配置先を記載する。ステージ2の check が参照する。
-- **元に戻せないものの一覧と、外部への書き込みの一覧**: [router](parts/router.md) の「作業を停止して確認する」の具体的な対象とする。不可逆な決定の例は、スキーマ、識別子、公開 API である。マルチテナントならテナントの単位も含める。
-- **リポジトリが育てるもの**: リポジトリ固有の[観点ファイル](checks.md)、skill、playbook、CLAUDE.md の索引である。git 管理を既定とする。
-- **規則と強制手段の表**: リポジトリ側に置く。
-- **設定ファイル**: 単一の設定ファイルがすべての置き場所の正本である。runtime はパスをハードコードせず、設定ファイルから引く。設定で変えられるのは置き場所と git 管理の可否だけであり、動作は変えない。インストーラがバイナリを置き、設定ファイルを生成する。
-- **記録ディレクトリ**: ledger、checkpoint、ループ計画、検出試験の記録を置く。既定は gitignore とし、リポジトリ内に置いて git 管理にする設定も許す。
-- **kit の固定物**: バイナリ、テンプレート、観点ファイル、規則、分類表である。リポジトリ内にコピーするか、外部を参照するかはインストーラで選ぶ。チームでは、リポジトリ内に入れて全員が同じバージョンを使うことを既定とする。
+- **指示ファイル(AGENTS.md と CLAUDE.md)**: リポジトリ自身が管理し、kit は触れない。判定の規範としての扱いは[指示ファイルとホスト設定](architecture/layout.md#指示ファイルとホスト設定)に従う。
+- **配置ガイド**: 置くもの・置かないもの・配置先を示す。配置と形式は[dev-kit のリポジトリ](architecture/layout.md#dev-kit-のリポジトリ)、brief への取り込みは[作業の指示](architecture/flow.md#作業の指示)に従う。
+- **元に戻せないものと外部への書き込み**: 元に戻せないものは[規則と強制手段](architecture/data.md#規則と強制手段-rules)の `.devkit/rules.md` と計画に置く。外部への書き込みは [config](architecture/modules.md#config)に登録し、計画の承認で足りる操作は[計画の宣言](architecture/data.md#計画-plan)で扱う。
+- **育てるもの**: 資産の範囲・所有者・git 管理は[所有と生存期間](architecture/data.md#所有と生存期間)に従い、更新とチームでの共有は[資産の更新と共有](architecture/data.md#資産の更新と共有)に従う。
+- **規則と強制手段**: 移行記録を含め、[Rules](architecture/data.md#規則と強制手段-rules)に従って `.devkit/rules.md` に置く。
+- **設定ファイル**: `devkit.toml` は kit のバージョン、判定コマンド(`[judges]`)、検証コマンド(`[commands]`)、外部操作、deny、分類表の追記を扱う。設定項目は [config](architecture/modules.md#config)、配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)、検証コマンドを用いる `command:` の check は[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
+- **実行の記録と生成物**: 配置と git 管理からの除外は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。保存する実行の記録と、そこから組み立てる [checkpoint](architecture/data.md#checkpoint)は区別する。
+- **kit の固定物**: [kit の供給](architecture/modules.md#kit)に従い、`.devkit/kit/<バージョン>/` のコピーから参照する。
 
-組み立て後は、Fresh Session Test で確認する。
+導入時に `init` が用意するものは [install](architecture/modules.md#install)、hook の登録先と設定の追記は[権限の境界](architecture/guarantees.md#権限の境界)に従う。バイナリの配置を含む配布方法は[仮決定](architecture/decisions.md#仮決定)に未決定として残す。
+
+導入後の照合は [doctor](architecture/modules.md#doctor-の確認項目)、別セッションや compaction 後の再開の確認は[結合試験](architecture/contract-changes.md#結合試験)に従う。
