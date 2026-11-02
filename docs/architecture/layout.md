@@ -35,11 +35,15 @@ dev-kit/
     skills/              skill の正本(devkit の進め方)
     hosts/               ホスト設定、サブエージェント定義、rules の断片
     examples/            検出試験の違反例・適合例・許容例
-  principles/            既存の原則。埋め込み対象
+  principles/            既存の原則
   docs/                  既存の設計書
-    parts/               部品の契約。直接埋め込む正本
-  embed.go               principles、docs/parts、kit の埋め込み
+    parts/               部品の契約
+    architecture/        判定と進行の規則
+    *.md                 契約から相対リンクでたどる設計書
+  embed.go               固定物の埋め込みと公開
 ```
+
+埋め込みの範囲は[ルートパッケージ](modules.md#ルートパッケージ)、コピーの供給と相対パスの保持は [kit](modules.md#kit)に従う。
 
 各ディレクトリの配置ガイドは、`doc.go` の先頭コメントまたは README に置く。[`principles/structure.md`](../../principles/structure.md) の原則1に従う。
 
@@ -63,7 +67,7 @@ dev-kit/
     rules.md                 規則と強制手段。移行記録も項目として持つ
     detect.json              検出試験の合格記録の索引
     structure.json           構造ステージを使うときだけ
-    kit/<バージョン>/         固定物のコピー。principles と部品の契約を含む
+    kit/<バージョン>/         固定物のコピー
     run/                     実行の記録と生成物。.gitignore で除外
       sessions/<session_id>/<時刻>-<イベント>.json   セッションの観測。作業の外にチェックアウトごとに置く
       work/<作業ID>/
@@ -73,7 +77,7 @@ dev-kit/
         prompts/             人の入力の観測(UserPromptSubmit が書く)
         brief/               next が書く brief と判定依頼
         snap/<対象のバージョン>/   判定者に読ませる対象の展開(read-tree と checkout-index --prefix)
-        results/<指示ID>-<agent_id>.json   判定者・計画者の結果(SubagentStop が書く)
+        results/<指示ID>-<agent_id>.json   判定者・計画者のサブエージェントの結果(SubagentStop が書く)
         view.html
 ```
 
@@ -90,6 +94,6 @@ pre-commit の共有と導入は[完了条件](guarantees.md#完了条件)に従
 
 kit はリポジトリの AGENTS.md と CLAUDE.md に触れない。devkit の動かし方(開始・`next`・`submit`・問いの見せ方・サブエージェントの起動)はすべて kit の skill に閉じ、人は `/devkit` の skill で始める。指示ファイルはリポジトリ自身のものであり、判定者の規範としては読む。skill の正本は `.agents/skills/devkit/` とし、`.claude/skills/devkit` を git 管理のシンボリックリンクにする。操作手順は skill に集約し、独立した playbook(操作手順書)は設けない。
 
-判定者・計画者は `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` で定義し、`init` が既定の定義を書く。名前には `devkit-` の接頭辞を付け、Codex の組み込み名と重複させない。
+判定者・計画者のサブエージェントは `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` で定義し、`init` が既定の定義を書く。名前には `devkit-` の接頭辞を付け、Codex の組み込み名と重複させない。
 
 hook の登録では `init` が kit のバイナリを登録する。設定の正本と追記時の確認は[権限の境界](guarantees.md#権限の境界)、束縛のないセッションでの扱いは [hook の共通処理](hooks.md#共通処理)、導入後の確認は [doctor](modules.md#doctor-の確認項目)に従う。

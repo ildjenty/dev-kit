@@ -78,7 +78,7 @@
 - [check.md](../parts/check.md) の規範の一覧の CLAUDE.md を「指示ファイル(AGENTS.md と CLAUDE.md)」、「ループ計画」を「計画」へ改め、固定方法と規範の束ね方は[規範の固定](guarantees.md#規範の固定)と [check](modules.md#check)への参照にする。
 - [check.md](../parts/check.md) の検出試験の規則を[検出試験](guarantees.md#検出試験)と [DetectionTest の同一性](data.md#検出試験の記録-detectiontest)への参照に置き換え、対象を観点ファイルに限り、表記修正で再試験を免除する記述を削って、原則2の適用除外を人が手で行う試験だけに適用する形に改める。
 - [check.md](../parts/check.md) 末尾の集約と必須 check が `NOT ASSESSED` のときの遷移を分け、集約は[判定結果の受理](guarantees.md#判定結果の受理)、遷移は [router の完了条件](guarantees.md#完了条件)と [plan の遷移表](modules.md#plan)への参照に改める。
-- [check.md「実行主体」](../parts/check.md)の起動・操作を要する観点の runner を[操作の禁止とサブエージェントの制限](guarantees.md#操作の禁止とサブエージェントの制限)への参照に置き換え、読み取り専用の判定者では実行しない形に改める。
+- [check.md「実行主体」](../parts/check.md)の起動・操作を要する観点の runner を[操作の禁止とサブエージェントの制限](guarantees.md#操作の禁止とサブエージェントの制限)への参照に置き換え、読み取り専用の判定者サブエージェントでは実行しない形に改める。
 
 ### form
 

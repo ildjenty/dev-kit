@@ -56,7 +56,7 @@ hook の共有は git の `core.hooksPath` による。`init` は、リポジト
 ### 判定結果の受理
 
 - **失敗**: 作成者自身が `PASS` を付けたり、自己評価を依頼文に混ぜたり、別の条件で得た判定を流用したりする。
-- **仕組み**: 判定者・計画者の起動時の prompt は、実行しない固定文字列 `devkit-instruction <指示 ID>` だけの1行とする。これはサブコマンドではない。起動の制限は [PreToolUse](hooks.md#pretooluse)、最終メッセージと来歴の採取は [SubagentStop](hooks.md#subagentstop)に従う。
+- **仕組み**: 判定者・計画者のサブエージェントの起動時の prompt は、実行しない固定文字列 `devkit-instruction <指示 ID>` だけの1行とする。これはサブコマンドではない。起動の制限は [PreToolUse](hooks.md#pretooluse)、最終メッセージと来歴の採取は [SubagentStop](hooks.md#subagentstop)に従う。
 - **置き場所**: `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` の定義、`internal/check/` の受理、`internal/engine/` の `next`。
 
 サブエージェントの定義には次の2点を記載する。
@@ -64,7 +64,7 @@ hook の共有は git の `core.hooksPath` による。`init` は、リポジト
 - prompt が上の定型以外を含む場合は `NOT ASSESSED` を返す。
 - 指示 ID に含まれる作業 ID から `.devkit/run/work/<作業 ID>/brief/<指示 ID>.md` を解決し、依頼の本文を読む。
 
-`next` は SubagentStop hook が書いた結果ファイルだけを読み、スキーマ、指示 ID、対象のバージョン、規範の識別を照合する。さらに、最初の利用者メッセージが上の定型と一致し、定義ファイルの内容ハッシュが[規範の固定](#規範の固定)で定めるスナップショット内の定義と一致し、観測した effort(Claude Code)または model(Codex)が定義の値と一致することを検証する。不一致は受理せず、エージェントが書いたファイルや標準出力も受理しない。
+`next` はサブエージェントの結果を受け取る際、SubagentStop hook が書いた結果ファイルだけを読み、スキーマ、指示 ID、対象のバージョン、規範の識別を照合する。さらに、最初の利用者メッセージが上の定型と一致し、定義ファイルの内容ハッシュが[規範の固定](#規範の固定)で定めるスナップショット内の定義と一致し、観測した effort(Claude Code)または model(Codex)が定義の値と一致することを検証する。不一致は受理せず、エージェントが書いたファイルや標準出力も受理しない。
 
 定義を編集したラウンドの完了手順は[サブエージェント定義の変更と完了](decisions.md#サブエージェント定義の変更と完了)に残す。
 
@@ -113,7 +113,7 @@ check と判定前の pre-commit の実行前にスナップショットが一�
 ### 判定対象の展開と完了時の永続化
 
 - **失敗**: git の属性で判定対象が変わったり、完了時に未判定の変更を取り込んだり、index と HEAD が食い違ったりする。
-- **仕組み**: 判定者には返却後のスナップショットを一時インデックスから `git read-tree` と `git checkout-index --prefix` で `snap/<対象のバージョン>/` に展開し、対象はその読み取り専用の場所だけを読ませる。`.gitattributes` の `export-ignore`・`export-subst` の影響を受けない。
+- **仕組み**: 返却後のスナップショットを一時インデックスから `git read-tree` と `git checkout-index --prefix` で `snap/<対象のバージョン>/` に展開し、判定者サブエージェントには対象をその読み取り専用の場所だけで読ませる。`.gitattributes` の `export-ignore`・`export-subst` の影響を受けない。
 - **置き場所**: `internal/workspace/` の展開と永続化、`internal/engine/` の判定指示と完了の確定。
 
 完了時の永続化は[完了条件](#完了条件)の `git commit` に従う。エージェントにはコミットさせない。
@@ -195,7 +195,7 @@ pre-commit hook・判定コマンド・検証コマンドは `devkit` の子プ�
 
 リポジトリ全体に適用する操作の deny は、人がリポジトリの方針として `.claude/settings.json` に書く。kit が `permissions.deny` に追加するのは `Edit(.devkit/run/**/records/**)`・`Edit(.devkit/run/**/results/**)`・`Edit(.devkit/run/**/sessions/**)`・`Edit(.devkit/run/**/prompts/**)`・`Edit(.devkit/run/**/snap/**)` に限る。kit の `[deny]` とサブエージェントの起動の制限は [PreToolUse](hooks.md#pretooluse)で適用し、settings には足さない。Claude Code の hook は `onFailure: "block"` 相当の設定で登録する。
 
-Claude Code の判定者・計画者は、定義の `tools` を読み取り用に限定する。この制限と `Agent(fork)`・`Agent(model:*)` の deny が効くことは確認済みである。Codex は親の sandbox を継承するため、カスタム定義に `features.shell_tool = false` を指定する。この設定を書けることは確認済みである。読み取りの可否と代替は[未確認の前提](decisions.md#未確認の前提)に残す。
+Claude Code の判定者・計画者のサブエージェントは、定義の `tools` を読み取り用に限定する。この制限と `Agent(fork)`・`Agent(model:*)` の deny が効くことは確認済みである。Codex は親の sandbox を継承するため、カスタム定義に `features.shell_tool = false` を指定する。この設定を書けることは確認済みである。読み取りの可否と代替は[未確認の前提](decisions.md#未確認の前提)に残す。
 
 起動・操作を要する check(動作検証)の runner は判定コマンドまたは `command:<name>` に限り、読み取り専用の判定者サブエージェントには割り当てない。
 
