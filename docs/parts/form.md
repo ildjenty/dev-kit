@@ -10,5 +10,5 @@ form は、後続の[ステージ](../stages.md)、hook、人が読み取れる�
 - **PR 本文**: 構成はこの契約を正本とし、記載内容は [`principles/writing.md`](../../principles/writing.md) の原則1に従う。リポジトリ固有のフォーマットがあればそれに従い、なければ Why / What changed / Scope / Tradeoffs / Blast Radius / Verification の順とし、Why は1〜3文、Scope は必須、Verification は必須で実行したコマンドと結果を記載する。
 - **設計案**: 不可逆な決定の一覧、または「該当なし」を必須とする。
 - **コマンドの使い方**: CLAUDE.md の索引からたどれる場所に置く。
-- **文書の保存**: 承認された節は、節の ID と版に対応する成果物としてファイルに保存する。
+- **文書の保存**: 承認された節は、節の ID とバージョンに対応する成果物としてファイルに保存する。
 - **原則**: [`principles/README.md`](../../principles/README.md) の「原則のフォーマット」に従う。

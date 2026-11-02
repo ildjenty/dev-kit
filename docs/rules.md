@@ -17,9 +17,9 @@
 
 ## テスト
 
-- **テストは実装前に一度失敗することを確認してテスト ID・対象の版・実行結果を記録し、実装前に確認できない場合は検出試験で代替する。**: [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
+- **テストは実装前に一度失敗することを確認してテスト ID・対象のバージョン・実行結果を記録し、実装前に確認できない場合は検出試験で代替する。**: [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
 - **実装前に失敗を確認できなかったテストとセキュリティ上の処理のテストでは、検証対象を1か所だけ意図的に壊し、失敗を確認した変異差分と実行結果をテスト ID に結び付けて記録する。**: [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
-- **検出試験では1か所を変更して1回実行し、直ちに元に戻して対象の版が復元されたことを確認する。**: [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
+- **検出試験では1か所を変更して1回実行し、直ちに元に戻して対象のバージョンが復元されたことを確認する。**: [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
 - **回帰テストは、修正前のコードで失敗することを確認してから信頼する。**: [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
 - **テストに `skip` や `only` を残さない。**: [`principles/testing.md`](../principles/testing.md) の原則9。手段: 未実装。
 
@@ -45,4 +45,4 @@
 - **モバイルの入力欄のフォントは16px 以上とする。**: [`principles/ui.md`](../principles/ui.md) の原則8。手段: 未実装。
 - **メニューを開いている間は背景をスクロールさせない。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
 - **アニメーションの各フレームで再描画を発生させない。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
-- **確認対象のページ・状態・版に対応するスクリーンショットを撮影し、取得の記録を残す。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
+- **確認対象のページ・状態・バージョンに対応するスクリーンショットを撮影し、取得の記録を残す。**: [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。

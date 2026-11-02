@@ -75,7 +75,7 @@
 ## harness
 
 - **ステージ**: メタ
-- **確認事項**: [`principles/harness.md`](../principles/harness.md) の各原則の違反・兆候と blocking、および [check](parts/check.md)・[ledger](parts/ledger.md)・[router](parts/router.md)・[runtime](parts/runtime.md) の契約に従う。check の必須化では違反例と適合例・許容例の判定理由を確かめ、防ぐ失敗と運用負担から仕組みと適用範囲を選んでいるか（harness の原則2・5）。skill に description があるか。参照先が存在するか。check が `NOT ASSESSED` を返せるか。原則が所定の形式を満たすか。skill・playbook・checkpoint に同じ処理の実装が重複していないか（`principles/working.md` の原則5。同じ既存コマンドの呼び出しは数えない）。Fresh Session Test として、新しいセッションがリポジトリだけを読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるかを確かめる。部品間の接続は runtime の組み立ての試験に従い、保存した checkpoint を別セッションで読み戻し、保存先・読み込み先と版・内容を照合する。
+- **確認事項**: [`principles/harness.md`](../principles/harness.md) の各原則の違反・兆候と blocking、および [check](parts/check.md)・[ledger](parts/ledger.md)・[router](parts/router.md)・[runtime](parts/runtime.md) の契約に従う。check の必須化では違反例と適合例・許容例の判定理由を確かめ、防ぐ失敗と運用負担から仕組みと適用範囲を選んでいるか（harness の原則2・5）。skill に description があるか。参照先が存在するか。check が `NOT ASSESSED` を返せるか。原則が所定の形式を満たすか。skill・playbook・checkpoint に同じ処理の実装が重複していないか（`principles/working.md` の原則5。同じ既存コマンドの呼び出しは数えない）。Fresh Session Test として、新しいセッションがリポジトリだけを読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるかを確かめる。部品間の接続は runtime の組み立ての試験に従い、保存した checkpoint を別セッションで読み戻し、保存先・読み込み先とバージョン・内容を照合する。
 - **blocking**: 答えられない問いがある。照合した原則の blocking 条件に該当するか、部品の契約に違反する。
 
 ## skill の試験
