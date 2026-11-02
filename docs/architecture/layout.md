@@ -24,6 +24,7 @@ dev-kit/
     install/             導入と doctor
     view/                HTML の生成
   kit/                   固定物の埋め込み元
+    plans/               既定の雛形: default、feature、fix、docs など
     stages/              ステージ定義
     checks/              観点ファイル
     templates/           form のテンプレート
@@ -55,6 +56,7 @@ dev-kit/
   .codex/agents/devkit-*.toml 判定者・計画者のサブエージェント定義。git 管理
   .agents/skills/devkit/     skill の正本。Codex の置き場所
   .devkit/                   git 管理(run/ を除く)
+    plans/<name>.json        利用者が組むループの雛形。init が kit の既定をコピー
     checks/<観点ID>.md        観点ファイル。違反例・適合例は checks/<観点ID>/ の下
     rules.md                 規則と強制手段。移行記録も項目として持つ
     detect.json              検出試験の合格記録の索引

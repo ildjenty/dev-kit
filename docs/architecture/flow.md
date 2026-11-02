@@ -4,9 +4,9 @@
 
 ## 作業の開始
 
-人は通常どおりセッションを開き、kit の skill で課題を伝える。エージェントが `devkit start <課題>` を実行すると、engine は作業 ID とブランチを作り、基点コミットと kit のバージョンを記録して[セッションを束縛](data.md#セッションとブランチ)する。返すのは計画者への指示 ID と `brief/<指示 ID>.md` のパスである。
+人は通常どおりセッションを開き、kit の skill で課題を伝える。エージェントは `devkit start --plan <name> <課題>` で[雛形](data.md#ループの雛形-plantemplate)を指定する。`--plan` の省略時は kit の既定 `default` を使う。engine は作業 ID とブランチを作り、基点コミットと kit のバージョンを記録して[セッションを束縛](data.md#セッションとブランチ)する。返すのは計画者への指示 ID と `brief/<指示 ID>.md` のパスである。
 
-エージェントは `devkit-planner` を、[定型の prompt](guarantees.md#判定結果の受理)で起動する。計画者が最終メッセージで計画を返すと、[SubagentStop](hooks.md#subagentstop)が結果を保存する。次の `devkit next` で engine が結果を受理し、JSON Schema で検証して提案中の計画として記録する。
+エージェントは `devkit-planner` を、[定型の prompt](guarantees.md#判定結果の受理)で起動する。計画者が雛形から計画を作るときに行うのは、完了条件を書く、課題に関係のないステージを外す、check の対象(画面・データ・外部通信)を指定する、必要なら調査・試作のステージを雛形の候補から足すことだけである。雛形からの逸脱は [Plan](data.md#計画-plan) の承認条件に従う。計画者が最終メッセージで計画を返すと、[SubagentStop](hooks.md#subagentstop)が結果を保存する。次の `devkit next` で engine が結果を受理し、JSON Schema で検証して提案中の計画として記録する。
 
 ## 計画の check と承認ゲート
 
@@ -27,6 +27,8 @@ brief にはステージ定義、前のステージの出力、リポジトリ�
 engine は `submit` で終了ブロックを受理し、返却後の[スナップショット](data.md#対象のバージョン-targetversion)を取得して成果物を記録し、StageRun を判定待ちにする。
 
 ## 作業結果の判定
+
+[Plan の check の実行順と失敗時の規則](data.md#計画-plan)に従い、engine はステージに置いたコマンドの check を実行する。
 
 判定の指示を返す前に、engine は返却後のツリーに対して pre-commit を実行する([完了条件](guarantees.md#完了条件))。失敗なら判定者を起動せず、router が「修正する」に分類する。
 

@@ -11,7 +11,7 @@
 - Stop を[停止の補助](hooks.md#stop)として位置付ける。記録の網羅性は [view](modules.md#view)へ合わせる。「Read では大きな文書の全文読み込みを拒否する」を削除する。SubagentStop は結果の受け取りに使い、PostToolUse による skill 編集の検知は[router の分類](guarantees.md#人への確認対象)へ移す。
 - ホストの能力の検出試験と代替経路を削除し、[doctor](modules.md#doctor-の確認項目)と[セッションの観測](data.md#セッションの観測-sessionobservation)に置き換える。「並列作業や試作は worktree で行う」「作業の排他」「委任の区別と依存」は[ホストに任せる範囲](guarantees.md#実装対象外の機能)、[作業の排他制御](data.md#作業の排他制御)、[定型の依頼](guarantees.md#判定結果の受理)へ改訂する。
 - 束縛とブランチの扱いは[セッションとブランチ](data.md#セッションとブランチ)、hook の直前の観測は[稼働確認](guarantees.md#再開と-hook-の稼働確認)、commit 直前の対象の照合は[完了条件](guarantees.md#完了条件)へ合わせる。
-- 検証コマンドの登録・実行を削除し、検証をリポジトリの pre-commit に置き換える。実行時点と commit の扱いは[完了条件](guarantees.md#完了条件)に従う。
+- 検証コマンドの登録を [config](modules.md#config)、ステージの check の実行を [engine](modules.md#engine)へ合わせる。pre-commit の実行時点と commit の扱いは[完了条件](guarantees.md#完了条件)に従う。
 
 ### repository
 
@@ -28,13 +28,13 @@
 ### router
 
 - ステージの[完了条件](guarantees.md#完了条件)を定め、Stop と共有する記述を改訂する。[人への確認対象](guarantees.md#人への確認対象)と [hook の稼働不足](guarantees.md#再開と-hook-の稼働確認)を反映する。
-- 検証コマンドの実行結果の照合を pre-commit を伴う commit の成否に置き換え、失敗の分類は[完了条件](guarantees.md#完了条件)へ合わせる。
+- コマンドの check の結果は [Judgment](data.md#check-の結果-judgment)として扱い、pre-commit を伴う commit の成否と合わせた完了の判断は[完了条件](guarantees.md#完了条件)へ合わせる。
 - ロールの語彙を作業者・判定者・計画者に揃え、分類表の出力をサブエージェントまたは登録コマンドの名前にする。
 
 ### check
 
 - 実行主体を [Plan の担当と観点](data.md#計画-plan)へ合わせる。「作成と判定のコンテキスト ID と履歴継承設定を照合する」「会話の内容を知らないサブエージェント」は[判定結果の受理](guarantees.md#判定結果の受理)と [PreToolUse](hooks.md#pretooluse)へ改訂する。
-- 「Codex ではモデル名を明示する」はリポジトリ内の定義と[起動時の上書きの制限](hooks.md#pretooluse)へ改訂する。機械による検証はリポジトリの pre-commit に置き換え、Judgment への変換を削除する。修正ラウンドの依頼と Finding は[指摘](data.md#指摘-finding)へ合わせる。
+- 「Codex ではモデル名を明示する」はリポジトリ内の定義と[起動時の上書きの制限](hooks.md#pretooluse)へ改訂する。コマンドの check の実行結果から Judgment への変換は [Plan](data.md#計画-plan) と[受理境界](guarantees.md#判定結果の受理)へ合わせる。修正ラウンドの依頼と Finding は[指摘](data.md#指摘-finding)へ合わせる。
 - transcript・定義・実効条件の照合、結果の選択、判定の食い違いは[判定結果の受理](guarantees.md#判定結果の受理)を参照する。
 
 ### form
@@ -49,7 +49,8 @@
 
 ### loop-plan
 
-- 担当と check の実行主体の表記を [Plan](data.md#計画-plan)へ合わせ、ステージから検証コマンドの集合への参照を削除する。機械による検証は[完了条件](guarantees.md#完了条件)の pre-commit に置き換える。
+- [雛形](data.md#ループの雛形-plantemplate)(利用者が組む)と[計画](data.md#計画-plan)(課題ごと)の2層に分け、フォーマットを JSON(英語キー)で定める。例も雛形と計画に分ける。
+- 担当と check の実行主体の表記を [Plan](data.md#計画-plan)へ合わせ、計画の check の確認事項には雛形からの逸脱を含める。機械による検証と pre-commit の関係は[完了条件](guarantees.md#完了条件)に従う。
 - 計画の承認で足りる外部操作の宣言を加え、[外部操作の承認](guarantees.md#外部操作の承認)の識別項目へ合わせる。
 
 ### skill の手順

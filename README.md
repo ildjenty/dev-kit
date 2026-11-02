@@ -1,6 +1,6 @@
 # dev-kit
 
-Claude Code や Codex CLI のセッション内で、リポジトリ専用の開発ループを回すための道具。ループを構成する部品（brief、check、router、ledger、form、view、runtime）、部品が従う原則、課題ごとのループ計画、ループを実行する単一バイナリ `devkit` からなる。現在は設計段階で、コードはまだない。
+リポジトリの持ち主が kit の部品からループを組み、Claude Code や Codex CLI のセッション内で、リポジトリ専用の開発ループを回すための道具。ループを構成する部品（brief、check、router、ledger、form、view、runtime）、部品が従う原則、課題ごとのループ計画、ループを実行する単一バイナリ `devkit` からなる。現在は設計段階で、コードはまだない。
 
 ## 参照順序
 
