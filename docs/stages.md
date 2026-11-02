@@ -18,7 +18,7 @@ kit は、利用者が[ループの雛形](architecture/data.md#ループの雛�
 - **決めること**: 含めるものと含めないもの。外部から見えるもの。
 - **決めずに次のステージへ渡すこと**: 内部構造。
 - **元に戻せないもの**: スキーマ、識別子、契約の型、外部への公開、データの保持のうち、該当すると判断したもの。
-- **成果物**: スコープの明示と、元に戻せないものの一覧。継続して守るものは[規則と強制手段](architecture/data.md#規則と強制手段-rules)の `.devkit/rules.md`、課題固有のものは[計画](architecture/data.md#計画-plan)に置く。後続ステージの [brief](architecture/modules.md#brief)(入力から組み立てる依頼文)に渡す範囲は[規則と強制手段](architecture/data.md#規則と強制手段-rules)に従う。
+- **成果物**: スコープの明示と、元に戻せないものの一覧。保存先は[規則と強制手段](architecture/data.md#規則と強制手段-rules)と[計画](architecture/data.md#計画-plan)に従う。後続ステージの [brief](architecture/modules.md#brief)(入力から組み立てる依頼文)に渡す範囲は[規則と強制手段](architecture/data.md#規則と強制手段-rules)に従う。
 
 ## 2 構造
 

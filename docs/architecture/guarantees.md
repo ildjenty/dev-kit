@@ -30,20 +30,18 @@ git と、Claude Code・Codex CLI の両方にある機能で賄えるものは 
 ### 完了条件
 
 - **失敗**: 未検証の変更や未判定の要求を完了に含める。
-- **仕組み**: ステージの完了には、返却後の対象のバージョンに対するすべての必須 check(`command:` の check を含む)の `PASS`、必須 check のうち判定者が担当する観点とその担当に対する検出試験の合格、そして `devkit` が行う `git commit` の成功が必要である。検出試験の対象は[検出試験](#検出試験)に従う。Judgment の有効性は [check の結果](data.md#check-の結果-judgment)に従う。Stop hook はこの条件を照合しない。
+- **仕組み**: ステージの完了には、返却後の対象のバージョンに対するすべての必須 check(`command:` の check を含む)の `PASS`、必須 check のうち判定者が担当する観点とその担当に対する検出試験の合格、そして `devkit` が行う `git commit` の成功と[対象の照合](#commit-直前の対象の照合)が必要である。検出試験の対象は[検出試験](#検出試験)に従う。Judgment の有効性は [check の結果](data.md#check-の結果-judgment)に従う。Stop hook はこの条件を照合しない。
 - **置き場所**: `internal/plan/` の完了条件の規則を `internal/router/` が照合し、`internal/engine/` が `internal/workspace/` にコミットを依頼してステージ完了を記録する。
 
 完了の確定では、条件を満たさない完了の主張を完了として扱わない。ステージごとに選ぶ検証は雛形の check として置き、pre-commit はステージに関係なく完了時のコミットで必ず通る検証である。devkit は検証の集合を自分で決めず、省略も監視しない。何を置くかは雛形を組む人が決め、[雛形からの逸脱](data.md#計画-plan)は計画の check と人のゲートで見る。
 
-`devkit` は完了時に、返却後のスナップショットと同じ内容の index で本物の `git commit` を実行する。`--no-verify` は使わず、pre-commit hook がリポジトリで定義した検証を走らせる。commit の失敗は router に渡さず engine が「修正する」として記録し、hook の出力を次の brief に含める。commit の成功がその対象のバージョンに対する pre-commit の検証の記録であり、保存項目は [StageRun の完了記録](data.md#ステージの実行-stagerun)に従う。pre-commit の別の検証結果の記録は持たない。
-
-commit 直前は[対象の照合](#commit-直前の対象の照合)に従う。
+`devkit` は完了時に、返却後のスナップショットと同じ内容の index で本物の `git commit` を実行する。`--no-verify` は使わず、pre-commit hook がリポジトリで定義した検証を走らせる。commit の失敗は router に渡さず engine が「修正する」として記録し、hook の出力を次の brief に含める。[対象の照合](#commit-直前の対象の照合)を満たした commit の成功を、その対象のバージョンに対する pre-commit の検証の記録とし、保存項目は [StageRun の完了記録](data.md#ステージの実行-stagerun)に従う。pre-commit の別の検証結果の記録は持たない。
 
 commit 時には環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。
 
 hook の共有は git の `core.hooksPath` による。`init` は、リポジトリに hook の仕組み(husky、pre-commit フレームワーク、既存の `core.hooksPath`)がなければ `.githooks/` を作って `core.hooksPath` を向け、空の pre-commit を置く。既にあれば触らない。`doctor` は pre-commit が存在することを確認する。
 
-フォーマッタが pre-commit でファイルを書き換え、hook が非0で終了した場合は commit が失敗し、作業ツリーに差分が残る。commit の失敗は前述の扱いで次のラウンドに渡す。[Git の pre-commit の仕様](https://git-scm.com/docs/githooks#_pre_commit)では、ファイルの書き換えだけで commit の失敗は保証されない。判定前も `git hook run pre-commit`(git 2.36 以降)で同じ hook を実行する。commit 時と同じ入力条件になるよう、返却後のスナップショットと同じ内容の一時 index を `GIT_INDEX_FILE` で与え、作業ツリーから一時 index で `write-tree` を取ってスナップショットと一致することを確かめてから実行する。`DEVKIT_STAGE` と `DEVKIT_WORK` も commit 時と同じく渡す。失敗は router に渡さず engine が「修正する」として記録し、hook の出力を次の brief に含める。実行順は[作業結果の判定](flow.md#作業結果の判定)に従う。`init` が git のバージョンを確認し、使えない環境では pre-commit による検証は完了時の commit だけで行う。判定前の実行は早く失敗を知るためのもので、pre-commit による完了条件の記録は commit の成功だけである。
+フォーマッタが pre-commit でファイルを書き換え、hook が非0で終了した場合は commit が失敗し、作業ツリーに差分が残る。commit の失敗は前述の扱いで次のラウンドに渡す。[Git の pre-commit の仕様](https://git-scm.com/docs/githooks#_pre_commit)では、ファイルの書き換えだけで commit の失敗は保証されない。判定前も `git hook run pre-commit`(git 2.36 以降)で同じ hook を実行する。commit 時と同じ入力条件になるよう、返却後のスナップショットと同じ内容の一時 index を `GIT_INDEX_FILE` で与え、作業ツリーから一時 index で `write-tree` を取ってスナップショットと一致することを確かめてから実行する。`DEVKIT_STAGE` と `DEVKIT_WORK` も commit 時と同じく渡す。失敗は router に渡さず engine が「修正する」として記録し、hook の出力を次の brief に含める。実行順は[作業結果の判定](flow.md#作業結果の判定)に従う。`init` が git のバージョンを確認し、使えない環境では pre-commit による検証は完了時の commit だけで行う。判定前の実行は早く失敗を知るためのもので、完了の確定には使わない。
 
 ### 規範の固定
 
@@ -98,11 +96,17 @@ hook の共有は git の `core.hooksPath` による。`init` は、リポジト
 
 文章での回答(決定の保留の理由など)は、全文が問い ID で始まる入力のうち最新のものを取り、本文をそのまま記録に写す。同一性・訂正の競合・根拠の保存は[回答・承認](data.md#回答承認-answer--approval)に従う。
 
+承認対象が決定 ID の[問い](data.md#問い-question)では、定型に一致する選択肢の回答を受理したときに、engine がその決定 ID と回答への参照を持つ状態変更を追記し、選択肢に対応する状態にする。文章の回答だけでは決定の状態を変えない。
+
 ### commit 直前の対象の照合
 
 - **失敗**: 判定後にファイルが変更され、判定・完了・コミットの対象が食い違う。
-- **仕組み**: commit の直前に、作業ツリーから一時インデックスで `write-tree` を取り、返却後のスナップショットと一致することを確かめる。一致しなければ commit せず、変更後のツリーで返却後のスナップショットと成果物を更新して判定からやり直す。取り直しは1回だけとし、2回目も変われば問いを起票する。
+- **仕組み**: commit の直前に、作業ツリーから一時インデックスで `write-tree` を取り、返却後の判定済みスナップショットと一致することを確かめる。一致しなければ commit せず、変更後のツリーで返却後のスナップショットと成果物を更新し、すべての必須 check をやり直す。
 - **置き場所**: `internal/engine/` の完了の確定と、`internal/workspace/` の一時インデックス。
+
+commit が成功したら、生成されたコミットのツリーハッシュを返却後の判定済みスナップショットと照合し、一致を確認してから engine がステージ完了を記録する。pre-commit が整形や `git add` で内容を変えるなどして不一致になった場合は、完了を記録せず、コミットは取り消さない。そのコミットのツリーを新しい対象のバージョンとして返却後のスナップショットと成果物を更新し、すべての必須 check をやり直す。
+
+commit 前後の不一致による取り直しは合わせて1回だけとし、取り直し後も対象が変われば engine が必ず問いを起票して停止する。
 
 check と判定前の pre-commit の実行前にスナップショットが一致しない場合の扱いは[検証前の対象の不一致](decisions.md#検証前の対象の不一致)に残す。
 
@@ -149,10 +153,12 @@ check と判定前の pre-commit の実行前にスナップショットが一�
 ### 人への確認対象
 
 - **失敗**: 依存やループ自身の変更を、確認なしに進める。
-- **仕組み**: 「人に確認する」は kit の分類表の既定データとし、リポジトリ側の追記で上書きできる。既定には依存の宣言(ロックファイル・マニフェスト)の差分、宣言のないメタループの編集、[commit 直前の対象の照合](#commit-直前の対象の照合)で定める対象の再変化を含める。メタループの編集は `.devkit/`(`run/` を除く)・`devkit.toml`・ホストの設定・指示ファイル・skill・git hook(`core.hooksPath` の先の pre-commit)の変更である。`.devkit/` にはループの雛形を置く `.devkit/plans/` も含まれる。検証そのものを変える編集なので、メタループの編集を宣言したステージ以外では人が確認する。
+- **仕組み**: 「人に確認する」は kit の分類表の既定データとし、リポジトリ側の追記で上書きできる。既定には依存の宣言(ロックファイル・マニフェスト)の差分、宣言のないメタループの編集を含める。メタループの編集は `.devkit/`(`run/` を除く)・`devkit.toml`・ホストの設定・指示ファイル・skill・git hook(`core.hooksPath` の先の pre-commit)の変更である。`.devkit/` にはループの雛形を置く `.devkit/plans/` も含まれる。検証そのものを変える編集なので、メタループの編集を宣言したステージ以外では人が確認する。
 - **置き場所**: `kit/router/` の既定、`devkit.toml` の追記、`internal/router/` の分類。hook の稼働を確認できない場合は[再開と hook の稼働確認](#再開と-hook-の稼働確認)で扱う。
 
-「暫定判断で進めてレビューで確認する」場合は、問いを起票せず、暫定の決定を `devkit note` で記録して進み、次のゲートまたは PR レビューで人が確認する。router の分類の出力としては「修正する」または「完了する」で返す。
+対象の再変化は[commit 直前の対象の照合](#commit-直前の対象の照合)で定める必須の受理境界であり、分類表の追記で上書きできない。
+
+分類表で「暫定判断で進めてレビューで確認する」とした場合は、問いを起票せず、暫定の決定を `devkit note` で記録して進み、次のゲートまたは PR レビューで人が確認する。router の分類の出力としては「修正する」または「完了する」で返す。
 
 #### 教訓の反映先
 

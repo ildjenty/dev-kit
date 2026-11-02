@@ -73,7 +73,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### engine
 
-- **責務**: [処理の流れ](flow.md)の状態機械を進める。`start --plan <name>` の雛形の指定と作業作成、`next` の結果の受理と指示の計算、brief・判定依頼の書き出し、`submit` の終了ブロックと成果物の受理、判定コマンドの判定の実行、[`command:` の check の実行](flow.md#作業結果の判定)、router の判断の記録を担う。`plan` の提案とゲート、`answer` の回答、`external` の要求、`note` の決定と証拠を受理する。教訓には router の「教訓の反映先」の分類を付けて記録する。判定前は workspace へ pre-commit の実行を依頼し、完了時は `git commit` を依頼する。失敗は[完了条件](guarantees.md#完了条件)に従って「修正する」として記録する。受理の境界は[整合性](data.md#整合性の境界)と[保証](guarantees.md)に従う。
+- **責務**: [処理の流れ](flow.md)の状態機械を進める。`start --plan <name>` の雛形の指定と作業作成、`next` の結果の受理と指示の計算、brief・判定依頼の書き出し、`submit` の終了ブロックと成果物の受理、判定コマンドの判定の実行、[`command:` の check の実行](flow.md#作業結果の判定)、router の判断の記録を担う。`plan` の提案とゲート、`answer` の回答、`external` の要求、`note` の決定と証拠を受理する。教訓には router の「教訓の反映先」の分類を付けて記録する。判定前は workspace へ pre-commit の実行を依頼し、完了時は `git commit` を依頼する。pre-commit と commit の成否、完了の記録は[完了条件](guarantees.md#完了条件)に従う。受理の境界は[整合性](data.md#整合性の境界)と[保証](guarantees.md)に従う。
 - **持つデータ**: 現在の作業、StageRun、ラウンド、指示の計算結果を扱う。永続化する状態はすべて ledger に記録する。
 - **公開する契約**: `start`・`next`・`submit`・`plan`・`answer`・`external`・`note`・`abort` に対応する操作を公開する。実装の接続は[ポート](#モジュール境界と入出力の集約)の方針に従う。
 - **依存**: plan、brief、check、router、ledger、form、workspace、external、ledger/fsstore に依存する。
@@ -108,7 +108,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **責務**: git CLI を使い、次の操作を担う。
 
   - ブランチの作成と切り替え。
-  - 対象のバージョンとなるスナップショットとコミットオブジェクトの作成、`git show` による読み出し、一時インデックスからの `git read-tree` と `git checkout-index --prefix` による展開。
+  - 対象のバージョンとなるスナップショットとコミットオブジェクトの作成、コミットのツリーハッシュの取得、`git show` による読み出し、一時インデックスからの `git read-tree` と `git checkout-index --prefix` による展開。
   - 一時 index を `GIT_INDEX_FILE` で与える `git hook run pre-commit` と、[完了条件](guarantees.md#完了条件)に従う返却後のスナップショットと同じ index での `git commit`(hook を有効にして)。
   - 変更ファイルの一覧と `.devkit/structure.json` の履歴の取得、`core.hooksPath` の設定、cwd のブランチ名の取得、チェックアウトのルートの解決、`git config user.name` の取得。
 - **持つデータ**: 基点コミット、ブランチ、ツリーとコミットオブジェクト、一時インデックス、refs、git から取得したリポジトリ情報を扱う。
@@ -146,7 +146,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **持つデータ**: 記録と構造の解析済みの値、表示用の派生値、生成する HTML を扱う。新着は最後の状態変更(閲覧)より後に追加された記録、必読集合は未回答の問い・未確認の blocking の指摘・有効な暫定判断・構造の変化とする。
 - **公開する契約**: `devkit view` で静的 HTML を生成する。
 - **依存**: ledger、問いを描画する form、ステージ名を持つ plan に依存する。
-- **置くもの・置かないもの**: 人向けの表示を置く。サーバは持たない。状態変更は HTML から行わず、チャット経由の `answer` で記録する。
+- **置くもの・置かないもの**: 人向けの表示を置く。サーバは持たない。状態変更は HTML から行わず、[決定と証拠](data.md#決定と証拠-decision--evidence)の経路で記録する。
 
 #### view の表示構成
 

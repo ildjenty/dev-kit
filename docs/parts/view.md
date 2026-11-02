@@ -16,11 +16,11 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 #### 冒頭の固定形式
 
-作業の現在地と人の次の行動は [view の表示構成](../architecture/modules.md#view-の表示構成)に従って示す。[記録の網羅性](../architecture/modules.md#view)(`submit` が成果物を記録した範囲)の定義と入力はリンク先に従う。
+作業の現在地と人の次の行動は [view の表示構成](../architecture/modules.md#view-の表示構成)に従って示す。[記録の網羅性](../architecture/modules.md#view)の定義と入力はリンク先に従う。
 
 #### 主表示
 
-表示のまとまりと各項目の属性は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。[新着](../architecture/modules.md#view)(最後の状態変更(閲覧)より後に追加された記録)の基準は、正本の定義に従う。
+表示のまとまりと各項目の属性は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。[新着](../architecture/modules.md#view)の基準は、正本の定義に従う。
 
 ##### 要対応
 
@@ -28,7 +28,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 ##### 現在の到達点と有効な変更
 
-有効な変更と、撤回する場合に満たす必要がある条件を含む暫定判断の表示は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。[確認範囲の地図](../architecture/modules.md#view)(完了条件ごとの対象のバージョン・方法・確認した範囲・未確認の範囲の一覧)を示す。
+有効な変更と、撤回する場合に満たす必要がある条件を含む暫定判断の表示は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。[確認範囲の地図](../architecture/modules.md#view)を示す。
 
 ##### 経緯
 
@@ -38,7 +38,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 要対応の各項目は、[判断対象](../architecture/modules.md#view-の表示構成)(人が確認・判断する対象)ごとに正本の表示構成に従ってまとめ、[form の問い](form.md#問い)(人への確認事項)の文面を引き継ぐ。
 
-確認状況には、[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(確認対象の識別)が照合対象と一致するかを示す。[規範の識別](../architecture/data.md#check-の結果-judgment)(判定に使った規則の識別)についても、照合対象と一致するかを別に示す。判定値と有効性の条件は[判定結果](../architecture/data.md#check-の結果-judgment)(観点から対象を判定した記録)に従う。
+確認状況の表示項目は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。判定値と有効性の条件は[判定結果](../architecture/data.md#check-の結果-judgment)(観点から対象を判定した記録)に従う。
 
 #### 閲覧の記録と確認済みの集合
 

@@ -36,7 +36,7 @@ check とゲート(人の承認を待つ関門)は、次の規則で組む。
 
 - 画面・データ・外部との通信を変えるステージには、観点[「動作検証」](checks.md#動作検証)の check を置く。
 - 人によるレビューゲートの理由の書き方は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。人に確認する条件は[人への確認対象](architecture/guarantees.md#人への確認対象)で定める。
-- 画面のデザインを始める前のレビューゲートでは、[問いの定義](architecture/data.md#問い-question)に従ってツリーのスナップショットを承認対象とする。
+- 画面のデザインを始める前のレビューゲートの承認対象は、[問いの定義](architecture/data.md#問い-question)に従う。
 - check の追加・必須化の判断は [`principles/harness.md` の原則5](../principles/harness.md#5-防ぐ失敗と運用負担から仕組みを選ぶ)に従う。[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は、[検出試験](architecture/guarantees.md#検出試験)(観点ファイルが期待する判定を出せるかの試験)に従う。
 
 ステージ間の前提と戻り先の設計は [`principles/harness.md` の原則3](../principles/harness.md#3-前提が崩れたときに戻るステージを決める)に従う。戻り先の表現は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)、入力の組み立ては[作業の指示](architecture/flow.md#作業の指示)、再計画は[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
