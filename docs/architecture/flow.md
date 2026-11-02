@@ -4,7 +4,7 @@
 
 ## 作業の開始
 
-人は通常どおりセッションを開き、kit の skill で課題を伝える。エージェントは `devkit start --plan <name> <課題>` で[雛形](data.md#ループの雛形-plantemplate)を指定する。`--plan` の省略時は kit の既定 `default` を使う。engine は作業 ID とブランチを作り、基点コミットと kit のバージョンを記録して[セッションを束縛](data.md#セッションとブランチ)する。返すのは計画者への指示 ID と `brief/<指示 ID>.md` のパスである。
+人は通常どおりセッションを開き、kit の skill で課題を伝える。エージェントは `devkit start --plan <name> <課題>` で[雛形](data.md#ループの雛形-plantemplate)を指定する。`start --plan <name>` の解決先は `.devkit/plans/` だけとし、`--plan` の省略時は育てるもの側の `.devkit/plans/default.json` を使う。engine は作業 ID とブランチ `devkit/<作業 ID>` を作ってチェックアウトを切り替え、基点コミットと kit のバージョンを記録して[セッションを束縛](data.md#セッションとブランチ)する。返すのは計画者への指示 ID と `brief/<指示 ID>.md` のパスである。
 
 エージェントは `devkit-planner` を、[定型の prompt](guarantees.md#判定結果の受理)で起動する。計画者が雛形から計画を作るときに行うのは、完了条件を書く、課題に関係のないステージを外す、check の対象(画面・データ・外部通信)を指定する、必要なら調査・試作のステージを雛形の候補から足すことだけである。雛形からの逸脱は [Plan](data.md#計画-plan) の承認条件に従う。計画者が最終メッセージで計画を返すと、[SubagentStop](hooks.md#subagentstop)が結果を保存する。次の `devkit next` で engine が結果を受理し、JSON Schema で検証して提案中の計画として記録する。
 
@@ -16,7 +16,7 @@
 
 ## 作業の指示
 
-`devkit next` は現在の StageRun とラウンドを特定する。[hook の稼働](guarantees.md#再開と-hook-の稼働確認)を確認し、[対象のバージョン](data.md#対象のバージョン-targetversion)を取得して、識別したセッション ID をラウンドに結び付ける。engine は brief をファイルに書き、[出力上限](guarantees.md#性能と出力の上限)に応じて返す。人が担当するステージなら問いを起票し、回答待ちにする。
+`devkit next` は現在の StageRun とラウンドを特定する。[hook の稼働](guarantees.md#再開と-hook-の稼働確認)を確認し、[対象のバージョン](data.md#対象のバージョン-targetversion)を取得して、識別したセッション ID をラウンドに結び付ける。engine は brief をファイルに書き、[出力上限](guarantees.md#性能と出力の上限)に応じて返す。人が担当するステージの扱いは [Plan の担当](data.md#計画-plan)に従う。
 
 brief にはステージ定義、前のステージの出力、リポジトリの事実(配置ガイド、`rules.md` の元に戻せないもの、利用可能な check)を含める。修正ラウンドには前回の指摘と指摘 ID も含める。規範の参照先は [kit のコピー](modules.md#kit)と `.devkit/checks/` であり、読み出しは[規範の固定](guarantees.md#規範の固定)に従う。
 
@@ -28,13 +28,13 @@ engine は `submit` で終了ブロックを受理し、返却後の[スナッ�
 
 ## 作業結果の判定
 
-[Plan の check の実行順と失敗時の規則](data.md#計画-plan)に従い、engine はステージに置いたコマンドの check を実行する。
+engine はステージに置いた `command:` の check をすべて判定者の check より先に実行する。雛形の列挙順は同じ種類の中だけ有効とする。作業ツリーから一時 index で `write-tree` を取り、返却後のスナップショットと一致することを確かめてから、その作業ツリーで実行する。環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。終了コードと出力を Judgment に変換し、終了コードが0なら `PASS`、0以外なら `FAIL`、期限超過は `NOT ASSESSED` とする。必須の `command:` の check が `FAIL` なら、pre-commit も判定者も実行せず、engine が「修正する」として記録して出力を次の brief に含める。
 
-判定の指示を返す前に、engine は返却後のツリーに対して pre-commit を実行する([完了条件](guarantees.md#完了条件))。失敗なら判定者を起動せず、router が「修正する」に分類する。
+続いて、判定の指示を返す前に engine は[完了条件](guarantees.md#完了条件)の入力条件で `git hook run pre-commit` を実行する。失敗なら判定者を起動せず、router に渡さず engine が「修正する」として記録し、hook の出力を次の brief に含める。
 
 `devkit next` は判定依頼を `brief/<指示 ID>.md` に書き、[対象を展開](guarantees.md#判定対象の展開と完了時の永続化)して、指示 ID と展開先のパスを返す。依頼には規範、観点ファイル、対象の展開先、最終メッセージとして返す JSON の形式、修正ラウンドなら前回の指摘 ID を含める。
 
-エージェントが判定者を起動し、判定者は結果を最終メッセージで返す。hook が観測を添えて保存し、次の `next` が[判定結果の受理](guarantees.md#判定結果の受理)に従って Judgment を記録・集約する。登録コマンドを担当とする判定は `devkit` が実行し、同じ受理境界に従う。
+エージェントが判定者を起動し、判定者は結果を最終メッセージで返す。hook が観測を添えて保存し、次の `next` が[判定結果の受理](guarantees.md#判定結果の受理)に従って Judgment を記録・集約する。判定コマンドを担当とする判定は `devkit` が実行し、同じ受理境界に従う。
 
 ## router の判断
 
@@ -43,13 +43,13 @@ engine は [Finding と完了条件 ID](data.md#指摘-finding)の差分から�
 - **修正する**: 次の `next` が指摘を取り込んだ brief を返す。
 - **人に確認する**: 問いを記録し、StageRun を回答待ちにして、`next` が問いの指示を返す。[既定の分類](guarantees.md#人への確認対象)を使う。
 - **前のステージに戻る**: [再計画の扱い](data.md#計画のバージョン)に従って旧 StageRun と提案を更新し、`next` が計画者への指示を返す。
-- **完了する**: [完了条件](guarantees.md#完了条件)に従い、workspace が `git commit` を実行してリポジトリの pre-commit を動かす。失敗なら「修正する」へ進み、成功ならステージ完了を記録して次のステージへ進む。最後のステージなら作業完了を記録して、`next` が完了の指示を返す。
+- **完了する**: [完了条件](guarantees.md#完了条件)に従い、workspace が `git commit` を実行してリポジトリの pre-commit を動かす。失敗なら router に渡さず engine が「修正する」として記録し、hook の出力を次の brief に含める。成功ならステージ完了を記録して次のステージへ進む。最後のステージなら作業完了を記録して、`next` が完了の指示を返す。
 
 ## 人の回答と再開
 
-人の判断が必要なら、エージェントはチャットで問いを見せてセッションを終える。人の入力を hook が観測し、エージェントが `devkit answer <問い ID>` で記録して `devkit next` で続ける。`answer` は[決定の状態変更](data.md#決定と証拠-decision--evidence)も受け付ける。訂正は[回答の受理](guarantees.md#回答の受理)に従う。
+人の判断が必要なら、エージェントはチャットで問いを見せてターンを終える。人の入力を hook が観測し、エージェントが `devkit answer <問い ID>` で記録して `devkit next` で続ける。`answer` は[決定の状態変更](data.md#決定と証拠-decision--evidence)も受け付ける。訂正は[回答の受理](guarantees.md#回答の受理)に従う。
 
-セッションをまたぐ再開はホストのセッション再開と [SessionStart](hooks.md#sessionstart)の注入で行う。停止の可否は [Stop](hooks.md#stop)、引き継ぐ状態は [checkpoint](data.md#checkpoint)に従う。
+セッションをまたぐ再開はホストのセッション再開と [SessionStart](hooks.md#sessionstart)の注入で行う。新しいセッションからの束縛とブランチ不一致時の扱いは[セッションとブランチ](data.md#セッションとブランチ)、指示の出し直しは[指示](data.md#指示-instruction)に従う。停止の可否は [Stop](hooks.md#stop)、引き継ぐ状態は [checkpoint](data.md#checkpoint)に従う。
 
 ## 外部操作
 

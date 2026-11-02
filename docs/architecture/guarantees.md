@@ -6,15 +6,16 @@ kit は事故、自己評価の偏り、再開時の食い違い、バージョ�
 
 作業者(セッションのエージェント)と評価対象のコードに悪意はないものとする。記録や承認の偽造、規範を書き換えて check を通す細工、資格情報の窃取は、同じ OS 利用者の権限で動く kit では防げないため範囲外とする。チームでは育てるものを git 管理し、PR レビューで確認できるようにする。[principles/harness.md](../../principles/harness.md) の原則5に従い、この前提を超える保証の仕組みは設けない。記録には秘密情報を書かない。
 
-pre-commit hook と登録コマンドの権限および人のレビューは[権限の境界](#権限の境界)に従う。エージェントが書いたテストコードも同じ権限で動くことを信頼の前提に含める。
+pre-commit hook・判定コマンド・検証コマンドの権限および人のレビューは[権限の境界](#権限の境界)に従う。エージェントが書いたテストコードも同じ権限で動くことを信頼の前提に含める。
 
 ## 実装対象外の機能
 
 git と、Claude Code・Codex CLI の両方にある機能で賄えるものは kit で実装しない。[principles/designing.md](../../principles/designing.md) の原則5に従う。
 
 - ブランチ、worktree、ignore、履歴、アーカイブ、利用者の名前は git に任せる。
-- sandbox、permissions、hook の登録、skill、指示ファイル、サブエージェントの起動と隔離、セッション再開と compaction、人とのやり取りはホストに任せる。
-- kit が持つのは、ホストに対応する機能がないループ計画の状態機械、記録、check の依頼の作成と結果の受理、[コマンドの check の実行](data.md#計画-plan)、router の判断、外部操作の冪等性である。pre-commit との関係は[完了条件](#完了条件)に従う。
+- sandbox、hook の登録と実行の仕組み、permissions、skill、指示ファイル、サブエージェントの起動と隔離、セッション再開と compaction、人とのやり取りはホストに任せる。
+- kit が持つのは、計画・依頼・判定・分類・形式(plan・brief・check・router・form)、記録と保存(ledger・ledger/fsstore)、進行と外部操作(engine・external)、ホストとの接続(hook・host/event)、git 操作(workspace)、設定・導入・固定物(config・install・kit)、表示(view)、組み立て(cmd/devkit)である。契約は[モジュール](modules.md#モジュールごとの契約)に従う。
+- `[deny]` は束縛のあるセッションに限って効かせるため kit が照合する。`permissions.deny` では範囲が広すぎる。
 
 ## 防ぐ失敗と対策
 
@@ -27,43 +28,45 @@ git と、Claude Code・Codex CLI の両方にある機能で賄えるものは 
 ### 完了条件
 
 - **失敗**: 未検証の変更や未判定の要求を完了に含める。
-- **仕組み**: ステージの完了には、返却後の対象のバージョンに対するすべての必須 check(`command:` の check を含む)の `PASS`、必須 check の観点と担当に対する検出試験の合格、そして `devkit` が行う `git commit` の成功が必要である。検出試験の対象は[観点ファイル](#検出試験)に限る。Judgment は対象と規範の識別が一致する[有効なもの](data.md#check-の結果-judgment)に限る。Stop hook はこの条件を照合しない。
+- **仕組み**: ステージの完了には、返却後の対象のバージョンに対するすべての必須 check(`command:` の check を含む)の `PASS`、必須 check のうち判定者が担当する観点とその担当に対する検出試験の合格、そして `devkit` が行う `git commit` の成功が必要である。検出試験の対象は[検出試験](#検出試験)に従う。Judgment は対象と規範の識別が一致する[有効なもの](data.md#check-の結果-judgment)に限る。Stop hook はこの条件を照合しない。
 - **置き場所**: `internal/plan/` の完了条件の規則を `internal/router/` が照合し、`internal/engine/` が `internal/workspace/` にコミットを依頼してステージ完了を記録する。
 
-ステージごとに選ぶ検証は雛形の check として置き、pre-commit はステージに関係なく完了時のコミットで必ず通る検証である。devkit は検証の集合を自分で決めず、省略も監視しない。何を置くかは雛形を組む人が決め、[雛形からの逸脱](data.md#計画-plan)は計画の check と人のゲートで見る。
+完了の確定では、条件を満たさない完了の主張を完了として扱わない。ステージごとに選ぶ検証は雛形の check として置き、pre-commit はステージに関係なく完了時のコミットで必ず通る検証である。devkit は検証の集合を自分で決めず、省略も監視しない。何を置くかは雛形を組む人が決め、[雛形からの逸脱](data.md#計画-plan)は計画の check と人のゲートで見る。
 
-`devkit` は完了時に、返却後のスナップショットと同じ内容の index で本物の `git commit` を実行する。`--no-verify` は使わず、リポジトリの pre-commit hook がそこでテストや lint を走らせる。commit の失敗は router の「修正する」に分類し、hook の出力を次の brief に含める。commit の成功がその対象のバージョンに対する pre-commit の検証の記録であり、コミットのハッシュを StageRun の完了記録に残す。pre-commit の別の検証結果の記録は持たない。
+`devkit` は完了時に、返却後のスナップショットと同じ内容の index で本物の `git commit` を実行する。`--no-verify` は使わず、pre-commit hook がリポジトリで定義した検証を走らせる。commit の失敗は router に渡さず engine が「修正する」として記録し、hook の出力を次の brief に含める。commit の成功がその対象のバージョンに対する pre-commit の検証の記録であり、コミットのハッシュを StageRun の完了記録に残す。pre-commit の別の検証結果の記録は持たない。
 
-commit の直前に、作業ツリーから一時インデックスで `write-tree` を取り、返却後のスナップショットと一致することを確かめる。一致しなければ commit せず、変更後のツリーで返却後のスナップショットと成果物を更新して判定からやり直す。取り直しは1回だけとし、2回目も変われば問いを起票する。
+commit 直前は[対象の照合](#commit-直前の対象の照合)に従う。
 
 commit 時には環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。
 
 hook の共有は git の `core.hooksPath` による。`init` は、リポジトリに hook の仕組み(husky、pre-commit フレームワーク、既存の `core.hooksPath`)がなければ `.githooks/` を作って `core.hooksPath` を向け、空の pre-commit を置く。既にあれば触らない。`doctor` は pre-commit が存在することを確認する。
 
-フォーマッタが pre-commit でファイルを書き換える構成では commit が失敗し、作業ツリーに差分が残る。これは「修正する」として次のラウンドに渡す。判定の指示を返す前に、`devkit` は `git hook run pre-commit`(git 2.36 以降)で同じ hook を返却後のツリーに対して実行し、失敗なら判定者を起動せずに router の「修正する」に分類して出力を次の brief に含める。`init` が git のバージョンを確認し、使えない環境では pre-commit による検証は完了時の commit だけで行う。判定前の実行は早く失敗を知るためのもので、pre-commit による完了条件の記録は commit の成功だけである。
+フォーマッタが pre-commit でファイルを書き換える構成では commit が失敗し、作業ツリーに差分が残る。engine が「修正する」として記録し、次のラウンドに渡す。判定前も `git hook run pre-commit`(git 2.36 以降)で同じ hook を実行する。commit 時と同じ入力条件になるよう、返却後のスナップショットと同じ内容の一時 index を `GIT_INDEX_FILE` で与え、作業ツリーから一時 index で `write-tree` を取ってスナップショットと一致することを確かめてから実行する。`DEVKIT_STAGE` と `DEVKIT_WORK` も commit 時と同じく渡す。失敗は router に渡さず engine が「修正する」として記録し、hook の出力を次の brief に含める。実行順は[作業結果の判定](flow.md#作業結果の判定)に従う。`init` が git のバージョンを確認し、使えない環境では pre-commit による検証は完了時の commit だけで行う。判定前の実行は早く失敗を知るためのもので、pre-commit による完了条件の記録は commit の成功だけである。
 
 ### 規範の固定
 
 - **失敗**: ラウンド中に規範を書き換え、そのラウンドの判定を有利にする。
-- **仕組み**: 観点ファイル、登録コマンドの定義、分類表の追記、`[deny]`、サブエージェントの定義は、ラウンド開始時のスナップショットから `git show` で読む。編集中の値は次のラウンドから適用する。変更は対象のバージョンの差分に現れ、メタループの編集を宣言していないステージなら[人への確認対象](#人への確認対象)で扱う。ラウンド外の計画・ゲート・検出試験の間は、作業のブランチの HEAD(直前の完了コミット、なければ基点コミット)の `devkit.toml` から `[deny]` を読む。
+- **仕組み**: [規範の識別](data.md#check-の結果-judgment)に含まれるものはすべて、ラウンド開始時のスナップショットから `git show` で読む。例えば、観点ファイル、検証コマンドと判定コマンドの定義、分類表の追記、`[deny]`、サブエージェントの定義、rules.md、ループの雛形、kit のコピー、指示ファイル(AGENTS.md と CLAUDE.md)が含まれる。編集中の値は次のラウンドから適用する。変更は対象のバージョンの差分に現れ、メタループの編集を宣言したステージ以外なら[人への確認対象](#人への確認対象)で扱う。
 - **置き場所**: `internal/engine/` のラウンド開始と、`internal/workspace/` の読み出し。hook の deny の読み出しもこの境界に従う。
+
+ラウンド外の判定(計画の check、検出試験)では、指示を出す時点でスナップショットを取り、規範の識別・読み出しと Judgment の有効性の照合に使う。ラウンド外の `[deny]` も同じスナップショットから読む。観点ファイルの参照元は kit のコピー(`.devkit/kit/<バージョン>/checks/`)と `.devkit/checks/` の両方である。
 
 ### 判定結果の受理
 
 - **失敗**: 作成者自身が `PASS` を付けたり、自己評価を依頼文に混ぜたり、別の条件で得た判定を流用したりする。
-- **仕組み**: 判定者・計画者の起動時の prompt は `devkit instruction <指示 ID>` だけの1行とする。定義には、それ以外を含むなら `NOT ASSESSED` を返し、依頼の本文は `brief/<指示 ID>.md` から読むと記載する。起動の制限は [PreToolUse](hooks.md#pretooluse)、最終メッセージと来歴の採取は [SubagentStop](hooks.md#subagentstop)に従う。
+- **仕組み**: 判定者・計画者の起動時の prompt は、実行しない固定文字列 `devkit-instruction <指示 ID>` だけの1行とする。これはサブコマンドではない。定義には、それ以外を含むなら `NOT ASSESSED` を返し、指示 ID は作業 ID を含むので、依頼の本文は `.devkit/run/work/<作業 ID>/brief/<指示 ID>.md` を解決して読むと記載する。起動の制限は [PreToolUse](hooks.md#pretooluse)、最終メッセージと来歴の採取は [SubagentStop](hooks.md#subagentstop)に従う。
 - **置き場所**: `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` の定義、`internal/check/` の受理、`internal/engine/` の `next`。
 
-`next` は SubagentStop hook が書いた結果ファイルだけを読み、スキーマ、指示 ID、対象のバージョン、規範の識別を照合する。さらに、最初の利用者メッセージが上の定型と一致し、定義ファイルの内容ハッシュがラウンド開始時の固定と一致し、観測した effort(Claude Code)または model(Codex)が定義の値と一致することを検証する。不一致は受理せず、エージェントが書いたファイルや標準出力も受理しない。
+`next` は SubagentStop hook が書いた結果ファイルだけを読み、スキーマ、指示 ID、対象のバージョン、規範の識別を照合する。さらに、最初の利用者メッセージが上の定型と一致し、定義ファイルの内容ハッシュが[規範の固定](#規範の固定)で定めるスナップショット内の定義と一致し、観測した effort(Claude Code)または model(Codex)が定義の値と一致することを検証する。不一致は受理せず、エージェントが書いたファイルや標準出力も受理しない。
 
-同じ指示 ID に複数の結果があれば、SubagentStop の観測時刻が最も早いものだけを受理し、他は参考として記録に残す。判定が食い違えば Finding に `needs-decision` として含める。登録コマンドの判定と `command:` の check は `devkit` が実行し、同じ受理境界で Judgment に変換する。`command:` の結果の変換と実行順は [Plan](data.md#計画-plan) に従う。
+同じ指示 ID に複数の結果があれば、SubagentStop の観測時刻が最も早いものだけを受理し、他は参考として記録に残す。判定が食い違えば Finding に `needs-decision` として含める。判定コマンドの判定と `command:` の check は `devkit` が実行し、同じ受理境界で Judgment に変換する。`command:` の結果の変換と実行順は[作業結果の判定](flow.md#作業結果の判定)に従う。
 
 適用除外の主張と根拠がある場合は、それによって対象から外れる要求に限って違反としない。判定は、`FAIL`、`NOT ASSESSED`、`PASS` の優先順で集約する。
 
 ### 検出試験
 
 - **失敗**: 違反を検出できるか確かめていない観点を、必須 check にする。
-- **仕組み**: 対象は観点ファイルだけとする。違反例では `FAIL`、適合例・許容例では `PASS` を期待する。[principles/harness.md](../../principles/harness.md) の原則2に従い、計画の担当と一致する[合格記録](data.md#検出試験の記録-detectiontest)がない観点は必須 check にしない。記録が不足すれば、`next` はラウンドを開く前に検出試験を指示し、合格を記録してから開始時のスナップショットを取る。不合格なら観点を修正するか必須から外すかの問いを起票し、停止する。
+- **仕組み**: 対象は判定者(サブエージェントと判定コマンド)が担当する観点ファイルだけとし、`command:` の check は検出試験を要しない。違反例では `FAIL`、適合例・許容例では `PASS` を期待する。[principles/harness.md](../../principles/harness.md) の原則2に従い、計画の check の実行主体と一致する[合格記録](data.md#検出試験の記録-detectiontest)がない観点は必須 check にしない。記録が不足すれば、`next` はラウンドを開く前に検出試験を指示し、合格を記録してから開始時のスナップショットを取る。不合格なら観点を修正するか必須から外すかの問いを起票し、停止する。
 - **置き場所**: `internal/check/` の試験仕様と結果の判定、`internal/engine/` の `next`、`.devkit/detect.json` の合格記録の索引。
 
 ### 回答の受理
@@ -79,7 +82,7 @@ hook の共有は git の `core.hooksPath` による。`init` は、リポジト
 ### commit 直前の対象の照合
 
 - **失敗**: 判定後にファイルが変更され、判定・完了・コミットの対象が食い違う。
-- **仕組み**: [完了条件](#完了条件)の commit 直前の `write-tree` 照合と、対象の取り直しに従う。
+- **仕組み**: commit の直前に、作業ツリーから一時インデックスで `write-tree` を取り、返却後のスナップショットと一致することを確かめる。一致しなければ commit せず、変更後のツリーで返却後のスナップショットと成果物を更新して判定からやり直す。取り直しは1回だけとし、2回目も変われば問いを起票する。
 - **置き場所**: `internal/engine/` の完了の確定と、`internal/workspace/` の一時インデックス。
 
 ### 判定対象の展開と完了時の永続化
@@ -109,7 +112,7 @@ hook の共有は git の `core.hooksPath` による。`init` は、リポジト
 ### 誤った場所への書き込みと危険な操作
 
 - **失敗**: チェックアウト外への書き込み、元に戻せない操作、external を迂回する外部書き込み、結果ファイルへの通常の書き込みが起きる。
-- **仕組み**: 書き込み先と外部通信は[権限の境界](#権限の境界)で制限する。危険な操作と迂回は [PreToolUse](hooks.md#pretooluse)の `[deny]` で止める。結果ファイルへの Write・リダイレクト・`cat`・`tee` による書き込みも deny で止め、それ以外は信頼の前提の範囲とする。
+- **仕組み**: 書き込み先と外部通信は[権限の境界](#権限の境界)で制限する。危険な操作と迂回は [PreToolUse](hooks.md#pretooluse)の `[deny]` で止める。結果ファイルへの通常の書き込みは[操作の禁止](#操作の禁止とサブエージェントの制限)の `permissions.deny` と、[PreToolUse](hooks.md#pretooluse)の「リダイレクト・置換を含むコマンドは分割せず deny」で止め、それ以外は信頼の前提の範囲とする。
 - **置き場所**: ホストの sandbox と permissions、`devkit.toml` の `[deny]`、`internal/hook/` の PreToolUse、`internal/install/` の設定の追記。
 
 ### 再開と hook の稼働確認
@@ -118,12 +121,12 @@ hook の共有は git の `core.hooksPath` による。`init` は、リポジト
 - **仕組み**: [StageRun の束縛](data.md#計画のバージョン)、[指示 ID](data.md#指示-instruction)、[セッションとブランチ](data.md#セッションとブランチ)、[checkpoint](data.md#checkpoint)で現在地を復元する。途中でセッションが終わっても作業は「作業中」のまま残り、次のセッションに引き継ぐ。継続は [Stop](hooks.md#stop)が補助し、唯一の保証とはしない。
 - **置き場所**: `internal/engine/` の受理前の照合、セッションの観測、`internal/hook/` の SessionStart と Stop。
 
-`devkit` は Bash のツール呼び出しなので、その直前に PreToolUse が発火する。`next`・`submit`・`answer`・`external` は、同じセッションの PreToolUse の最終観測が呼び出し直前(数秒以内)にあることを照合する。なければ処理を拒否し、「hook が動いていない。`devkit doctor` と `/hooks` を確認する」と返す。ゲートの承認もこの照合を通らなければ受理しない。`next` は状態を進めず「hook の稼働を確認する」指示を返す。
+`devkit` は Bash のツール呼び出しなので、その直前に PreToolUse が発火する。`next`・`submit`・`answer`・`external`・`plan`・`note` は、同じセッションの PreToolUse の最終観測が呼び出し直前(数秒以内)にあることを照合する。なければ `next` は状態を進めず「hook の稼働を確認する」指示を返す。それ以外の書く操作は拒否し、`answer` を含め拒否理由に「hook が動いていない。`devkit doctor` と `/hooks` を確認する」を含める。ゲートの承認もこの照合を通らなければ受理しない。
 
 ### 人への確認対象
 
 - **失敗**: 依存やループ自身の変更を、確認なしに進める。
-- **仕組み**: 「人に確認する」は kit の分類表の既定データとし、リポジトリ側の追記で上書きできる。既定には依存の宣言(ロックファイル・マニフェスト)の差分、宣言のないメタループの編集、[完了条件](#完了条件)で定める対象の再変化を含める。メタループの編集は `.devkit/`・`devkit.toml`・ホストの設定・指示ファイル・skill・git hook(`core.hooksPath` の先の pre-commit)の変更である。`.devkit/` にはループの雛形を置く `.devkit/plans/` も含まれる。検証そのものを変える編集なので、検証の構築を宣言したステージ以外では人が確認する。
+- **仕組み**: 「人に確認する」は kit の分類表の既定データとし、リポジトリ側の追記で上書きできる。既定には依存の宣言(ロックファイル・マニフェスト)の差分、宣言のないメタループの編集、[commit 直前の対象の照合](#commit-直前の対象の照合)で定める対象の再変化を含める。メタループの編集は `.devkit/`(`run/` を除く)・`devkit.toml`・ホストの設定・指示ファイル・skill・git hook(`core.hooksPath` の先の pre-commit)の変更である。`.devkit/` にはループの雛形を置く `.devkit/plans/` も含まれる。検証そのものを変える編集なので、メタループの編集を宣言したステージ以外では人が確認する。
 - **置き場所**: `kit/router/` の既定、`devkit.toml` の追記、`internal/router/` の分類。hook の稼働を確認できない場合は[再開と hook の稼働確認](#再開と-hook-の稼働確認)で扱う。
 
 router の「教訓の反映先」の分類には、[ループの雛形](data.md#ループの雛形-plantemplate)を含める。
@@ -148,7 +151,7 @@ router の「教訓の反映先」の分類には、[ループの雛形](data.md
 
 エージェントの書き込み先と外部通信はホストの sandbox が制限する。`devkit` 自身は git への書き込み(スナップショット、refs、コミット)と外部操作のために sandbox の外で動く。
 
-pre-commit hook と登録コマンドは `devkit` の子プロセスとして sandbox の外で動き、専用の隔離は行わない。pre-commit hook はリポジトリが所有して人がレビューする。登録コマンドは `devkit.toml` の `[judges]`・`[commands]` に登録する育てるものであり、登録時に人がレビューする。
+pre-commit hook・判定コマンド・検証コマンドは `devkit` の子プロセスとして sandbox の外で動き、専用の隔離は行わない。pre-commit hook はリポジトリが所有して人がレビューする。判定コマンドは `devkit.toml` の `[judges]`、検証コマンドは `[commands]` に登録する育てるものであり、登録時に人がレビューする。
 
 - Codex は `.codex/rules/devkit.rules` の `prefix_rule(pattern=["devkit"], decision="allow")` を使う。sandbox の外で承認なしに動かす機能であり、experimental であることは確認済みである。
 - Claude Code は `sandbox.excludedCommands` の `devkit *` と `permissions.allow` の `Bash(devkit *)` を併用する。前者だけでは権限の問い合わせが残る。この挙動と、プロジェクト設定の `sandbox` が効くことは確認済みである。`init` は利便性のためこの allow を提案し、記録上の保証には使わない。

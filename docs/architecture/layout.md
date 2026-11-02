@@ -15,12 +15,12 @@ dev-kit/
     form/                固定フォーマットのスキーマと描画
     ledger/              記録の型と問い合わせ
       fsstore/           記録ごとに独立したファイルを作る実装。生成物の公開も担う
-    engine/              状態機械の進行、指示の計算、登録コマンドの実行、結果の受理
+    engine/              状態機械の進行、指示の計算、判定コマンドと検証コマンドの実行、結果の受理
     external/            外部への書き込みの唯一の実行経路
     hook/                ホストのイベント処理と観測の書き出し
     host/event/          イベント JSON の変換と出力の整形
     workspace/           git の操作
-    config/              devkit.toml の読み込み
+    config/              渡された TOML の解析と検証
     install/             導入と doctor
     view/                HTML の生成
   kit/                   固定物の埋め込み元
@@ -46,12 +46,13 @@ dev-kit/
 
 ```text
 <repo>/
-  devkit.toml                kit のバージョン、登録コマンド、外部操作、deny、分類表の追記。git 管理
+  devkit.toml                kit のバージョン、判定コマンドと検証コマンド、外部操作、deny、分類表の追記。git 管理
   .githooks/pre-commit       init が用意。既存の hook の仕組みがあれば作らない。git 管理
   .claude/settings.json      hook の登録、excludedCommands、記録・結果・観測・展開先への Edit の deny、Bash(devkit *) の allow の提案。init が項目を足す。git 管理
   .claude/agents/devkit-*.md 判定者・計画者のサブエージェント定義。init が書く。git 管理
   .claude/skills/devkit -> ../../.agents/skills/devkit   skill 単位のリンク。git 管理
   .codex/hooks.json          hook の登録。init が項目を足す。git 管理
+  .codex/config.toml         init が sandbox の項目を足す。git 管理
   .codex/rules/devkit.rules  devkit を sandbox の外で動かす allow。git 管理
   .codex/agents/devkit-*.toml 判定者・計画者のサブエージェント定義。git 管理
   .agents/skills/devkit/     skill の正本。Codex の置き場所
@@ -63,7 +64,7 @@ dev-kit/
     structure.json           構造ステージを使うときだけ
     kit/<バージョン>/         固定物のコピー。principles と部品の契約を含む
     run/                     実行の記録と生成物。.gitignore で除外
-      sessions/<session_id>.json   セッションの観測。作業の外にチェックアウトごとに置く
+      sessions/<session_id>/<時刻>-<イベント>.json   セッションの観測。作業の外にチェックアウトごとに置く
       work/<作業ID>/
         records/<ULID>.json  追記のみの記録
         run.lock
