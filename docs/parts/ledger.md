@@ -12,6 +12,8 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 作業の単位と識別は [Work](../architecture/data.md#作業-work)(課題単位のループ)の定義に従う。
 
+作業の中断・再開と現在地の関係は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)、受理条件は[中断](../architecture/guarantees.md#中断)に従う。
+
 ### 計画
 
 [計画](../architecture/data.md#計画-plan)(課題ごとの実行内容)に関する記録の分離と実行可能性の導出は[計画のバージョン](../architecture/data.md#計画のバージョン)に従う。

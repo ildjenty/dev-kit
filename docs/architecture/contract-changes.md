@@ -14,7 +14,7 @@
 - [runtime.md](../parts/runtime.md)の進行と入力の受け渡しを、[architecture.md「全体構成」](../architecture.md#全体構成)・[engine の操作](modules.md#engine)・[判定結果の受理](guarantees.md#判定結果の受理)・[回答の受理](guarantees.md#回答の受理)・[UserPromptSubmit](hooks.md#userpromptsubmit)に合わせて改訂した。
 - [runtime.md](../parts/runtime.md#ファイルの分類と置き場所)のファイルの分類と配置を、[所有と生存期間](data.md#所有と生存期間)・[利用側のリポジトリ](layout.md#利用側のリポジトリ)に合わせて改訂した。
 - [runtime.md](../parts/runtime.md)の hook と書き込み先を、[hook の共通処理](hooks.md#共通処理)・[記録の書き込みと排他](data.md#記録の書き込みと排他)に合わせて改訂した。
-- [runtime.md](../parts/runtime.md)の hook の共通処理と責務を、[Stop の観測内の継続回数と上限](hooks.md#stop)・[cmd/devkit](modules.md#cmddevkit)・[host/event](modules.md#hostevent)に合わせて改訂した。
+- [runtime.md](../parts/runtime.md)の hook の共通処理と責務を、[Stop の作業単位の継続回数と上限](hooks.md#stop)・[cmd/devkit](modules.md#cmddevkit)・[host/event](modules.md#hostevent)に合わせて改訂した。
 - [runtime.md](../parts/runtime.md)の停止・完了と skill 編集時の確認を、[停止の補助](hooks.md#stop)・[submit の終了ブロック](data.md#進捗-progress)・[完了条件](guarantees.md#完了条件)・[人への確認対象](guarantees.md#人への確認対象)に合わせて改訂した。
 - [runtime.md](../parts/runtime.md#ホストの差分と共通の仕組み)のホストの確認と実行権限を、[doctor](modules.md#doctor-の確認項目)・[セッションの観測](data.md#セッションの観測-sessionobservation)・[権限の境界](guarantees.md#権限の境界)に合わせて改訂した。
 - [runtime.md](../parts/runtime.md)の隔離・排他・委任の扱いを、[ホストに任せる範囲](guarantees.md#実装対象外の機能)・[作業の排他制御](data.md#作業の排他制御)・[定型の依頼](guarantees.md#判定結果の受理)に合わせて改訂した。
@@ -181,6 +181,7 @@ kit の skill の実装と調査の記録順の追加は未反映である。
 ### ledger
 
 - 参照の整合、決定の有効性、計画と承認の状態、checkpoint・確認済みの集合・未受理の指示の派生。
+- [中断・再開の状態](data.md#状態遷移と受理条件)と根拠の復元、中断前の現在地と到着した結果の保持、観測の取り込みの重複と取り込み後の削除。
 - [承認](data.md#回答承認-answer--approval)の再送・訂正・競合、古い問い、完了後の更新、観測削除後の根拠。
 - [指示 ID](data.md#指示-instruction)の作業・観点・計画・提案・試験ごとの差、出し直し、ラウンド前の識別と本文の扱い。
 - [成果物による網羅性](modules.md#view)と[観測時刻による実行状態](data.md#ステージの実行-stagerun)。
@@ -194,6 +195,11 @@ kit の skill の実装と調査の記録順の追加は未反映である。
 ### engine
 
 - 関数値を差し替えた Workspace・External と偽の結果・観測を使い、各操作列の遷移、進展、再計画、[状態遷移と受理条件](data.md#状態遷移と受理条件)の拒否境界。
+- [中断](guarantees.md#中断)について、ラウンド中・判定待ち・計画待ち・問い待ち・外部操作の実行中・修正ラウンド中・Stop の block 中を含む全状態からの遷移と元の状態への再開。
+- 完了・中止後の中断と再開で、終端の状態を取り消さないこと。
+- 中断中の `next` の反復で新しい指示・ラウンド・判定・計画・検証・外部操作・完了処理が始まらないこと。未取り込みの観測も照合し、実行中の処理から戻った後も新しい処理へ進まないこと。
+- 中断後の人の入力がない場合の状態と再開方法の応答、人の入力を観測した後の再開の記録、再度の中断、結果の到着・ツール呼び出し・別セッションだけでは再開しないこと。
+- 継続上限の問いの取り込み前後に `next` を繰り返しても、人の回答までは継続しないこと。
 - [指示](data.md#指示-instruction)の再現性・重複・古い結果、[束縛とブランチ](data.md#セッションとブランチ)、環境変数のない場合、[hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)。
 - [`command:` の check と pre-commit の実行順](flow.md#作業結果の判定)、必須コマンド失敗時の起動抑止、pre-commit 失敗を router に渡さず「修正する」として記録すること。
 - [commit 直前の対象の照合](guarantees.md#commit-直前の対象の照合)、対象の取り直しと再判定、再変化による問い、commit の成否と次の brief への接続。
@@ -205,11 +211,17 @@ kit の skill の実装と調査の記録順の追加は未反映である。
 - [操作 ID と要求 ID](guarantees.md#外部操作の二重適用)、成功・実行中・結果不明に対する再送と発生単位。
 - [承認と実行順序](guarantees.md#外部操作の承認)、計画の宣言・登録定義・実行ファイルの照合。
 - [許可値と入力](modules.md#external)、期限超過から照会または人への確認への分岐。
+- [中断](guarantees.md#中断)で実行中の操作を取り消さず、届いた成功・失敗・結果不明を記録し、再開後の再送でも二重適用しないこと。
 
 ### hook
 
 - 両ホストの固定イベント JSON による[束縛の有無とサブエージェント内の処理](hooks.md#共通処理)、[ブランチの不一致](data.md#セッションとブランチ)。
-- [SessionStart](hooks.md#sessionstart)の環境変数・注入・警告と、[Stop](hooks.md#stop)の指示ごとの判断・継続回数。
+- [SessionStart](hooks.md#sessionstart)の環境変数・注入・警告と、[Stop](hooks.md#stop)の作業単位の判断・継続回数。
+- [中断](guarantees.md#中断)の定型の完全一致、前後の空白の除去と引用・説明・他の文の拒否、回答後・ラウンド外・ブランチ不一致時の観測、束縛がない場合の非観測。
+- 中断の観測の ledger への取り込み前後で Stop が常に停止を許すことと、SessionStart が中断中であることを注入し、再開しないこと。
+- PreToolUse の deny が `devkit pause` と中断の観測を妨げず、他のコマンドの deny を維持すること。
+- 記録の追加のない連続した block 判定で上限到達時に停止を許し、問いを一度だけ起票して出力すること。ツール呼び出し・別セッション・観測の追加で計数をリセットせず、ledger の記録の追加で数え直すこと。
+- 中断後に届いた判定者・計画者の結果の採取と、既存の受理条件の維持。
 - [PreToolUse](hooks.md#pretooluse)の登録・構文・読み出し元・起動制限と、[通常の結果ファイルへの書き込み](guarantees.md#誤った場所への書き込みと危険な操作)の deny。
 - [SubagentStop](hooks.md#subagentstop)の担当・transcript・実効条件・定義の来歴と、[UserPromptSubmit](hooks.md#userpromptsubmit)の回答後を含む観測範囲。
 
@@ -242,11 +254,13 @@ kit の skill の実装と調査の記録順の追加は未反映である。
 ### view
 
 - 固定の ledger と構造による[表示](modules.md#view)の冒頭・3群・確認範囲の地図・確認済みの集合・待ち・失効・観測時刻。
-- 網羅性の入力と、[問いの表示と停止](data.md#状態遷移と受理条件)の関係。
+- 網羅性の入力と、[問いの表示と停止](data.md#状態遷移と受理条件)の関係。未取り込みの観測も含め、中断中の状態と再開方法を示すこと。
 - 描画結果を [principles/ui.md](../../principles/ui.md) の原則9に従って確認する。
 
 ### 結合試験
 
 - skill の手順と偽の hook 入力で [start から完了](flow.md)までを通し、Stop の途中と待ち状態、別セッション・compaction 後の SessionStart を確認する。
+- 両ホストで、チャットの中断とターミナル・`!` 経由の `devkit pause`、作業ロック保持中の中断、hook の稼働確認が通らない場合の `pause`、ブランチ不一致時と束縛のないセッションでの作業の特定を確認する。
+- [中断](guarantees.md#中断)から別セッション・compaction を経て、人の入力の観測を根拠に中断前の続きへ戻ることと、継続上限からの問い・回答・続行を通す。
 - 他の skill や plugin と共存する、[束縛のないセッション](hooks.md#共通処理)を確認する。
 - 両ホストでの[実行権限とコマンドの呼び方](guarantees.md#ホスト設定と実行権限)と、sandbox の中での記録前の失敗を確認する。

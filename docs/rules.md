@@ -18,6 +18,8 @@
 
 並行作業の配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。共有状態と共通の不変条件の扱いは [`principles/data.md`](../principles/data.md) の原則6に従う。
 
+人による中断と再開、Stop の継続上限は[中断](architecture/guarantees.md#中断)に従う。
+
 ## コメントと lint
 
 - **lint の抑制には、空でない理由を必ず記載する**。 [`principles/engineering.md`](../principles/engineering.md) の原則4。手段: 未実装。

@@ -24,6 +24,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 - **終了ブロックと成果物**: [ラウンド](../architecture/data.md#ラウンド-round)(作業依頼から判断までの往復)の[終了ブロック](../architecture/data.md#進捗-progress)(作業報告)を受け取る。返却後の[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(判定対象の識別値)と成果物の記録は[作業結果の提出](../architecture/flow.md#作業結果の提出)、入力 JSON の場所と拒否条件は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
 - **判定結果**: 結果ファイルとコマンド実行結果を受け取る。受理から記録までの分担は [check](../architecture/modules.md#check)(観点ごとの判定を扱う部品)と [ledger の契約](../architecture/modules.md#ledger)、結果の種類と照合・集約は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)、`command:` の check(検証コマンドを実行する check)の定義は[計画](../architecture/data.md#計画-plan)、実行順は[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
 - **人の入力と訂正**: 観測された人の回答と訂正を受け取る。回答の根拠と受理主体、回答の形式と訂正期限は[回答の受理](../architecture/guarantees.md#回答の受理)、入力の観測は [UserPromptSubmit](../architecture/hooks.md#userpromptsubmit)(人の入力時のイベント)、問いの提示と再開は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
+- **中断**: 人からの中断と再開の根拠を受け取り、[中断](../architecture/guarantees.md#中断)に従う。CLI の呼び分けは [cmd/devkit](../architecture/modules.md#cmddevkit)、観測と記録の受理は [engine](../architecture/modules.md#engine)に従う。
 - **指示と表示**: CLI は次の指示と [brief](../architecture/modules.md#brief)(作業や判定の依頼文)、問い、状態、操作の結果を返す。出力上限を超えた場合の返し方は[性能と出力の上限](../architecture/guarantees.md#性能と出力の上限)に従う。
 
 ### ホストの差分と共通の仕組み
@@ -43,7 +44,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 - **ホストと git に任せる範囲**: サブエージェントの起動と隔離、worktree の扱いは[ホストと git に任せる範囲](../architecture/guarantees.md#実装対象外の機能)、並行作業の配置は[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。
 - **メタループの編集**: [メタループ](../meta-loop.md#メタループ)(ループ自体を改善するループ)の編集を宣言したステージの扱いと、人への確認の条件は[人への確認対象](../architecture/guarantees.md#人への確認対象)に従う。
 - **互換性**: バイナリ・固定物・記録形式のバージョンの不一致と、読めない記録は[ロールアウト](../architecture/guarantees.md#ロールアウト)に従って報告する。
-- **停止の補助**: 停止の判断は [Stop](../architecture/hooks.md#stop)、完了の確定は[完了条件](../architecture/guarantees.md#完了条件)に従う。
+- **停止の補助**: 停止の判断は [Stop](../architecture/hooks.md#stop)、中断と継続上限は[中断](../architecture/guarantees.md#中断)、完了の確定は[完了条件](../architecture/guarantees.md#完了条件)に従う。
 - **checkpoint の注入**: 出力上限を超えた場合の注入内容は[性能と出力の上限](../architecture/guarantees.md#性能と出力の上限)に従う。
 - **登録と実行権限**: hook の登録と `devkit` の実行権限は[権限の境界](../architecture/guarantees.md#権限の境界)に従う。ホストの設定とプロジェクトの信頼(workspace trust / `trust_level`)の確認は [doctor](../architecture/modules.md#doctor-の確認項目)、hook の実際の稼働は[セッションの観測](../architecture/data.md#セッションの観測-sessionobservation)と[稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)で確かめる。
 

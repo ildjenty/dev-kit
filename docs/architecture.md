@@ -9,6 +9,7 @@ dev-kit は、リポジトリごとの開発ループを、Claude Code や Codex
 ```mermaid
 graph LR
   human[人] -- チャット --> agent[セッションのエージェント]
+  human -- "devkit pause" --> devkit
   agent -- "devkit next / submit / answer" --> devkit[devkit CLI]
   devkit -- 指示と依頼文 --> agent
   devkit -- 記録 --> run[.devkit/run/]
@@ -22,7 +23,7 @@ graph LR
 
 - **セッションのエージェント**は実行役である。[brief](architecture/modules.md#brief)(作業や判定の依頼文)を読み、コードを書き、[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定の形式で書いた JSON)を返す。判定者と計画者のサブエージェントは、[定型の1行の prompt](architecture/guarantees.md#判定結果の受理)で起動する。
 - **`devkit`** は状態機械である。利用者が組んだ[ループの雛形](architecture/data.md#ループの雛形-plantemplate)(再利用するループの定義)から作る[計画](architecture/data.md#計画-plan)(課題ごとの実行内容)と記録から次の指示を計算し、[ステージの完了時に `git commit` し](architecture/guarantees.md#完了条件)、判定者の結果と人の答えを受理し、記録を書く。エージェントが Bash から呼ぶが、sandbox の外で動く。
-- **hook** は同じバイナリの別の呼び出し口である。セッションの開始時に状況を注入し、終了を止め、危険な操作を拒み、サブエージェントの結果と人の入力を観測してファイルに書く。
+- **hook** は同じバイナリの別の呼び出し口である。セッションの開始時に状況を注入し、[Stop](architecture/hooks.md#stop)で停止の可否を判断し、危険な操作を拒み、サブエージェントの結果と人の入力を観測してファイルに書く。
 - **人**はチャットで問いに答える。`devkit answer` が hook の観測した入力をもとに回答を受理する条件は、[回答の受理](architecture/guarantees.md#回答の受理)で定める。
 
 ## 作業の流れ
@@ -36,6 +37,8 @@ graph LR
 7. セッションをまたぐ再開は、[人の回答と再開](architecture/flow.md#人の回答と再開)に従う。
 
 [ラウンド](architecture/data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)では、[Judgment](architecture/data.md#check-の結果-judgment)(`command:` の check を含む判定結果)を受理して次の行動を決める。
+
+人による中断、`devkit pause` と再開の条件、Stop の継続上限は[中断](architecture/guarantees.md#中断)に従う。
 
 段階ごとの詳細は [flow.md](architecture/flow.md)。
 

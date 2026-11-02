@@ -12,6 +12,8 @@ dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバ�
 
 設計の正本は [docs/architecture.md](docs/architecture.md) と [docs/architecture/](docs/architecture/)である。`docs/parts/` と `docs/` 直下の各文書の記述が正本と食い違う場合は、正本を優先する。作業手順は[処理の流れ](docs/architecture/flow.md)に従う。
 
+人による中断、`devkit pause` と再開の条件、Stop の継続上限は[中断](docs/architecture/guarantees.md#中断)に従う。
+
 ## ファイル構成
 
 - [docs/architecture.md](docs/architecture.md): 設計の概要。

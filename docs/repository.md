@@ -26,3 +26,5 @@
 - **ロールと実行主体**: ロール(作業や判断を担う役割)と実行主体(runner。check を実行する相手)を区別する。語彙と割り当ては[計画](architecture/data.md#計画-plan)、check の実行主体の指定は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。計画の作成は[作業の開始](architecture/flow.md#作業の開始)で計画者が担う。
 
 人への問いと回答はセッションのチャットで扱い、CLI が受理して進行を再開する([人の回答と再開](architecture/flow.md#人の回答と再開))。計画の作り直しと切り替えは[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
+
+人による中断、`devkit pause` と再開の条件、Stop の継続上限は[中断](architecture/guarantees.md#中断)に従う。
