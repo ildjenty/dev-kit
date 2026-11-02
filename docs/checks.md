@@ -91,7 +91,6 @@
   - 判定: [check の結果](architecture/data.md#check-の結果-judgment)に従い、`NOT ASSESSED`(未評価)を返せるか。
   - 原則の形式: [原則のフォーマット](../principles/README.md#原則のフォーマット)を満たすか。
   - 新しいセッションによる確認: リポジトリと実行の記録を読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるか。
-  - 接続と再開: 正本の[試験項目](architecture/contract-changes.md#試験項目)に従い、部品間の[結合試験](architecture/contract-changes.md#結合試験)を確認する。
 - **blocking**: 新しいセッションによる確認で答えられない問いがある、照合した原則の blocking 条件に該当する、または照合した契約に違反する。
 
 ## skill の試験

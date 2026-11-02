@@ -35,9 +35,3 @@ PR 本文で共有する情報は[資産の更新と共有](../architecture/data
 形式と意味論の境界、および供給された定義の扱いは [form の契約](../architecture/modules.md#form)、ファイルの読み書きの制約は[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従う。
 
 計画の検証との責務の境界は [plan の契約](../architecture/modules.md#plan)(計画の意味論を扱う実装)に従う。
-
-## 試験項目
-
-試験の範囲は正本の [form の試験項目](../architecture/contract-changes.md#form-1)に従う。
-
-- [ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(再利用するループの定義)・[計画](../architecture/data.md#計画-plan)(課題固有のループのデータ)のスキーマを form の適用対象に含めないこと。

@@ -71,7 +71,3 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 ### 育てるものとの境界
 
 [構造](../architecture/data.md#構造の記録-structure)(リポジトリの構造の資産)と[規則と強制手段](../architecture/data.md#規則と強制手段-rules)(設計上の決定と守る手段)の分類は、[育てるもの](../architecture/data.md#所有と生存期間)(リポジトリが git で管理する資産)を定める「所有と生存期間」と各定義に従う。
-
-## 試験項目
-
-試験は正本の[試験項目](../architecture/contract-changes.md#試験項目)に従う。

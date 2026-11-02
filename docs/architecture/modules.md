@@ -9,15 +9,17 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **外部型の変換**: host/event はホストの JSON、workspace は git の出力、config は TOML、ledger/fsstore はファイル形式、external は外部コマンドの入出力を境界で内部の型に変換する。外部の型を公開契約・記録・ドメイン(plan・ledger・check など)に持ち込まない。[principles/structure.md](../../principles/structure.md) の原則5に従う。
 - **共通の通過点**: ledger の書き込みは[記録の書き込みと排他](data.md#記録の書き込みと排他)、外部書き込みは [external](#external)、固定物は [kit](#kit)に集める。ホストの設定はホスト自身が読む。
 
+モジュールの内部構造、view の見た目、ledger/fsstore の最適化は、後から変更できる。
+
 ## モジュールごとの契約
 
-各モジュールを Go のパッケージとすることを仮決定する。plan、brief、check、router、form は入出力を行わず、自らファイルを読まない。cmd/devkit が config と kit から値を解決して渡す。ポートと外部型の扱いは[モジュール境界と入出力の集約](#モジュール境界と入出力の集約)で定める。
+各モジュールを Go のパッケージとして実装する。plan、brief、check、router、form は入出力を行わず、自らファイルを読まない。cmd/devkit が config と kit から値を解決して渡す。ポートと外部型の扱いは[モジュール境界と入出力の集約](#モジュール境界と入出力の集約)で定める。
 
 提供単位は [brief](../parts/brief.md)、[check](../parts/check.md)、[router](../parts/router.md)、[ledger](../parts/ledger.md)、[form](../parts/form.md)、[view](../parts/view.md)、[runtime](../parts/runtime.md)であり、それぞれ契約・テンプレート・試験を持つ。brief・check・router・ledger・form・view は同名の実装モジュールに対応し、runtime は冒頭に列挙した実装モジュールに対応する。plan は部品を追加せず計画の意味論を扱う。[基本設計](../design.md)に従う。
 
 ### plan
 
-雛形と計画は英語キーの JSON とする。
+雛形と計画は[データ形式](data.md#データ形式)に従い、キーは英語とする。
 
 - **責務**: ループ計画の意味論を扱う。雛形と計画の JSON Schema による検証、[計画の雛形からの逸脱](data.md#計画-plan)の計算、router の分類から次のステージを選ぶ遷移、計数の上限の判定、現在のバージョンと残りの計画から新しいバージョンを作成する操作、およびその差分、実行可能なバージョンの判定、計画の承認で足りる外部操作の宣言の照合を扱う。
 - **持つデータ**: `PlanTemplate`、`Plan`、`Stage`、`Assignee`、`Gate`、`Transition`、`Limits` の型、ID 付きの完了条件、観点と完了条件の対応、check の実行主体、必須 check、宣言した外部操作、router が使うステージの完了条件の規則を持つ。
@@ -42,6 +44,8 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **置くもの・置かないもの**: 入出力を伴わない判定の意味論、依頼の内容の決定、結果の解析・受理、検出試験の仕様を置く。判定者サブエージェントの起動と hook による結果の受け取りは[判定結果の受理](guarantees.md#判定結果の受理)、判定コマンドの実行は [engine](#engine)に従う。結果の保存は ledger に、次の行動の判断は router に置く。
 
 ### router
+
+メタループは専用モジュールを持たず、[kit](#kit) の固定物と router の「教訓の反映先」で表す。
 
 - **責務**: 分類表の固定物とリポジトリ側の追記を解析済みの値として受け取り、check の集約、ラウンド数、engine が計算した進展の有無、計画の上限、終了ブロックの終了の種別([進捗](data.md#進捗-progress))から[次の行動](flow.md#router-の判断)を選ぶ。plan の[完了条件](guarantees.md#完了条件)を照合し、[人への確認対象](guarantees.md#人への確認対象)を扱う。
 - **持つデータ**: 人への確認、check の結果、教訓の反映先(ループの雛形を含む。[分類](guarantees.md#人への確認対象)に従う)、ロールと実行主体、振り返りに関する分類表の型と内容を持つ。router はロールの語彙(作業者・人・判定者・計画者)を持つだけで、実行主体は雛形の check の runner で決まる。
@@ -71,9 +75,11 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **持つデータ**: 記録と生成物のファイル、一時ファイル、隔離ディレクトリ、作業ロックを扱う。
 - **公開する契約**: 追記・一覧・取得、作業の排他制御、生成物の公開の操作を公開する。記録ルートは引数で受け取り、その配下だけを扱う。互換性の失敗は[バージョン互換性](guarantees.md#バージョン互換性)に従って報告する。
 - **依存**: 他のモジュールに依存しない。
-- **置くもの・置かないもの**: 保存形式、原子的な公開、隔離、排他を置く。記録の意味論は ledger に、記録ルートの解決は [cmd/devkit](#cmddevkit)に置く。保存方式の選択は[不採用の案](decisions.md#不採用の案)に残す。
+- **置くもの・置かないもの**: 保存形式、原子的な公開、隔離、排他を置く。記録の意味論は ledger に、記録ルートの解決は [cmd/devkit](#cmddevkit)に置く。
 
 ### engine
+
+別系統のエンジンによる判定は判定コマンドとして表し、`codex exec --output-schema` などを子プロセスとして実行する。
 
 - **責務**: [処理の流れ](flow.md)の状態機械を進める。`start --plan <name>` の雛形の指定と作業作成、`next` の結果の受理と指示の計算、brief・判定依頼の書き出し、`submit` の終了ブロックと成果物の受理、判定コマンドの判定の実行、[`command:` の check の実行](flow.md#作業結果の判定)、router の判断の記録を担う。`plan` の提案とゲート、`answer` の回答、`external` の要求、`note` の決定と証拠を受理する。教訓には router の「教訓の反映先」の分類を付けて記録する。判定前は workspace へ pre-commit の実行を依頼し、完了時は `git commit` を依頼する。pre-commit と commit の成否、完了の記録は[完了条件](guarantees.md#完了条件)に従う。受理の境界は[整合性](data.md#整合性の境界)と[保証](guarantees.md)に従う。
 - **持つデータ**: 現在の作業、StageRun、ラウンド、指示の計算結果を扱う。受理した状態はすべて ledger に記録する。
@@ -120,6 +126,8 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### config
 
+設定ファイルは `devkit.toml` とし、TOML で記述する。
+
 - **責務**: 渡された TOML の解析と検証を行う。kit のバージョン、`[judges]` の判定コマンド(名前・実行ファイル・固定引数・期限・出力スキーマの指定)、`[commands]` の検証コマンド(名前・実行ファイル・固定引数・期限)、外部操作の登録、`[deny]`、分類表の追記を扱う。配置は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に従う。
 - **持つデータ**: 解析・検証した設定値と、各コマンドの登録定義を持つ。
 - **公開する契約**: 設定の解析・検証と内部の型への変換を公開する。
@@ -132,7 +140,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **持つデータ**: 導入する固定物と設定の断片、導入先との差分、doctor の照合結果を扱う。
 - **公開する契約**: `init` と `doctor` に対応する導入・照合の操作を公開する。doctor の項目は[doctor の確認項目](#doctor-の確認項目)に従う。
 - **依存**: config、kit、ledger、workspace に依存する。
-- **置くもの・置かないもの**: 導入先の構成と登録・照合を置く。配布の決定状況は[バイナリの配布方法](decisions.md#バイナリの配布方法)に残す。
+- **置くもの・置かないもの**: 導入先の構成と登録・照合を置く。配布の決定状況は[バイナリの配布方法](../architecture.md#バイナリの配布方法)に残す。
 
 ### kit
 

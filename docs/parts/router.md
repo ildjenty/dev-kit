@@ -41,9 +41,3 @@ router による[完了条件](../architecture/guarantees.md#完了条件)(ス�
 ### ロールと実行主体
 
 [ロール](../architecture/data.md#計画-plan)(ループ内の担当区分)と[実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する相手)の境界は [router の契約](../architecture/modules.md#router)に従う。
-
-## 試験項目
-
-試験の範囲は正本の [router の試験項目](../architecture/contract-changes.md#router-1)に従う。
-
-- [router の契約](../architecture/modules.md#router)で定めるロールと実行主体の境界の試験。

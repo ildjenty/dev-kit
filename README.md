@@ -6,7 +6,7 @@ dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバ�
 
 ## 参照順序
 
-1. [docs/architecture.md](docs/architecture.md): 構成と動作の概要。作業の流れと保証の範囲を示す。
+1. [docs/architecture.md](docs/architecture.md): 構成と動作の概要。作業の流れ、保証の範囲、[未決事項](docs/architecture.md#未決事項)と[未確認の前提](docs/architecture.md#未確認の前提)。
 2. [docs/design.md](docs/design.md): 基本方針と、7つの部品の役割。
 3. [principles/README.md](principles/README.md): [check](docs/parts/check.md)(評価と判定の部品)が評価基準とする原則の一覧と、原則の書き方。
 
@@ -16,7 +16,7 @@ dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバ�
 
 ## ファイル構成
 
-- [docs/architecture.md](docs/architecture.md): 設計の概要。
+- [docs/architecture.md](docs/architecture.md): 設計の概要、[未決事項](docs/architecture.md#未決事項)と[未確認の前提](docs/architecture.md#未確認の前提)。
 - [docs/architecture/](docs/architecture/): 設計の詳細。
   - [flow.md](docs/architecture/flow.md): 開始から完了までの流れ。
   - [data.md](docs/architecture/data.md): 記録と状態。
@@ -24,8 +24,6 @@ dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバ�
   - [layout.md](docs/architecture/layout.md): ディレクトリ構成。
   - [hooks.md](docs/architecture/hooks.md): 5つの hook。
   - [guarantees.md](docs/architecture/guarantees.md): 失敗ごとの防止の仕組み。
-  - [decisions.md](docs/architecture/decisions.md): 仮決定、不採用の案、未決事項、未確認の前提。
-  - [contract-changes.md](docs/architecture/contract-changes.md): 部品の契約の改訂と試験。
   - [examples.md](docs/architecture/examples.md): 雛形・計画・設定・観点・pre-commit の最小の例。
 - [docs/design.md](docs/design.md): 基本方針と部品の一覧。
 - [docs/parts/](docs/parts/): 部品ごとの契約。

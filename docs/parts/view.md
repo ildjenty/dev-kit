@@ -53,10 +53,3 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 ## 保証
 
 表示の責務と他の部品との境界は [view の契約](../architecture/modules.md#view)、本体の重複表示と必読集合の扱いは [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
-
-## 試験項目
-
-試験の範囲と描画結果の確認は正本の [view の試験項目](../architecture/contract-changes.md#view-1)に従う。
-
-- [view の表示構成](../architecture/modules.md#view-の表示構成)で定める本体の配置・参照と、[view の契約](../architecture/modules.md#view)で定める新着の基準の試験。
-- 必読集合の対象と、目的ごとの残件数が整合すること。

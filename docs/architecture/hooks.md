@@ -37,7 +37,7 @@ Claude Code の継続回数の上限は8回である。ホストが数える継�
 
 規則は `Bash(<前方一致> *)`、ツール名(MCP ツールを含む)、`Agent(<属性>)` の3種とする。Claude Code の permission rule の意味論は再実装しない。Bash の `&&`・`||`・`;`・`|` による線形な連結は分割し、各部分に前方一致を当てる。リダイレクト・置換を含むコマンドと制御構文は分割せず deny し、「分けて実行する」と返す。結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)の `permissions.deny` とこの規則を組み合わせる。
 
-他の skill の手順への影響は[Bash の一律拒否と他の skill の共存](decisions.md#bash-の一律拒否と他の-skill-の共存)に残す。
+他の skill の手順への影響は[Bash の一律拒否と他の skill の共存](../architecture.md#bash-の一律拒否と他の-skill-の共存)に残す。
 
 束縛のあるセッションでサブエージェントを起動するとき(Claude Code の Agent ツール)、`subagent_type` が `devkit-` で始まる場合に限り、prompt が[判定結果の受理](guarantees.md#判定結果の受理)の定型でなければ deny する。同じ適用範囲で fork(`isolation` や fork の指定)、`model`・[`effort`](data.md#check-の結果-judgment)(Claude Code の推論量の設定)の明示も deny する。これらは `[deny]` の既定の `Agent(fork)`・`Agent(model:*)`・`Agent(effort:*)` と定型の照合として適用し、リポジトリ全体の `permissions.deny` には足さない。
 
@@ -48,7 +48,7 @@ Claude Code の継続回数の上限は8回である。ホストが数える継�
 - **出力**: 最終メッセージに来歴を添えて結果ファイルとして公開し、[判定結果の受理](guarantees.md#判定結果の受理)に渡す。
 - **書く生成物**: `results/<指示 ID>-<agent_id>.json`。transcript の最初の利用者メッセージ、Claude Code の `effort.level` または Codex の `model`、その時点の定義ファイルの内容ハッシュ、SubagentStop の観測時刻を添える。
 
-実効条件の採取元は[effort と model の取得元](decisions.md#effort-と-model-の取得元)、定義を編集したラウンドの完了手順は[サブエージェント定義の変更と完了](decisions.md#サブエージェント定義の変更と完了)に残す。
+実効条件の採取元は[effort と model の取得元](../architecture.md#effort-と-model-の取得元)、定義を編集したラウンドの完了手順は[サブエージェント定義の変更と完了](../architecture.md#サブエージェント定義の変更と完了)に残す。
 
 ## UserPromptSubmit
 

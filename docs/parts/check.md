@@ -47,9 +47,3 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 ### 集約と遷移の境界
 
 集約後の次の行動は [router](../architecture/modules.md#router)(次の行動を選ぶ部品)の[完了条件](../architecture/guarantees.md#完了条件)と [plan](../architecture/modules.md#plan)(計画の意味論を扱う実装)の遷移で扱う。
-
-## 試験項目
-
-試験の範囲は正本の[check の試験項目](../architecture/contract-changes.md#check-1)に従う。
-
-ラウンドの判定依頼にその終了ブロックが含まれ、観点「差分」には有効な承認・委任の一覧も渡ることを確認する。

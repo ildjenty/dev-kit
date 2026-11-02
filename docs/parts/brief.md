@@ -33,9 +33,3 @@ brief の内容とバージョンを返し、計算・書き出しの責務は [
 停止の判断は [engine](../architecture/modules.md#engine) と [router](../architecture/modules.md#router)(次の行動を選ぶ部品)が担う。
 
 brief 自身は具体的な進め方や原因の仮説を付け加えず、前のステージの出力は内容を変えずに渡す。
-
-## 試験項目
-
-試験の範囲は正本の [brief の試験項目](../architecture/contract-changes.md#brief-1)に従う。
-
-修正用の brief に、必須の [`command:` の check](../architecture/data.md#計画-plan)(登録した検証コマンドの実行)と [pre-commit](../architecture/guarantees.md#完了条件)(リポジトリの検証 hook)の失敗出力が含まれることを確認する。
