@@ -114,7 +114,7 @@
 ### checks
 
 - [checks.md](../checks.md)の各観点のステージ欄を削除し、使用ステージの指定を [PlanTemplate](data.md#ループの雛形-plantemplate)への参照に改めた。
-- [checks.md](../checks.md#終了時の状態)の終了時の状態を、[submit の終了ブロック](data.md#進捗-progress)・[完了条件](guarantees.md#完了条件)に合わせて改訂した。
+- [checks.md](../checks.md#終了時の状態)の[終了ブロック](data.md#進捗-progress)の照合対象を、[計画の完了条件](data.md#計画-plan)と [`principles/context.md` の原則5](../../principles/context.md#5-完了条件を満たして終え中断時は安全に再開できる状態を残す)の中断時の引き継ぎ要件に改め、必須 check の集約と commit の成功の確認は、[完了条件](guarantees.md#完了条件)に従う `devkit` の完了の確定処理に委ねる記述に改訂した。
 - [checks.md](../checks.md#harness)の skill と接続・再開の確認を、[skill の配置](layout.md#指示ファイルとホスト設定)・[試験項目](#試験項目)に合わせて改訂した。
 - [checks.md](../checks.md#計画)の計画の逸脱の確認を、[Plan の雛形からの逸脱](data.md#計画-plan)に合わせて改訂した。
 - [checks.md](../checks.md#差分)の承認・委任の照合を、[判定結果の受理](guarantees.md#判定結果の受理)に合わせて改訂した。

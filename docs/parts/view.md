@@ -58,6 +58,5 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 試験の範囲と描画結果の確認は正本の [view の試験項目](../architecture/contract-changes.md#view-1)に従う。
 
-- 暫定判断の本体が1か所だけにあり、他の群から参照できること。
-- 最後の状態変更より後に追加された記録だけが新着になること。
+- [view の表示構成](../architecture/modules.md#view-の表示構成)で定める本体の配置・参照と、[view の契約](../architecture/modules.md#view)で定める新着の基準の試験。
 - 必読集合の対象と、目的ごとの残件数が整合すること。

@@ -46,4 +46,4 @@ router による[完了条件](../architecture/guarantees.md#完了条件)(ス�
 
 試験の範囲は正本の [router の試験項目](../architecture/contract-changes.md#router-1)に従う。
 
-- ロールの語彙を扱う際に、check の runner を選択・変更しないこと。
+- [router の契約](../architecture/modules.md#router)で定めるロールと実行主体の境界の試験。

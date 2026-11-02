@@ -65,7 +65,7 @@
 
 ## 終了時の状態
 
-- **確認事項**: 判定依頼に含まれるその[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から結果に対する判断までの往復)の[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定形式で返す記録)を[完了条件](architecture/guarantees.md#完了条件)と照合する。終了・中断時の記録と再開条件は [`principles/context.md` の原則5](../principles/context.md#5-完了条件を満たして終え中断時は安全に再開できる状態を残す)に従う。
+- **確認事項**: 判定依頼に含まれるその[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から結果に対する判断までの往復)の[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定形式で返す記録)を、[計画に記載された完了条件](architecture/data.md#計画-plan)と [`principles/context.md` の原則5](../principles/context.md#5-完了条件を満たして終え中断時は安全に再開できる状態を残す)の中断時の引き継ぎ要件に照らして確認する。必須 check の集約と commit の成功の確認は、[完了条件](architecture/guarantees.md#完了条件)に従う `devkit` の完了の確定処理に委ねる。
 - **blocking**: 同原則5の blocking 条件に従う。必須の確認が残る場合の判定も同原則5に従う。
 
 ## 計画
