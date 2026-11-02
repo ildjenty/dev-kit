@@ -39,7 +39,7 @@ Claude Code の継続回数の上限は8回である。ホストが数える継�
 
 他の skill の手順への影響は[Bash の一律拒否と他の skill の共存](decisions.md#bash-の一律拒否と他の-skill-の共存)に残す。
 
-束縛のあるセッションでサブエージェントを起動するとき(Claude Code の Agent ツール)、`subagent_type` が `devkit-` で始まる場合に限り、prompt が[判定結果の受理](guarantees.md#判定結果の受理)の定型でなければ deny する。同じ適用範囲で fork(`isolation` や fork の指定)、`model`・`effort` の明示も deny する。これらは `[deny]` の既定の `Agent(fork)`・`Agent(model:*)`・`Agent(effort:*)` と定型の照合として適用し、リポジトリ全体の `permissions.deny` には足さない。
+束縛のあるセッションでサブエージェントを起動するとき(Claude Code の Agent ツール)、`subagent_type` が `devkit-` で始まる場合に限り、prompt が[判定結果の受理](guarantees.md#判定結果の受理)の定型でなければ deny する。同じ適用範囲で fork(`isolation` や fork の指定)、`model`・[`effort`](data.md#check-の結果-judgment)(Claude Code の推論量の設定)の明示も deny する。これらは `[deny]` の既定の `Agent(fork)`・`Agent(model:*)`・`Agent(effort:*)` と定型の照合として適用し、リポジトリ全体の `permissions.deny` には足さない。
 
 ## SubagentStop
 

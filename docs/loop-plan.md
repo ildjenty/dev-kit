@@ -8,7 +8,7 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 
 ## フォーマット
 
-雛形と計画は英語キーの JSON とし、項目は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)と[計画](architecture/data.md#計画-plan)、検証の方式と責務は [plan](architecture/modules.md#plan)に従う。
+雛形と計画の形式、検証の方式と責務は [plan](architecture/modules.md#plan)、項目は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)と[計画](architecture/data.md#計画-plan)に従う。
 
 ステージ(作業を区切る単位)の担当と [check](architecture/modules.md#check)(観点やコマンドによる確認)の実行主体(runner)は[計画](architecture/data.md#計画-plan)で定める。
 
