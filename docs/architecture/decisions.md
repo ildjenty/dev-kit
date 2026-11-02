@@ -100,7 +100,7 @@
 - **記録形式の `migrate`**: 互換性のない記録の移行機構を kit に増やさず、[バージョン互換性](guarantees.md#バージョン互換性)の扱いに従う。
 - **依存物の有効条件・再構築・掃除を kit で管理する方式**: リポジトリ固有の準備と掃除を kit の責務に増やさず、[判定コマンドと検証コマンド](modules.md#config)に委ねる。
 - **`devkit progress`・`record`・`check`・`detect`・`ledger` のサブコマンド**: 進捗の提出・途中の記録・判定・検出試験・照会は[現在の CLI の操作](modules.md#cmddevkit)で扱えるため、呼び出し口を増やさない。
-- **Judgment の規範の内容ハッシュ(ツリーに含まれないものの照合)**: 規範はすべて[規範の固定](guarantees.md#規範の固定)で定めるスナップショットに含まれる。[Judgment の規範の識別](data.md#check-の結果-judgment)を使う。
+- **Judgment の規範の内容ハッシュ(ツリーに含まれないものの照合)**: [Judgment の「規範の識別」](data.md#check-の結果-judgment)に含めるファイルは、すべて[規範の固定](guarantees.md#規範の固定)で定めるスナップショットに含まれる。
 - **リポジトリ全体の `permissions.deny` に kit の `[deny]` を足す方式**: 束縛のないセッションや他の skill にも効く。[PreToolUse](hooks.md#pretooluse)で適用する。
 - **`.claude/skills` 全体をリンクにする方式**: 既存の skill と衝突する。[skill 単位の配置](layout.md#指示ファイルとホスト設定)を使う。
 - **サブエージェントの依頼文をエージェントに書かせる方式**: 作業者の説明や自己評価が依頼に混ざる。[判定結果の受理](guarantees.md#判定結果の受理)に従う。
