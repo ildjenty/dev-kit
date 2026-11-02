@@ -38,7 +38,7 @@ commit 時には環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<
 
 hook の共有は git の `core.hooksPath` による。`init` は、リポジトリに hook の仕組み(husky、pre-commit フレームワーク、既存の `core.hooksPath`)がなければ `.githooks/` を作って `core.hooksPath` を向け、空の pre-commit を置く。既にあれば触らない。`doctor` は pre-commit が存在することを確認する。
 
-フォーマッタが pre-commit でファイルを書き換える構成では commit が失敗し、作業ツリーに差分が残る。これは「修正する」として次のラウンドに渡す。判定前の検証は[未確認の前提](decisions.md#未確認の前提)に残し、当面は完了時だけ実行する。
+フォーマッタが pre-commit でファイルを書き換える構成では commit が失敗し、作業ツリーに差分が残る。これは「修正する」として次のラウンドに渡す。判定の指示を返す前に、`devkit` は `git hook run pre-commit`(git 2.36 以降)で同じ hook を返却後のツリーに対して実行し、失敗なら判定者を起動せずに router の「修正する」に分類して出力を次の brief に含める。`init` が git のバージョンを確認し、使えない環境では完了時の commit だけで検証する。判定前の実行は早く失敗を知るためのもので、完了条件の記録は commit の成功だけである。
 
 ### 規範の固定
 

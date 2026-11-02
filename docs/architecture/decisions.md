@@ -15,7 +15,7 @@
 9. 保存と書き手は[記録の書き込みと排他](data.md#記録の書き込みと排他)、保存場所と ignore は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に従う。
 10. スナップショットは[対象のバージョン](data.md#対象のバージョン-targetversion)、読み出しは[規範の固定](guarantees.md#規範の固定)、展開と確定は[判定対象の展開と完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に従う。
 11. 判定の有効性と規範の識別は [Judgment](data.md#check-の結果-judgment)に従う。
-12. 検証はリポジトリの pre-commit に任せ、`devkit` はステージ完了時に本物の `git commit` を行い、その成否を完了条件に使う。`DEVKIT_STAGE` と `DEVKIT_WORK` を環境変数で渡す。詳細は[完了条件](guarantees.md#完了条件)、判定の登録内容と準備・掃除の責務は [config](modules.md#config)に従う。
+12. 検証はリポジトリの pre-commit に任せ、`devkit` はステージ完了時に本物の `git commit` を行い、その成否を完了条件に使う。判定の指示の前にも `git hook run pre-commit` で同じ hook を実行し、失敗なら判定者を起動しない(git 2.36 以降。使えなければ完了時だけ)。`DEVKIT_STAGE` と `DEVKIT_WORK` を環境変数で渡す。詳細は[完了条件](guarantees.md#完了条件)、判定の登録内容と準備・掃除の責務は [config](modules.md#config)に従う。
 13. 承認者、承認の同一性、訂正は[回答・承認](data.md#回答承認-answer--approval)に従う。
 14. 外部操作は[承認](guarantees.md#外部操作の承認)と[二重適用の防止](guarantees.md#外部操作の二重適用)に従う。
 15. 停止の補助は [Stop](hooks.md#stop)、サブエージェント内の扱いは [hook の共通処理](hooks.md#共通処理)に従う。
@@ -77,7 +77,7 @@
 
 ## 未確認の前提
 
-- 判定の指示の前に `devkit` が `git hook run pre-commit`(git 2.36 以降)を実行し、早く検証結果を得る選択肢を使えるか。当面の実行時点は[完了条件](guarantees.md#完了条件)に従う。
+- `git hook run pre-commit` が、`core.hooksPath` や husky・pre-commit フレームワークの構成でも commit 時と同じ hook を実行すること。
 - husky・pre-commit フレームワークと `core.hooksPath` の共存。
 - Codex で escalation を要さない呼び出しにも rules の allow が適用されること。
 - Codex の SubagentStop の `agent_type` の値の形式が、サブエージェント定義の名前と照合できること。
