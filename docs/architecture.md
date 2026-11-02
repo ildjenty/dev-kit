@@ -2,7 +2,7 @@
 
 dev-kit は、リポジトリごとの開発ループを、Claude Code や Codex CLI のセッション内で回すための道具である。人は普段どおりセッションを開き、kit の skill で課題を渡す。セッションのエージェントが手を動かし、単一バイナリの `devkit` が「次に何をするか」「終わってよいか」「何を記録するか」を決める。進行の判断は `devkit` が担う。
 
-## 形
+## 全体構成
 
 ```mermaid
 graph LR
@@ -35,7 +35,7 @@ graph LR
 
 段階ごとの詳細は [flow.md](architecture/flow.md)。
 
-## 守るもの、守らないもの
+## 保証の範囲
 
 - **信頼の前提**: 作業者(エージェント)と評価対象のコードに悪意はない。防ぐのは事故(誤った場所への書き込み、元に戻せない操作、二重適用)、自己評価の偏り(自己 `PASS`、完了の過大申告、手順の省略、人の答えの都合のよい解釈)、再開の食い違い、バージョンの不一致である。偽造や資格情報の窃取は範囲外で、チームでは git 管理と PR レビューで見えるようにする。
 - **保証**: `devkit` が保証するのは「記録上、正しくない完了・承認・外部操作が成立しない」こと。セッションを終わらせない Stop hook は補助である。
@@ -49,7 +49,7 @@ graph LR
 - **配置**: 利用側は `devkit.toml`、`.devkit/`(育てるもの)、`.devkit/run/`(記録。ignore)、ホストの設定、`.agents/skills/`。[layout.md](architecture/layout.md)
 - **hook**: SessionStart・Stop・PreToolUse・SubagentStop・UserPromptSubmit の5イベント。[hooks.md](architecture/hooks.md)
 
-## 決定
+## 設計上の決定
 
 - 仮決定、不採用の案、未確認の前提: [decisions.md](architecture/decisions.md)
 - 部品の契約への改訂: [contract-changes.md](architecture/contract-changes.md)

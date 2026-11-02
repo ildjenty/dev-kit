@@ -1,6 +1,6 @@
 # 契約の改訂と試験
 
-部品の契約は、セッション内の CLI が状態機械を進め、hook の観測を受理する構成に合わせて改訂する。変更する契約と削る旧記述を整理し、受理条件そのものはデータと保証の節を参照する。試験ではモジュールごとの境界と組み合わせを確認する。
+部品の契約は、セッション内の CLI が状態機械を進め、hook の観測を受理する構成に合わせて改訂する。変更する契約と削る旧記述を整理し、受理条件そのものは「データ」と「保証と対策」の節を参照する。試験ではモジュールごとの境界と組み合わせを確認する。
 
 ## 契約の改訂
 
@@ -8,42 +8,42 @@
 
 - workflow を外側のループから [engine の操作](modules.md#engine)へ改訂する。担当の起動と結果の受け取りは[判定結果の受理](guarantees.md#判定結果の受理)、人の入力と訂正は[回答の受理](guarantees.md#回答の受理)・[UserPromptSubmit](hooks.md#userpromptsubmit)へ合わせる。
 - 実行の記録と生成物の配置を[利用側のリポジトリ](layout.md#利用側のリポジトリ)へ合わせ、git 管理を選べる仕組みと設定項目を削除する。hook の登録先と sandbox の外での実行を[権限の境界](guarantees.md#権限の境界)へ加える。
-- Stop を[停止の補助](hooks.md#stop)として位置付ける。記録の網羅性は [view](modules.md#view)へ合わせる。「Read では大きな文書の全文読み込みを拒否する」を削除する。SubagentStop は結果の受け取りに使い、PostToolUse による skill 編集の検知は[router の分類](guarantees.md#人に確認する分類)へ移す。
-- ホストの能力の検出試験と代替経路を削除し、[doctor](modules.md#導入の照合)と[セッションの観測](data.md#セッションの観測-sessionobservation)に置き換える。「並列作業や試作は worktree で行う」「作業の排他」「委任の区別と依存」は[ホストに任せる範囲](guarantees.md#実装しないもの)、[作業の排他](data.md#作業の排他)、[定型の依頼](guarantees.md#判定結果の受理)へ改訂する。
-- 束縛とブランチの扱いは[セッションとブランチ](data.md#セッションとブランチ)、hook の直前の観測は[稼働確認](guarantees.md#再開と-hook-の停止)、検証後の対象の更新は[検証対象の一致](guarantees.md#検証対象の一致)へ合わせる。
+- Stop を[停止の補助](hooks.md#stop)として位置付ける。記録の網羅性は [view](modules.md#view)へ合わせる。「Read では大きな文書の全文読み込みを拒否する」を削除する。SubagentStop は結果の受け取りに使い、PostToolUse による skill 編集の検知は[router の分類](guarantees.md#人への確認対象)へ移す。
+- ホストの能力の検出試験と代替経路を削除し、[doctor](modules.md#doctor-の確認項目)と[セッションの観測](data.md#セッションの観測-sessionobservation)に置き換える。「並列作業や試作は worktree で行う」「作業の排他」「委任の区別と依存」は[ホストに任せる範囲](guarantees.md#実装対象外の機能)、[作業の排他制御](data.md#作業の排他制御)、[定型の依頼](guarantees.md#判定結果の受理)へ改訂する。
+- 束縛とブランチの扱いは[セッションとブランチ](data.md#セッションとブランチ)、hook の直前の観測は[稼働確認](guarantees.md#再開と-hook-の稼働確認)、検証後の対象の更新は[検証対象の一致](guarantees.md#検証対象の一致)へ合わせる。
 
 ### repository
 
-- 指示ファイルの終了手順を [submit と verify](flow.md#submit-と-verify)、記録ディレクトリを[利用側の配置](layout.md#利用側のリポジトリ)へ置き換える。
+- 指示ファイルの終了手順を [作業結果の提出と検証](flow.md#作業結果の提出と検証)、記録ディレクトリを[利用側の配置](layout.md#利用側のリポジトリ)へ置き換える。
 - hook の登録先を[権限の境界](guarantees.md#権限の境界)へ合わせ、ホスト設定・サブエージェント定義・rules を[育てるもの](data.md#所有と生存期間)に含める。
 
 ### ledger
 
 - checkpoint、閲覧、カーソル、確認済みの集合を [checkpoint](data.md#checkpoint)と[状態変更](data.md#決定と証拠-decision--evidence)の派生値へ合わせる。
-- 保存は[書き手と調停](data.md#書き手と調停)へ合わせ、「改行・タブを除く」という制限を削除する。実行状態は [StageRun](data.md#ステージの実行-stagerun)へ合わせ、「異常終了・不明」を削る。
+- 保存は[記録の書き込みと排他](data.md#記録の書き込みと排他)へ合わせ、「改行・タブを除く」という制限を削除する。実行状態は [StageRun](data.md#ステージの実行-stagerun)へ合わせ、「異常終了・不明」を削る。
 - 途中の記録は [note](data.md#決定と証拠-decision--evidence)、検出試験の正本と実行の事実は [DetectionTest](data.md#検出試験の記録-detectiontest)、判定の失効は [Judgment](data.md#check-の結果-judgment)へ合わせる。記録範囲の照合の節は削除し、網羅性は[成果物の記録](modules.md#view)から導く。
 - 指示と出し直しは [Instruction](data.md#指示-instruction)、発行した指示の集合は [Round](data.md#ラウンド-round)、結果ファイル名は [SubagentStop](hooks.md#subagentstop)へ合わせる。検証による変更は[成果物](data.md#成果物-artifact-record)、回答の本文と出所は [Answer / Approval](data.md#回答承認-answer--approval)へ加える。
 
 ### router
 
-- ステージの[完了条件](guarantees.md#完了条件)を定め、Stop と共有する記述を改訂する。[人に確認する分類](guarantees.md#人に確認する分類)と [hook の稼働不足](guarantees.md#再開と-hook-の停止)を反映する。
+- ステージの[完了条件](guarantees.md#完了条件)を定め、Stop と共有する記述を改訂する。[人への確認対象](guarantees.md#人への確認対象)と [hook の稼働不足](guarantees.md#再開と-hook-の稼働確認)を反映する。
 - ロールの語彙を作業者・判定者・計画者に揃え、分類表の出力をサブエージェントまたは登録コマンドの名前にする。
 
 ### check
 
 - 実行主体を [Plan の担当と観点](data.md#計画-plan)へ合わせる。「作成と判定のコンテキスト ID と履歴継承設定を照合する」「会話の内容を知らないサブエージェント」は[判定結果の受理](guarantees.md#判定結果の受理)と [PreToolUse](hooks.md#pretooluse)へ改訂する。
-- 「Codex ではモデル名を明示する」はリポジトリ内の定義と[起動時の上書きの制限](hooks.md#pretooluse)へ改訂する。機械の観点は [verify](flow.md#submit-と-verify)、修正ラウンドの依頼と Finding は[指摘](data.md#指摘-finding)へ合わせる。
+- 「Codex ではモデル名を明示する」はリポジトリ内の定義と[起動時の上書きの制限](hooks.md#pretooluse)へ改訂する。機械の観点は [verify](flow.md#作業結果の提出と検証)、修正ラウンドの依頼と Finding は[指摘](data.md#指摘-finding)へ合わせる。
 - transcript・定義・実効条件の照合、結果の選択、判定の食い違いは[判定結果の受理](guarantees.md#判定結果の受理)を参照する。
 
 ### form
 
-- 終了ブロックを [submit の入力](data.md#進捗-progress)とし、判定者の最終メッセージ、指示、問い、決定と証拠のスキーマを [form](modules.md#form)へ合わせる。playbook は[skill の配置](layout.md#指示とホスト設定)へ統合する。
-- 問いの回答案内は [Question](data.md#問い-question)、選択肢と文章の回答・訂正期限は[回答の受理](guarantees.md#回答の受理)、表示上の範囲と入力 JSON の場所は[進行と受理](data.md#進行と受理)へ合わせる。
+- 終了ブロックを [submit の入力](data.md#進捗-progress)とし、判定者の最終メッセージ、指示、問い、決定と証拠のスキーマを [form](modules.md#form)へ合わせる。playbook は[skill の配置](layout.md#指示ファイルとホスト設定)へ統合する。
+- 問いの回答案内は [Question](data.md#問い-question)、選択肢と文章の回答・訂正期限は[回答の受理](guarantees.md#回答の受理)、表示上の範囲と入力 JSON の場所は[状態遷移と受理条件](data.md#状態遷移と受理条件)へ合わせる。
 
 ### view
 
 - 待ち・失効・最後の観測時刻・網羅性、構造図と git の履歴の入力元を [view](modules.md#view)へ合わせる。
-- 閲覧と確認済みの集合は[状態変更](data.md#決定と証拠-decision--evidence)、問いの表示と停止は[進行と受理](data.md#進行と受理)を参照する。
+- 閲覧と確認済みの集合は[状態変更](data.md#決定と証拠-decision--evidence)、問いの表示と停止は[状態遷移と受理条件](data.md#状態遷移と受理条件)を参照する。
 
 ### loop-plan
 
@@ -52,10 +52,10 @@
 
 ### skill の手順
 
-- 作業の進め方は[開始から完了まで](flow.md)、人への確認は[人の回答と再開](flow.md#人の回答と再開)、判定者・計画者の起動は[定型の依頼](guarantees.md#判定結果の受理)に合わせる。
+- 作業の進め方は[処理の流れ](flow.md)、人への確認は[人の回答と再開](flow.md#人の回答と再開)、判定者・計画者の起動は[定型の依頼](guarantees.md#判定結果の受理)に合わせる。
 - コマンドの呼び方は[権限の境界](guarantees.md#権限の境界)、コミットの扱いは[完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)を参照する。
 
-## 試験で確認すること
+## 試験項目
 
 ### plan
 
@@ -78,8 +78,8 @@
 ### router
 
 - 集約、ラウンド数、進展、上限、停止分類の組み合わせ。
-- [人に確認する分類](guarantees.md#人に確認する分類)の既定と追記。
-- [hook の稼働不足](guarantees.md#再開と-hook-の停止)を含む次の指示との接続。
+- [人への確認対象](guarantees.md#人への確認対象)の既定と追記。
+- [hook の稼働不足](guarantees.md#再開と-hook-の稼働確認)を含む次の指示との接続。
 
 ### ledger
 
@@ -90,16 +90,16 @@
 
 ### ledger/fsstore
 
-- 同時追記と[原子的な公開](data.md#書き手と調停)、一時ファイルの扱い、壊れた記録の隔離。
-- [作業ロック](data.md#作業の排他)と生成物の公開。
+- 同時追記と[原子的な公開](data.md#記録の書き込みと排他)、一時ファイルの扱い、壊れた記録の隔離。
+- [作業ロック](data.md#作業の排他制御)と生成物の公開。
 - [読めないバージョン](guarantees.md#ロールアウト)の失敗報告。
 
 ### engine
 
-- 関数値を差し替えた Workspace・External と偽の結果・観測を使い、各操作列の遷移、進展、再計画、[進行と受理](data.md#進行と受理)の拒否境界。
-- [指示](data.md#指示-instruction)の再現性・重複・古い結果、[束縛とブランチ](data.md#セッションとブランチ)、環境変数のない場合、[hook の稼働確認](guarantees.md#再開と-hook-の停止)。
-- [検証対象の更新](guarantees.md#検証対象の一致)の各段階、中断からの再実行、[ロック中の指示と完了の受理](data.md#作業の排他)。
-- [回答](guarantees.md#回答の受理)の入力境界・訂正期限・文章、[未回答時と inbox](data.md#進行と受理)の制約。
+- 関数値を差し替えた Workspace・External と偽の結果・観測を使い、各操作列の遷移、進展、再計画、[状態遷移と受理条件](data.md#状態遷移と受理条件)の拒否境界。
+- [指示](data.md#指示-instruction)の再現性・重複・古い結果、[束縛とブランチ](data.md#セッションとブランチ)、環境変数のない場合、[hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)。
+- [検証対象の更新](guarantees.md#検証対象の一致)の各段階、中断からの再実行、[ロック中の指示と完了の受理](data.md#作業の排他制御)。
+- [回答](guarantees.md#回答の受理)の入力境界・訂正期限・文章、[未回答時と inbox](data.md#状態遷移と受理条件)の制約。
 - [外部操作](guarantees.md#外部操作の承認)の受理から中断後の再送、[検出試験](guarantees.md#検出試験)の不足と不合格。
 
 ### external
@@ -125,7 +125,7 @@
 
 - [導入](modules.md#install)の冪等性、ignore、コピー、skill 単位のリンク、既存設定と inbox の保持。
 - [設定の追記と差分](guarantees.md#権限の境界)、deny の範囲と既定、allow の提案、hook の matcher と失敗時の設定。
-- [doctor の照合項目](modules.md#導入の照合)。
+- [doctor の照合項目](modules.md#doctor-の確認項目)。
 
 ### kit
 
@@ -142,10 +142,10 @@
 ### view
 
 - 固定の ledger と構造による[表示](modules.md#view)の冒頭・3群・確認範囲の地図・確認済みの集合・待ち・失効・観測時刻。
-- 網羅性の入力と、[問いの表示と停止](data.md#進行と受理)の関係。
+- 網羅性の入力と、[問いの表示と停止](data.md#状態遷移と受理条件)の関係。
 - 描画結果を [principles/ui.md](../../principles/ui.md) の原則9に従って確認する。
 
-### 組み立て
+### 結合試験
 
 - skill の手順と偽の hook 入力で [start から完了](flow.md)までを通し、Stop の途中と待ち状態、別セッション・compaction 後の SessionStart を確認する。
 - 他の skill や plugin と共存する、[束縛のないセッション](hooks.md#共通処理)を確認する。

@@ -1,8 +1,8 @@
-# 配置
+# ディレクトリ構成
 
 実装と埋め込み元は dev-kit のリポジトリに置き、利用側には設定、育てるもの、作業ごとの実行の記録と生成物を置く。利用側のチェックアウトを単位に配置を完結させ、並行する作業は別のチェックアウトに分ける。ディレクトリのツリーは、それぞれの置き場所と役割を示す。
 
-### dev-kit のリポジトリ
+## dev-kit のリポジトリ
 
 ```text
 dev-kit/
@@ -42,7 +42,7 @@ dev-kit/
 
 各ディレクトリの配置ガイドは、`doc.go` の先頭コメントまたは README に置く。[`principles/structure.md`](../../principles/structure.md) の原則1に従う。
 
-### 利用側のリポジトリ
+## 利用側のリポジトリ
 
 ```text
 <repo>/
@@ -79,10 +79,10 @@ dev-kit/
 
 同じ機械で複数の作業を並行するときは、ホストや git の worktree 機能で別のチェックアウトを開く。それぞれが自分の `.devkit/run/` を持つ。育てるものの読み出しは[規範の固定](guarantees.md#規範の固定)に従う。
 
-## 指示とホスト設定
+## 指示ファイルとホスト設定
 
 AGENTS.md は既存のものに kit の案内を1行足すだけとし、CLAUDE.md は生成しない。skill の正本は `.agents/skills/devkit/` とし、`.claude/skills/devkit` を git 管理のシンボリックリンクにする。playbook は skill に統合する。
 
 判定者・計画者は `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` で定義し、`init` が既定の定義を書く。名前には `devkit-` の接頭辞を付け、Codex の組み込み名と重複させない。
 
-hook の登録では `init` が kit のバイナリを登録する。設定の正本と追記時の確認は[権限の境界](guarantees.md#権限の境界)、束縛のないセッションでの扱いは [hook の共通処理](hooks.md#共通処理)、導入後の確認は [doctor](modules.md#導入の照合)に従う。
+hook の登録では `init` が kit のバイナリを登録する。設定の正本と追記時の確認は[権限の境界](guarantees.md#権限の境界)、束縛のないセッションでの扱いは [hook の共通処理](hooks.md#共通処理)、導入後の確認は [doctor](modules.md#doctor-の確認項目)に従う。

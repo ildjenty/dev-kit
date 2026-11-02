@@ -8,23 +8,23 @@ Claude Code と Codex CLI を対象とし、どちらも既定のホストとは
 
 束縛は[セッションの観測](data.md#セッションの観測-sessionobservation)から取得する。束縛がなければ早期終了するが、SessionStart の観測と PreToolUse・UserPromptSubmit の最終観測時刻の更新は行う。入力の本文は束縛があるときだけ観測する。これにより、他の skill や plugin と同じリポジトリで使える。
 
-サブエージェント内(入力に `agent_id` がある場合)では、Stop と SessionStart は何もしない。PreToolUse の deny は親と同じく適用する。ブランチの不一致は[セッションとブランチ](data.md#セッションとブランチ)、ledger と生成物の書き分けは[書き手と調停](data.md#書き手と調停)に従う。
+サブエージェント内(入力に `agent_id` がある場合)では、Stop と SessionStart は何もしない。PreToolUse の deny は親と同じく適用する。ブランチの不一致は[セッションとブランチ](data.md#セッションとブランチ)、ledger と生成物の書き分けは[記録の書き込みと排他](data.md#記録の書き込みと排他)に従う。
 
 ## SessionStart
 
 - **入力**: 起動・再開・compaction 後のセッション ID、ホスト名、cwd などのイベント。
 - **判断**: ブランチに関係なく観測を作り、束縛があれば [checkpoint](data.md#checkpoint)を組み立てる。
-- **出力**: checkpoint を注入する。失敗時は警告を注入する(SessionStart は block できない)。本文と要約の切り替えは[性能と出力](guarantees.md#性能と出力)に従う。
+- **出力**: checkpoint を注入する。失敗時は警告を注入する(SessionStart は block できない)。本文と要約の切り替えは[性能と出力](guarantees.md#性能と出力の上限)に従う。
 - **書く生成物**: `.devkit/run/sessions/<session_id>.json`。Claude Code では `CLAUDE_ENV_FILE` に `DEVKIT_SESSION_ID` も書き、後続コマンドに渡す。
 
 ## Stop
 
 - **入力**: このセッションに束縛された作業、`next` が返す指示、観測内の継続回数。
 - **判断**: 問い・完了・中止・判定待ち・検証中なら停止を許す。それ以外はラウンドの有無ではなく作業単位で `block` する。継続上限に達したら、状態を変えず停止を許す。
-- **出力**: `block` 時は理由として「`devkit next` を実行する」を返す。検証中の扱いは[作業の排他](data.md#作業の排他)に従う。
+- **出力**: `block` 時は理由として「`devkit next` を実行する」を返す。検証中の扱いは[作業の排他制御](data.md#作業の排他制御)に従う。
 - **書く生成物**: セッションの観測に継続回数を書く。
 
-Claude Code の継続上限は8回で、ツール呼び出しでリセットされることは確認済みである。他の hook の `continue: false` が優先される場合がある。停止後の再開は SessionStart の注入で行い、保証との関係は[再開と hook の停止](guarantees.md#再開と-hook-の停止)に従う。
+Claude Code の継続上限は8回で、ツール呼び出しでリセットされることは確認済みである。他の hook の `continue: false` が優先される場合がある。停止後の再開は SessionStart の注入で行い、保証との関係は[再開と hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)に従う。
 
 ## PreToolUse
 
