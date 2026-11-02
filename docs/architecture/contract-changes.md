@@ -48,7 +48,7 @@
 
 - [ledger.md](../parts/ledger.md)の checkpoint と確認済みの集合を、[checkpoint](data.md#checkpoint)・[状態変更](data.md#決定と証拠-decision--evidence)に合わせて改訂した。
 - [ledger.md](../parts/ledger.md)の保存方法と実行状態を、[記録の書き込みと排他](data.md#記録の書き込みと排他)・[StageRun](data.md#ステージの実行-stagerun)に合わせて改訂した。
-- [ledger.md](../parts/ledger.md#決定)の途中の記録を [note](data.md#決定と証拠-decision--evidence)への参照に改め、調査の記録順は[skill の手順](#skill-の手順)への移管を未反映のまま残した。
+- [ledger.md](../parts/ledger.md#決定)の途中の記録を [note](data.md#決定と証拠-decision--evidence)への参照に改め、調査の記録順を削除した。kit の skill への手順の追加は[skill の手順](#skill-の手順)に残す。
 - [ledger.md](../parts/ledger.md#check-の結果)の検出試験・判定と網羅性を、[DetectionTest](data.md#検出試験の記録-detectiontest)・[Judgment](data.md#check-の結果-judgment)・[view の成果物](modules.md#view)に合わせて改訂した。
 - [ledger.md](../parts/ledger.md)の指示と回答を、[Instruction](data.md#指示-instruction)・[Round](data.md#ラウンド-round)・[SubagentStop](hooks.md#subagentstop)・[Answer / Approval](data.md#回答承認-answer--approval)に合わせて改訂した。
 - [ledger.md](../parts/ledger.md)の共通項目と種別ごとの参照を、[記録の範囲](data.md#記録の範囲)に合わせて改訂した。
@@ -140,11 +140,11 @@
 
 ### skill の手順
 
-kit の skill の実装と調査の記録順の移管は未反映である。
+kit の skill の実装と調査の記録順の追加は未反映である。
 
 - kit の skill の作業の進め方は[処理の流れ](flow.md)、人への確認は[人の回答と再開](flow.md#人の回答と再開)、判定者・計画者の起動は[定型の依頼](guarantees.md#判定結果の受理)に合わせる。
 - kit の skill のコマンドの呼び方は[権限の境界](guarantees.md#権限の境界)、コミットの扱いは[完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)への参照にする。
-- [ledger.md「決定」の調査の記録順](../parts/ledger.md#決定)を kit の skill の手順に移し、再現手順の保存先とバージョンは修正開始前、仮説の結果は次の仮説を始める前に [devkit note](data.md#決定と証拠-decision--evidence)で記録する形に改める。
+- kit の skill に、再現手順の保存先とバージョンは修正開始前、仮説の結果は次の仮説を始める前に [devkit note](data.md#決定と証拠-decision--evidence)で記録する手順を追加する。
 
 ## 試験項目
 
