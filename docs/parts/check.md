@@ -10,7 +10,7 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 評価対象と[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(評価対象の識別値)・場所、固定した規範と観点、依頼と結果の照合に必要な資料を受け取る。[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)の[終了ブロック](../architecture/data.md#進捗-progress)(作業結果の記録)や修正時の[指摘の参照](../architecture/data.md#指摘-finding)を含む入力の構成は[判定依頼の公開契約](../architecture/modules.md#check)、観点「差分」の入力は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
-規範の入力は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。対象の受け渡しとコマンドの実行場所は、それぞれ[判定対象の展開](../architecture/guarantees.md#判定対象の展開と完了時の永続化)と[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
+規範の入力は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。対象の受け渡し、コマンドの実行場所と実行前後の照合は[判定対象の展開と完了時の永続化](../architecture/guarantees.md#判定対象の展開と完了時の永続化)に従う。
 
 [判定者](../architecture/data.md#計画-plan)(評価を担うロール)の結果ファイルまたはコマンド実行結果を受け取り、[受理境界](../architecture/guarantees.md#判定結果の受理)(結果を取り込む際の照合条件)で照合する。判定者サブエージェントの返却形式は [form](../architecture/modules.md#form)(スキーマとテンプレートを持つ部品)と[作業結果の判定](../architecture/flow.md#作業結果の判定)、判定コマンド(`[judges]`)(判定を返すコマンド)の出力スキーマは [config](../architecture/modules.md#config)(設定を解析する実装)に従う。
 

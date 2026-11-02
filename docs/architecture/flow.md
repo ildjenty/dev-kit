@@ -28,7 +28,7 @@ engine は `submit` で[状態遷移と受理条件](data.md#状態遷移と受�
 
 ## 作業結果の判定
 
-engine は `next` の中で、ステージに置いた `command:` の check(終了コードによる検証)をすべて判定者の check より先に実行する。雛形の列挙順は同じ種類の中だけ有効とする。作業ツリーから一時 index で `write-tree` を取り、返却後のスナップショットと一致することを確かめてから、その作業ツリーで実行する。環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。終了コードと出力を [Judgment](data.md#check-の結果-judgment)(check の結果)に変換し、終了コードが0なら `PASS`、0以外なら `FAIL`、期限超過は `NOT ASSESSED` とする。必須の `command:` の check が `FAIL` なら、pre-commit も判定者も実行せず、engine が「修正する」として記録して出力を次の brief に含める。
+engine は `next` の中で、ステージに置いた `command:` の check(終了コードによる検証)をすべて判定者の check より先に実行する。雛形の列挙順は同じ種類の中だけ有効とする。コマンドの実行場所と実行前後の照合は[判定対象の展開と完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に従う。環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。終了コードと出力を [Judgment](data.md#check-の結果-judgment)(check の結果)に変換し、終了コードが0なら `PASS`、0以外なら `FAIL`、期限超過は `NOT ASSESSED` とする。必須の `command:` の check が `FAIL` なら、pre-commit も判定者も実行せず、engine が「修正する」として記録して出力を次の brief に含める。
 
 続いて、同じ `next` の中で判定の指示を返す前に pre-commit を実行する。実行の可否・入力条件・失敗時の扱いは[完了条件](guarantees.md#完了条件)に従う。
 
