@@ -67,6 +67,24 @@
 }
 ```
 
+上の計画で作業した[終了ブロック](data.md#進捗-progress)の例。`instruction_id` には作業の指示で受け取った ID を入れる。提出は[作業結果の提出](flow.md#作業結果の提出)、受理は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
+
+```json
+{
+  "instruction_id": "<作業指示 ID>",
+  "judgment": "PASS",
+  "termination_kind": "完了を主張",
+  "next_action": "作業結果の判定を受ける",
+  "changed_files": ["src/save-button.tsx"],
+  "confirmed": ["保存ボタンに『保存』と表示され、既存のテストが通る"],
+  "unconfirmed": [],
+  "unreferenced_inputs": [],
+  "prohibited_changes": ["保存処理の挙動を変えない"],
+  "temporary_state": [],
+  "resume_conditions": []
+}
+```
+
 ## 設定
 
 `devkit.toml` の例。実行ファイル・固定引数・期限を登録する。`review` は上の雛形と計画で画面を起動・確認する[実行主体(runner)](data.md#計画-plan)(check の担当)であり、`[judges]` の判定コマンドとして登録する。スクリプトと出力スキーマのパスは利用側で用意するものに合わせる。

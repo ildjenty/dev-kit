@@ -12,6 +12,8 @@ form は固定フォーマットの型と、[スキーマ・テンプレート](
 
 スキーマの適用対象と形式は [form の定義](../architecture/modules.md#form)、各データの項目は[エンティティの定義](../architecture/data.md#エンティティ)に従う。[判定者](../architecture/data.md#計画-plan)(評価を担うロール)の結果の項目は、[判定結果](../architecture/data.md#check-の結果-judgment)(観点から対象を判定した記録)と[指摘](../architecture/data.md#指摘-finding)(失敗や判断を要する点)に従う。
 
+終了ブロックのスキーマは[進捗](../architecture/data.md#進捗-progress)の必須項目を含めて定義する。入力ファイルの場所と受理条件は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
+
 #### 問い
 
 問い(人への確認事項)の文面に添える回答の案内は[問いの定義](../architecture/data.md#問い-question)に従う。選択肢による回答と文章による回答の受理、および訂正期限は[回答の受理](../architecture/guarantees.md#回答の受理)、停止する範囲と進められる範囲の表示は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。

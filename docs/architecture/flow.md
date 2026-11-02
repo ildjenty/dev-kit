@@ -24,7 +24,7 @@ engine は [brief の責務](modules.md#brief)で定める入力を解決して 
 
 ## 作業結果の提出
 
-engine は `submit` で終了ブロックを受理し、返却後の[スナップショット](data.md#対象のバージョン-targetversion)を取得して成果物を記録し、終了ブロックの終了の種別にかかわらず StageRun を判定待ちにする。次の `next` が[作業結果の判定](#作業結果の判定)を進め、終了の種別は [router](modules.md#router)(次の行動を分類する部品)の判断にも渡す。
+engine は `submit` で[状態遷移と受理条件](data.md#状態遷移と受理条件)に従って終了ブロックを受理し、返却後の[スナップショット](data.md#対象のバージョン-targetversion)を取得して成果物を記録し、終了ブロックの終了の種別にかかわらず StageRun を判定待ちにする。次の `next` が[作業結果の判定](#作業結果の判定)を進め、終了の種別は [router](modules.md#router)(次の行動を分類する部品)の判断にも渡す。
 
 ## 作業結果の判定
 
