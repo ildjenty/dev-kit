@@ -2,17 +2,17 @@
 
 ## 責務
 
-check は入出力を行わず、[観点ファイル](../architecture/modules.md#check)(判定の基準)を基に判定依頼の内容を決め、結果の解析・受理・集約と適用除外の主張と根拠の照合を担う。公開する型と操作、必須 check と[検出試験](../architecture/guarantees.md#検出試験)(観点ファイルの試験)の照合、他の部品との境界は [check のモジュール契約](../architecture/modules.md#check)に従い、依頼文の組み立ては [brief](../architecture/modules.md#brief)(依頼文を組み立てる部品)に委ねる。
+check はファイルの読み書きなどの外部入出力を行わず、固定した[規範](../architecture/modules.md#check)(評価に用いる規則)と[観点ファイル](../architecture/modules.md#check)(判定の基準)を基に判定依頼の内容を決め、結果の解析・受理・集約と[適用除外](../architecture/guarantees.md#判定結果の受理)(特定の要求を外す条件)の主張と根拠の照合を担う。公開する型と操作、規範の束ね方、必須 check と[検出試験](../architecture/guarantees.md#検出試験)(観点ファイルの試験)の照合、他の部品との境界は [check のモジュール契約](../architecture/modules.md#check)に従い、依頼文の組み立ては [brief](../architecture/modules.md#brief)(依頼文を組み立てる部品)に委ねる。
 
 ## 入力と出力
 
 ### 入力
 
-評価対象と[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(評価対象の識別値)・場所、固定した規範(評価に用いる規則)と観点、依頼と結果の照合に必要な資料を受け取る。入力の構成は[判定依頼の公開契約](../architecture/modules.md#check)、規範の読み出しは[規範の固定](../architecture/guarantees.md#規範の固定)、対象の受け渡しとコマンドの実行場所はそれぞれ[判定対象の展開](../architecture/guarantees.md#判定対象の展開と完了時の永続化)と[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
+評価対象と[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(評価対象の識別値)・場所、固定した規範と観点、依頼と結果の照合に必要な資料を受け取る。[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)の[終了ブロック](../architecture/data.md#進捗-progress)(作業結果の記録)や修正時の[指摘の参照](../architecture/data.md#指摘-finding)を含む入力の構成は[判定依頼の公開契約](../architecture/modules.md#check)、観点「差分」の入力は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
-[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)の判定依頼には、そのラウンドの[終了ブロック](../architecture/data.md#進捗-progress)(作業結果の記録)を含める。観点「差分」では[有効な承認・委任の一覧](../architecture/guarantees.md#判定結果の受理)も受け取る。
+規範は、[engine](../architecture/modules.md#engine)(ループの進行を担う実装)が [workspace](../architecture/modules.md#workspace)(git 操作を扱う実装)を通じて[規範の固定](../architecture/guarantees.md#規範の固定)に従って読み出した値を受け取る。対象の受け渡しとコマンドの実行場所は、それぞれ[判定対象の展開](../architecture/guarantees.md#判定対象の展開と完了時の永続化)と[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
 
-[判定者](../architecture/data.md#計画-plan)(評価を担うロール)の結果ファイルまたはコマンド実行結果を受け取り、[受理境界](../architecture/guarantees.md#判定結果の受理)で照合する。判定者サブエージェントの返却形式は [form](../architecture/modules.md#form)(スキーマとテンプレートを持つ部品)と[作業結果の判定](../architecture/flow.md#作業結果の判定)、判定コマンド(`[judges]`)(判定を返すコマンド)の出力スキーマは [config](../architecture/modules.md#config)(設定を解析する実装)に従う。
+[判定者](../architecture/data.md#計画-plan)(評価を担うロール)の結果ファイルまたはコマンド実行結果を受け取り、[受理境界](../architecture/guarantees.md#判定結果の受理)(結果を取り込む際の照合条件)で照合する。判定者サブエージェントの返却形式は [form](../architecture/modules.md#form)(スキーマとテンプレートを持つ部品)と[作業結果の判定](../architecture/flow.md#作業結果の判定)、判定コマンド(`[judges]`)(判定を返すコマンド)の出力スキーマは [config](../architecture/modules.md#config)(設定を解析する実装)に従う。
 
 ### 出力
 
@@ -22,19 +22,19 @@ check は入出力を行わず、[観点ファイル](../architecture/modules.md
 
 ### 観点と判定
 
-観点ファイルは1つの観点につき1ファイルとし、形式と解析の責務は [check のモジュール契約](../architecture/modules.md#check)、配置と最小の例は[観点と検出試験の例](../architecture/examples.md#観点と検出試験)に従う。
+観点ファイルの形式は [form](../architecture/modules.md#form) のテンプレート、解析の責務は [check のモジュール契約](../architecture/modules.md#check)、配置と最小の例は[観点と検出試験の例](../architecture/examples.md#観点と検出試験)に従う。
 
 判定の値と結果・指摘の構成は [Judgment](../architecture/data.md#check-の結果-judgment)と [Finding](../architecture/data.md#指摘-finding)、適用除外と集約は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
 失敗のシナリオを示せない指摘は返さず、重大度は付けない。[blocking](../architecture/modules.md#check)(修正を求める条件)ではない指摘は修正を求めず、参考情報として残す。指摘数に上限は設けず、報告する範囲は観点ファイルの blocking の定義と「報告しない事項」で調整する。
 
-評価対象や外部の文書の扱いは [principles/context.md](../../principles/context.md) の原則3に従う。レビューコメントの本文をシェルのコマンド文字列に埋め込まない。
+評価対象や外部の文書の扱いは [principles/context.md](../../principles/context.md) の原則3に従う。
 
 省略した手順の報告は [principles/working.md](../../principles/working.md) の原則1、判定後の反証の検討は [principles/verification.md](../../principles/verification.md) の原則1に従う。
 
 ### 実行主体と受理
 
-[実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する担当)の指定は[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)の check、種類と割り当て制限は[計画](../architecture/data.md#計画-plan)(課題ごとのループ)と[操作の禁止とサブエージェントの制限](../architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。検証コマンド(`[commands]`)(テストなどを実行するコマンド)を使う `command:` の check と判定コマンドの登録は [config](../architecture/modules.md#config)で定める。
+[実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する担当)の指定は[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)の check、種類と割り当て制限は[計画](../architecture/data.md#計画-plan)(雛形から作る課題ごとの実行内容)と[操作の禁止とサブエージェントの制限](../architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。検証コマンド(`[commands]`)(テストなどを実行するコマンド)を使う `command:` の check と判定コマンドの登録は [config](../architecture/modules.md#config)で定める。
 
 サブエージェントの設定は[リポジトリ内の定義](../architecture/layout.md#指示ファイルとホスト設定)、起動時の制限は [PreToolUse](../architecture/hooks.md#pretooluse)(ツール実行前の hook)に従う。起動と結果の来歴の照合、重複結果と判定の食い違いの扱いは[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 

@@ -2,9 +2,9 @@
 
 dev-kit は、リポジトリ専用の開発ループを回すための道具である。Claude Code や Codex に開発を任せると、手順を飛ばす、[check](parts/check.md)(評価と判定の部品)の判定を自分で `PASS`(合格)にする、未完了でも完了を主張する、セッションをまたぐと文脈を失うことがある。判定値の定義は [check の結果](architecture/data.md#check-の結果-judgment)に従う。
 
-リポジトリの持ち主が「どの順で進み、どこで check を通し、どこで人が見るか」を[ループの雛形](architecture/data.md#ループの雛形-plantemplate)(リポジトリごとのループの定義)として組む。エージェントは普段のセッションでそのループに従い、`devkit` が順序・完了・記録を決定的に守らせる。指示ファイルや skill で頼むだけでは、順序と完了条件を守らせる力がない。
+リポジトリの持ち主が「どの順で進み、どこで check を通し、どこで人が見るか」を[ループの雛形](architecture/data.md#ループの雛形-plantemplate)(リポジトリごとのループの定義)として組む。エージェントは普段のセッションでそのループに従い、`devkit` が順序・完了・記録を決定的に守らせる。指示ファイルや [skill](architecture/layout.md#指示ファイルとホスト設定)(セッションに伝える作業手順)で頼むだけでは、順序と完了条件を守らせる力がない。
 
-kit は、下記の7つの部品、原則、固定物(既定の雛形・観点ファイル・skill・サブエージェント定義など)、`devkit` を提供する。部品と組み立てが満たす原則は [`principles/harness.md`](../principles/harness.md)、固定物の範囲は [kit](architecture/modules.md#kit)に従う。部品はループを支える機能の単位であり、雛形に組み込む要素の形式と既定は kit が用意する。検証コマンドの呼び出し口である `command:` の check は [config](architecture/modules.md#config)、[router](parts/router.md)(次の行動を分類する部品)の4分類をキーにする遷移表の形式は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。
+kit は、下記の7つの部品、原則、[固定物](architecture/modules.md#kit)(バージョン付きの資産)、`devkit` を提供する。部品と組み立てが満たす原則は [`principles/harness.md`](../principles/harness.md)に従う。部品はループを支える機能の単位であり、雛形に組み込む要素の形式と既定は kit が用意する。
 
 ## 基本方針
 
@@ -16,7 +16,7 @@ kit は、下記の7つの部品、原則、固定物(既定の雛形・観点�
 
 ## 部品
 
-部品は、契約、テンプレート、試験を持つ提供単位である。部品は `principles/harness.md` の原則を満たすように作り、契約は「責務 / 入力と出力 / 保証 / 試験項目」の見出し構成に揃える。仕組みは設計の正本で定め、契約から該当する節へ参照する。計画が取捨するのは雛形に定めた要素であり、提供単位である部品は選択の対象にしない。部品は次の7つとし、試験のない部品は kit に含めない。
+部品は、契約、テンプレート、試験を持つ提供単位である。契約は「責務 / 入力と出力 / 保証 / 試験項目」の見出し構成に揃える。仕組みは設計の正本で定め、契約から該当する節を参照する。計画が取捨するのは雛形に定めた要素であり、提供単位である部品は選択の対象にしない。部品は次の7つとし、試験のない部品は kit に含めない。
 
 - [brief](parts/brief.md) — 作業依頼のフォーマット
 - [check](parts/check.md) — 評価と判定
@@ -26,4 +26,6 @@ kit は、下記の7つの部品、原則、固定物(既定の雛形・観点�
 - [view](parts/view.md) — 人向けの表示
 - [runtime](parts/runtime.md) — 実行
 
-各部品の実装モジュール(計画の検証・遷移・上限判定を扱う [plan](architecture/modules.md#plan) を含む)、kit の固定物、配置、依存は [architecture.md](architecture.md) で定める。設計の正本は [architecture.md](architecture.md) と [architecture/](architecture/) である。
+[検証コマンド](architecture/modules.md#config)(`[commands]` に登録するテスト・型検査など)を呼ぶ `command:` の check は [config](architecture/modules.md#config)、router の4分類をキーにする遷移表の形式は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。
+
+各部品の実装モジュール(計画の検証・遷移・上限判定を扱う [plan](architecture/modules.md#plan) を含む)、kit の固定物、配置、依存は [architecture.md](architecture.md) で定める。正本と優先関係は [README の参照順序](../README.md#参照順序)に従う。

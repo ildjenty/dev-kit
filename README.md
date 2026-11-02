@@ -1,8 +1,8 @@
 # dev-kit
 
-dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバイナリである。
+dev-kit は、Claude Code や Codex CLI のセッション内で、リポジトリ専用の開発ループを回すための道具である。
 
-dev-kit は、Claude Code や Codex CLI のセッション内で、リポジトリ専用の開発ループを回すための道具である。リポジトリの持ち主が[ループの雛形](docs/architecture/data.md#ループの雛形-plantemplate)(作業の段階と判定・承認の組み合わせ)を組む。kit は[7つの部品](docs/design.md#部品)、原則、固定物(既定の雛形・観点ファイル・skill・サブエージェント定義など)、`devkit` を提供する。固定物の範囲は [kit](docs/architecture/modules.md#kit)に従う。現在は設計段階で、コードはまだない。
+dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバイナリである。リポジトリの持ち主が[ループの雛形](docs/architecture/data.md#ループの雛形-plantemplate)(作業の段階と判定・承認の組み合わせ)を組む。kit は[7つの部品](docs/design.md#部品)、原則、[固定物](docs/architecture/modules.md#kit)(バージョン付きの資産)、`devkit` を提供する。現在は設計段階で、コードはまだない。
 
 ## 参照順序
 
@@ -29,7 +29,7 @@ dev-kit は、Claude Code や Codex CLI のセッション内で、リポジト�
 - [docs/parts/](docs/parts/): 部品ごとの契約。
 - [docs/loop-plan.md](docs/loop-plan.md): ループの雛形(利用者が組む定義)と課題ごとの計画の形式・作成規則。
 - [docs/stages.md](docs/stages.md): 雛形に置くステージの候補。
-- [docs/checks.md](docs/checks.md): 観点ファイルの候補。
+- [docs/checks.md](docs/checks.md): [観点ファイル](docs/architecture/modules.md#check)(check の判定基準を記すファイル)の候補。
 - [docs/rules.md](docs/rules.md): 対象のコードと文書に課す規則と強制手段の設計上の一覧。利用側の正本は [Rules](docs/architecture/data.md#規則と強制手段-rules)に従う。
 - [docs/repository.md](docs/repository.md): 利用側の配置と実行の仕組みとの対応。
 - [docs/meta-loop.md](docs/meta-loop.md): ループ自体を改善する手順。

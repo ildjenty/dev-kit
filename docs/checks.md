@@ -31,7 +31,7 @@
 
 ## 校閲
 
-- **確認事項**: 読者の前提と言葉の具体性は [`principles/writing.md`](../principles/writing.md) の原則2・3の違反・兆候と blocking に従う。
+- **確認事項**: 想定読者の前提と表現の具体性を、[`principles/writing.md`](../principles/writing.md) の原則2・3の違反・兆候に照らして確認する。
 - **blocking**: 読み手が意味を取り違える箇所。
 
 ## 契約
@@ -61,7 +61,7 @@
 
 ## 終了時の状態
 
-- **確認事項**: 判定依頼に含まれるそのラウンドの[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定形式で返す記録)を[完了条件](architecture/guarantees.md#完了条件)と照合する。終了・中断時の記録と再開条件は [`principles/context.md` の原則5](../principles/context.md#5-完了条件を満たして終え中断時は安全に再開できる状態を残す)に従う。
+- **確認事項**: 判定依頼に含まれるその[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から結果に対する判断までの往復)の[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定形式で返す記録)を[完了条件](architecture/guarantees.md#完了条件)と照合する。終了・中断時の記録と再開条件は [`principles/context.md` の原則5](../principles/context.md#5-完了条件を満たして終え中断時は安全に再開できる状態を残す)に従う。
 - **blocking**: 同原則5の blocking 条件に従う。必須の確認が残る場合の判定も同原則5に従う。
 
 ## 計画
@@ -83,12 +83,12 @@
 - **確認事項**:
   - 原則と契約: [`principles/harness.md`](../principles/harness.md) の各原則と[モジュールごとの契約](architecture/modules.md#モジュールごとの契約)に従う。
   - check の必須化: 仕組みの選定は同原則5、[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は[検出試験](architecture/guarantees.md#検出試験)(観点ファイルが期待する判定を出せるかの試験)に従う。
-  - skill: description の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`principles/working.md` の原則5](../principles/working.md#5-定型処理はコマンドにし手順はそれを呼ぶ)に従う。
+  - skill: [`description`](https://agentskills.io/specification#description-field)(skill の説明項目)の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`principles/working.md` の原則5](../principles/working.md#5-定型処理はコマンドにし手順はそれを呼ぶ)に従う。
   - 判定: [check の結果](architecture/data.md#check-の結果-judgment)に従い、`NOT ASSESSED`(未評価)を返せるか。
   - 原則の形式: [原則のフォーマット](../principles/README.md#原則のフォーマット)を満たすか。
   - 新しいセッションによる確認: リポジトリと実行の記録を読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるか。
   - 接続と再開: 正本の[試験項目](architecture/contract-changes.md#試験項目)に従い、部品間の[結合試験](architecture/contract-changes.md#結合試験)を確認する。
-- **blocking**: 新しいセッションによる確認で答えられない問いがある、照合した原則の blocking 条件に該当する、または部品の契約に違反する。
+- **blocking**: 新しいセッションによる確認で答えられない問いがある、照合した原則の blocking 条件に該当する、または照合した契約に違反する。
 
 ## skill の試験
 

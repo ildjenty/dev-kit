@@ -17,7 +17,7 @@
       "assignee": "worker",
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true },
-        { "aspect": "wording", "runner": "devkit-judge", "required": true }
+        { "aspect": "wording", "runner": "review", "required": true }
       ],
       "gate": { "required": false, "reason": "公開契約を変えない文言の修正" },
       "limits": { "max_rounds": 3, "max_no_progress": 2 },
@@ -42,7 +42,7 @@
 ```json
 {
   "version": 1,
-  "template": { "name": "default", "path": ".devkit/plans/default.json", "content_hash": "3eb6aaa03ac46da5fc99c75df9d11b695f67974a71a656e39c2d39e6322d4b3a" },
+  "template": { "name": "default", "path": ".devkit/plans/default.json", "content_hash": "ad129ad29196a75002c26666388190219abb207bc4b79b69d1aa23da211e9ee5" },
   "task": "保存ボタンの文言を『登録』から『保存』に変える",
   "completion_conditions": [
     { "id": "C1", "description": "保存ボタンに『保存』と表示され、既存のテストが通る" }
@@ -55,7 +55,7 @@
       "assignee": "worker",
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "返却後のツリー" },
-        { "aspect": "wording", "runner": "devkit-judge", "required": true, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示とそのテスト" }
+        { "aspect": "wording", "runner": "review", "required": true, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示とそのテスト" }
       ],
       "gate": { "required": false, "reason": "公開契約を変えない文言の修正" },
       "limits": { "max_rounds": 3, "max_no_progress": 2 },
@@ -69,7 +69,7 @@
 
 ## 設定
 
-`devkit.toml` の例。実行ファイル・固定引数・期限を登録する。`review` は判定コマンドの登録例であり、上の計画では `devkit-judge` を使う。スクリプトと出力スキーマのパスは利用側で用意するものに合わせる。
+`devkit.toml` の例。実行ファイル・固定引数・期限を登録する。`review` は上の雛形と計画で画面を起動・確認する[実行主体(runner)](data.md#計画-plan)(check の担当)であり、`[judges]` の判定コマンドとして登録する。スクリプトと出力スキーマのパスは利用側で用意するものに合わせる。
 
 ```toml
 kit_version = "v1"
@@ -91,7 +91,7 @@ human_confirmation = ["billing_changed"]
 
 ## 観点と検出試験
 
-観点ファイル `.devkit/checks/wording.md` の例。
+観点ファイル `.devkit/checks/wording.md` の例。[Judgment](data.md#check-の結果-judgment)(観点ごとの判定結果)を返し、`NOT ASSESSED`(未評価)の判定値は同じ定義に従う。
 
 ```markdown
 # wording
@@ -127,7 +127,7 @@ human_confirmation = ["billing_changed"]
 }
 ```
 
-各 HTML の最小の内容は、違反例が `<button id="save">登録</button>`、適合例が `<button id="save">保存</button>`、許容例が `<button id="save">保存</button><button id="other">登録</button>`。試験の完了条件は「`save` の文言が『保存』」とする。起動と画面の確認方法も依頼に含め、合格の扱いは[検出試験](guarantees.md#検出試験)に従う。
+各 HTML の最小の内容は、違反例が `<button id="save">登録</button>`、適合例が `<button id="save">保存</button>`、許容例が `<button id="save">保存</button><button id="other">登録</button>`。試験の完了条件は「`save` の文言が『保存』」とする。起動と画面の確認方法も依頼に含め、上の計画と同じ判定コマンド `review` で実行する。合格の扱いは[検出試験](guarantees.md#検出試験)に従う。
 
 ## pre-commit
 

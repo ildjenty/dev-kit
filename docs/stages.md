@@ -18,7 +18,7 @@ kit は、利用者が[ループの雛形](architecture/data.md#ループの雛�
 - **決めること**: 含めるものと含めないもの。外部から見えるもの。
 - **決めずに次のステージへ渡すこと**: 内部構造。
 - **元に戻せないもの**: スキーマ、識別子、契約の型、外部への公開、データの保持のうち、該当すると判断したもの。
-- **成果物**: スコープの明示と、元に戻せないものの一覧。継続して守るものは[規則と強制手段](architecture/data.md#規則と強制手段-rules)の `.devkit/rules.md`、課題固有のものは[計画](architecture/data.md#計画-plan)に置き、両方を後続ステージの [brief](architecture/modules.md#brief)(入力から組み立てる依頼文)に渡す。
+- **成果物**: スコープの明示と、元に戻せないものの一覧。継続して守るものは[規則と強制手段](architecture/data.md#規則と強制手段-rules)の `.devkit/rules.md`、課題固有のものは[計画](architecture/data.md#計画-plan)に置く。後続ステージの [brief](architecture/modules.md#brief)(入力から組み立てる依頼文)に渡す範囲は[規則と強制手段](architecture/data.md#規則と強制手段-rules)に従う。
 
 ## 2 構造
 
@@ -60,7 +60,7 @@ kit は、利用者が[ループの雛形](architecture/data.md#ループの雛�
 - **決めること**: 未確認の前提の真偽。
 - **決めずに次のステージへ渡すこと**: 本番のコード。
 - **元に戻せないもの**: なし。
-- **成果物**: 実験の結果と決定。決定は [`devkit note`](architecture/data.md#決定と証拠-decision--evidence) で記録する。試作は本番のコードから分離し、`submit` 前に削除するか、追跡対象外で ignore された場所に置いて[完了時のコミット](architecture/guarantees.md#完了条件)に含めない。
+- **成果物**: 実験の結果と決定。決定は [`devkit note`](architecture/data.md#決定と証拠-decision--evidence) で記録する。試作は本番のコードから分離し、[`devkit submit`](architecture/flow.md#作業結果の提出)(作業結果を提出するコマンド)の実行前に削除するか、追跡対象外で ignore された場所に置いて[完了時のコミット](architecture/guarantees.md#完了条件)に含めない。
 
 ## 初期化
 

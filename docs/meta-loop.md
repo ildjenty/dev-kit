@@ -4,7 +4,7 @@
 
 メタループは、ループの仕組み(部品、組み立て、計画)を改善するためのループである。同じループの作業対象を、その仕組み自体にする。
 
-- **入口**: 指摘、失敗、振り返りで出た案は `devkit note` の種別「教訓」で記録する([途中の記録](architecture/data.md#決定と証拠-decision--evidence))。[engine](architecture/modules.md#engine)(進行と記録を担う実装)が [router](architecture/modules.md#router)(次の行動を分類する部品)の「教訓の反映先」の分類を付けて記録し、skill が人と反映先の候補を選ぶ手順を持つ。反映先の優先順は[人への確認対象](architecture/guarantees.md#人への確認対象)に従う。
+- **入口**: 指摘、失敗、振り返りで出た案を改善の候補にする。教訓の記録方法は[決定と証拠](architecture/data.md#決定と証拠-decision--evidence)、分類の付与は[作業の指示](architecture/flow.md#作業の指示)に従う。[skill](architecture/layout.md#指示ファイルとホスト設定)(セッションに伝える作業手順)で、人と反映先の候補を選ぶ。反映先の優先順は[人への確認対象](architecture/guarantees.md#人への確認対象)に従う。
 - **振り返り**: 判断の誤り、ツールと仕組み、代替手段という3つの視点で会話の記録を読む。案は「採用」「却下」「保留」に分類する。メタループの編集を宣言したステージでの扱いと、宣言のないステージでの人への確認は[人への確認対象](architecture/guarantees.md#人への確認対象)に従う。
 - **改善の手がかり**: [check](parts/check.md)(評価と判定の部品)の結果の記録([blocking](architecture/data.md#指摘-finding)(完了を妨げる指摘)ではない指摘も含む)と、人が後から発見した見逃しを手がかりにする。人は check の結果から意図的に一部を選んで読み直し、自分の判断と check の判定を照合する。同種の問題が繰り返される場合は、[観点](checks.md)(check の確認事項のまとまり)・原則・lint として取り込む候補にする。
 - **検査**: 確認事項は観点「[harness](checks.md#harness)」「[skill の試験](checks.md#skill-の試験)」「[前提の批評](checks.md#前提の批評)」に従う。
@@ -18,10 +18,10 @@
 
 生成した設計には、配置の不自然さや冗長さが生じることがある。以下は、[ステージ候補](stages.md)の「0 目的」「2 構造」を採用する場合の分類である。検査と blocking の基準は観点「[構造](checks.md#構造)」に従う。
 
-- **配置の誤り**(配置ガイドがない): ガイドの配置と取り込みは[リポジトリ側の構成](repository.md#リポジトリ側の構成)に従う。
+- **配置の誤り**: 成果物を本来の配置先と異なる場所に置く。配置ガイドの欠如が原因・兆候となる。ガイドの配置と取り込みは[リポジトリ側の構成](repository.md#リポジトリ側の構成)に従う。
 - **冗長さ**(制約ごとに仕組みを足す、既存コードを変更せずにレイヤーを追加する): より単純な構造との比較は観点「[構造](checks.md#構造)」に従う。判断には [`principles/designing.md`](../principles/designing.md) の原則5と [`principles/structure.md`](../principles/structure.md) の原則7の違反・兆候を使う。
 - **前提への固着**(Issue に書かれた手段に設計が縛られる): 目的と手段を決める範囲はステージ「[0 目的](stages.md#0-目的)」「[2 構造](stages.md#2-構造)」に従い、観点「[構造](checks.md#構造)」で前提を照合する。
-- **1回だけの生成**(一度の生成で設計を済ませる): check の [`FAIL`](architecture/data.md#check-の結果-judgment)(不合格の判定)に対する修正ラウンドは[作業結果の判定](architecture/flow.md#作業結果の判定)と [router の判断](architecture/flow.md#router-の判断)に従い、設計を作り直す。実行主体(runner。check を実行する相手)は[計画](architecture/data.md#計画-plan)、結果の受理は[判定結果の受理](architecture/guarantees.md#判定結果の受理)に従う。
-- **既存の流儀の無視**(同じ種類の処理があるのに、別の書き方でつぎはぎする): 調査と成果物はステージ「[調査](stages.md#調査)」「[2 構造](stages.md#2-構造)」、照合は観点「[構造](checks.md#構造)」「[差分](checks.md#差分)」に従う。
+- **1回だけの生成**(一度の生成で設計を済ませる): check の [`FAIL`](architecture/data.md#check-の結果-judgment)(不合格の判定)に対する修正ラウンドは[作業結果の判定](architecture/flow.md#作業結果の判定)と [router](architecture/modules.md#router)(次の行動を分類する部品)の[判断](architecture/flow.md#router-の判断)に従い、設計を作り直す。
+- **既存の流儀の無視**(同じ種類の処理があるのに、既存の書き方と異なる実装を追加する): 調査と成果物はステージ「[調査](stages.md#調査)」「[2 構造](stages.md#2-構造)」、照合は観点「[構造](checks.md#構造)」「[差分](checks.md#差分)」に従う。
 
 上記の問題を理由に却下した設計案は、[決定と証拠](architecture/data.md#決定と証拠-decision--evidence)の「却下した案とその分類」に該当する分類を記録する。どの分類が多いかを見て、観点を改善する。

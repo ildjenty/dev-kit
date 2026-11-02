@@ -2,7 +2,7 @@
 
 Claude Code や Codex に開発を任せると、手順の省略、自己 `PASS`、完了の過大申告、セッションをまたぐ文脈の喪失が起きることがある。指示ファイルや skill で頼むだけでは順序と完了条件を守らせる力がないため、dev-kit がこれを担う([基本方針](design.md))。
 
-dev-kit は、リポジトリごとの開発ループを、Claude Code や Codex CLI のセッション内で回すための道具である。人は普段どおりセッションを開き、kit の skill で課題を渡す。セッションのエージェントが手を動かし、単一バイナリの `devkit` が「次に何をするか」「終わってよいか」「何を記録するか」を決める。進行の判断は `devkit` が担う。
+dev-kit は、リポジトリごとの開発ループを、Claude Code や Codex CLI のセッション内で回すための道具である。人は普段どおりセッションを開き、kit の skill で課題を渡す。セッションのエージェントがコードの変更やコマンドの実行を行い、単一バイナリの `devkit` が「次に何をするか」「終わってよいか」「何を記録するか」を決める。進行の判断は `devkit` が担う。
 
 ## 全体構成
 
@@ -10,7 +10,7 @@ dev-kit は、リポジトリごとの開発ループを、Claude Code や Codex
 graph LR
   human[人] -- チャット --> agent[セッションのエージェント]
   agent -- "devkit next / submit / answer" --> devkit[devkit CLI]
-  devkit -- 指示と brief --> agent
+  devkit -- 指示と依頼文 --> agent
   devkit -- 記録 --> run[.devkit/run/]
   agent -- 起動 --> sub[サブエージェント<br/>判定者・計画者]
   sub -- 最終メッセージ --> hook[devkit hook]
@@ -20,44 +20,41 @@ graph LR
   host[ホスト] -- イベント --> hook
 ```
 
-- **セッションのエージェント**は実行役である。brief を読み、コードを書き、終了ブロック(作業の結果を固定の形式で書いた JSON)を返す。判定者と計画者のサブエージェントを起動するが、依頼文は定型の1行に固定される。
-- **`devkit`** は状態機械である。利用者が組んだループの雛形に従って、ループ計画(ステージの列と遷移表)と記録から次の指示を計算し、[ステージの完了時に `git commit` し](architecture/guarantees.md#完了条件)、判定者の結果と人の答えを受理し、記録を書く。エージェントが Bash から呼ぶが、sandbox の外で動く。
+- **セッションのエージェント**は実行役である。[brief](architecture/modules.md#brief)(作業や判定の依頼文)を読み、コードを書き、[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定の形式で書いた JSON)を返す。判定者と計画者のサブエージェントは、[定型の1行の prompt](architecture/guarantees.md#判定結果の受理)で起動する。
+- **`devkit`** は状態機械である。利用者が組んだ[ループの雛形](architecture/data.md#ループの雛形-plantemplate)(再利用するループの定義)から作る[計画](architecture/data.md#計画-plan)(課題ごとの実行内容)と記録から次の指示を計算し、[ステージの完了時に `git commit` し](architecture/guarantees.md#完了条件)、判定者の結果と人の答えを受理し、記録を書く。エージェントが Bash から呼ぶが、sandbox の外で動く。
 - **hook** は同じバイナリの別の呼び出し口である。セッションの開始時に状況を注入し、終了を止め、危険な操作を拒み、サブエージェントの結果と人の入力を観測してファイルに書く。
-- **人**はチャットで問いに答える。hook が観測した選択肢の回答は定型「問い ID 選択肢」に完全一致するときだけ受理し、文章の回答は[回答の受理](architecture/guarantees.md#回答の受理)に従う。
+- **人**はチャットで問いに答える。`devkit answer` が hook の観測した入力をもとに回答を受理する条件は、[回答の受理](architecture/guarantees.md#回答の受理)で定める。
 
 ## 作業の流れ
 
-1. `devkit start --plan <name> <課題>` が作業とブランチ `devkit/<作業 ID>` を作り、チェックアウトを切り替える。計画者が雛形から計画を作り(完了条件を埋め、関係のないステージを外し、必要なら候補から足す)、計画の check と、雛形からの逸脱があれば人の承認を経て実行可能になる。
-2. `devkit next` がステージの brief を返す。このとき規範(観点ファイル(check の確認事項と blocking の定義を書いたファイル)や検証コマンドの定義、deny、サブエージェントの定義など)をスナップショットに固定する。
-3. エージェントが作業し、終了ブロックを `devkit submit` で渡す。`devkit` が返却後のスナップショットを取る。
-4. ステージに置いた `command:` の check(テスト、型検査など)を `devkit` が実行する。必須の `command:` の check が `FAIL` なら修正へ回す。続いて pre-commit を `git hook run` で実行し、失敗なら同じく修正へ回す(git 2.36 以降。使えなければ完了時だけ)。詳細は[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
-5. `devkit next` が判定の指示を返し、エージェントが判定者を起動する。結果は hook が受け取り、次の `next` が受理する。
-6. router(check の結果から次の行動を分類する部品)が「修正する」「人に確認する」「前のステージに戻る」「完了する」を判断する。修正なら 2 へ、確認なら人の答えを待って `answer` で記録、完了なら `devkit` が `git commit` し、リポジトリの pre-commit がリポジトリで定義した検証を走らせる。失敗なら修正へ、成功なら次のステージへ進む。詳細は[完了条件](architecture/guarantees.md#完了条件)に従う。
-7. セッションをまたぐ再開は、ホストのセッション再開と SessionStart の注入で行う。途中で終わっても作業は「作業中」のまま残る。
+1. `devkit start --plan <name> <課題>` で[作業を開始](architecture/flow.md#作業の開始)し、計画者が雛形から計画を作る。[check](architecture/modules.md#check)(評価と判定)と人の承認は[計画の check と承認ゲート](architecture/flow.md#計画の-check-と承認ゲート)に従う。
+2. `devkit next` が[作業の指示](architecture/flow.md#作業の指示)としてステージ(作業を区切る単位)の brief を返す。判定に使う規範は[規範の固定](architecture/guarantees.md#規範の固定)に従って確定する。
+3. エージェントが作業し、終了ブロックを `devkit submit` で[提出する](architecture/flow.md#作業結果の提出)。
+4. `devkit` が判定者に先立って検証を実行する。実行順と失敗時の扱いは[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
+5. `devkit next` の指示で判定者を起動し、結果は[作業結果の判定](architecture/flow.md#作業結果の判定)に従って受理する。
+6. [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)が判断し、[判断後の処理](architecture/flow.md#router-の判断)へ進む。[人の回答](architecture/flow.md#人の回答と再開)や[完了の確定](architecture/guarantees.md#完了条件)は、その判断の後に行う。
+7. セッションをまたぐ再開は、[人の回答と再開](architecture/flow.md#人の回答と再開)に従う。
 
-2〜6 がラウンドで、修正のたびに繰り返す。観点ファイルに基づく Judgment(check の結果)を受理し、次の行動を決める。
+[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)では、[Judgment](architecture/data.md#check-の結果-judgment)(`command:` の check を含む判定結果)を受理して次の行動を決める。
 
 段階ごとの詳細は [flow.md](architecture/flow.md)。
 
 ## 利用者が組むもの
 
 1. **雛形**: 既定を `.devkit/plans/<name>.json` に複製して編集する([PlanTemplate](architecture/data.md#ループの雛形-plantemplate)、[例](architecture/examples.md#雛形と計画))。
-2. **観点**: `.devkit/checks/<観点ID>.md` と例を置き、雛形の check に加えると `next` が検出試験を先に指示する([検出試験](architecture/guarantees.md#検出試験)、[例](architecture/examples.md#観点と検出試験))。
-3. **検証コマンド**: `devkit.toml` の `[commands]` に登録し、雛形の check に `command:<name>` と書く([config](architecture/modules.md#config)、[例](architecture/examples.md#設定))。
-4. **pre-commit**: `.githooks/pre-commit` にテストと lint を書く([導入と完了条件](architecture/guarantees.md#完了条件)、[例](architecture/examples.md#pre-commit))。
+2. **観点**: `.devkit/checks/<観点ID>.md` と例を置き、雛形の check に使う。[検出試験](architecture/guarantees.md#検出試験)(観点ファイルの判定能力を確かめる試験)の対象・実行条件・合格記録の再利用は参照先に従う([例](architecture/examples.md#観点と検出試験))。
+3. **検証コマンド(`[commands]`)**: 雛形で `command:` の check(終了コードによる検証)に使う。登録形式と実行主体(runner)は[計画の check](architecture/data.md#計画-plan)に従う([例](architecture/examples.md#設定))。
+4. **pre-commit**: リポジトリで有効な pre-commit にテストと lint を書く。既存の hook の仕組みがない場合の配置は[導入と完了条件](architecture/guarantees.md#完了条件)に従う([例](architecture/examples.md#pre-commit))。
 
 ## 保証の範囲
 
-- **信頼の前提**: 作業者(エージェント)と評価対象のコードに悪意はない。防ぐのは事故(誤った場所への書き込み、元に戻せない操作、二重適用)、自己評価の偏り(自己 `PASS`、完了の過大申告、手順の省略、人の答えの都合のよい解釈)、再開の食い違い、バージョンの不一致である。偽造や資格情報の窃取は範囲外で、チームでは git 管理と PR レビューで見えるようにする。
-- **保証**: `devkit` が保証するのは「記録上、正しくない完了・承認・外部操作が成立しない」こと。セッションを終わらせない Stop hook は補助である。
-- **実装しないもの**: git と、両ホストにある機能で賄えるものは kit で実装しない。ブランチ・worktree・履歴は git に、sandbox・permissions・hook・skill・サブエージェント・セッション再開・人とのやり取りはホストに任せる。
-- 失敗ごとの対策の対応は [guarantees.md](architecture/guarantees.md)。
+[保証と対策](architecture/guarantees.md)で保証の対象を定める。保証が成り立つ条件は[信頼の前提](architecture/guarantees.md#信頼の前提)、git とホストに任せる範囲は[実装対象外の機能](architecture/guarantees.md#実装対象外の機能)を参照する。
 
 ## 構成要素
 
-- **データ**: 作業、ループの雛形、計画、ステージの実行、ラウンド、対象のバージョン(ツリーのスナップショットなど)、Judgment、問いと回答、外部操作、進捗。実行の記録は作業ごとに追記し、書き手は `devkit` だけ。[data.md](architecture/data.md)
+- **データ**: 作業に属するデータの種類は[エンティティ](architecture/data.md#エンティティ)、実行の記録(作業ごとに残す記録)の保存と書き手は[記録の書き込みと排他](architecture/data.md#記録の書き込みと排他)で定める。
 - **役割**: 計画・判定・進行・記録・表示を分担する。7つの部品と実装モジュールの対応、runtime の内訳と依存は [modules.md](architecture/modules.md)で定める。
-- **配置**: 利用側は `devkit.toml`、`.devkit/`(育てるもの)、`.devkit/run/`(記録。ignore)、ホストの設定、`.agents/skills/`。[layout.md](architecture/layout.md)
+- **配置**: [育てるもの](architecture/data.md#所有と生存期間)(リポジトリが所有して git で管理する資産)を含む利用側の配置は [layout.md](architecture/layout.md)で定める。
 - **hook**: SessionStart・Stop・PreToolUse・SubagentStop・UserPromptSubmit の5イベント。[hooks.md](architecture/hooks.md)
 
 ## 設計上の決定

@@ -1,8 +1,8 @@
 # 規則と強制手段
 
-対象のコードと文書に課す規則と、それを守らせる手段の設計上の一覧である。「手段: 未実装」は、その規則を強制する実装がまだないことを示す。ループの仕組みの規則は[設計の正本](architecture.md)に置く。
+規則は対象のコードと文書に適用する。「手段: 未実装」は、その規則を強制する実装がまだないことを示す。ループの仕組みとの分担は[基本方針](design.md#基本方針)に従う。
 
-利用側の規則の正本は[規則と強制手段](architecture/data.md#規則と強制手段-rules)の `.devkit/rules.md` であり、規則の既定は [kit の `rules/`](architecture/layout.md#dev-kit-のリポジトリ)に置き、[init](architecture/modules.md#install) が初期内容を用意する。
+利用側の規則の正本は[規則と強制手段](architecture/data.md#規則と強制手段-rules)、既定の配置は [dev-kit のリポジトリ](architecture/layout.md#dev-kit-のリポジトリ)、初期化は [install](architecture/modules.md#install) に従う。
 
 ## コードの構造
 
@@ -16,7 +16,7 @@
 
 ## 作業の進め方
 
-並行作業の単位はチェックアウト(git worktree など)であり、配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。共有状態と共通の不変条件の扱いは [`principles/data.md`](../principles/data.md) の原則6に従う。
+並行作業の配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。共有状態と共通の不変条件の扱いは [`principles/data.md`](../principles/data.md) の原則6に従う。
 
 ## コメントと lint
 
@@ -28,8 +28,8 @@
 
 テストの検出能力の確認は、検証対象を意図的に壊してテストが失敗することを確かめる操作である。観点ファイルを対象にする[検出試験](architecture/guarantees.md#検出試験)とは区別する。
 
-- **テスト(回帰テストを含む)は実装前に一度失敗することを確認してテスト ID・[対象のバージョン](architecture/data.md#対象のバージョン-targetversion)(確認対象の状態)・実行結果を記録し、実装前に確認できない場合はテストの検出能力の確認で代替する**。 [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
-- **実装前に失敗を確認できなかったテストとセキュリティ上の処理のテストでは、検証対象を1か所だけ意図的に壊し、失敗を確認した変異差分と実行結果をテスト ID に結び付けて記録する**。 [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
+- **テスト(回帰テストを含む)は実装前に一度失敗することを確認する。テスト ID・[対象のバージョン](architecture/data.md#対象のバージョン-targetversion)(確認対象の状態)・実行結果を記録する。実装前に確認できない場合は、次項のテストの検出能力の確認で代替する**。 [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
+- **実装前に失敗を確認できなかったテストとセキュリティ上の処理のテストでは、検証対象を1か所だけ意図的に壊し、失敗を引き起こした変更の差分と実行結果をテスト ID に結び付けて記録する**。 [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
 - **テストの検出能力の確認では1か所を変更して1回実行し、直ちに元に戻して変更前のソースの状態が復元されたことを確認する**。 [`principles/testing.md`](../principles/testing.md) の原則4。手段: 未実装。
 - **テストに `skip` や `only` を残さない**。 [`principles/testing.md`](../principles/testing.md) の原則9。手段: 未実装。
 
@@ -44,7 +44,11 @@
   - 「不明」: 何をどのように調べて見つからなかったかを示す場合に用いる。
 
 - **文章に「明らかに」「当然」「単に」を使わない**。 [`principles/verification.md`](../principles/verification.md) の原則2。手段: 未実装。
-- **機械が読む固定フォーマット([終了ブロック](architecture/data.md#進捗-progress)(ラウンドの結果を記す JSON)、[PR 本文の検証の節](parts/form.md#テンプレート))は、結論と判断材料を先に書く文章構成の検査から除外する**。 [`principles/writing.md`](../principles/writing.md) の原則1。手段: 未実装。
+- **結論と判断材料を先に書く文章構成の検査から、次の機械が読む固定フォーマットを除外する**。 [`principles/writing.md`](../principles/writing.md) の原則1。手段: 未実装。
+
+  - [終了ブロック](architecture/data.md#進捗-progress)(ラウンドの結果を記す JSON)
+  - [PR 本文の検証の節](parts/form.md#テンプレート)
+
 - **人に判断を求める質問には、選択肢、推奨案、その理由を添える**。 [`principles/writing.md`](../principles/writing.md) の原則7。手段: 未実装。
 - **PR 本文とレビューコメントに「私は」と記述しない**。 [`principles/writing.md`](../principles/writing.md) の原則2。手段: 未実装。
 
@@ -64,4 +68,4 @@
 - **モバイルの入力欄のフォントは16px 以上とする**。 [`principles/ui.md`](../principles/ui.md) の原則8。手段: 未実装。
 - **メニューを開いている間は背景をスクロールさせない**。 [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
 - **アニメーションの各フレームで再描画を発生させない**。 [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
-- **確認対象のページ・状態・バージョンに対応するスクリーンショットを撮影し、取得の記録を残す**。 [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。
+- **確認対象のページ・状態・[対象のバージョン](architecture/data.md#対象のバージョン-targetversion)に対応するスクリーンショットを撮影し、取得の記録を残す**。 [`principles/ui.md`](../principles/ui.md) の原則9。手段: 未実装。

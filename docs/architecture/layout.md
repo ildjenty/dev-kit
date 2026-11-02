@@ -1,12 +1,12 @@
 # ディレクトリ構成
 
-実装と埋め込み元は dev-kit のリポジトリに置き、利用側には設定、育てるもの、作業ごとの実行の記録と生成物を置く。利用側のチェックアウトを単位に配置を完結させ、並行する作業は別のチェックアウトに分ける。ディレクトリのツリーは、それぞれの置き場所と役割を示す。
+実装と埋め込み元は dev-kit のリポジトリに置き、利用側には設定などの[育てるもの](data.md#所有と生存期間)(利用側で更新する git 管理の資産)、作業ごとの実行の記録と生成物を置く。利用側のチェックアウトを単位に配置を完結させ、並行する作業は別のチェックアウトに分ける。ディレクトリのツリーは、それぞれの置き場所と役割を示す。
 
 ## dev-kit のリポジトリ
 
 ```text
 dev-kit/
-  cmd/devkit/            組み立ての根。サブコマンドの定義と配線だけ
+  cmd/devkit/             サブコマンドの定義と各実装の接続
   internal/
     plan/                計画の意味論
     brief/               brief と判定依頼の組み立て
@@ -22,6 +22,7 @@ dev-kit/
     workspace/           git の操作
     config/              渡された TOML の解析と検証
     install/             導入と doctor
+    kit/                 固定物の供給・コピー・照合の実装
     view/                HTML の生成
   kit/                   固定物の埋め込み元
     plans/               既定の雛形: default、feature、fix、docs など
@@ -72,12 +73,12 @@ dev-kit/
         prompts/             人の入力の観測(UserPromptSubmit が書く)
         brief/               next が書く brief と判定依頼
         snap/<対象のバージョン>/   判定者に読ませる対象の展開(read-tree と checkout-index --prefix)
-        results/<指示ID>-<agent_id>.json   判定者の結果(SubagentStop が書く)
+        results/<指示ID>-<agent_id>.json   判定者・計画者の結果(SubagentStop が書く)
         view.html
 ```
 
 
-配置ガイドは各ディレクトリの README に置く。brief は変更対象のディレクトリの README を取り込む。
+配置ガイドは各ディレクトリの README に置き、[brief の入力](modules.md#brief)に使う。
 
 チェックアウトのルートは `git rev-parse --show-toplevel` で取得し、直下の `devkit.toml` を入口にする。作業はセッションの cwd であるチェックアウトで、[Work のブランチ](data.md#作業-work)を使う。実行の記録と生成物の場所は `.devkit/run/` に固定し、`init` が `.gitignore` にこの1行を足す。実行の記録を git 管理する選択肢は設けず、ignore された未追跡ファイルなので対象のバージョンにも含まれない。
 
@@ -87,7 +88,7 @@ pre-commit の共有と導入は[完了条件](guarantees.md#完了条件)に従
 
 ## 指示ファイルとホスト設定
 
-kit はリポジトリの AGENTS.md と CLAUDE.md に触れない。devkit の動かし方(開始・`next`・`submit`・問いの見せ方・サブエージェントの起動)はすべて kit の skill に閉じ、人は `/devkit` の skill で始める。指示ファイルはリポジトリ自身のものであり、判定者の規範としては読む。skill の正本は `.agents/skills/devkit/` とし、`.claude/skills/devkit` を git 管理のシンボリックリンクにする。playbook は skill に統合する。
+kit はリポジトリの AGENTS.md と CLAUDE.md に触れない。devkit の動かし方(開始・`next`・`submit`・問いの見せ方・サブエージェントの起動)はすべて kit の skill に閉じ、人は `/devkit` の skill で始める。指示ファイルはリポジトリ自身のものであり、判定者の規範としては読む。skill の正本は `.agents/skills/devkit/` とし、`.claude/skills/devkit` を git 管理のシンボリックリンクにする。操作手順は skill に集約し、独立した playbook(操作手順書)は設けない。
 
 判定者・計画者は `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` で定義し、`init` が既定の定義を書く。名前には `devkit-` の接頭辞を付け、Codex の組み込み名と重複させない。
 

@@ -7,11 +7,11 @@
 各リポジトリには、次のものを用意する。
 
 - **指示ファイル(AGENTS.md と CLAUDE.md)**: 管理・更新方針と判定の規範としての扱いは[指示ファイルとホスト設定](architecture/layout.md#指示ファイルとホスト設定)に従う。
-- **配置ガイド**: 各ディレクトリの README に置く、置くもの・置かないもの・配置先の案内である。[brief](parts/brief.md)(作業依頼を組み立てる部品)には変更対象のディレクトリの README を取り込む。利用側の配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)、取り込みの手順は[作業の指示](architecture/flow.md#作業の指示)を参照する。
+- **配置ガイド**: 置くもの・置かないもの・配置先の案内である。配置先は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)、[brief](parts/brief.md)(作業依頼を組み立てる部品)への取り込みは[作業の指示](architecture/flow.md#作業の指示)に従う。
 - **元に戻せないものと外部操作**: 元に戻せないものの共有項目は下記の「規則と強制手段」、課題固有の項目は[計画](architecture/data.md#計画-plan)(雛形から作る課題ごとの実行内容)で扱う。brief に渡す範囲は [Rules](architecture/data.md#規則と強制手段-rules)、外部操作(外部への書き込みの行為)の登録は [config](architecture/modules.md#config)、宣言と承認は[外部操作の承認](architecture/guarantees.md#外部操作の承認)に従う。
 - **育てるもの**: リポジトリが所有する資産であり、範囲と管理は[所有と生存期間](architecture/data.md#所有と生存期間)、更新とチームでの共有は[資産の更新と共有](architecture/data.md#資産の更新と共有)に従う。
 - **規則と強制手段**: 移行の記録(教訓を反映先へ移した記録)を含め、内容・配置・作業への参照は [Rules](architecture/data.md#規則と強制手段-rules)に従う。
-- **設定ファイル**: `devkit.toml` の項目は [config](architecture/modules.md#config)、配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。[判定コマンド](architecture/modules.md#config)(`[judges]`。別エンジンによる判定)と[検証コマンド](architecture/modules.md#config)(`[commands]`。テスト・型検査など)を区別し、検証コマンドを呼ぶ `command:` の [check](parts/check.md)(評価と判定の部品)の扱いは[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
+- **設定ファイル**: `devkit.toml` の項目は [config](architecture/modules.md#config)、配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。[判定コマンド](architecture/modules.md#config)(`[judges]`)は別エンジンによる判定に使う。[検証コマンド](architecture/modules.md#config)(`[commands]`)はテスト・型検査などに使い、`command:<name>` の [check](parts/check.md)(評価と判定の部品)から呼ぶ。実行の扱いは[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
 - **実行の記録と生成物**: 保存する記録と再生成できる出力の区分は[所有と生存期間](architecture/data.md#所有と生存期間)、配置と git 管理は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。記録から組み立てる [checkpoint](architecture/data.md#checkpoint)(再開用の派生状態)は保存する記録と区別する。
 - **kit の固定物**: kit が供給するバージョン付きの資産であり、供給元と照合は [kit の供給](architecture/modules.md#kit)に従う。
 

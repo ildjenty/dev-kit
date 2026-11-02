@@ -2,77 +2,62 @@
 
 ## 責務
 
-view は1[作業](../architecture/data.md#作業-work)(1課題のループ)を表示する。[ledger](../architecture/modules.md#ledger)(作業の記録)と[構造](../architecture/data.md#構造の記録-structure)(責務と依存関係の資産)から人向けの静的 HTML を生成し、表示の文面は記録から組み立てる。
+view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ)を表示する。[ledger](../architecture/modules.md#ledger)(作業の記録)と[構造](../architecture/data.md#構造の記録-structure)(責務と依存関係の資産)から人向けの静的 HTML を生成し、表示の文面は記録から組み立てる。
 
 ## 入力と出力
 
-対象の作業の ledger と、[構造ステージ](../stages.md#2-構造)(責務・配置・依存を決める段階)を使う場合の `.devkit/structure.json` の解析済みの値と git の履歴を受け取り、`devkit view` で表示する静的 HTML を返す。履歴の取得は [cmd/devkit](../architecture/modules.md#cmddevkit)(コマンドの接続)と [workspace](../architecture/modules.md#workspace)(git 操作)が担い、受け渡しは [view の契約](../architecture/modules.md#view)に従う。
+### 入力
 
-## 保証
+対象の作業の ledger を受け取り、[構造ステージ](../stages.md#2-構造)(責務・配置・依存を決める段階)を使う場合は `.devkit/structure.json` の解析済みの値と、その構造の git の履歴も受け取る。履歴の取得と受け渡しは [view の契約](../architecture/modules.md#view)に従う。
 
-表示の責務と他の部品との境界は [view の契約](../architecture/modules.md#view)に従う。
+### 出力
 
-### 冒頭の固定形式
+`devkit view` で表示する静的 HTML を返す。表示の構成は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
 
-view の冒頭は、人が戻る間隔と進んだ作業の量にかかわらず、同じ固定形式で次の内容を短く示す。
+#### 冒頭の固定形式
 
-- **目的と対象**: 作業の目的と、対象の課題を示す。
-- **現在の到達点**: 対象の課題で完了したステージと、現在できるようになったことを示す。
-- **実行状態**: [ステージの実行](../architecture/data.md#ステージの実行-stagerun)(計画に束縛した1回の実行)の状態、停止理由、次に動く主体を示す。状態の値はその定義、観測時刻の表示条件は [view の契約](../architecture/modules.md#view)に従う。
-- **人の次の行動**: 次にすべき行動を1つ示す。なければ「対応不要」とし、作業が完了していれば「次の課題を選ぶ」とする。
-- **記録の網羅性**: 網羅性の定義と入力は [view の契約](../architecture/modules.md#view)に従う。
+作業の現在地と人の次の行動は [view の表示構成](../architecture/modules.md#view-の表示構成)に従って示す。[記録の網羅性](../architecture/modules.md#view)(`submit` が成果物を記録した範囲)の定義と入力はリンク先に従う。
 
-### 主表示
+#### 主表示
 
-主表示は次の3群とし、同じ対象の本体は1か所にだけ表示する。他の群では本体への参照リンクを置く。
+表示のまとまりと各項目の属性は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。[新着](../architecture/modules.md#view)(最後の状態変更(閲覧)より後に追加された記録)の基準は、正本の定義に従う。
 
-「新着」「未確認」「承認済み」は各項目の属性として付ける。[新着](../architecture/modules.md#view)(最後の閲覧以降の追加)の基準は、正本の定義に従う。
+##### 要対応
 
-#### 要対応
+対応が必要な項目と、関連する[暫定判断](../architecture/data.md#決定と証拠-decision--evidence)(人の確認前の決定)への参照は [view の表示構成](../architecture/modules.md#view-の表示構成)に従って示す。
 
-今、作業を止めているもの、[暫定判断](../architecture/data.md#決定と証拠-decision--evidence)(人の確認前の決定)で進んでいるが人の回答が要るもの、再検討の条件を付けた保留の順に分ける。暫定判断の本体は「現在の到達点と有効な変更」に置き、ここでは参照リンクを示す。
+##### 現在の到達点と有効な変更
 
-#### 現在の到達点と有効な変更
+有効な変更と、撤回する場合に満たす必要がある条件を含む暫定判断の表示は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。[確認範囲の地図](../architecture/modules.md#view)(完了条件ごとの対象のバージョン・方法・確認した範囲・未確認の範囲の一覧)を示す。
 
-有効な変更は[成果物](../architecture/data.md#成果物-artifact-record)(変更と永続化先の記録)から生成する。
+##### 経緯
 
-- **正味の差分**: 成果ごとに、できるようになったことと外から見える振る舞い・契約の変化を示す。
-- **暫定判断と撤回時の影響**: 現在有効な暫定判断の本体を置き、依存する成果・決定、無効になる確認、元に戻すための成立条件を示す。
-- **確認範囲の地図**: [確認範囲の地図](../architecture/modules.md#view)(完了条件ごとの確認状況の一覧)を示す。項目はリンク先の定義に従う。
-- **構造の変化**: 影響箇所から示し、全体図へ展開する。
+過去の判断や変更の経緯は [view の表示構成](../architecture/modules.md#view-の表示構成)に従って示す。
 
-#### 経緯
+#### 判断対象ごとの表示
 
-置換された判断、古くなった確認、戻した変更のうち残る効果(外部への書き込みなど)、履歴を示す。
+要対応の各項目は、[判断対象](../architecture/modules.md#view-の表示構成)(人が確認・判断する対象)ごとに正本の表示構成に従ってまとめ、[form の問い](form.md#問い)(人への確認事項)の文面を引き継ぐ。
 
-### 判断対象ごとの表示
+確認状況には、[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(確認対象の識別)が照合対象と一致するかを示す。[規範の識別](../architecture/data.md#check-の結果-judgment)(判定に使った規則の識別)についても、照合対象と一致するかを別に示す。判定値と有効性の条件は[判定結果](../architecture/data.md#check-の結果-judgment)(観点から対象を判定した記録)に従う。
 
-要対応の各項目は、判断対象ごとに次の内容を1か所に束ねる。
+#### 閲覧の記録と確認済みの集合
 
-- **問い**: [form の問い](form.md#問い)(人への確認事項)の文面を引き継ぐ。
-- **関連する暫定判断**: 「現在の到達点と有効な変更」の本体への参照リンクを示す。
-- **影響する変更**: 関連する変更の本体への参照リンクを示す。
-- **確認状況の要点**: [実行主体(runner)](../architecture/data.md#計画-plan)(判定の担当)、判定、[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(確認対象の識別)と[規範の識別](../architecture/data.md#check-の結果-judgment)(判定に使った規則の識別)の一致、承認状態を別々に示す。判定値と有効性の条件は[判定結果](../architecture/data.md#check-の結果-judgment)に従う。
-- **前回の人の判断**: その判断が成立した条件と、今回変わった条件を示す。
-- **未回答時の範囲**: 停止する範囲と進められる範囲を示し、実際の停止との関係は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
-- **根拠へのリンク**: 決定と [check](../architecture/modules.md#check)(評価と判定)の記録をたどれるようにする。
-
-### 閲覧の記録と確認済みの集合
-
-[必読集合](../architecture/modules.md#view)(目的ごとに必ず読む項目)の対象は正本の定義に従い、人への確認の要否の[分類](../architecture/guarantees.md#人への確認対象)にかかわらず表示する。
-
-対象の問いに関連する「この回答に必要な確認」と、それ以外の「状況把握のために残っている確認」を分け、それぞれ対象のバージョンと、必読集合から確認済みの集合を除いた残件数を示す。件数で打ち切らず、残りの項目と省略した詳細へのリンクを残す。
+[必読集合](../architecture/modules.md#view)(必ず読む記録の集合)の対象はリンク先の定義、表示と残件数のまとめ方は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
 
 閲覧の記録と確認済みの集合の導出は[状態変更の定義](../architecture/data.md#決定と証拠-decision--evidence)、状態変更の経路は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
 
-### 構造図
+#### 構造図
 
-構造図の入力は[構造の記録](../architecture/data.md#構造の記録-structure)、生成形式は [view の契約](../architecture/modules.md#view)に従う。図の描き方は [`principles/writing.md`](../../principles/writing.md) の原則8に従い、入力に関係の種類がなければ依存関係の図までにとどめる。
+構造図の入力は[構造の記録](../architecture/data.md#構造の記録-structure)、生成形式は [view の契約](../architecture/modules.md#view)に従う。図の描き方は [`principles/writing.md` の原則8](../../principles/writing.md#8-図の目的を定め関係の種類と向きを示す)に従い、入力に関係の種類がなければ依存関係の図までにとどめる。
+
+## 保証
+
+表示の責務と他の部品との境界は [view の契約](../architecture/modules.md#view)、本体の重複表示と必読集合の扱いは [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
 
 ## 試験項目
 
-試験の範囲と描画結果の確認は[正本の試験項目](../architecture/contract-changes.md#試験項目)に従う。
+試験の範囲と描画結果の確認は正本の [view の試験項目](../architecture/contract-changes.md#view-1)に従う。
 
 - 暫定判断の本体が1か所だけにあり、他の群から参照できること。
 - 最後の状態変更より後に追加された記録だけが新着になること。
-- 必読集合の対象と、目的ごとの残件数の整合。
+- 必読集合の対象と、目的ごとの残件数が整合すること。

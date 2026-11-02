@@ -1,6 +1,6 @@
 # hook
 
-hook はホストの5つのイベントを受け、セッションの現在地の注入、停止の補助、操作の拒否、判定結果と入力の観測を行う。イベントの処理は決定的にし、モデルに判断させない。観測を生成物として公開し、記録への受理は CLI に委ねる。
+hook はホストの5つのイベントを受け、セッションの現在地の注入、停止の補助、操作の拒否、判定結果と入力の観測を行う。イベントの処理は決定的にし、モデルに判断させない。hook は観測ファイルを[生成物](data.md#所有と生存期間)(再生成または削除できるファイル)として公開し、CLI がその内容を[実行の記録](data.md#所有と生存期間)(作業ごとに残す記録)として受理する。
 
 ## 共通処理
 
@@ -8,43 +8,47 @@ Claude Code と Codex CLI を対象とし、どちらも既定のホストとは
 
 束縛は[セッションの観測](data.md#セッションの観測-sessionobservation)から取得する。束縛がなければ早期終了するが、SessionStart の観測と PreToolUse・UserPromptSubmit の最終観測時刻の更新は行う。入力の本文は束縛があるときだけ観測する。これにより、他の skill や plugin と同じリポジトリで使える。
 
-セッションの観測は `.devkit/run/sessions/<session_id>/<時刻>-<イベント>.json` に追記型で公開し、共有ファイルを上書きしない。読み手は最新の観測を取る。
+セッションの観測は `.devkit/run/sessions/<session_id>/<時刻>-<イベント>.json` に追記型で公開し、共有ファイルを上書きしない。`<イベント>` には hook のイベント名、または[束縛を書く CLI](data.md#セッションとブランチ)の操作名を使う。読み手は最新の観測を取る。
 
-サブエージェント内(入力に `agent_id` がある場合)では、Stop と SessionStart は何もしない。PreToolUse の deny は親と同じく適用する。ブランチの不一致は[セッションとブランチ](data.md#セッションとブランチ)、ledger と生成物の書き分けは[記録の書き込みと排他](data.md#記録の書き込みと排他)に従う。
+サブエージェント内(入力に `agent_id` がある場合)では、Stop と SessionStart は何もしない。PreToolUse の [deny](#pretooluse)(操作の禁止規則)は親と同じく適用する。ブランチの不一致は[セッションとブランチ](data.md#セッションとブランチ)、[ledger](modules.md#ledger)(記録を扱う部品)と生成物の書き分けは[記録の書き込みと排他](data.md#記録の書き込みと排他)に従う。
 
 ## SessionStart
 
-- **入力**: 起動・再開・compaction 後のセッション ID、ホスト名、cwd などのイベント。
+- **入力**: 起動・再開・コンテキスト圧縮(compaction)後のセッション ID、ホスト名、cwd などのイベント。
 - **判断**: ブランチに関係なく観測を作り、束縛があれば [checkpoint](data.md#checkpoint)を組み立てる。
 - **出力**: checkpoint を注入する。失敗時は警告を注入する(SessionStart は block できない)。本文と要約の切り替えは[性能と出力](guarantees.md#性能と出力の上限)に従う。
 - **書く生成物**: [共通処理](#共通処理)で定めるセッションの観測。Claude Code では `CLAUDE_ENV_FILE` に `DEVKIT_SESSION_ID` も書き、後続コマンドに渡す。
 
 ## Stop
 
-- **入力**: このセッションに束縛された作業、`next` が返す指示、観測内の継続回数。
-- **判断**: 問い・外部操作の確認・完了・中止・判定待ちなら停止を許す。それ以外はラウンドの有無ではなく作業単位で `block` する。継続上限に達したら、状態を変えず停止を許す。
+- **入力**: このセッションに束縛された作業、ledger から導いた未受理の指示の種別、観測内の継続回数。
+- **判断**: 問い・外部操作の確認・完了・中止・判定待ちなら停止を許す。それ以外はラウンドの有無ではなく作業単位で `block` する。kit 独自の上限による停止条件は[kit の継続上限](decisions.md#kit-の継続上限)に残す。
 - **出力**: `block` 時は理由として「`devkit next` を実行する」を返す。
 - **書く生成物**: セッションの観測に継続回数を書く。
 
-Claude Code の継続上限は8回で、ツール呼び出しでリセットされることは確認済みである。他の hook の `continue: false` が優先される場合がある。停止後の再開は SessionStart の注入で行い、保証との関係は[再開と hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)に従う。
+Claude Code の継続回数の上限は8回である。ホストが数える継続回数はツール呼び出しでリセットされることが確認済みである。他の hook の `continue: false` が優先される場合がある。セッションをまたぐ再開は SessionStart の注入、回答待ちからの継続は[人の回答と再開](flow.md#人の回答と再開)に従う。保証との関係は[再開と hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)に従う。
 
 ## PreToolUse
 
 - **入力**: ツール名、Bash のコマンド、サブエージェント起動の引数、セッションの束縛。Codex で `tool_input.command` を取得できることは確認済みである。
-- **判断**: 先に最終観測時刻を更新する。束縛があれば、cmd/devkit が workspace で解決して渡す「スナップショットから `devkit.toml` を読む関数値」を使い、[規範の固定](guarantees.md#規範の固定)に従って `[deny]` を読み、以下の構文と起動の定型を照合する。
-- **出力**: 許可、または deny と理由。登録はツール名の matcher だけにし、一致の判定は hook が行う。
+- **判断**: 先に最終観測時刻を更新する。束縛があれば、[規範の固定](guarantees.md#規範の固定)に従って固定したスナップショットから `[deny]` を読み、以下の構文と起動の定型を照合する。読み出し関数の受け渡しは [hook の依存](modules.md#hook)に従う。
+- **出力**: 許可、または deny と理由。hook の matcher(起動対象を絞り込む設定)にはツール名だけを指定し、禁止規則との一致は hook 内で判定する。
 - **書く生成物**: セッションの観測の PreToolUse 最終観測時刻。
 
-規則は `Bash(<前方一致> *)`、ツール名(MCP ツールを含む)、`Agent(<属性>)` の3種とする。`Agent(<属性>)` は fork・model・effort の指定と、`subagent_type` が `devkit-` のときの prompt の定型を照合する。Claude Code の permission rule の意味論は再実装しない。Bash の `&&`・`||`・`;`・`|` による線形な連結は分割し、各部分に前方一致を当てる。リダイレクト・置換を含むコマンドと制御構文は分割せず deny し、「分けて実行する」と返す。結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)の `permissions.deny` とこの規則を組み合わせる。
+規則は `Bash(<前方一致> *)`、ツール名(MCP ツールを含む)、`Agent(<属性>)` の3種とする。Claude Code の permission rule の意味論は再実装しない。Bash の `&&`・`||`・`;`・`|` による線形な連結は分割し、各部分に前方一致を当てる。リダイレクト・置換を含むコマンドと制御構文は分割せず deny し、「分けて実行する」と返す。結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)の `permissions.deny` とこの規則を組み合わせる。
 
-束縛のあるセッションでサブエージェントを起動するとき(Claude Code の Agent ツール)、`subagent_type` が `devkit-` で始まる場合は、prompt が[判定結果の受理](guarantees.md#判定結果の受理)の定型でなければ deny する。fork(`isolation` や fork の指定)、`model`・`effort` の明示も deny する。これらは `[deny]` の既定の `Agent(fork)`・`Agent(model:*)`・`Agent(effort:*)` と定型の照合として適用し、リポジトリ全体の `permissions.deny` には足さない。
+他の skill の手順への影響は[仮決定](decisions.md#仮決定)に残す。
+
+束縛のあるセッションでサブエージェントを起動するとき(Claude Code の Agent ツール)、`subagent_type` が `devkit-` で始まる場合に限り、prompt が[判定結果の受理](guarantees.md#判定結果の受理)の定型でなければ deny する。同じ適用範囲で fork(`isolation` や fork の指定)、`model`・`effort` の明示も deny する。これらは `[deny]` の既定の `Agent(fork)`・`Agent(model:*)`・`Agent(effort:*)` と定型の照合として適用し、リポジトリ全体の `permissions.deny` には足さない。
 
 ## SubagentStop
 
-- **入力**: `agent_type`、`agent_id`、`last_assistant_message`、`agent_transcript_path`、発行済みの判定または計画の指示。
-- **判断**: 束縛があり、`agent_type` が指示の担当名と一致すれば採取する。不一致なら何もしない。Claude Code の `agent_type` が定義の `name` であることは確認済みである。
+- **入力**: `agent_type`、`agent_id`、`last_assistant_message`、`agent_transcript_path` とその参照先の transcript、ホストから観測した effort または model、発行済みの[指示](data.md#指示-instruction)。
+- **判断**: transcript の最初の利用者メッセージから[起動の定型](guarantees.md#判定結果の受理)に従って指示 ID を取る。束縛があり、発行済みのサブエージェントへの指示と指示 ID・担当名が一致すれば採取する。計画の check と検出試験の指示も対象とし、不一致なら何もしない。Claude Code の `agent_type` が定義の `name` であることは確認済みである。
 - **出力**: 最終メッセージに来歴を添えて結果ファイルとして公開し、[判定結果の受理](guarantees.md#判定結果の受理)に渡す。
 - **書く生成物**: `results/<指示 ID>-<agent_id>.json`。transcript の最初の利用者メッセージ、Claude Code の `effort.level` または Codex の `model`、その時点の定義ファイルの内容ハッシュ、SubagentStop の観測時刻を添える。
+
+実効条件の採取元は[effort と model の取得元](decisions.md#effort-と-model-の取得元)、定義を編集したラウンドの完了手順は[サブエージェント定義の変更と完了](decisions.md#サブエージェント定義の変更と完了)に残す。
 
 ## UserPromptSubmit
 

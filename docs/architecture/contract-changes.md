@@ -68,6 +68,8 @@
 
 ### check
 
+以下の改訂は [check の契約](../parts/check.md)に反映済みであり、残件はない。
+
 - [check.md「入力」](../parts/check.md)を [TargetVersion](data.md#対象のバージョン-targetversion)・[判定対象の展開](guarantees.md#判定対象の展開と完了時の永続化)・[check の公開契約](modules.md#check)へ合わせ、「commit または content hash」をツリーハッシュ・計画のバージョン・構造のバージョンに改め、依頼の内容は [check の契約](modules.md#check)への参照にする。
 - [check.md「出力」「指摘」](../parts/check.md)を [form の判定者の結果](modules.md#form)と [Finding](data.md#指摘-finding)へ合わせ、「1行目に PASS/FAIL/NOT ASSESSED」を削って最終メッセージの JSON に改める。
 - [check.md「実行主体」と作成・判定の分離の規則](../parts/check.md)を [Plan の担当と runner](data.md#計画-plan)と[判定結果の受理](guarantees.md#判定結果の受理)へ合わせ、コンテキスト ID と履歴継承設定の照合および「会話の内容を知らないサブエージェント」という記述を置き換える。
@@ -131,6 +133,8 @@
 - [meta-loop.md「生成した設計の典型的な問題」](../meta-loop.md#生成した設計の典型的な問題)末尾の採用しなかった設計の5分類の記録先を[決定と証拠](data.md#決定と証拠-decision--evidence)へ合わせ、決定のスキーマの「却下した案とその分類」に記録する形に改める。
 
 ### brief
+
+以下の改訂は [brief の契約](../parts/brief.md)に反映済みであり、残件はない。
 
 - [brief.md](../parts/brief.md) の入力と引き継ぎを [brief の責務](modules.md#brief)と[作業の指示](flow.md#作業の指示)への参照に改める。
 - [brief.md](../parts/brief.md) の用途とバージョンを [brief](modules.md#brief)と[定型の依頼](guarantees.md#判定結果の受理)へ合わせ、判定者・計画者への依頼文も brief とし、起動は定型の1行、本文は `brief/<指示 ID>.md`、バージョンは内容ハッシュに改める。
