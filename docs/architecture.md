@@ -59,5 +59,5 @@ graph LR
 
 ## 設計上の決定
 
-- 仮決定、不採用の案、未確認の前提: [decisions.md](architecture/decisions.md)
+- 仮決定、不採用の案、未決事項、未確認の前提: [decisions.md](architecture/decisions.md)
 - 部品の契約への改訂: [contract-changes.md](architecture/contract-changes.md)

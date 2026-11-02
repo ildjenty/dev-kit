@@ -22,7 +22,7 @@ dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバ�
   - [layout.md](docs/architecture/layout.md): ディレクトリ構成。
   - [hooks.md](docs/architecture/hooks.md): 5つの hook。
   - [guarantees.md](docs/architecture/guarantees.md): 失敗ごとの防止の仕組み。
-  - [decisions.md](docs/architecture/decisions.md): 仮決定、不採用の案、未確認の前提。
+  - [decisions.md](docs/architecture/decisions.md): 仮決定、不採用の案、未決事項、未確認の前提。
   - [contract-changes.md](docs/architecture/contract-changes.md): 部品の契約の改訂と試験。
   - [examples.md](docs/architecture/examples.md): 雛形・計画・設定・観点・pre-commit の最小の例。
 - [docs/design.md](docs/design.md): 基本方針と部品の一覧。

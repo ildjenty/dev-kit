@@ -43,7 +43,7 @@ dev-kit/
   embed.go               固定物の埋め込みと公開
 ```
 
-埋め込みの範囲は[ルートパッケージ](modules.md#ルートパッケージ)、コピーの供給と相対パスの保持は [kit](modules.md#kit)に従う。
+埋め込みの範囲は[ルートパッケージ](modules.md#ルートパッケージ)、コピーの供給とコピー先の配置は [kit](modules.md#kit)に従う。
 
 各ディレクトリの配置ガイドは、`doc.go` の先頭コメントまたは README に置く。[`principles/structure.md`](../../principles/structure.md) の原則1に従う。
 
@@ -68,6 +68,18 @@ dev-kit/
     detect.json              検出試験の合格記録の索引
     structure.json           構造ステージを使うときだけ
     kit/<バージョン>/         固定物のコピー
+      docs/                  部品の契約とその参照文書
+      principles/            原則
+      plans/                 既定の雛形
+      stages/                ステージ定義
+      checks/                kit 提供の観点ファイル
+      templates/             form のテンプレート
+      router/                分類表の既定
+      rules/                 規則の既定
+      schemas/               JSON Schema
+      skills/                skill の正本
+      hosts/                 ホスト設定、サブエージェント定義、rules の断片
+      examples/              検出試験の違反例・適合例・許容例
     run/                     実行の記録と生成物。.gitignore で除外
       sessions/<session_id>/<時刻>-<イベント>.json   セッションの観測。作業の外にチェックアウトごとに置く
       work/<作業ID>/

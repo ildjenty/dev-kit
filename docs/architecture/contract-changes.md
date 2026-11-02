@@ -22,7 +22,7 @@
 - [runtime.md「終了条件」](../parts/runtime.md)の検証コマンドの登録を [config](modules.md#config)、ステージの check の実行を [engine](modules.md#engine)へ改め、pre-commit の実行時点と commit の扱いは[完了条件](guarantees.md#完了条件)への参照にする。
 - [runtime.md「ループ計画」](../parts/runtime.md)を[雛形](data.md#ループの雛形-plantemplate)と[計画](data.md#計画-plan)の2層へ改め、「分類と計数だけを評価する」は [router の入力と判断](modules.md#router)への参照に置き換える。
 - [runtime.md「設定」](../parts/runtime.md)の「すべての置き場所の正本」と git 管理の可否を削り、[固定配置](layout.md#利用側のリポジトリ)と [config の設定項目](modules.md#config)への参照に置き換える。
-- [runtime.md「インストーラ」](../parts/runtime.md)の「バイナリを置く」を削り、[install の init](modules.md#install)による導入と[バイナリ配布の未決定](decisions.md#仮決定)を分ける。
+- [runtime.md「インストーラ」](../parts/runtime.md)の「バイナリを置く」を削り、[install の init](modules.md#install)による導入と[バイナリの配布方法](decisions.md#バイナリの配布方法)を分ける。
 - [runtime.md「ステージの実行記録」「記録範囲の照合」](../parts/runtime.md)の Stop による ledger の書き込みを[セッションの観測](hooks.md#stop)へ、実行状態の記録を [CLI による書き込み](data.md#記録の書き込みと排他)へ、網羅性の照合を [view の成果物による網羅性](modules.md#view)へ改める。
 - [runtime.md「再開」](../parts/runtime.md)の外部書き込みの再実行を[外部操作の二重適用](guarantees.md#外部操作の二重適用)への参照に置き換え、成功済みは記録を返し、実行中・結果不明は照会か人への確認に進み、盲目的に再実行しない扱いに改める。
 - [runtime.md「前のステージに戻る」「計画の作り直し」](../parts/runtime.md)を[計画のバージョン](data.md#計画のバージョン)と [flow の再計画](flow.md#router-の判断)へ合わせ、計画者が作り直し、check の合格と必要な承認を経て切り替え、旧 StageRun は再計画待ちとする。
@@ -41,7 +41,7 @@
 - [repository.md「リポジトリが育てるもの」](../repository.md#リポジトリ側の構成)の一覧を[所有と生存期間](data.md#所有と生存期間)への参照に置き換え、雛形・`.devkit/detect.json`・kit のコピーを含め、playbook と CLAUDE.md の索引を外し、ホスト設定・サブエージェント定義・rules も同じ資産として扱う。
 - [repository.md「設定ファイル」「記録ディレクトリ」](../repository.md#リポジトリ側の構成)を [config](modules.md#config)と[利用側のリポジトリ](layout.md#利用側のリポジトリ)への参照に置き換え、置き場所を設定から引く記述と git 管理の可否を削り、`devkit.toml` は kit のバージョン・判定コマンド・検証コマンド・外部操作・deny・分類表の追記を扱う説明に改める。
 - [repository.md「kit の固定物」](../repository.md#リポジトリ側の構成)の外部参照の選択肢を削り、[kit の供給](modules.md#kit)に合わせて `.devkit/kit/<バージョン>/` のコピーに限る。
-- [repository.md「設定ファイル」](../repository.md#リポジトリ側の構成)の「インストーラがバイナリを置く」を削り、[init の役割](modules.md#install)と[バイナリ配布の未決定](decisions.md#仮決定)を分け、hook の登録先は[権限の境界](guarantees.md#権限の境界)への参照にする。
+- [repository.md「設定ファイル」](../repository.md#リポジトリ側の構成)の「インストーラがバイナリを置く」を削り、[init の役割](modules.md#install)と[バイナリの配布方法](decisions.md#バイナリの配布方法)を分け、hook の登録先は[権限の境界](guarantees.md#権限の境界)への参照にする。
 - [repository.md「runtime」と人の判断の段落](../repository.md#実行の仕組みとの対応)を [architecture.md「全体構成」](../architecture.md#全体構成)へ合わせ、外側の workflow をセッション内の CLI による進行と hook の観測に改め、計画の作り直しは[計画のバージョン](data.md#計画のバージョン)への参照にする。
 
 ### ledger

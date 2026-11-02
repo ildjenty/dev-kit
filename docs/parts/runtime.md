@@ -8,7 +8,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 - **判定者・計画者との接続**: 起動主体は[全体構成](../architecture.md#全体構成)、最終メッセージと来歴の採取・受け渡しは [SubagentStop](../architecture/hooks.md#subagentstop)(サブエージェント終了時のイベント)、起動の定型と結果の受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 - **git と外部操作**: git 操作と[外部操作](../architecture/flow.md#外部操作)(リポジトリ外への書き込み)の責務配分は [workspace](../architecture/modules.md#workspace) と [external](../architecture/modules.md#external) の契約に従う。
 - **組み立て**: 設定と[固定物](../architecture/data.md#所有と生存期間)(kit が提供する資産)の受け渡しを含む組み立ては [cmd/devkit](../architecture/modules.md#cmddevkit) の契約に従う。
-- **導入**: 利用側の配置と設定の準備は [install](../architecture/modules.md#install) の契約、配布方法の決定状況は[仮決定27](../architecture/decisions.md#仮決定)に従う。
+- **導入**: 利用側の配置と設定の準備は [install](../architecture/modules.md#install) の契約、配布方法の決定状況は[バイナリの配布方法](../architecture/decisions.md#バイナリの配布方法)に従う。
 - **指示ファイルと skill**: kit の操作手順と skill の配置、リポジトリの AGENTS.md・CLAUDE.md との境界は[指示ファイルとホスト設定](../architecture/layout.md#指示ファイルとホスト設定)に従う。
 
 <a id="ファイルの分類と既定の置き場所"></a>

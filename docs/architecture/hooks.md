@@ -37,7 +37,7 @@ Claude Code の継続回数の上限は8回である。ホストが数える継�
 
 規則は `Bash(<前方一致> *)`、ツール名(MCP ツールを含む)、`Agent(<属性>)` の3種とする。Claude Code の permission rule の意味論は再実装しない。Bash の `&&`・`||`・`;`・`|` による線形な連結は分割し、各部分に前方一致を当てる。リダイレクト・置換を含むコマンドと制御構文は分割せず deny し、「分けて実行する」と返す。結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)の `permissions.deny` とこの規則を組み合わせる。
 
-他の skill の手順への影響は[仮決定](decisions.md#仮決定)に残す。
+他の skill の手順への影響は[Bash の一律拒否と他の skill の共存](decisions.md#bash-の一律拒否と他の-skill-の共存)に残す。
 
 束縛のあるセッションでサブエージェントを起動するとき(Claude Code の Agent ツール)、`subagent_type` が `devkit-` で始まる場合に限り、prompt が[判定結果の受理](guarantees.md#判定結果の受理)の定型でなければ deny する。同じ適用範囲で fork(`isolation` や fork の指定)、`model`・`effort` の明示も deny する。これらは `[deny]` の既定の `Agent(fork)`・`Agent(model:*)`・`Agent(effort:*)` と定型の照合として適用し、リポジトリ全体の `permissions.deny` には足さない。
 

@@ -28,7 +28,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 ##### 現在の到達点と有効な変更
 
-有効な変更と、撤回する場合に満たす必要がある条件を含む暫定判断の表示は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。[確認範囲の地図](../architecture/modules.md#view)を示す。
+有効な変更と、撤回する場合に満たす必要がある条件を含む暫定判断の表示は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
 
 ##### 経緯
 
@@ -36,7 +36,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 #### 判断対象ごとの表示
 
-要対応の各項目は、[判断対象](../architecture/modules.md#view-の表示構成)(人が確認・判断する対象)ごとに正本の表示構成に従ってまとめ、[form の問い](form.md#問い)(人への確認事項)の文面を引き継ぐ。
+要対応の各項目は、[判断対象](../architecture/modules.md#view-の表示構成)(人が確認・判断する対象)ごとに正本の表示構成に従ってまとめる。
 
 確認状況の表示項目は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。判定値と有効性の条件は[判定結果](../architecture/data.md#check-の結果-judgment)(観点から対象を判定した記録)に従う。
 
