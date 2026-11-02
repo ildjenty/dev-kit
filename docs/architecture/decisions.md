@@ -95,6 +95,7 @@
 - Codex に履歴を継承するサブエージェントの起動があるか、あるなら禁止できるか。禁止できなければ transcript の照合だけで代える。
 - 両ホストの `agent_transcript_path` の形式から、最初の prompt を取り出せること。
 - Codex の PreToolUse が、サブエージェントの起動を捕まえること。
+- Claude Code の `-p` で `Agent(fork)` などの Agent の引数を PreToolUse で判定できること。
 - Claude Code で `Agent(effort:*)` が effort の上書きを禁止できること。
 - Claude Code の hook の登録に `onFailure: "block"` 相当の設定を使えること。
 - settings の Stop hook がサブエージェントの終了で発火するか。発火する場合は `agent_id` で無視する。

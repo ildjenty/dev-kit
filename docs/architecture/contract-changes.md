@@ -12,7 +12,7 @@
 ### runtime
 
 - [runtime.md](../parts/runtime.md) 冒頭と「workflow」を [architecture.md「全体構成」](../architecture.md#全体構成)と [engine の操作](modules.md#engine)へ合わせてセッション内の CLI による進行に改め、担当の起動・結果の受け取りと人の入力・訂正は[判定結果の受理](guarantees.md#判定結果の受理)・[回答の受理](guarantees.md#回答の受理)・[UserPromptSubmit](hooks.md#userpromptsubmit)への参照にする。
-- [runtime.md「ファイルの分類と既定の置き場所」](../parts/runtime.md#ファイルの分類と既定の置き場所)の一覧を[所有と生存期間](data.md#所有と生存期間)への参照に置き換え、固定物の外部参照と実行の記録の git 管理を選べる記述を削り、配置は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に固定する。
+- [runtime.md「ファイルの分類と置き場所」](../parts/runtime.md#ファイルの分類と置き場所)の一覧を[所有と生存期間](data.md#所有と生存期間)への参照に置き換え、固定物の外部参照と実行の記録の git 管理を選べる記述を削り、配置は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に固定する。
 - [runtime.md「hook」「kit が使う hook」](../parts/runtime.md)の一覧を [hooks.md](hooks.md) の5イベントに置き換え、PostToolUse の利用と「ホスト固有のイベント」の Codex での代替を削り、hook の書き込み先は[生成物だけ](data.md#記録の書き込みと排他)に改める。
 - [runtime.md「hook」の共通処理](../parts/runtime.md)の `stop_hook_active` によるループ防止を [Stop の観測内の継続回数と上限](hooks.md#stop)へ改め、ルートの解決は [cmd/devkit](modules.md#cmddevkit)、出力の整形は [host/event](modules.md#hostevent)の責務にする。
 - [runtime.md「hook」「終了条件」](../parts/runtime.md)の Stop による check を[停止の補助](hooks.md#stop)と [submit の終了ブロック](data.md#進捗-progress)・[完了条件](guarantees.md#完了条件)へ改め、「Read では大きな文書の全文読み込みを拒否する」を削り、skill 編集の検知は PostToolUse ではなく[人への確認対象](guarantees.md#人への確認対象)への参照にする。
@@ -29,7 +29,7 @@
 - [runtime.md「harness の改善」「メタループの編集対象」](../parts/runtime.md)の「途中で修正しない」と編集対象の列挙を[人への確認対象](guarantees.md#人への確認対象)と雛形の宣言への参照に置き換え、検出試験の対象は[観点ファイルだけ](guarantees.md#検出試験)に改める。
 - [runtime.md](../parts/runtime.md) の組み立ての試験の「設定ファイルから引いた置き場所」と「保存した checkpoint」を[固定配置](layout.md#利用側のリポジトリ)と [ledger から組み立てる checkpoint](data.md#checkpoint)へ改め、別セッション・compaction 後の注入を[結合試験](#結合試験)に合わせて確認する。
 - [runtime.md「hook の出力上限」](../parts/runtime.md#ホストの差分と共通の仕組み)の一律にファイル参照とする注入を[性能と出力の上限](guarantees.md#性能と出力の上限)への参照に置き換え、上限内は本文、超えるときは要約と `devkit status` の案内に改める。
-- [runtime.md「決定候補」](../parts/runtime.md#決定候補)を削除して決定の所在を [decisions.md の仮決定](decisions.md#仮決定)と[不採用の案](decisions.md#不採用の案)への参照に移し、担当を子プロセスで起動する推奨は不採用の案への参照に置き換える。
+- [runtime.md「決定候補」](../parts/runtime.md)を削除して決定の所在を [decisions.md の仮決定](decisions.md#仮決定)と[不採用の案](decisions.md#不採用の案)への参照に移し、担当を子プロセスで起動する推奨は不採用の案への参照に置き換える。
 - [runtime.md「hook の形式」「hook の共通化」](../parts/runtime.md#ホストの差分と共通の仕組み)の入出力・終了コードが両ホストで共通という記述を [host/event による変換](modules.md#hostevent)へ改め、「担当の起動の共通化」のアダプタは[定型の依頼と結果の受理](guarantees.md#判定結果の受理)への参照に置き換える。
 
 ### repository
@@ -62,13 +62,13 @@
 
 - [router.md「check の結果」](../parts/router.md#check-の結果)の完了条件と Stop と共有する記述を[完了条件](guarantees.md#完了条件)への参照に置き換え、`command:` の結果を [Judgment](data.md#check-の結果-judgment)として扱い、pre-commit を伴う commit の成否と合わせた完了の判断に改める。
 - [router.md「人への確認」](../parts/router.md#人への確認)を[人への確認対象](guarantees.md#人への確認対象)と [hook の稼働不足](guarantees.md#再開と-hook-の稼働確認)に合わせ、既定と利用側の追記による分類へ改める。
-- [router.md「ロールとエンジン」](../parts/router.md#ロールとエンジン)のロールを [Plan の担当](data.md#計画-plan)に合わせて作業者・人・判定者・計画者に揃え、分類表の出力はサブエージェントまたは判定コマンドの名前へ改める。
+- [router.md「ロールと実行主体」](../parts/router.md#ロールと実行主体)を [router のロールと実行主体](modules.md#router)への参照に改める。
 - [router.md「教訓の反映先」](../parts/router.md#教訓の反映先)の分類順を[人への確認対象で定める順序](guarantees.md#人への確認対象)への参照に置き換え、移行記録の結び付け先を ledger から [Rules](data.md#規則と強制手段-rules)の `.devkit/rules.md` の項目へ改める。
-- [router.md「check の結果」](../parts/router.md#check-の結果)の分類の入力を [router の契約](modules.md#router)へ合わせ、集約した判定・ラウンド数・進展の有無・計画の上限・停止分類に改める。
+- [router.md「check の結果」](../parts/router.md#check-の結果)の分類の入力を [router の契約](modules.md#router)への参照に改める。
 
 ### check
 
-- [check.md「入力」](../parts/check.md)を [TargetVersion](data.md#対象のバージョン-targetversion)・[判定対象の展開](guarantees.md#判定対象の展開と完了時の永続化)・[check の公開契約](modules.md#check)へ合わせ、「commit または content hash」をツリーハッシュ・計画のバージョン・構造のバージョンに改め、読み取り専用の展開先・固定した規範と観点・出力スキーマ・前回の指摘 ID を渡す形にする。
+- [check.md「入力」](../parts/check.md)を [TargetVersion](data.md#対象のバージョン-targetversion)・[判定対象の展開](guarantees.md#判定対象の展開と完了時の永続化)・[check の公開契約](modules.md#check)へ合わせ、「commit または content hash」をツリーハッシュ・計画のバージョン・構造のバージョンに改め、依頼の内容は [check の契約](modules.md#check)への参照にする。
 - [check.md「出力」「指摘」](../parts/check.md)を [form の判定者の結果](modules.md#form)と [Finding](data.md#指摘-finding)へ合わせ、「1行目に PASS/FAIL/NOT ASSESSED」を削って最終メッセージの JSON に改める。
 - [check.md「実行主体」と作成・判定の分離の規則](../parts/check.md)を [Plan の担当と runner](data.md#計画-plan)と[判定結果の受理](guarantees.md#判定結果の受理)へ合わせ、コンテキスト ID と履歴継承設定の照合および「会話の内容を知らないサブエージェント」という記述を置き換える。
 - [check.md「実行主体」](../parts/check.md)の「Codex ではモデル名を明示する」をリポジトリ内の定義と[起動時の上書きの制限](hooks.md#pretooluse)への参照に改め、`command:` の実行結果から Judgment への変換は[作業結果の判定](flow.md#作業結果の判定)と[受理境界](guarantees.md#判定結果の受理)へ、修正ラウンドの依頼は [Finding](data.md#指摘-finding)へ合わせる。
@@ -83,8 +83,8 @@
 - [form.md「終了ブロック」](../parts/form.md)を [submit の入力](data.md#進捗-progress)へ、判定者の最終メッセージ・指示・問い・決定と証拠のスキーマを [form](modules.md#form)へ合わせ、playbook は[skill の配置](layout.md#指示ファイルとホスト設定)に従って skill に統合する。
 - [form.md「人への確認事項」](../parts/form.md)の回答案内を [Question](data.md#問い-question)、選択肢と文章の回答・訂正期限を[回答の受理](guarantees.md#回答の受理)、表示上の範囲と入力 JSON の場所を[状態遷移と受理条件](data.md#状態遷移と受理条件)へ合わせる。
 - [form.md「コマンドの使い方」](../parts/form.md)の「CLAUDE.md の索引から」を[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に合わせて「devkit のコマンドは kit の skill に置く」へ改める。
-- [form.md「PR 本文」](../parts/form.md)に[資産の更新と共有](data.md#資産の更新と共有)に従って計画の要約と共有に必要な決定を加える。
-- [form.md](../parts/form.md) の計画・判定者の結果・指示・問い・決定と証拠・終了ブロックのスキーマの正本を [form の依存と kit の固定物](modules.md#form)へ合わせ、form が供給された定義を使う形に改める。
+- [form.md「PR 本文」](../parts/form.md)の節を [form のテンプレート](modules.md#form)へ合わせる。
+- [form.md](../parts/form.md) のスキーマと固定物の扱いを [form の契約](modules.md#form)へ合わせ、雛形と計画の検証は [plan](modules.md#plan)への参照にする。
 
 ### view
 
@@ -128,11 +128,11 @@
 
 - [meta-loop.md](../meta-loop.md) の入口と教訓の反映先に[人への確認対象の分類順](guarantees.md#人への確認対象)を参照してループの雛形(`.devkit/plans/`)を加える。
 - [meta-loop.md「振り返り」](../meta-loop.md#メタループ)の課題を分ける規則を[人への確認対象](guarantees.md#人への確認対象)への参照に置き換え、メタループの編集は雛形で宣言したステージで行い、宣言のないステージでは人に確認する形に改める。
-- [meta-loop.md「設計の2〜3割に生じる問題」](../meta-loop.md#設計の23割に生じる問題)末尾の採用しなかった設計の5分類の記録先を[決定と証拠](data.md#決定と証拠-decision--evidence)へ合わせ、決定のスキーマの「却下した案とその分類」に記録する形に改める。
+- [meta-loop.md「生成した設計の典型的な問題」](../meta-loop.md#生成した設計の典型的な問題)末尾の採用しなかった設計の5分類の記録先を[決定と証拠](data.md#決定と証拠-decision--evidence)へ合わせ、決定のスキーマの「却下した案とその分類」に記録する形に改める。
 
 ### brief
 
-- [brief.md](../parts/brief.md) の入力と引き継ぎを [brief](modules.md#brief)と[作業の指示](flow.md#作業の指示)へ合わせ、ステージ定義・前のステージの出力・リポジトリの事実(配置ガイド、rules.md の元に戻せないもの、利用可能な check)から組み立て、修正ラウンドには前回の指摘と指摘 ID を含める形に改める。
+- [brief.md](../parts/brief.md) の入力と引き継ぎを [brief の責務](modules.md#brief)と[作業の指示](flow.md#作業の指示)への参照に改める。
 - [brief.md](../parts/brief.md) の用途とバージョンを [brief](modules.md#brief)と[定型の依頼](guarantees.md#判定結果の受理)へ合わせ、判定者・計画者への依頼文も brief とし、起動は定型の1行、本文は `brief/<指示 ID>.md`、バージョンは内容ハッシュに改める。
 - [brief.md「停止条件」](../parts/brief.md)を [plan の上限](modules.md#plan)の表示だけに改め、停止の判断は [engine](modules.md#engine)と [router](modules.md#router)への参照に置き換える。
 - [brief.md「返却内容」](../parts/brief.md)を[進捗](data.md#進捗-progress)の項目へ置き換え、決定は [note](data.md#決定と証拠-decision--evidence)、人の判断が必要な事項は終了の種別で表し、「参照しなかった入力」は進捗に含める形に改める。
@@ -166,9 +166,15 @@
 
 ### router
 
-- 集約、ラウンド数、進展、上限、停止分類の組み合わせ。
+- [router の入力](modules.md#router)の組み合わせ。
 - [人への確認対象](guarantees.md#人への確認対象)の既定と追記。
 - [hook の稼働不足](guarantees.md#再開と-hook-の稼働確認)を含む次の指示との接続。
+
+### form
+
+- [スキーマとテンプレート](modules.md#form)の適用、Markdown の描画。
+- 各固定フォーマットと [data.md の定義](data.md#エンティティ)の整合。
+- [問いの回答案内](data.md#問い-question)と[停止する範囲・進められる範囲](data.md#状態遷移と受理条件)の表示。
 
 ### ledger
 

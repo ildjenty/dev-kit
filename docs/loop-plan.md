@@ -1,49 +1,58 @@
 # ループ計画
 
-ループは、利用者が組む[ループの雛形](architecture/data.md#ループの雛形-plantemplate)と、計画者が雛形から課題ごとに作る[計画](architecture/data.md#計画-plan)の2層で表す。計画は [plan](architecture/modules.md#plan) の型であり、計画者への依頼文は [brief](architecture/modules.md#brief) の一種である。
+ループは、利用者が組む[ループの雛形](architecture/data.md#ループの雛形-plantemplate)(再利用するループの定義)と、[計画者](architecture/flow.md#作業の開始)(雛形から計画を作るサブエージェント)が課題ごとに作る[計画](architecture/data.md#計画-plan)(課題に合わせたループのデータ)の2層で表す。計画のデータ型は [plan](architecture/modules.md#plan) モジュールが定め、計画者への依頼文は [brief](architecture/modules.md#brief)(入力から組み立てる依頼文)として渡す。
 
-kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開始)と、[作業の指示から router の判断まで](architecture/flow.md#作業の指示)の1ラウンドの進め方を固定する。ステージ、担当、check、遷移、ゲート、上限は利用者が雛形として組む。
+kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開始)と、1[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から結果に対する判断までの往復)の進め方を固定し、利用者は雛形の構成を定める。
 
-雛形は git 管理で育てるもの、計画は `.devkit/run/` に置き ignore する実行の記録である。[所有と生存期間](architecture/data.md#所有と生存期間)と[固定配置](architecture/layout.md#利用側のリポジトリ)に従い、残す価値がある決定は PR 本文の「計画の要約と決定」に写して[共有](architecture/data.md#資産の更新と共有)する。
-
-ラウンドの範囲は [Round](architecture/data.md#ラウンド-round)、次の行動の判断に使う入力は [router](architecture/modules.md#router)に従う。必須 check、`command:` の check、pre-commit を伴うコミットの関係は[完了条件](architecture/guarantees.md#完了条件)で定める。
+雛形を[育てるもの](architecture/data.md#所有と生存期間)(リポジトリが所有する資産)、計画を[実行の記録](architecture/data.md#所有と生存期間)(作業ごとに残す記録)として扱い、保存先は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)、決定の共有は[資産の更新と共有](architecture/data.md#資産の更新と共有)に従う。
 
 ## フォーマット
 
-雛形と計画は英語キーの JSON とし、[plan](architecture/modules.md#plan) が JSON Schema で検証する。項目は [PlanTemplate](architecture/data.md#ループの雛形-plantemplate) と [Plan](architecture/data.md#計画-plan)に従う。
+雛形と計画は英語キーの JSON とし、項目は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)と[計画](architecture/data.md#計画-plan)、検証の方式と責務は [plan](architecture/modules.md#plan)に従う。
 
-ステージの担当と check の実行主体は [Plan の担当と runner](architecture/data.md#計画-plan)で定める。作業者は担当名を持たないセッション自身であり、計画でモデルを割り当てない。
+ステージ(作業を区切る単位)の担当と [check](architecture/modules.md#check)(観点やコマンドによる確認)の実行主体(runner)は[計画](architecture/data.md#計画-plan)で定める。
 
-計画の承認で足りる外部操作は、[Plan の宣言](architecture/data.md#計画-plan)に種別・対象・入力のハッシュと、宣言時の登録定義・実行ファイルの内容ハッシュを持たせる。承認との照合は[外部操作の承認](architecture/guarantees.md#外部操作の承認)に従う。
+個別の承認なしに計画の承認だけで実行してよい[外部操作](architecture/flow.md#外部操作)(リポジトリ外への書き込み行為)は、[計画の宣言](architecture/data.md#計画-plan)と[外部操作の承認](architecture/guarantees.md#外部操作の承認)に従って扱う。
 
 ## 例
 
-JSON の例は [雛形と計画](architecture/examples.md#雛形と計画)、判定コマンド(`[judges]`)と検証コマンド(`[commands]`)の登録例は[設定](architecture/examples.md#設定)を参照する。
+JSON の例は[雛形と計画](architecture/examples.md#雛形と計画)を参照する。check の実行主体として登録する[判定コマンド(`[judges]`)](architecture/modules.md#config)(判定結果を返すコマンド)と[検証コマンド(`[commands]`)](architecture/modules.md#config)(終了コードで検証結果を返すコマンド)の例は[設定](architecture/examples.md#設定)を参照する。
 
 ## 作成ルール
 
 ### 雛形を組む規則
 
-利用者が開始ステージ、ステージの列、check、ゲート、上限、遷移表、候補ステージ、メタループの編集を宣言したステージを組む。各項目の契約は [PlanTemplate](architecture/data.md#ループの雛形-plantemplate)に従う。
+利用者は変更の種類(機能追加・修正・文書など)ごとに雛形を組み、担当を含む構成項目は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。[メタループ](meta-loop.md#メタループ)(開発ループ自体を改善するループ)の編集を宣言したステージも雛形で定める。
 
-- **何を変えるか**に基づいて、開始する[ステージ](stages.md)を決める。目的やスコープが未確定ならステージ0、変更困難な決定（スキーマ、契約、外部への公開など）に触れるならステージ1、責務・配置・依存を変えるならステージ2、変更困難な決定に触れない内部の契約だけならステージ3、コードだけならステージ4または5から始める。公開契約・内部契約のいずれも、保存済みデータ、実行中の処理、利用者と呼び出し元への影響、再生成と復旧の可否から判断する（[`principles/designing.md`](../principles/designing.md) の原則1）。「修正方法を知っているか」では決めない。
-- 調査・試作は、計画者が必要に応じて足せる候補ステージとして用意する。
-- 画面・データ・外部との通信に対応する「動作検証」を組み込む。起動・操作を要する check の実行主体は[サブエージェントの制限](architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。
-- 人によるレビューゲートには理由を付ける。確認の分類は[人への確認対象](architecture/guarantees.md#人への確認対象)に従う。
-- 画面のデザインを始める前に、画面 ID と表示内容のバージョンに対する人の承認をレビューゲートの通過条件とする。
-- check の追加・必須化は `principles/harness.md` の原則5「防ぐ失敗と運用負担から仕組みを選ぶ」に従う。
-- 段階的に具体化し、前のステージの出力を次のステージの入力にする。行き詰まったときの戻り先と再計画は `principles/harness.md` の原則3に従う。
+各雛形の開始ステージは、修正方法を知っているかではなく、何を変えるかで決める。元に戻せないもの(変更困難な決定)の判断は、公開契約か内部契約かにかかわらず、[`principles/designing.md` の原則1](../principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する)に従う。
+
+- 目的やスコープの根拠を具体化するなら、[ステージ0(目的)](stages.md#0-目的)。
+- 元に戻せないものに触れるなら、[ステージ1(スコープ)](stages.md#1-スコープ)。
+- 責務・配置・依存を変えるなら、[ステージ2(構造)](stages.md#2-構造)。
+- 元に戻せないものに触れない内部の契約だけなら、[ステージ3(契約)](stages.md#3-契約)。
+- コードだけなら、[ステージ4(手順)](stages.md#4-手順)または[ステージ5(実装)](stages.md#5-実装)。
+
+check とゲート(人の承認を待つ関門)は、次の規則で組む。
+
+- 画面・データ・外部との通信を変えるステージには、観点[「動作検証」](checks.md#動作検証)の check を置く。
+- 人によるレビューゲートの理由は自由記述とし、分類項目に対応する場合の書き方は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。人に確認する条件は[人への確認対象](architecture/guarantees.md#人への確認対象)で定める。
+- 画面のデザインを始める前のレビューゲートでは、画面 ID(画面の識別子)と表示内容を含む[ツリーのスナップショット](architecture/data.md#対象のバージョン-targetversion)(対象ファイルの固定時点の内容)を承認対象とする。画面 ID は[問い](architecture/data.md#問い-question)の説明に示す。
+- check の追加・必須化の判断は [`principles/harness.md` の原則5](../principles/harness.md#5-防ぐ失敗と運用負担から仕組みを選ぶ)に従う。[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点の必須化には、[検出試験](architecture/guarantees.md#検出試験)(観点ファイルが期待する判定を出せるかの試験)の合格を要する。
+
+ステージ間の前提と戻り先の設計は [`principles/harness.md` の原則3](../principles/harness.md#3-前提が崩れたときに戻るステージを決める)に従う。戻り先は[雛形の遷移表の `back`](architecture/data.md#ループの雛形-plantemplate)に書き、入力の組み立ては[作業の指示](architecture/flow.md#作業の指示)、再計画は[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
 
 ### 計画を作る規則
 
-計画への入力は、雛形、依頼内容、リポジトリの事実である。リポジトリの事実には、配置ガイド、元に戻せないものの一覧、利用可能な check を含める。
+計画への入力は、雛形、依頼内容、リポジトリの事実である。リポジトリの事実と brief への取り込みは[作業の指示](architecture/flow.md#作業の指示)に従い、[配置ガイド](repository.md#リポジトリ側の構成)(置くもの・置かないもの・配置先の案内)は変更対象のディレクトリの README から取り込む。元に戻せないものは[規則と強制手段](architecture/data.md#規則と強制手段-rules)と計画から渡す。
 
-計画者は完了条件を記し、関係のないステージを外し、check の対象を指定し、必要な調査・試作を候補から足す。作成の範囲は[作業の開始](architecture/flow.md#作業の開始)に従う。
+課題ごとの雛形の選択と計画者による取捨の範囲は[作業の開始](architecture/flow.md#作業の開始)に従い、開始ステージの変更を含む逸脱の判定は[計画](architecture/data.md#計画-plan)で定める。
 
-ステージの取捨は [`principles/harness.md`](../principles/harness.md) の原則3の適用除外に従い、変えるものだけを扱う最小の計画に保つ。戻り先を定めるためだけに不要なステージを足さない。
+変えるものだけを扱う最小の計画に保ち、戻り先を定めるためだけに不要なステージを足さない。
 
 ## 計画の check と人によるレビュー
 
-計画自体に[観点](checks.md#計画)「計画」の check を適用し、雛形からの逸脱も確認する。候補にないステージの追加・ゲートの削除・遷移の変更・必須 check の削除は、[Plan の承認条件](architecture/data.md#計画-plan)に従って人の承認を要する。
+計画自体に観点[「計画」](checks.md#計画)の check を適用し、雛形からの逸脱と承認条件は[計画](architecture/data.md#計画-plan)に従って確認する。
 
 check と必要なゲートの進行は[計画の check と承認ゲート](architecture/flow.md#計画の-check-と承認ゲート)、作り直しと切り替えは[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
+
+次の行動を選ぶ入力は [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)、必須 check とコミットの関係は[完了条件](architecture/guarantees.md#完了条件)に従う。起動・操作を要する check の実行主体は[操作の禁止とサブエージェントの制限](architecture/guarantees.md#操作の禁止とサブエージェントの制限)で定める。

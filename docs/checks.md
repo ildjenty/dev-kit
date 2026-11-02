@@ -1,35 +1,42 @@
-# check の観点ファイル
+# check の観点
 
-各観点を使うステージと実行主体、必須かどうかは[ループの雛形の check](architecture/data.md#ループの雛形-plantemplate)で定める。文書・設計・harness・メタは [kit の既定の雛形](architecture/layout.md#dev-kit-のリポジトリ)で使う名前として扱い、観点とステージの対応は各雛形に置く。
+[check](architecture/modules.md#check)(観点やコマンドによる確認)は、観点(確認の切り口)ごとの確認事項と [blocking](architecture/data.md#指摘-finding)(進行を止める指摘の条件)で対象を照合する。観点ファイルの配置は [kit と利用側の配置](architecture/layout.md)、形式は [check](architecture/modules.md#check)と[観点と検出試験の例](architecture/examples.md#観点と検出試験)に従う。
+
+各観点を使うステージ(作業を区切る単位)と実行主体(runner)、必須かどうかは[ループの雛形](architecture/data.md#ループの雛形-plantemplate)で定め、起動・操作を要する check は[操作の禁止とサブエージェントの制限](architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。各リポジトリでは、繰り返し発生する失敗を新たな観点として追加できる。
 
 ## 目的
 
 - **確認事項**: 目的を1文で説明できるか。完了を判定できるか。
 - **blocking**: 完了を判定できない。
 
-## 不可逆な決定
+## 元に戻せないもの
 
-- **確認事項**: [`principles/designing.md`](../principles/designing.md) の原則1に従い、変更困難な決定を影響と再生成・復旧の可否から判断しているか。一覧に漏れがないか。選択を左右する未確認事項を解消してから確定しているか。
-- **blocking**: 変更困難な決定が一覧から漏れているか、「後で直せる」扱いになっている。または、選択を左右する未確認事項を残したまま確定している。
+- **確認事項**: 元に戻せないもの(変更困難な決定)の一覧に漏れがないか。判断と確定の時期は [`principles/designing.md` の原則1](../principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する)に従う。
+- **blocking**: 一覧に漏れがある、または同原則1の blocking 条件に該当する。
 
 ## 構造
 
-- **確認事項**: 各配置を責務に基づいて正当化できるか。同じ目的と境界の保証を保つ、より単純な構造を1つ作り、元の案の余分な部分を示す。[`principles/designing.md`](../principles/designing.md)、[`principles/structure.md`](../principles/structure.md)、[`principles/data.md`](../principles/data.md) の各原則の違反・兆候（浅いモジュール、常に一緒に変更・理解する知識の分散、並行した更新と統合でも共通の不変条件が保たれる根拠の欠落、同じ規則の変更を同時に反映する保証のない処理経路）を確認する。外部入力を利用先で命令や許可範囲外の対象として解釈させない境界と、更新時に必要な整合性を保証する境界が定まっているか（structure の原則2、data の原則5）。既存の同種の処理を探し、揃えているか。揃えない理由が示されているか（designing の原則7）。
+- **確認事項**:
+  - 配置: 各配置を責務に基づいて正当化できるか。
+  - 原則との照合: [`principles/designing.md`](../principles/designing.md)、[`principles/structure.md`](../principles/structure.md)、[`principles/data.md`](../principles/data.md) の各原則の違反・兆候に該当するか。
+  - 単純さ: 対案との比較は [`principles/structure.md` の原則7](../principles/structure.md#7-たどるレイヤーと覚える状態を減らす)に従う。
+  - 境界: 外部入力の検証は [`principles/structure.md` の原則2](../principles/structure.md#2-成立条件が保たれる検証は繰り返さない)、更新時の整合性は [`principles/data.md` の原則5](../principles/data.md#5-データの所有と生存期間を定め不変条件を守る境界を決める)に従う。
+  - 流儀: 構造の揃え方は [`principles/designing.md` の原則7](../principles/designing.md#7-既存の流儀に揃える)に従う。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## 整合
 
-- **確認事項**: 文書や設計案の中の矛盾、未定義の事項、用語の揺れ。
+- **確認事項**: 文書や設計案の中に矛盾、未定義の事項、用語の揺れがないか。
 - **blocking**: 矛盾がある。未定義の事項と用語の揺れは記録のみとする。
 
 ## 校閲
 
-- **確認事項**: [`principles/writing.md`](../principles/writing.md) の原則2・3の違反・兆候と blocking に従う。
+- **確認事項**: 読者の前提と言葉の具体性は [`principles/writing.md`](../principles/writing.md) の原則2・3の違反・兆候と blocking に従う。
 - **blocking**: 読み手が意味を取り違える箇所。
 
 ## 契約
 
-- **確認事項**: 不正な状態や値を、型・境界の検証・DB 制約・更新時の検査で拒否できるか（[`principles/data.md`](../principles/data.md) の原則3）。復旧・調査・制御に必要な失敗の種類を内部で区別でき、公開応答が秘匿すべき情報を漏らさないか（[`principles/engineering.md`](../principles/engineering.md) の原則1）。
+- **確認事項**: 状態と値の受け入れは [`principles/data.md` の原則3](../principles/data.md#3-不正な状態や値の受け入れを型と検証で防ぐ)、失敗の分類と公開応答は [`principles/engineering.md` の原則1](../principles/engineering.md#1-失敗を隠さない)に従う。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## 手順
@@ -39,39 +46,51 @@
 
 ## 差分
 
-- **確認事項**: [`principles/engineering.md`](../principles/engineering.md) の原則1・5 と、[`principles/working.md`](../principles/working.md) の原則6・7、および各原則の blocking に従う。人の承認が必要な判断・操作は、[判定依頼に含めた有効な承認・委任の一覧](architecture/guarantees.md#判定結果の受理)と対象・範囲を照合する。差分が周囲の同種の処理の流儀と違っていないか。違うなら理由が示されているか（[`principles/designing.md`](../principles/designing.md) の原則7）。PR 本文と報告は、[form](parts/form.md) の PR 本文の契約と [規則と強制手段](rules.md#文章と記録)、および [`principles/writing.md`](../principles/writing.md) の原則1と [`principles/verification.md`](../principles/verification.md) の原則1の blocking に従う。
+- **確認事項**:
+  - コード: 失敗と変更の影響は [`principles/engineering.md`](../principles/engineering.md) の原則1・5に従う。
+  - 承認・委任: 判断と操作の範囲は [`principles/working.md`](../principles/working.md) の原則6・7に従い、判定依頼に含まれる有効な承認・委任の一覧と[対象・範囲を照合する](architecture/guarantees.md#判定結果の受理)。
+  - 流儀: 差分の揃え方は [`principles/designing.md` の原則7](../principles/designing.md#7-既存の流儀に揃える)に従う。
+  - PR 本文: [form](architecture/modules.md#form)(形式と描画を扱う部品)の契約と[文章と記録の規則](rules.md#文章と記録)に従う。
+  - 報告: 判断に必要な記載は [`principles/writing.md` の原則1](../principles/writing.md#1-結論と人の判断に必要なことを先に書く)、検証の主張は [`principles/verification.md` の原則1](../principles/verification.md#1-確かめていないことを確かめたように書かない)に従う。PR 本文にも両原則を適用する。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## 動作検証
 
-- **確認事項**: 起動、操作、証拠の取得、後片付けを確認し、[規則と強制手段](rules.md#画面) の画面の規則に従う。画面はスクリーンショットを画像として見て、反応・待機・フォーカス移動・アニメーションは実際に操作して確かめる。コンソールエラー、ページ全体の意図しない横スクロール、読めない文字、プレースホルダなどを確認する（[principles/ui.md](../principles/ui.md) の原則9）。比較に必要な情報や対応関係を保つための要素内の横スクロールは許す。長い名前、0件、大量のデータ、多言語など、問題が起きやすいデータも使う。
-- **blocking**: ui の原則9の blocking 条件に該当するか、画面の規則に違反する。確認できなかった箇所や性質は `NOT ASSESSED` とする。
-
-起動・操作を要する check の実行主体は、[操作の禁止とサブエージェントの制限](architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。
+- **確認事項**: 起動、操作、コンソールエラー、証拠の取得、後片付けを確認し、[画面の規則](rules.md#画面)に従う。描画結果と操作の確認は [`principles/ui.md` の原則9](../principles/ui.md#9-描画結果と操作を確認する)に従い、長い名前、0件、大量のデータ、多言語など、問題が起きやすいデータも使う。
+- **blocking**: 同原則9の blocking 条件に該当する、または画面の規則に違反する。未確認の扱いも同原則9に従う。
 
 ## 終了時の状態
 
-- **確認事項**: [submit の終了ブロック](architecture/data.md#進捗-progress)と[完了条件](architecture/guarantees.md#完了条件)、および [`principles/context.md`](../principles/context.md) の原則5に従う。中断時は未完了・起動不能・未確認の状態と再開条件、意図して保存した再現手順・証拠の用途・保存先・扱いを確認する。依頼外の復旧が必要なときは、復旧を行わず、状態と再開条件を明示して安全に止める（原則5の中断時の扱い）。
-- **blocking**: 完了として扱う作業が合意した完了条件を満たしていない、または安全な停止・再開を妨げる状態がある。必須の確認を実施できなかった場合は `NOT ASSESSED` とする。
+- **確認事項**: 判定依頼に含まれるそのラウンドの[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定形式で返す記録)を[完了条件](architecture/guarantees.md#完了条件)と照合する。終了・中断時の記録と再開条件は [`principles/context.md` の原則5](../principles/context.md#5-完了条件を満たして終え中断時は安全に再開できる状態を残す)に従う。
+- **blocking**: 同原則5の blocking 条件に従う。必須の確認が残る場合の判定も同原則5に従う。
 
 ## 計画
 
-- **確認事項**: 人によるレビューゲートの理由が [router](architecture/guarantees.md#人への確認対象) の分類に含まれるか。[Plan の雛形からの逸脱](architecture/data.md#計画-plan)がないか。逸脱があれば、人の承認を要する指摘として `needs-decision` を付ける。ステージを減らせないか。**各完了条件に対応する [check](architecture/modules.md#check) があるか。変更の種類（画面・データ・外部との通信・構造）に必要な検査が含まれるか。**
+- **確認事項**:
+  - ゲート: [ループの雛形](architecture/data.md#ループの雛形-plantemplate)の理由の書き方に従い、理由を示しているか。人への確認の判定は[人への確認対象](architecture/guarantees.md#人への確認対象)に従っているか。
+  - 逸脱: [計画の雛形からの逸脱](architecture/data.md#計画-plan)を確認し、該当する指摘に [`needs-decision`](architecture/data.md#指摘-finding)(人の判断が必要な指摘)を付けているか。
+  - 規模: ステージを減らせないか。
+  - 網羅性: 各完了条件に対応する check と、変更の種類(画面・データ・外部との通信・構造)に必要な検査が含まれるか。
 - **blocking**: 対応する check がない完了条件がある。
 
 ## 前提の批評
 
-- **確認事項**: 部品・原則・記録・観点の数と形式を疑い、対案を作って比較する。
-- **blocking**: 採用すると設計の形が変わる。
+- **確認事項**: 部品・原則・記録・観点の数と形式に、より単純な対案があるか。
+- **blocking**: 対案を採用すると構成要素の数や役割が変わる。
 
 ## harness
 
-- **確認事項**: [`principles/harness.md`](../principles/harness.md) の各原則の違反・兆候と blocking、および[モジュールごとの契約](architecture/modules.md#モジュールごとの契約)に従う。check の必須化は[検出試験](architecture/guarantees.md#検出試験)に従い、防ぐ失敗と運用負担から仕組みと適用範囲を選んでいるかを確かめる（harness の原則5）。skill に description があるか。[skill の配置](architecture/layout.md#指示ファイルとホスト設定)と参照先が正しいか。check が `NOT ASSESSED` を返せるか。原則が所定の形式を満たすか。skill と実装に同じ処理が重複していないか（`principles/working.md` の原則5。同じ既存コマンドの呼び出しは数えない）。Fresh Session Test として、新しいセッションがリポジトリと実行の記録を読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるかを確かめる。部品間の接続と再開は[試験項目](architecture/contract-changes.md#試験項目)、特に[結合試験](architecture/contract-changes.md#結合試験)に従って確かめる。
-- **blocking**: 答えられない問いがある。照合した原則の blocking 条件に該当するか、部品の契約に違反する。
+- **確認事項**:
+  - 原則と契約: [`principles/harness.md`](../principles/harness.md) の各原則と[モジュールごとの契約](architecture/modules.md#モジュールごとの契約)に従う。
+  - check の必須化: 仕組みの選定は同原則5、[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は[検出試験](architecture/guarantees.md#検出試験)(観点ファイルが期待する判定を出せるかの試験)に従う。
+  - skill: description の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`principles/working.md` の原則5](../principles/working.md#5-定型処理はコマンドにし手順はそれを呼ぶ)に従う。
+  - 判定: [check の結果](architecture/data.md#check-の結果-judgment)に従い、`NOT ASSESSED`(未評価)を返せるか。
+  - 原則の形式: [原則のフォーマット](../principles/README.md#原則のフォーマット)を満たすか。
+  - 新しいセッションによる確認: リポジトリと実行の記録を読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるか。
+  - 接続と再開: 正本の[試験項目](architecture/contract-changes.md#試験項目)に従い、部品間の[結合試験](architecture/contract-changes.md#結合試験)を確認する。
+- **blocking**: 新しいセッションによる確認で答えられない問いがある、照合した原則の blocking 条件に該当する、または部品の契約に違反する。
 
 ## skill の試験
 
 - **確認事項**: 依頼と入力だけを渡し、結果を期待結果と照合する。テストケースには「判定できない」場合も含める。評価中だと分かる表現は、試験対象に見せない。
 - **blocking**: 期待結果と異なる。
-
-各リポジトリでは、そのリポジトリで繰り返し発生する失敗を、新たな観点として追加できる。

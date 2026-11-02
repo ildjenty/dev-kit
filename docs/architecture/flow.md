@@ -18,9 +18,9 @@
 
 `devkit next` は現在の StageRun とラウンドを特定する。[hook の稼働](guarantees.md#再開と-hook-の稼働確認)を確認し、[対象のバージョン](data.md#対象のバージョン-targetversion)を取得して、識別したセッション ID をラウンドに結び付ける。engine は brief をファイルに書き、[出力上限](guarantees.md#性能と出力の上限)に応じて返す。人が担当するステージの扱いは [Plan の担当](data.md#計画-plan)に従う。
 
-brief にはステージ定義、前のステージの出力、リポジトリの事実(配置ガイド、`rules.md` の元に戻せないもの、利用可能な check)を含める。修正ラウンドには前回の指摘と指摘 ID も含める。規範の参照先は [kit のコピー](modules.md#kit)と `.devkit/checks/` であり、読み出しは[規範の固定](guarantees.md#規範の固定)に従う。
+計画(ID 付きの完了条件と上限)を含む brief の入力と、修正ラウンドで取り込む前回の指摘・指摘 ID、必須の `command:` の check と pre-commit の出力は [brief の責務](modules.md#brief)に従う。リポジトリの事実には、[配置ガイドとなる変更対象のディレクトリの README](layout.md#利用側のリポジトリ)、[`rules.md` と計画の元に戻せないもの](data.md#規則と強制手段-rules)、利用可能な check を取り込む。規範の参照先は [kit のコピー](modules.md#kit)と `.devkit/checks/` であり、読み出しは[規範の固定](guarantees.md#規範の固定)に従う。
 
-エージェントはセッション内で作業し、他の skill や plugin も使える。途中の決定や調査結果は `devkit note`、作業の終了ブロックは `devkit submit <ファイル>` で渡す。入力 JSON の場所と受理の条件は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。コミットは[完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に委ねる。
+エージェントはセッション内で作業し、他の skill や plugin も使える。途中の決定や調査結果は `devkit note`、作業の終了ブロックは `devkit submit <ファイル>` で渡す。教訓は [engine](modules.md#engine)が router の「教訓の反映先」の分類を付けて記録する。入力 JSON の場所と受理の条件は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。コミットは[完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に委ねる。
 
 ## 作業結果の提出
 
@@ -32,13 +32,13 @@ engine はステージに置いた `command:` の check をすべて判定者の
 
 続いて、判定の指示を返す前に engine は[完了条件](guarantees.md#完了条件)の入力条件で `git hook run pre-commit` を実行する。失敗なら判定者を起動せず、router に渡さず engine が「修正する」として記録し、hook の出力を次の brief に含める。
 
-`devkit next` は判定依頼を `brief/<指示 ID>.md` に書き、[対象を展開](guarantees.md#判定対象の展開と完了時の永続化)して、指示 ID と展開先のパスを返す。依頼には規範、観点ファイル、対象の展開先、最終メッセージとして返す JSON の形式、修正ラウンドなら前回の指摘 ID を含める。
+`devkit next` は判定依頼を `brief/<指示 ID>.md` に書き、[対象を展開](guarantees.md#判定対象の展開と完了時の永続化)して、指示 ID と展開先のパスを返す。そのラウンドの終了ブロックを含む判定依頼の内容は [check の契約](modules.md#check)、観点「差分」の有効な承認・委任の一覧は[判定結果の受理](guarantees.md#判定結果の受理)に従う。
 
 エージェントが判定者を起動し、判定者は結果を最終メッセージで返す。hook が観測を添えて保存し、次の `next` が[判定結果の受理](guarantees.md#判定結果の受理)に従って Judgment を記録・集約する。判定コマンドを担当とする判定は `devkit` が実行し、同じ受理境界に従う。
 
 ## router の判断
 
-engine は [Finding と完了条件 ID](data.md#指摘-finding)の差分から進展を計算する。router は集約した判定、ラウンド数、進展の有無、計画の上限、停止分類を受け取って判断し、engine が記録する。
+engine は [Finding と完了条件 ID](data.md#指摘-finding)の差分から進展を計算する。router は集約した判定、ラウンド数、進展の有無、計画の上限、終了ブロックの終了の種別([進捗](data.md#進捗-progress))を受け取って判断し、engine が記録する。
 
 - **修正する**: 次の `next` が指摘を取り込んだ brief を返す。
 - **人に確認する**: 問いを記録し、StageRun を回答待ちにして、`next` が問いの指示を返す。[既定の分類](guarantees.md#人への確認対象)を使う。

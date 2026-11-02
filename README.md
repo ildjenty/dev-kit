@@ -2,27 +2,35 @@
 
 dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバイナリである。
 
-リポジトリの持ち主がステージ・観点・ゲート・検証コマンドをループの雛形として組み、Claude Code や Codex CLI のセッション内で、リポジトリ専用の開発ループを回すための道具。kit は部品（brief、check、router、ledger、form、view、runtime の7つ）と原則、既定の雛形、`devkit` からなる。現在は設計段階で、コードはまだない。
+dev-kit は、Claude Code や Codex CLI のセッション内で、リポジトリ専用の開発ループを回すための道具である。リポジトリの持ち主が[ループの雛形](docs/architecture/data.md#ループの雛形-plantemplate)(作業の段階と判定・承認の組み合わせ)を組む。kit は[7つの部品](docs/design.md#部品)、原則、固定物(既定の雛形・観点ファイル・skill・サブエージェント定義など)、`devkit` を提供する。固定物の範囲は [kit](docs/architecture/modules.md#kit)に従う。現在は設計段階で、コードはまだない。
 
 ## 参照順序
 
 1. [docs/architecture.md](docs/architecture.md): 構成と動作の概要。作業の流れと保証の範囲を示す。
 2. [docs/design.md](docs/design.md): 基本方針と、7つの部品の役割。
-3. [principles/README.md](principles/README.md): check が評価基準とする原則の一覧と、原則の書き方。
+3. [principles/README.md](principles/README.md): [check](docs/parts/check.md)(評価と判定の部品)が評価基準とする原則の一覧と、原則の書き方。
 
-設計の正本は [docs/architecture.md](docs/architecture.md) と [docs/architecture/](docs/architecture/)。`docs/parts` と loop-plan・repository・stages・checks の記述が食い違うときは [architecture/contract-changes.md の改訂](docs/architecture/contract-changes.md)に従う。
-
-その先は、必要な箇所を読む。
+設計の正本は [docs/architecture.md](docs/architecture.md) と [docs/architecture/](docs/architecture/)である。`docs/parts/` と `docs/` 直下の各文書の記述が正本と食い違う場合は、正本を優先する。作業手順は[処理の流れ](docs/architecture/flow.md)に従う。
 
 ## ファイル構成
 
-- `docs/architecture.md`: 設計の概要。
-- `docs/architecture/`: 設計の詳細。`flow.md`（開始から完了までの流れ）、`data.md`（記録と状態）、`modules.md`（モジュールと依存関係）、`layout.md`（ディレクトリ構成）、`hooks.md`（5つの hook）、`guarantees.md`（どの失敗をどの仕組みで防ぐか）、`decisions.md`（仮決定、不採用の案、未確認の前提）、`contract-changes.md`（部品の契約の改訂と試験）。
-- [docs/architecture/examples.md](docs/architecture/examples.md): 雛形・計画・設定・観点・pre-commit の最小の例。
-- `docs/design.md`: 基本方針と部品の一覧。
-- `docs/parts/`: 部品ごとの契約。`brief.md`、`check.md`、`router.md`、`ledger.md`、`form.md`、`view.md`、`runtime.md`。
-- `docs/loop-plan.md`: 課題ごとに作るループ計画の形式。`docs/stages.md` は雛形に置くステージの候補、`docs/checks.md` は観点ファイルの候補。
-- `docs/rules.md`: 対象のコードと文書に課す規則と、それを守らせる手段。
-- `docs/repository.md`: 利用側の配置（正本は [architecture/layout.md](docs/architecture/layout.md)）。
-- `docs/meta-loop.md`: ループ自体を改善するループ。
-- `principles/`: 原則。適用する場面（設計、構造、データ、実装、テスト、確認、進め方、文脈、harness、UI、文章）ごとにファイルを分けている。
+- [docs/architecture.md](docs/architecture.md): 設計の概要。
+- [docs/architecture/](docs/architecture/): 設計の詳細。
+  - [flow.md](docs/architecture/flow.md): 開始から完了までの流れ。
+  - [data.md](docs/architecture/data.md): 記録と状態。
+  - [modules.md](docs/architecture/modules.md): モジュールと依存関係。
+  - [layout.md](docs/architecture/layout.md): ディレクトリ構成。
+  - [hooks.md](docs/architecture/hooks.md): 5つの hook。
+  - [guarantees.md](docs/architecture/guarantees.md): 失敗ごとの防止の仕組み。
+  - [decisions.md](docs/architecture/decisions.md): 仮決定、不採用の案、未確認の前提。
+  - [contract-changes.md](docs/architecture/contract-changes.md): 部品の契約の改訂と試験。
+  - [examples.md](docs/architecture/examples.md): 雛形・計画・設定・観点・pre-commit の最小の例。
+- [docs/design.md](docs/design.md): 基本方針と部品の一覧。
+- [docs/parts/](docs/parts/): 部品ごとの契約。
+- [docs/loop-plan.md](docs/loop-plan.md): ループの雛形(利用者が組む定義)と課題ごとの計画の形式・作成規則。
+- [docs/stages.md](docs/stages.md): 雛形に置くステージの候補。
+- [docs/checks.md](docs/checks.md): 観点ファイルの候補。
+- [docs/rules.md](docs/rules.md): 対象のコードと文書に課す規則と強制手段の設計上の一覧。利用側の正本は [Rules](docs/architecture/data.md#規則と強制手段-rules)に従う。
+- [docs/repository.md](docs/repository.md): 利用側の配置と実行の仕組みとの対応。
+- [docs/meta-loop.md](docs/meta-loop.md): ループ自体を改善する手順。
+- [principles/](principles/): 原則。適用場面ごとにファイルを分けている。

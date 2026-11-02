@@ -135,7 +135,9 @@ hook の共有は git の `core.hooksPath` による。`init` は、リポジト
 - **仕組み**: 「人に確認する」は kit の分類表の既定データとし、リポジトリ側の追記で上書きできる。既定には依存の宣言(ロックファイル・マニフェスト)の差分、宣言のないメタループの編集、[commit 直前の対象の照合](#commit-直前の対象の照合)で定める対象の再変化を含める。メタループの編集は `.devkit/`(`run/` を除く)・`devkit.toml`・ホストの設定・指示ファイル・skill・git hook(`core.hooksPath` の先の pre-commit)の変更である。`.devkit/` にはループの雛形を置く `.devkit/plans/` も含まれる。検証そのものを変える編集なので、メタループの編集を宣言したステージ以外では人が確認する。
 - **置き場所**: `kit/router/` の既定、`devkit.toml` の追記、`internal/router/` の分類。hook の稼働を確認できない場合は[再開と hook の稼働確認](#再開と-hook-の稼働確認)で扱う。
 
-router の「教訓の反映先」の分類順は、hook・lint・型 → [ループの雛形](data.md#ループの雛形-plantemplate) → 原則 → skill の手順 → kit に戻す、とする。
+「暫定判断で進めてレビューで確認する」場合は、問いを起票せず、暫定の決定を `devkit note` で記録して進み、次のゲートまたは PR レビューで人が確認する。router の分類の出力としては「修正する」または「完了する」で返す。
+
+router の「教訓の反映先」の優先順は、hook・lint・型 → [ループの雛形](data.md#ループの雛形-plantemplate) → 原則 → skill の手順 → kit に戻す、とする。
 
 ### 記録の破損と競合
 
@@ -180,7 +182,7 @@ Claude Code の判定者・計画者は、定義の `tools` を読み取り用�
 
 commit は pre-commit の実行時間だけかかるので、エージェントは完了を進める `next` を Bash の timeout を上限値にして呼ぶ。
 
-CLI の標準出力は、Claude Code の Bash の上限(正常時は約3万字、失敗時は約1万字)に収まるなら全文、超えるなら要点とファイルのパスを出す。[runtime の契約](../parts/runtime.md)に従う。hook の出力上限は Claude Code が約1万字、Codex が約2,500トークンと確認済みである。checkpoint は上限内なら本文を注入し、超えるなら要約と「`devkit status` で全文」の案内を注入する。
+CLI の標準出力は、Claude Code の Bash の上限(正常時は約3万字、失敗時は約1万字)に収まるなら全文、超えるなら要点とファイルのパスを出す。hook の出力上限は Claude Code が約1万字、Codex が約2,500トークンと確認済みである。checkpoint は上限内なら本文を注入し、超えるなら要約と「`devkit status` で全文」の案内を注入する。
 
 ## 観測性
 
