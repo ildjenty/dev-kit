@@ -63,17 +63,23 @@ hook の共有は git の `core.hooksPath` による。`init` は、リポジト
 
 適用除外の主張と根拠がある場合は、それによって対象から外れる要求に限って違反としない。判定は、`FAIL`、`NOT ASSESSED`、`PASS` の優先順で集約する。
 
+観点「差分」の判定依頼には、有効な承認・委任の一覧を含め、判定者が対象と範囲を照合できるようにする。
+
 ### 検出試験
 
 - **失敗**: 違反を検出できるか確かめていない観点を、必須 check にする。
 - **仕組み**: 対象は判定者(サブエージェントと判定コマンド)が担当する観点ファイルだけとし、`command:` の check は検出試験を要しない。違反例では `FAIL`、適合例・許容例では `PASS` を期待する。[principles/harness.md](../../principles/harness.md) の原則2に従い、計画の check の実行主体と一致する[合格記録](data.md#検出試験の記録-detectiontest)がない観点は必須 check にしない。記録が不足すれば、`next` はラウンドを開く前に検出試験を指示し、合格を記録してから開始時のスナップショットを取る。不合格なら観点を修正するか必須から外すかの問いを起票し、停止する。
 - **置き場所**: `internal/check/` の試験仕様と結果の判定、`internal/engine/` の `next`、`.devkit/detect.json` の合格記録の索引。
 
+合格記録の再利用は[内容ハッシュによる同一性](data.md#検出試験の記録-detectiontest)に従い、表記修正でも識別に使うハッシュが変われば試験をやり直す。[principles/harness.md](../../principles/harness.md) の原則2の適用除外は、人が手で行う試験だけに適用する。
+
 ### 回答の受理
 
 - **失敗**: 人の曖昧な答え、引用、説明、別の主体の報告を、都合よく承認と解釈する。
 - **仕組み**: `devkit answer <問い ID>` は選択肢を引数に取らない。起票後に観測した入力のうち、全文から前後の空白を除いたものが「問い ID 選択肢」だけの1行と完全に一致する最新の入力だけを受理する。引用・説明を含む入力や長文は一致しない。ゲートと外部操作の承認に、この照合を必須とする。
 - **置き場所**: [UserPromptSubmit](hooks.md#userpromptsubmit)が書く観測、`internal/engine/` の `answer`、[回答・承認](data.md#回答承認-answer--approval)の記録。
+
+選択肢の回答が定型に一致しなければ実行せず、「問い ID 選択肢」だけの1行での再入力を求める。
 
 受付期限内に新たな定型の入力が観測されれば、訂正としてそちらを優先する。訂正は、承認した外部操作の実行開始、またはゲート通過後の次のステージの開始まで受け付ける。それ以後の定型の入力は訂正として受理せず、新しい問いの起票を促す。
 
@@ -129,7 +135,7 @@ hook の共有は git の `core.hooksPath` による。`init` は、リポジト
 - **仕組み**: 「人に確認する」は kit の分類表の既定データとし、リポジトリ側の追記で上書きできる。既定には依存の宣言(ロックファイル・マニフェスト)の差分、宣言のないメタループの編集、[commit 直前の対象の照合](#commit-直前の対象の照合)で定める対象の再変化を含める。メタループの編集は `.devkit/`(`run/` を除く)・`devkit.toml`・ホストの設定・指示ファイル・skill・git hook(`core.hooksPath` の先の pre-commit)の変更である。`.devkit/` にはループの雛形を置く `.devkit/plans/` も含まれる。検証そのものを変える編集なので、メタループの編集を宣言したステージ以外では人が確認する。
 - **置き場所**: `kit/router/` の既定、`devkit.toml` の追記、`internal/router/` の分類。hook の稼働を確認できない場合は[再開と hook の稼働確認](#再開と-hook-の稼働確認)で扱う。
 
-router の「教訓の反映先」の分類には、[ループの雛形](data.md#ループの雛形-plantemplate)を含める。
+router の「教訓の反映先」の分類順は、hook・lint・型 → [ループの雛形](data.md#ループの雛形-plantemplate) → 原則 → skill の手順 → kit に戻す、とする。
 
 ### 記録の破損と競合
 
@@ -163,6 +169,8 @@ pre-commit hook・判定コマンド・検証コマンドは `devkit` の子プ�
 リポジトリ全体に適用する操作の deny は、人がリポジトリの方針として `.claude/settings.json` に書く。kit が `permissions.deny` に追加するのは `Edit(.devkit/run/**/records/**)`・`Edit(.devkit/run/**/results/**)`・`Edit(.devkit/run/**/sessions/**)`・`Edit(.devkit/run/**/prompts/**)`・`Edit(.devkit/run/**/snap/**)` に限る。kit の `[deny]` とサブエージェントの起動の制限は [PreToolUse](hooks.md#pretooluse)で適用し、settings には足さない。Claude Code の hook は `onFailure: "block"` 相当の設定で登録する。
 
 Claude Code の判定者・計画者は、定義の `tools` を読み取り用に限定する。この制限と `Agent(fork)`・`Agent(model:*)` の deny が効くことは確認済みである。Codex は親の sandbox を継承するため、カスタム定義に `features.shell_tool = false` を指定する。この設定を書けることは確認済みである。読み取りの可否と代替は[未確認の前提](decisions.md#未確認の前提)に残す。
+
+起動・操作を要する check(動作検証)の runner は判定コマンドまたは `command:<name>` に限り、読み取り専用の判定者サブエージェントには割り当てない。
 
 ## 性能と出力の上限
 
