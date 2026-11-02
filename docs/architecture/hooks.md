@@ -6,7 +6,7 @@ hook はホストの5つのイベントを受け、セッションの現在地�
 
 Claude Code と Codex CLI を対象とし、どちらも既定のホストとはしない。ホストは `devkit hook <event>` を呼び、標準入力の JSON を host/event が共通イベントへ変換する。出力も host/event がホストの形式と上限に合わせる。
 
-束縛は[セッションの観測](data.md#セッションの観測-sessionobservation)から取得する。束縛がなければ早期終了するが、SessionStart の観測と PreToolUse・UserPromptSubmit の最終観測時刻の更新は行う。入力の本文は束縛があるときだけ観測する。これにより、他の skill や plugin と同じリポジトリで使える。
+束縛は[セッションの観測](data.md#セッションの観測-sessionobservation)から取得する。束縛がなければ早期終了するが、SessionStart の観測と PreToolUse・UserPromptSubmit の最終観測時刻の更新は先に行う。UserPromptSubmit の本文は束縛があるときだけ、未回答の問いの有無にかかわらず、回答後の訂正も含めて常に観測する。これにより、他の skill や plugin と同じリポジトリで使える。
 
 セッションの観測は `.devkit/run/sessions/<session_id>/<時刻>-<イベント>.json` に追記型で公開し、共有ファイルを上書きしない。`<イベント>` には hook のイベント名、または[束縛を書く CLI](data.md#セッションとブランチ)の操作名を使う。読み手は最新の観測を取る。
 
@@ -15,7 +15,7 @@ Claude Code と Codex CLI を対象とし、どちらも既定のホストとは
 ## SessionStart
 
 - **入力**: 起動・再開・コンテキスト圧縮(compaction)後のセッション ID、ホスト名、cwd などのイベント。
-- **判断**: ブランチに関係なく観測を作り、束縛があれば [checkpoint](data.md#checkpoint)を組み立てる。
+- **判断**: ブランチに関係なく[共通処理](#共通処理)に従い、続行する場合は [checkpoint](data.md#checkpoint)を組み立てる。
 - **出力**: checkpoint を注入する。失敗時は警告を注入する(SessionStart は block できない)。本文と要約の切り替えは[性能と出力](guarantees.md#性能と出力の上限)に従う。
 - **書く生成物**: [共通処理](#共通処理)で定めるセッションの観測。Claude Code では `CLAUDE_ENV_FILE` に `DEVKIT_SESSION_ID` も書き、後続コマンドに渡す。
 
@@ -31,7 +31,7 @@ Claude Code の継続回数の上限は8回である。ホストが数える継�
 ## PreToolUse
 
 - **入力**: ツール名、Bash のコマンド、サブエージェント起動の引数、セッションの束縛。Codex で `tool_input.command` を取得できることは確認済みである。
-- **判断**: 先に最終観測時刻を更新する。束縛があれば、[規範の固定](guarantees.md#規範の固定)に従って固定したスナップショットから `[deny]` を読み、以下の構文と起動の定型を照合する。読み出し関数の受け渡しは [hook の依存](modules.md#hook)に従う。
+- **判断**: [共通処理](#共通処理)を経て続行する場合は、[規範の固定](guarantees.md#規範の固定)に従って固定したスナップショットから `[deny]` を読み、以下の構文と起動の定型を照合する。読み出し関数の受け渡しは [hook の依存](modules.md#hook)に従う。
 - **出力**: 許可、または deny と理由。hook の matcher(起動対象を絞り込む設定)にはツール名だけを指定し、禁止規則との一致は hook 内で判定する。
 - **書く生成物**: セッションの観測の PreToolUse 最終観測時刻。
 
@@ -53,6 +53,6 @@ Claude Code の継続回数の上限は8回である。ホストが数える継�
 ## UserPromptSubmit
 
 - **入力**: セッション ID と `prompt`。
-- **判断**: 束縛の有無に関係なく最終観測時刻を更新する。束縛があれば、未回答の問いの有無にかかわらず、回答後の訂正も含めて常に本文を観測する。
+- **判断**: [共通処理](#共通処理)の条件で最終観測時刻を更新し、本文を観測する。
 - **出力**: 観測した入力を[回答の受理](guarantees.md#回答の受理)の根拠にする。hook 自身は承認を決めない。
-- **書く生成物**: セッションの観測の UserPromptSubmit 最終観測時刻と、束縛がある場合の `prompts/<session_id>-<時刻>.txt`。本文はそのまま保存する。
+- **書く生成物**: セッションの観測の UserPromptSubmit 最終観測時刻と、`prompts/<session_id>-<時刻>.txt`。[共通処理](#共通処理)の条件で観測した本文はそのまま保存する。

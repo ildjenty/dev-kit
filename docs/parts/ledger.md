@@ -18,7 +18,7 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 ### 決定
 
-`devkit note` の入力と決定の状態、[確認済みの記録の集合](../architecture/data.md#決定と証拠-decision--evidence)(人が閲覧して判断した記録)の導出は[決定と証拠](../architecture/data.md#決定と証拠-decision--evidence)(判断と調査結果)の定義に従う。
+`devkit note` の入力と決定の状態、[確認済みの記録の集合](../architecture/data.md#決定と証拠-decision--evidence)の導出は[決定と証拠](../architecture/data.md#決定と証拠-decision--evidence)(判断と調査結果)の定義に従う。
 
 ### 問い・回答・承認
 

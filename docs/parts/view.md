@@ -44,7 +44,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 [必読集合](../architecture/modules.md#view)(必ず読む記録の集合)の対象はリンク先の定義、表示と残件数のまとめ方は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
 
-閲覧の記録と確認済みの集合の導出は[状態変更の定義](../architecture/data.md#決定と証拠-decision--evidence)、状態変更の経路は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
+閲覧の記録と確認済みの集合の導出は[状態変更の定義](../architecture/data.md#決定と証拠-decision--evidence)、承認・却下・保留の状態変更の経路は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
 
 #### 構造図
 

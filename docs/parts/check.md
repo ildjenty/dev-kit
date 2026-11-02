@@ -38,7 +38,7 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 サブエージェントの設定は[リポジトリ内の定義](../architecture/layout.md#指示ファイルとホスト設定)、起動時の制限は [PreToolUse](../architecture/hooks.md#pretooluse)(ツール実行前の hook)に従う。起動と結果の来歴の照合、重複結果と判定の食い違いの扱いは[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
-コマンド実行結果の Judgment への変換は[作業結果の判定](../architecture/flow.md#作業結果の判定)と[受理境界](../architecture/guarantees.md#判定結果の受理)に従う。結果の保存は [ledger](../architecture/modules.md#ledger)(記録を扱う部品)が担い、判定の有効性は[対象のバージョンと規範の識別](../architecture/data.md#check-の結果-judgment)で照合する。
+コマンド実行結果の Judgment への変換は[作業結果の判定](../architecture/flow.md#作業結果の判定)と[受理境界](../architecture/guarantees.md#判定結果の受理)に従う。結果の保存の責務は [check のモジュール契約](../architecture/modules.md#check)に従い、判定の有効性は[対象のバージョンと規範の識別](../architecture/data.md#check-の結果-judgment)で照合する。
 
 ### 検出試験
 
