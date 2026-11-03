@@ -104,7 +104,7 @@ kit を導入した git リポジトリである。設定ファイルと育て�
 - 観点 ID、対象のバージョン、規範の識別、確認した完了条件 ID の集合、判定、指摘を持つ。判定は `PASS`・`FAIL`・`NOT ASSESSED` である。
 - 確認した範囲と未確認の範囲、方法と環境、指示 ID、受理した内容と来歴を持つ。結果ファイルのパスは任意の診断情報とする。
 - 実行主体(runner。check を実行する相手)は種類ごとに次の項目で表す。
-  - サブエージェント: 名前。effort(Claude Code の推論の量を指定する設定項目)または model(Codex)の実測値は、取得できる場合に来歴として添える。
+  - サブエージェント: 名前。effort(Claude Code の推論の量を指定する設定項目)または model(Codex)の実測値は、取得できる場合に来歴として添える。取得元は [SubagentStop](hooks.md#subagentstop)に従い、取得できない項目は記録せず、必須にしない。設定値を観測値の代わりに使わない。
   - 判定コマンド(`[judges]`): 名前。
   - `command:` の check: `command:<name>`。
 - 担当とコマンドの定義は runner と使用した規範から一意に特定し、定義のハッシュを重ねて保持しない。
@@ -146,7 +146,7 @@ form に従う、人への確認事項である。
 ホストが受け取った入力の本文を保持する生成物である。
 
 - 本文の採取と保存先は [UserPromptSubmit](hooks.md#userpromptsubmit)に従う。
-- UserPromptSubmit はサブエージェントの報告、他のセッションからのメッセージ、定期タスクでも発火し、人が打った入力と区別する項目がない。これは Claude Code では確認済みであり、Codex は[未確認の前提](../architecture.md#未確認の前提)に残す。
+- 人以外の入力での発火と観測から除く本文は [UserPromptSubmit](hooks.md#userpromptsubmit)に従う。
 - 観測した入力からの回答の記録は[回答の受理](guarantees.md#回答の受理)に従う。人が別のセッションから回答を送る経路は範囲外とする。
 
 ### 停止の観測 (StopObservation)
@@ -227,7 +227,9 @@ kit が管理する、リポジトリ外への書き込み操作である。
 
 `start` は[開始の条件](guarantees.md#再開と-hook-の稼働確認)を満たしたセッションの観測に作業 ID を書いて束縛する。以後のコマンド(`next`・`submit`・`answer`・`external`・`resume` を含む)と hook はこの束縛から作業を特定し、`next` は識別したセッション ID をラウンドに結び付ける。束縛のないセッションで `next` または `resume` が呼ばれ、cwd のブランチが `devkit/<作業 ID>` なら、そのセッションを作業に束縛する。新しいセッションからはこの手順で作業を特定する。中断からの再開条件は[中断](guarantees.md#中断)に従う。
 
-Claude Code の環境変数の設定は [SessionStart](hooks.md#sessionstart)に従い、CLI は `DEVKIT_SESSION_ID` でセッションを識別する。環境変数がなければ最新の観測を使い、指示に警告を含める。cwd のブランチが作業のブランチと違っても束縛は無効にしない。読む操作(`next`・`status`・`view`)は警告だけで続けるが、`submit`・`answer`・`external`・`plan`・`resume`・完了の確定は拒否する。`note` の受理は[決定と証拠](#決定と証拠-decision--evidence)に従う。不一致時の `next` は記録を行わず、結果を受理せず照会だけで警告付きの指示を返す。中断中の応答は[中断](guarantees.md#中断)に従う。
+CLI は Bash の環境変数 `CLAUDE_CODE_SESSION_ID`(Claude Code)と `CODEX_THREAD_ID`(Codex)からセッションを直接識別する。前者は hook の `session_id`、後者は rollout のファイル名の ID と一致する。hook は入力のセッション ID を使う。
+
+cwd のブランチが作業のブランチと違っても束縛は無効にしない。読む操作(`next`・`status`・`view`)は警告だけで続けるが、`submit`・`answer`・`external`・`plan`・`resume`・完了の確定は拒否する。`note` の受理は[決定と証拠](#決定と証拠-decision--evidence)に従う。不一致時の `next` は記録を行わず、結果を受理せず照会だけで警告付きの指示を返す。中断中の応答は[中断](guarantees.md#中断)に従う。
 
 `pause` の作業の特定と、中断の記録に対するブランチ不一致時の扱いは[中断](guarantees.md#中断)に従う。
 

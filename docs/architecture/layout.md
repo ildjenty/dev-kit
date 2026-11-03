@@ -101,14 +101,16 @@ dev-kit/
 
 同じ機械で複数の作業を並行するときは、ホストや git の worktree 機能で別のチェックアウトを開く。それぞれが自分の `.devkit/run/` を持つ。育てるものの読み出しは[規範の固定](guarantees.md#規範の固定)に従う。
 
-pre-commit の共有と既存 hook の扱いは[完了条件](guarantees.md#完了条件)に従う。
+既存の git hook の扱いと実行は[完了条件](guarantees.md#完了条件)に従う。
 
 ## 指示ファイルとホスト設定
 
 kit はリポジトリの AGENTS.md と CLAUDE.md に触れない。devkit の動かし方(開始・`next`・`submit`・`pause`・`resume`・問いの見せ方・サブエージェントの起動)はすべて kit の skill に閉じ、人は `/devkit` の skill で始める。指示ファイルはリポジトリ自身のものであり、判定者の規範としては読む。skill の正本は `.agents/skills/devkit/` とし、`.claude/skills/devkit` を git 管理のシンボリックリンクにする。操作手順は skill に集約し、独立した playbook(操作手順書)は設けない。
 
+Claude Code が `.claude/skills/<name>` から `.agents/skills/<name>` へのシンボリックリンクをたどって skill を読み込むことは確認済みである。Codex も skill のシンボリックリンクをたどる。
+
 人がチャットで止めるよう頼んだら `devkit pause`、再開を頼んだら `devkit resume` をエージェントが呼ぶ手順も skill に含め、条件は[中断](guarantees.md#中断)を参照する。
 
 判定者・計画者のサブエージェントは `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` で定義し、`init` が既定の定義を書く。名前には `devkit-` の接頭辞を付け、Codex の組み込み名と重複させない。
 
-hook の登録では `init` が kit のバイナリを登録する。設定の正本と追記時の確認は[権限の境界](guarantees.md#権限の境界)、束縛のないセッションでの扱いは [hook の共通処理](hooks.md#共通処理)、導入後の確認は [doctor](modules.md#doctor-の確認項目)に従う。
+hook の登録では `init` が kit のバイナリを登録する。設定の正本と追記時の確認、Codex の導入後の信頼手順、インタプリタの指定は[ホスト設定と実行権限](guarantees.md#ホスト設定と実行権限)、束縛のないセッションでの扱いは [hook の共通処理](hooks.md#共通処理)、導入後の確認は [doctor](modules.md#doctor-の確認項目)に従う。

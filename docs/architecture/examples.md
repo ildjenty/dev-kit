@@ -144,7 +144,7 @@ human_confirmation = ["billing_changed"]
 
 ## pre-commit
 
-`.githooks/pre-commit` の例。実行可能にし、`scripts/test` と `scripts/lint` は利用側で用意する。
+素の git hook を使うリポジトリの `.git/hooks/pre-commit` の例。実行可能にし、`scripts/test` と `scripts/lint` は利用側で用意する。
 
 ```sh
 #!/bin/sh
@@ -153,4 +153,4 @@ set -eu
 ./scripts/lint
 ```
 
-既存の hook がある場合の導入、実行環境、失敗の扱いは[完了条件](guarantees.md#完了条件)に従う。
+既存の hook の扱い、実行環境、失敗の扱いは[完了条件](guarantees.md#完了条件)に従う。

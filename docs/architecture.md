@@ -47,7 +47,7 @@ graph LR
 1. **雛形**: 既定を `.devkit/plans/<name>.json` に複製して編集する([PlanTemplate](architecture/data.md#ループの雛形-plantemplate)、[例](architecture/examples.md#雛形と計画))。
 2. **観点**: `.devkit/checks/<観点ID>.md` と例を置き、雛形の check に使う。[検出試験](architecture/guarantees.md#検出試験)(観点ファイルの判定能力を確かめる試験)の対象・実行条件・合格記録の再利用は参照先に従う([例](architecture/examples.md#観点と検出試験))。
 3. **検証コマンド(`[commands]`)**: 雛形で `command:` の check(終了コードによる検証)に使う。登録形式と実行主体(runner)は[計画の check](architecture/data.md#計画-plan)に従う([例](architecture/examples.md#設定))。
-4. **pre-commit**: リポジトリで有効な pre-commit にテストと lint を書く。既存の hook の仕組みがない場合の配置は[導入と完了条件](architecture/guarantees.md#完了条件)に従う([例](architecture/examples.md#pre-commit))。
+4. **pre-commit**: リポジトリで有効な pre-commit にテストと lint を書く。既存の hook の扱いと実行は[完了条件](architecture/guarantees.md#完了条件)に従う([例](architecture/examples.md#pre-commit))。
 
 ## 保証の範囲
 
@@ -62,22 +62,5 @@ graph LR
 
 ## 未確認の前提
 
-- husky・pre-commit フレームワークと `core.hooksPath` が共存するか。共存は未確認とする。
-- Codex で escalation を要さない呼び出しにも rules の allow が適用されるか。適用の可否は未確認とする。
-- Codex の SubagentStop の `agent_type` を定義の名前と照合できるか。値の形式は未確認とする。
-- 両ホストの SubagentStop で `last_assistant_message` から本文を取得できるか、null になるか。取得と null の条件は未確認とする。
 - Codex の UserPromptSubmit が回答後の訂正を含めて入力ごとに発火するか。発火の範囲は未確認とする。
-- Codex の UserPromptSubmit が人以外のターンでも発火するか。発火の有無は未確認とする。
-- Codex の SessionStart hook から後続コマンドへ環境変数を渡せるか。未確認であり、渡せなければ同じチェックアウトで同時に複数のセッションを開かないことを前提とする。
-- Codex に履歴を継承するサブエージェントの起動があるか、禁止できるか。未確認であり、禁止できなければ transcript の照合だけで代える。
-- 両ホストの `agent_transcript_path` の形式から最初の prompt を取り出せるか。抽出の可否は未確認とする。
-- Codex の PreToolUse がサブエージェントの起動を捕まえるか。捕捉の可否は未確認とする。
-- Claude Code の `-p` で `Agent(fork)` などの引数を PreToolUse で判定できるか。判定の可否は未確認とする。
-- settings の Stop hook がサブエージェントの終了で発火するか。未確認であり、発火する場合は `agent_id` で無視する。
-- Codex の Stop の継続上限と Bash の出力上限はいくつか。値は未確認とする。
-- Claude Code の skill がシンボリックリンクされたディレクトリをたどるか。追跡の可否は未確認とする。
-- `features.shell_tool = false` の Codex の判定者サブエージェントが展開先を読めるか。未確認であり、読めなければ shell を残し、編集しない指示と `[deny]` で代える。
-
-### effort と model の取得元
-
-Claude Code の `effort.level` と Codex の `model` を SubagentStop のイベント JSON または transcript のどの項目から取得できるか。取得元は未確認であり、来歴の扱いは [Judgment](architecture/data.md#check-の結果-judgment)に従う。設定値を観測値の代わりに使わない。
+- Codex の Bash の出力上限はいくつか。値は未確認とする。

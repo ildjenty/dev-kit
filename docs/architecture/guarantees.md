@@ -39,7 +39,7 @@ git と、Claude Code・Codex CLI の両方にある機能で賄えるものは 
 
 commit 時には環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。
 
-hook の共有は git の `core.hooksPath` による。`init` は既存の hook の仕組み(husky、pre-commit フレームワーク、既存の `core.hooksPath`)を尊重する。
+devkit は `core.hooksPath` を設定せず、git hook のファイルも用意しない。リポジトリが使っている `.git/hooks`、husky、pre-commit フレームワークなどの仕組みをそのまま使い、完了時の `git commit` がそれを実行する。husky は自分のディレクトリを `core.hooksPath` に設定し、pre-commit フレームワークは `core.hooksPath` が設定されているとインストールを拒否するため、kit がこの設定を持つと衝突する。
 
 フォーマッタが pre-commit でファイルを書き換え、hook が非0で終了した場合は commit が失敗し、作業ツリーに差分が残る。commit の失敗は前述の扱いで次のラウンドに渡す。[Git の pre-commit の仕様](https://git-scm.com/docs/githooks#_pre_commit)では、ファイルの書き換えだけで commit の失敗は保証されない。
 
@@ -59,7 +59,7 @@ hook の共有は git の `core.hooksPath` による。`init` は既存の hook 
 - **仕組み**: 判定者・計画者のサブエージェントの起動時の prompt は、実行しない固定文字列 `devkit-instruction <指示 ID>` だけの1行とする。これはサブコマンドではない。起動の制限は [PreToolUse](hooks.md#pretooluse)、最終メッセージと来歴の採取は [SubagentStop](hooks.md#subagentstop)に従う。
 - **置き場所**: `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` の定義、`internal/check/` の受理、`internal/engine/` の `next`。
 
-サブエージェントの定義には、指示 ID に含まれる作業 ID から `.devkit/run/work/<作業 ID>/brief/<指示 ID>.md` を解決し、依頼の本文を読む手順を記載する。
+サブエージェントの定義には、指示 ID に含まれる作業 ID から `.devkit/run/work/<作業 ID>/brief/<指示 ID>.md` を解決し、依頼の本文を読む手順と、最終メッセージの結果に指示 ID (`instruction_id`)を含める手順を記載する。両ホストとも、結果側の指示 ID と SubagentStop の `agent_type` の照合を受理の根拠とし、起動時の本文や transcript の照合を根拠にしない。
 
 `next` はサブエージェントの結果を受け取る際、SubagentStop hook が書いた結果ファイルだけを読み、スキーマ、採取時に検証済みの指示 ID・担当、対象のバージョン、規範の識別を照合する。起動条件は [PreToolUse](hooks.md#pretooluse)で担当定義と照合し、実測値の扱いは [Judgment](data.md#check-の結果-judgment)に従う。不一致は受理せず、エージェントが書いたファイルや標準出力も受理しない。
 
@@ -155,12 +155,12 @@ kit はホストと別に継続上限を持つ。同じ作業で ledger への�
 
 受理時には、必要な結果・入力原文・指示・担当・対象を、それぞれ[判定結果の受理](#判定結果の受理)・[回答の受理](#回答の受理)・[状態遷移と受理条件](data.md#状態遷移と受理条件)に従って照合する。不足があれば、それを必要とする前進操作だけを拒否し、不足した観測と理由を示す。`note` の受理は[決定と証拠](data.md#決定と証拠-decision--evidence)、`pause` の記録と中断中の `next` の応答の優先は[中断](#中断)に従う。
 
-SessionStart の観測がないセッションでは `devkit start` を拒否し、`devkit doctor` で hook の設定を確かめるよう案内する。観測に代わるセッションの識別手段は設けない。
+SessionStart の観測がないセッションでは `devkit start` を拒否し、`devkit doctor` で hook の設定を確かめるよう案内する。セッションの識別は[セッションとブランチ](data.md#セッションとブランチ)に従い、識別できても観測の代わりにはしない。
 
 ### 人への確認対象
 
 - **失敗**: 依存やループ自身の変更を、確認なしに進める。
-- **仕組み**: 「人に確認する」は kit の分類表の既定データとし、リポジトリ側の追記で上書きできる。既定には依存の宣言(ロックファイル・マニフェスト)の差分、宣言のないメタループの編集、[commit 直前の対象の照合](#commit-直前の対象の照合)で取り直した後の対象の再変化を含める。メタループの編集は `.devkit/`(`run/` を除く)・`devkit.toml`・ホストの設定・指示ファイル・skill・git hook(`core.hooksPath` の先の pre-commit)の変更である。`.devkit/` にはループの雛形を置く `.devkit/plans/` も含まれる。検証そのものを変える編集なので、メタループの編集を宣言したステージ以外では人が確認する。
+- **仕組み**: 「人に確認する」は kit の分類表の既定データとし、リポジトリ側の追記で上書きできる。既定には依存の宣言(ロックファイル・マニフェスト)の差分、宣言のないメタループの編集、[commit 直前の対象の照合](#commit-直前の対象の照合)で取り直した後の対象の再変化を含める。メタループの編集は `.devkit/`(`run/` を除く)・`devkit.toml`・ホストの設定・指示ファイル・skill・git hook(リポジトリで有効な pre-commit)の変更である。`.devkit/` にはループの雛形を置く `.devkit/plans/` も含まれる。検証そのものを変える編集なので、メタループの編集を宣言したステージ以外では人が確認する。
 - **置き場所**: `kit/router/` の既定、`devkit.toml` の追記、`internal/router/` の分類。hook の稼働を確認できない場合は[再開と hook の稼働確認](#再開と-hook-の稼働確認)で扱う。
 
 分類表で「暫定判断で進めてレビューで確認する」とした場合は、問いを起票せず、暫定の決定を `devkit note` で記録して進み、次のゲートまたは PR レビューで人が確認する。router の分類の出力としては「修正する」または「完了する」で返す。
@@ -187,11 +187,15 @@ SessionStart の観測がないセッションでは `devkit start` を拒否し
 
 ホスト設定の正本はリポジトリ内の `.claude/settings.json`・`.claude/agents/`・`.codex/hooks.json`・`.codex/config.toml`・`.codex/agents/`・`.codex/rules/` とする。`init` は kit の断片を追記し、リポジトリ全体に適用する項目を差分として示して人の確認を待つ。起動時に kit はホストへ設定を渡さない。hook の登録先はリポジトリ内に統一する。
 
+Codex のプロジェクトの `.codex/hooks.json` は、プロジェクトの信頼と hook ごとの信頼が保存されていないと読み込まれない。`init` の後に、利用者が Codex を対話モードで開いてプロジェクトを信頼し、`/hooks` で各 hook を信頼する。`exec` の `-c` によるその場の信頼の上書きと `--dangerously-bypass-hook-trust` ではプロジェクトの hook は読み込まれない。稼働の確認と案内は [doctor](modules.md#doctor-の確認項目)に従う。
+
+hook のコマンドでインタプリタを使う場合は絶対パスで呼ぶ。hook は sandbox の制約下で動くことがあり、`/usr/bin/env python3` から pyenv の shim を経由すると失敗することがある。
+
 エージェントの書き込み先と外部通信はホストの sandbox が制限する。`devkit` 自身は git への書き込み(スナップショット、refs、コミット)と外部操作のために sandbox の外で動く。
 
 pre-commit hook・判定コマンド・検証コマンドは `devkit` の子プロセスとして sandbox の外で動き、専用の隔離は行わない。pre-commit hook はリポジトリが所有して人がレビューする。判定コマンドは `devkit.toml` の `[judges]`、検証コマンドは `[commands]` に登録する育てるものであり、登録時に人がレビューする。
 
-- Codex は `.codex/rules/devkit.rules` の `prefix_rule(pattern=["devkit"], decision="allow")` を使う。sandbox の外で承認なしに動かす機能であり、experimental であることは確認済みである。
+- Codex は `.codex/rules/devkit.rules` の `prefix_rule(pattern=["devkit"], decision="allow")` を使う。escalation を要さない呼び出しにも適用され、許可したコマンドは承認なしに sandbox の外へ書き込める。experimental であることは確認済みである。
 - Claude Code は `sandbox.excludedCommands` の `devkit *` と `permissions.allow` の `Bash(devkit *)` を併用する。前者だけでは権限の問い合わせが残る。この挙動と、プロジェクト設定の `sandbox` が効くことは確認済みである。`init` は利便性のためこの allow を提案し、記録上の保証には使わない。
 
 `devkit` は `cd`・リダイレクト・連結・置換を付けず、単独のコマンドとして呼ぶ。付けた場合は sandbox の中で動く。skill にこの呼び方を書く。必要な git 操作が失敗したら理由を報告し、失敗した処理を完了扱いしない。中断の記録と状態通知の扱いは[中断](#中断)に従う。
@@ -200,7 +204,7 @@ pre-commit hook・判定コマンド・検証コマンドは `devkit` の子プ�
 
 リポジトリ全体に適用する操作の deny は、人がリポジトリの方針として `.claude/settings.json` に書く。kit が `permissions.deny` に追加するのは `Edit(.devkit/run/**/records/**)`・`Edit(.devkit/run/**/results/**)` に限る。kit の `[deny]` とサブエージェントの起動の制限は [PreToolUse](hooks.md#pretooluse)で適用し、settings には足さない。観測用 hook の失敗で一律に block せず、観測が不足した操作の扱いは[受理時の照合](#再開と-hook-の稼働確認)に従う。生成物は[書き手の分離と指定先](data.md#記録の書き込みと排他)を守る。
 
-Claude Code の判定者・計画者のサブエージェントは、定義の `tools` を読み取り用に限定する。このツール制限が効くことは確認済みであり、起動条件の制限は [PreToolUse](hooks.md#pretooluse)に従う。Codex は親の sandbox を継承するため、カスタム定義に `features.shell_tool = false` を指定する。この設定を書けることは確認済みである。読み取りの可否と代替は[未確認の前提](../architecture.md#未確認の前提)に残す。
+Claude Code の判定者・計画者のサブエージェントは、定義の `tools` を読み取り用に限定する。このツール制限が効くことは確認済みである。Codex は親の sandbox を継承し、判定者の書き込みツールの制限と両ホストの起動条件の制限は [PreToolUse](hooks.md#pretooluse)に従う。
 
 起動・操作を要する check(動作検証)の runner は必要な確認能力で選ぶ。確認できなければ `NOT ASSESSED` とする。
 

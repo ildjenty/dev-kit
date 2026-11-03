@@ -118,7 +118,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
   - ブランチの作成と切り替え。
   - 対象のバージョンとなるスナップショットとコミットオブジェクトの作成、コミットのツリーハッシュの取得、`git show` による読み出し、一時インデックスからの `git read-tree` と `git checkout-index --prefix` による展開。
   - [完了条件](guarantees.md#完了条件)に従う返却後のスナップショットと同じ index での `git commit`(hook を有効にして)。
-  - 変更ファイルの一覧と `.devkit/structure.json` の履歴の取得、`core.hooksPath` の設定、cwd のブランチ名の取得、チェックアウトのルートの解決。
+  - 変更ファイルの一覧と `.devkit/structure.json` の履歴の取得、cwd のブランチ名の取得、チェックアウトのルートの解決。
 - **持つデータ**: 基点コミット、ブランチ、ツリーとコミットオブジェクト、一時インデックス、refs、git から取得したリポジトリ情報を扱う。
 - **公開する契約**: 具体型 `Workspace` として、責務に挙げた git 操作を公開する。[対象のバージョン](data.md#対象のバージョン-targetversion)と[展開・永続化](guarantees.md#判定対象の展開と完了時の永続化)の契約に従う。
 - **依存**: 他のモジュールに依存しない。外部の git CLI を使う。
@@ -138,7 +138,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 `devkit` のバイナリは `install.sh` で配布する。`install.sh` はリリースに置いた OS とアーキテクチャごとのビルド済みの `devkit` バイナリを取得し、PATH の通った場所に配置する。Go は dev-kit の開発言語であり、利用者の実行環境には不要である。
 
-- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、kit のコピー、既定の雛形のコピー、観点ファイルと rules.md の初期内容、ignore、ホスト設定、既定のサブエージェント定義、skill とリンクを用意する。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。pre-commit の導入は[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
+- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、kit のコピー、既定の雛形のコピー、観点ファイルと rules.md の初期内容、ignore、ホスト設定、既定のサブエージェント定義、skill とリンクを用意する。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
 - **持つデータ**: 導入する固定物と設定の断片、導入先との差分、doctor の照合結果を扱う。
 - **公開する契約**: `init` と `doctor` に対応する導入・照合の操作を公開する。doctor の項目は[doctor の確認項目](#doctor-の確認項目)に従う。
 - **依存**: config、kit、ledger、workspace に依存する。
@@ -246,6 +246,6 @@ graph TD
 `doctor` は次を照合する。
 
 - `devkit.toml` の妥当性、手元のバイナリと `devkit.toml` の kit のバージョンの一致、kit のコピーと埋め込みの一致、ホスト設定の断片、サブエージェントの定義の存在、skill のリンク、[作業に記録した kit との互換性](guarantees.md#バージョン互換性)。
-- 必要な観測の不足を示し、信頼設定の確認はホストに案内する。hook の信頼設定は `/hooks` を案内する。
+- 必要な観測の不足から hook が動いていないことを検出し、[ホスト設定と実行権限](guarantees.md#ホスト設定と実行権限)の信頼手順を案内する。
 
-Claude Code の `-p` と対話で `permissions.deny`・hook の登録が読み込まれること(対話では workspace trust の受諾後)、Codex のプロジェクト層の hooks・rules・agents が読み込まれる条件がプロジェクトの信頼であることは確認済みである。Codex の skill がシンボリックリンクをたどることも確認済みである。
+Claude Code の `-p` と対話で `permissions.deny`・hook の登録が読み込まれること(対話では workspace trust の受諾後)、Codex のプロジェクト層の rules・agents が読み込まれる条件がプロジェクトの信頼であることは確認済みである。hook の条件は[ホスト設定と実行権限](guarantees.md#ホスト設定と実行権限)、skill のリンクは[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。
