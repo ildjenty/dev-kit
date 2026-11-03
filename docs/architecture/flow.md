@@ -53,11 +53,11 @@ engine は [Finding と完了条件 ID](data.md#指摘-finding)の差分から�
 
 人が計画の変更を提案する場合は、エージェントが `devkit plan <ファイル>` で提案を記録する。撤回は `devkit plan --withdraw` で記録し、その後の進行は[計画のバージョン](data.md#計画のバージョン)に従う。作業を中止する場合は、エージェントが `devkit abort` を呼ぶ。
 
-セッションをまたぐ再開はホストのセッション再開と [SessionStart](hooks.md#sessionstart)の注入で現在地を引き継ぐ。人による中断からの再開条件は[中断](guarantees.md#中断)に従う。新しいセッションからの束縛とブランチ不一致時の扱いは[セッションとブランチ](data.md#セッションとブランチ)、指示の出し直しは[指示](data.md#指示-instruction)に従う。停止の可否は [Stop](hooks.md#stop)、引き継ぐ状態は [checkpoint](data.md#checkpoint)に従う。
+セッションをまたぐ再開はホストのセッション再開と [SessionStart](hooks.md#sessionstart)の注入で現在地を引き継ぐ。人による中断からは `devkit resume` で再開し、条件は[中断](guarantees.md#中断)に従う。新しいセッションからの束縛とブランチ不一致時の扱いは[セッションとブランチ](data.md#セッションとブランチ)、指示の出し直しは[指示](data.md#指示-instruction)に従う。停止の可否は [Stop](hooks.md#stop)、引き継ぐ状態は [checkpoint](data.md#checkpoint)に従う。
 
 ## 人による中断
 
-中断の入口、Stop の判断、再開と継続上限は[中断の保証](guarantees.md#中断)に従う。観測と記録の対応は[中断の観測](data.md#中断の観測-pauseobservation)、中断前の現在地との関係は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
+人がチャットで止めるよう頼んだら、言い回しによらずエージェントが `devkit pause` を呼ぶ。再開を頼んだら `devkit resume` を呼ぶ。人がどちらもターミナルで直接実行してよい。中断・再開の記録、Stop の判断、中断中の `next` の応答と継続上限は[中断の保証](guarantees.md#中断)、中断前の現在地との関係は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
 
 ## 外部操作
 

@@ -9,8 +9,8 @@ dev-kit は、リポジトリごとの開発ループを、Claude Code や Codex
 ```mermaid
 graph LR
   human[人] -- チャット --> agent[セッションのエージェント]
-  human -- "devkit pause" --> devkit
-  agent -- "devkit next / submit / answer" --> devkit[devkit CLI]
+  human -- "devkit pause / resume" --> devkit
+  agent -- "devkit next / submit / answer / pause / resume" --> devkit[devkit CLI]
   devkit -- 指示と依頼文 --> agent
   devkit -- 記録 --> run[.devkit/run/]
   agent -- 起動 --> sub[サブエージェント<br/>判定者・計画者]
@@ -38,7 +38,7 @@ graph LR
 
 [ラウンド](architecture/data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)では、[Judgment](architecture/data.md#check-の結果-judgment)(`command:` の check を含む判定結果)を受理して次の行動を決める。
 
-人による中断、`devkit pause` と再開の条件、Stop の継続上限は[中断](architecture/guarantees.md#中断)に従う。
+人の依頼でエージェントが呼ぶ、または人が直接実行する `devkit pause`・`devkit resume` の条件と、Stop の継続上限は[中断](architecture/guarantees.md#中断)に従う。
 
 段階ごとの詳細は [flow.md](architecture/flow.md)。
 

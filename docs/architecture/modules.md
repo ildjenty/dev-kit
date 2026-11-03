@@ -64,8 +64,8 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 ### ledger
 
 - **責務**: 記録の意味論、問い合わせ、派生値を扱う。決定のグラフから有効性・置換・依存を解決する。[checkpoint](data.md#checkpoint)(記録から組み立てる現在地)の組み立てと一時状態の無効条件の照合、作業の中断と中断前の現在地、有効な決定とその状態、実行可能な計画のバージョンと提案中・却下・撤回の状態、観点ごとの最新判定とバージョンの一致、完了記録のない [StageRun](data.md#ステージの実行-stagerun)(1回のステージ実行)、未回答の問い、承認の解決、確認済みの記録の集合、未受理の指示を派生値への問い合わせとして提供する。
-- **持つデータ**: 記録 ID と参照、記録形式のバージョンと読み取り可能な範囲を持つ。ペイロードは、作業、中断・再開とその根拠、計画のバージョンと撤回、決定、証拠、状態変更、問い・回答・承認、外部書き込み、進捗、check の結果、検出試験の実行、ステージの実行、ラウンド、成果物である。[エンティティ](data.md#エンティティ)の型を用いる。
-- **公開する契約**: 記録の型、派生値の問い合わせ、決定と承認の解決を公開する。関数は ledger/fsstore の具体型を受け取る。中断と未回答の問いの派生には、[checkpoint](data.md#checkpoint)と同じく未取り込みの観測を含める。
+- **持つデータ**: 記録 ID と参照、記録形式のバージョンと読み取り可能な範囲を持つ。ペイロードは、作業、中断・再開、計画のバージョンと撤回、決定、証拠、状態変更、問い・回答・承認、外部書き込み、進捗、check の結果、検出試験の実行、ステージの実行、ラウンド、成果物である。[エンティティ](data.md#エンティティ)の型を用いる。
+- **公開する契約**: 記録の型、派生値の問い合わせ、決定と承認の解決を公開する。関数は ledger/fsstore の具体型を受け取る。未回答の問いの派生には、[checkpoint](data.md#checkpoint)と同じく未取り込みの停止の観測を含める。
 - **依存**: ペイロードに使う plan、check、router、form の型と、保存を担う ledger/fsstore に依存する。
 - **置くもの・置かないもの**: 記録の意味論と問い合わせを置く。ファイル形式は ledger/fsstore に、表示は view に置く。
 
@@ -83,7 +83,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 - **責務**: [処理の流れ](flow.md)の状態機械を進める。`start --plan <name>` の雛形の指定と作業作成、`next` の結果の受理と指示の計算、brief・判定依頼の書き出し、`submit` の終了ブロックと成果物の受理、判定コマンドの判定の実行、[`command:` の check の実行](flow.md#作業結果の判定)、router の判断の記録を担う。`plan` の提案とゲート、`answer` の回答、`external` の要求、`note` の決定と証拠を受理する。教訓には router の「教訓の反映先」の分類を付けて記録する。判定前は workspace へ pre-commit の実行を依頼し、完了時は `git commit` を依頼する。pre-commit と commit の成否、完了の記録は[完了条件](guarantees.md#完了条件)に従う。受理の境界は[整合性](data.md#整合性の境界)と[保証](guarantees.md)に従う。
 - **持つデータ**: 現在の作業、StageRun、ラウンド、指示の計算結果を扱う。受理した状態はすべて ledger に記録する。
-- **公開する契約**: `start`・`next`・`submit`・`plan`・`answer`・`external`・`note`・`pause`・`abort` に対応する操作を公開する。中断の観測の公開と受理、根拠を伴う再開、中断中の `next` の応答と新しい指示・処理の抑止は[中断](guarantees.md#中断)に従う。継続上限の問いも観測から受理する。実装の接続は[ポート](#モジュール境界と入出力の集約)の方針に従う。
+- **公開する契約**: `start`・`next`・`submit`・`plan`・`answer`・`external`・`note`・`pause`・`resume`・`abort` に対応する操作を公開する。`pause`・`resume` による中断・再開の直接の記録、中断中の `next` の応答と新しい指示・処理の抑止は[中断](guarantees.md#中断)に従う。継続上限の問いも停止の観測から受理する。実装の接続は[ポート](#モジュール境界と入出力の集約)の方針に従う。
 - **依存**: plan、brief、check、router、ledger、form、workspace、external、ledger/fsstore に依存する。
 - **置くもの・置かないもの**: 状態機械の進行、指示の計算、判定コマンドと検証コマンドの実行、判定者の結果の受理を置く。git の操作は workspace に、外部書き込みの実行は external に、保存の実装は ledger/fsstore に置く。判定者・計画者のサブエージェントを起動する処理は置かない。
 
@@ -176,7 +176,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 - **責務**: サブコマンドを定義し、各実装を接続する。cwd をもとに workspace でルートとブランチ名を解決し、[セッションと作業](data.md#セッションとブランチ)を特定する。チェックアウトのルートと[固定配置](layout.md#利用側のリポジトリ)から記録ルートを解決し、ledger/fsstore に渡す。設定の読み出し元を解決して config に TOML を渡し、解析した設定と kit の値を各モジュールへ渡す。hook にはスナップショットから `devkit.toml` を読む関数値を渡し、[上限に応じた出力](guarantees.md#性能と出力の上限)を行う。
 - **持つデータ**: 解決したルート・ブランチ・セッション・作業、設定、kit のコピー、各モジュールの実装を扱う。
-- **公開する契約**: エージェントが呼ぶのは `start`、`next`、`submit`、`plan`、`answer`、`external`、`note`、`status`、`view`、`abort`。人が呼ぶのは `init`、`doctor`、`version`、`pause`。ホストが呼ぶのは `hook <event>`。`pause` の呼び出しと作業の特定は[中断](guarantees.md#中断)に従う。`status` は記録の照会も担う。
+- **公開する契約**: エージェントが呼ぶのは `start`、`next`、`submit`、`plan`、`answer`、`external`、`note`、`status`、`view`、`pause`、`resume`、`abort`。人が呼ぶのは `init`、`doctor`、`version`、`pause`、`resume`。ホストが呼ぶのは `hook <event>`。`pause`・`resume` の呼び出しと作業の特定は[中断](guarantees.md#中断)と[セッションとブランチ](data.md#セッションとブランチ)に従う。`status` は記録の照会も担う。
 - **依存**: すべての実装パッケージに依存する。
 - **置くもの・置かないもの**: コマンドの定義と配線を置く。計画・判定・記録の意味論は各モジュールへ渡す。
 

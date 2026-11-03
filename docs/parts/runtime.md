@@ -24,7 +24,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 - **終了ブロックと成果物**: [ラウンド](../architecture/data.md#ラウンド-round)(作業依頼から判断までの往復)の[終了ブロック](../architecture/data.md#進捗-progress)(作業報告)を受け取る。返却後の[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(判定対象の識別値)と成果物の記録は[作業結果の提出](../architecture/flow.md#作業結果の提出)、入力 JSON の場所と拒否条件は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
 - **判定結果**: 結果ファイルとコマンド実行結果を受け取る。受理から記録までの分担は [check](../architecture/modules.md#check)(観点ごとの判定を扱う部品)と [ledger の契約](../architecture/modules.md#ledger)、結果の種類と照合・集約は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)、`command:` の check(検証コマンドを実行する check)の定義は[計画](../architecture/data.md#計画-plan)、実行順は[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
 - **人の入力と訂正**: 観測された人の回答と訂正を受け取る。回答の根拠と受理主体、回答の形式と訂正期限は[回答の受理](../architecture/guarantees.md#回答の受理)、入力の観測は [UserPromptSubmit](../architecture/hooks.md#userpromptsubmit)(人の入力時のイベント)、問いの提示と再開は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
-- **中断**: 人からの中断と再開の根拠を受け取り、[中断](../architecture/guarantees.md#中断)に従う。CLI の呼び分けは [cmd/devkit](../architecture/modules.md#cmddevkit)、観測と記録の受理は [engine](../architecture/modules.md#engine)に従う。
+- **中断**: 人の依頼でエージェントが呼ぶ `devkit pause`・`devkit resume`、または人による直接の実行を受け付ける。中断中の `next` の応答を含む条件は[中断](../architecture/guarantees.md#中断)、CLI の呼び分けは [cmd/devkit](../architecture/modules.md#cmddevkit)、中断・再開の直接の記録は [engine](../architecture/modules.md#engine)に従う。
 - **指示と表示**: CLI は次の指示と [brief](../architecture/modules.md#brief)(作業や判定の依頼文)、問い、状態、操作の結果を返す。出力上限を超えた場合の返し方は[性能と出力の上限](../architecture/guarantees.md#性能と出力の上限)に従う。
 
 ### ホストの差分と共通の仕組み

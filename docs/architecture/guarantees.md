@@ -144,20 +144,19 @@ commit 前後の不一致による取り直しは合わせて1回だけとし、
 
 ### 中断
 
-人は作業のどの状態からでも、いつでも中断できる。ラウンド中、判定待ち、計画待ち、問い待ち、外部操作の実行中、修正ラウンド中、Stop hook の `block` 中にも例外を設けない。中断は作業と記録を残して止める操作であり、作業を捨てる中止(`devkit abort`)とは別である。終了ブロックの提出やエージェントの判断を前提にしない。
+人は作業のどの状態からでも、いつでも中断できる。ラウンド中、判定待ち、計画待ち、問い待ち、外部操作の実行中、修正ラウンド中、Stop hook の `block` 中にも例外を設けない。中断は作業と記録を残して止める操作であり、作業を捨てる中止(`devkit abort`)とは別である。終了ブロックの提出を前提にしない。
 
-入口は次の2つとし、どちらも決定的に[中断の観測](data.md#中断の観測-pauseobservation)を公開する。
+中断の入口は `devkit pause` だけとする。人がチャットで止めるよう頼んだら、言い回しによらずエージェントが呼ぶ。人がターミナルで直接実行してもよく、Claude Code / Codex の `!` 経由も含む。束縛があればその作業を対象とし、なければ cwd の `devkit/<作業 ID>` ブランチから作業を特定する。
 
-- UserPromptSubmit は、[回答の定型](#回答の受理)と同じく入力の全文から前後の空白を除き、「中断」に完全一致した場合に中断を観測する。引用・説明・他の文を含む入力は一致しない。束縛があれば、未回答の問いやラウンドの有無にかかわらず観測する。入力の出所については[人の入力の観測](data.md#人の入力の観測-promptobservation)の前提に従う。
-- 人はターミナルで `devkit pause` を実行する。Claude Code / Codex の `!` 経由も含む。束縛があればその作業を対象とし、なければ cwd の `devkit/<作業 ID>` ブランチから作業を特定する。エージェントに呼び出しを委ねない。
-
-中断の観測の公開と中断中の状態通知には作業ロックの取得、ブランチの一致、PreToolUse の直前の観測、起動時の `.git` への書き込み試験を要求しない。`pause` は観測の公開後に応答し、実行中の外部操作や ledger への取り込みを待たない。PreToolUse の deny は中断の観測と `devkit pause` を妨げない。CLI が観測を ledger に取り込む前も、Stop と engine は公開済みの観測を参照する。中断の時点は観測の公開時点とし、取り込み時刻に置き換えない。
+`pause` は中断と中断前の現在地への参照を ledger に直接追記し、[記録の公開方法](data.md#記録の書き込みと排他)に従って公開してから応答する。中断の記録と中断中の状態通知には作業ロックの取得、ブランチの一致、PreToolUse の直前の観測、起動時の `.git` への書き込み試験を要求せず、実行中の外部操作も待たない。PreToolUse の deny は `devkit pause` を妨げない。Stop と engine は ledger の中断の記録を参照する。中断の時点はその記録の公開時点とする。
 
 中断が記録された作業では、Stop は常に停止を許し、`block` しない。engine は指示の返却と新しい処理の開始前に中断を照合し、中断中は新しい指示を出さず、ラウンド・判定・計画・検証・外部操作・完了処理を新たに開始しない。実行中の外部操作は取り消さず、届いた結果を [ExternalOp](data.md#外部への書き込み-externalop) の規則で記録する。起動済みの判定者・計画者サブエージェントの結果も、受理条件を満たせば記録してよい。結果の到着や記録の追加は中断を解除しない。
 
-再開は人の明示だけによる。人は中断後にチャットで続行を指示し、エージェントが `devkit next` を呼ぶ。最新の中断の観測より後の UserPromptSubmit による人の入力の観測を再開の根拠とし、`next` がその根拠と中断への参照を持つ再開を記録する。後続の観測がなければ、中断中であることとこの再開方法だけを返し、再開しない。「中断」の定型の再入力は新しい中断であり、再開の根拠にしない。`next` の反復、ツール呼び出し、結果の到着、SessionStart や compaction だけでは再開しない。再開時もブランチと hook の稼働の照合を通し、ledger から組み立てた状態で中断前の続きから進む。SessionStart の注入には中断中であることを含める。
+再開の入口は `devkit resume` とし、人の明示だけによる。人がチャットで再開を頼んだらエージェントが呼び、人がターミナルで直接実行してもよい。`resume` は中断への参照を持つ再開を ledger に記録する。再開時もブランチと hook の稼働の照合を通し、ledger から組み立てた状態で中断前の続きから進む。
 
-kit はホストと別に継続上限を持つ。同じ作業で ledger への記録の追加がないまま Stop の `block` 判定が連続して上限に達したら、その回は `block` を返さず停止を許し、続行してよいかを人に確認する問いを起票する。上限は3回とする。記録の追加を境に数え直し、ツール呼び出し、セッションの切り替え、観測の追加だけではリセットしない。計数は作業ごとの[停止の観測](data.md#停止の観測-stopobservation)に残す。上限到達時はその観測に問いも公開し、停止を許す出力に問いを含める。CLI は次の `next` または `answer` で問いを ledger に一度だけ取り込み、通常の回答の受理で人の判断を待つ。取り込み前も未回答の問いとして扱い、`next` の反復で作業や `block` を再開しない。
+中断中の `next` は、中断中であることと `devkit resume` で再開できることだけを返す。`next` の反復、ツール呼び出し、結果の到着、SessionStart や compaction だけでは再開しない。SessionStart の注入には中断中であることを含める。
+
+kit はホストと別に継続上限を持つ。同じ作業で ledger への記録の追加がないまま Stop の `block` 判定が連続して上限に達したら、その回は `block` を返さず停止を許し、続行してよいかを人に確認する問いを起票する。上限は3回とする。記録の追加を境に数え直し、ツール呼び出し、セッションの切り替え、観測の追加だけではリセットしない。計数は作業ごとの[停止の観測](data.md#停止の観測-stopobservation)に残す。上限到達時はその観測に問いも公開し、停止を許す出力に問いを含める。CLI は中断中でない `next` または `answer` で問いを ledger に一度だけ取り込み、通常の回答の受理で人の判断を待つ。取り込み前も未回答の問いとして扱い、`next` の反復で作業や `block` を再開しない。
 
 ### 再開と hook の稼働確認
 
@@ -165,7 +164,7 @@ kit はホストと別に継続上限を持つ。同じ作業で ledger への�
 - **仕組み**: [StageRun の束縛](data.md#計画のバージョン)、[指示 ID](data.md#指示-instruction)、[セッションとブランチ](data.md#セッションとブランチ)、[checkpoint](data.md#checkpoint)で現在地を復元する。途中でセッションが終わっても作業の状態を保持し、次のセッションに引き継ぐ。人による停止と継続の歯止めは[中断](#中断)に従う。継続は [Stop](hooks.md#stop)が補助し、唯一の保証とはしない。
 - **置き場所**: `internal/engine/` の受理前の照合、セッションの観測、`internal/hook/` の SessionStart と Stop。
 
-`devkit` は Bash のツール呼び出しなので、その直前に PreToolUse が発火する。`next`・`submit`・`answer`・`external`・`plan`・`note` は、同じセッションの PreToolUse の最終観測が呼び出し直前(数秒以内)にあることを照合する。なければ `next` は状態を進めず「hook の稼働を確認する」指示を返す。それ以外の書く操作は拒否し、`answer` を含め拒否理由に「hook が動いていない。`devkit doctor` と `/hooks` を確認する」を含める。ゲートの承認もこの照合を通らなければ受理しない。中断の観測の取り込みと中断中の `next` の応答の優先は[中断](#中断)に従う。
+`devkit` は Bash のツール呼び出しなので、その直前に PreToolUse が発火する。`next`・`submit`・`answer`・`external`・`plan`・`note`・`resume` は、同じセッションの PreToolUse の最終観測が呼び出し直前(数秒以内)にあることを照合する。なければ `next` は状態を進めず「hook の稼働を確認する」指示を返す。それ以外の書く操作は拒否し、`answer` を含め拒否理由に「hook が動いていない。`devkit doctor` と `/hooks` を確認する」を含める。ゲートの承認もこの照合を通らなければ受理しない。`pause` の記録と中断中の `next` の応答の優先は[中断](#中断)に従う。
 
 観測がない状態での `start` の扱いは[観測のないセッションでの開始](../architecture.md#観測のないセッションでの開始)に残す。
 
@@ -208,11 +207,11 @@ pre-commit hook・判定コマンド・検証コマンドは `devkit` の子プ�
 - Codex は `.codex/rules/devkit.rules` の `prefix_rule(pattern=["devkit"], decision="allow")` を使う。sandbox の外で承認なしに動かす機能であり、experimental であることは確認済みである。
 - Claude Code は `sandbox.excludedCommands` の `devkit *` と `permissions.allow` の `Bash(devkit *)` を併用する。前者だけでは権限の問い合わせが残る。この挙動と、プロジェクト設定の `sandbox` が効くことは確認済みである。`init` は利便性のためこの allow を提案し、記録上の保証には使わない。
 
-`devkit` は `cd`・リダイレクト・連結・置換を付けず、単独のコマンドとして呼ぶ。付けた場合は sandbox の中で動く。skill にこの呼び方を書き、起動時には `.git` に一時 ref を作成・削除する書き込み試験を行う。sandbox の中なら記録を書く前に失敗し、理由を返す。中断の観測と状態通知の扱いは[中断](#中断)に従う。
+`devkit` は `cd`・リダイレクト・連結・置換を付けず、単独のコマンドとして呼ぶ。付けた場合は sandbox の中で動く。skill にこの呼び方を書き、起動時には `.git` に一時 ref を作成・削除する書き込み試験を行う。sandbox の中なら記録を書く前に失敗し、理由を返す。中断の記録と状態通知の扱いは[中断](#中断)に従う。
 
 ### 操作の禁止とサブエージェントの制限
 
-リポジトリ全体に適用する操作の deny は、人がリポジトリの方針として `.claude/settings.json` に書く。kit が `permissions.deny` に追加するのは `Edit(.devkit/run/**/records/**)`・`Edit(.devkit/run/**/results/**)`・`Edit(.devkit/run/**/sessions/**)`・`Edit(.devkit/run/**/prompts/**)`・`Edit(.devkit/run/**/pauses/**)`・`Edit(.devkit/run/**/stops/**)`・`Edit(.devkit/run/**/snap/**)` に限る。kit の `[deny]` とサブエージェントの起動の制限は [PreToolUse](hooks.md#pretooluse)で適用し、settings には足さない。Claude Code の hook は `onFailure: "block"` 相当の設定で登録する。
+リポジトリ全体に適用する操作の deny は、人がリポジトリの方針として `.claude/settings.json` に書く。kit が `permissions.deny` に追加するのは `Edit(.devkit/run/**/records/**)`・`Edit(.devkit/run/**/results/**)`・`Edit(.devkit/run/**/sessions/**)`・`Edit(.devkit/run/**/prompts/**)`・`Edit(.devkit/run/**/stops/**)`・`Edit(.devkit/run/**/snap/**)` に限る。kit の `[deny]` とサブエージェントの起動の制限は [PreToolUse](hooks.md#pretooluse)で適用し、settings には足さない。Claude Code の hook は `onFailure: "block"` 相当の設定で登録する。
 
 Claude Code の判定者・計画者のサブエージェントは、定義の `tools` を読み取り用に限定する。この制限と `Agent(fork)`・`Agent(model:*)` の deny が効くことは確認済みである。Codex は親の sandbox を継承するため、カスタム定義に `features.shell_tool = false` を指定する。この設定を書けることは確認済みである。読み取りの可否と代替は[未確認の前提](../architecture.md#未確認の前提)に残す。
 

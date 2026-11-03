@@ -87,7 +87,6 @@ dev-kit/
         run.lock
         inbox/               エージェントが終了ブロック・計画・note の入力 JSON を書く唯一の場所
         prompts/             人の入力の観測(UserPromptSubmit が書く)
-        pauses/<ULID>.json   中断の観測(UserPromptSubmit または pause が書く)
         stops/<ULID>.json    作業単位の継続回数と上限到達時の問い(Stop が書く)
         brief/               next が書く brief と判定依頼
         snap/<対象のバージョン>/   判定者に読ませる対象の展開(read-tree と checkout-index --prefix)
@@ -95,7 +94,7 @@ dev-kit/
         view.html
 ```
 
-記録 ID の形式は[記録の範囲](data.md#記録の範囲)、観測の保持条件は[中断の観測](data.md#中断の観測-pauseobservation)と[停止の観測](data.md#停止の観測-stopobservation)に従う。
+記録 ID の形式は[記録の範囲](data.md#記録の範囲)、停止の観測の保持条件は[停止の観測](data.md#停止の観測-stopobservation)に従う。
 
 配置ガイドは各ディレクトリの README に置き、[brief の入力](modules.md#brief)に使う。
 
@@ -107,9 +106,9 @@ pre-commit の共有と導入は[完了条件](guarantees.md#完了条件)に従
 
 ## 指示ファイルとホスト設定
 
-kit はリポジトリの AGENTS.md と CLAUDE.md に触れない。devkit の動かし方(開始・`next`・`submit`・問いの見せ方・サブエージェントの起動)はすべて kit の skill に閉じ、人は `/devkit` の skill で始める。指示ファイルはリポジトリ自身のものであり、判定者の規範としては読む。skill の正本は `.agents/skills/devkit/` とし、`.claude/skills/devkit` を git 管理のシンボリックリンクにする。操作手順は skill に集約し、独立した playbook(操作手順書)は設けない。
+kit はリポジトリの AGENTS.md と CLAUDE.md に触れない。devkit の動かし方(開始・`next`・`submit`・`pause`・`resume`・問いの見せ方・サブエージェントの起動)はすべて kit の skill に閉じ、人は `/devkit` の skill で始める。指示ファイルはリポジトリ自身のものであり、判定者の規範としては読む。skill の正本は `.agents/skills/devkit/` とし、`.claude/skills/devkit` を git 管理のシンボリックリンクにする。操作手順は skill に集約し、独立した playbook(操作手順書)は設けない。
 
-人による中断と再開の案内も skill に含め、条件は[中断](guarantees.md#中断)を参照する。
+人がチャットで止めるよう頼んだら `devkit pause`、再開を頼んだら `devkit resume` をエージェントが呼ぶ手順も skill に含め、条件は[中断](guarantees.md#中断)を参照する。
 
 判定者・計画者のサブエージェントは `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` で定義し、`init` が既定の定義を書く。名前には `devkit-` の接頭辞を付け、Codex の組み込み名と重複させない。
 
