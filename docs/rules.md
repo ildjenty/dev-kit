@@ -49,7 +49,6 @@
 - **結論と判断材料を先に書く文章構成の検査から、次の機械が読む固定フォーマットを除外する**。 [`principles/writing.md`](../principles/writing.md) の原則1。手段: 未実装。
 
   - [終了ブロック](architecture/data.md#進捗-progress)(ラウンドの結果を記す JSON)
-  - [PR 本文の検証の節](parts/form.md#テンプレート)
 
 - **人に判断を求める質問には、選択肢、推奨案、その理由を添える**。 [`principles/writing.md`](../principles/writing.md) の原則7。手段: 未実装。
 - **PR 本文とレビューコメントに「私は」と記述しない**。 [`principles/writing.md`](../principles/writing.md) の原則2。手段: 未実装。

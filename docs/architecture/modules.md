@@ -136,7 +136,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### install
 
-`devkit` のバイナリは `install.sh` で配布する。`install.sh` はリリースに置いた OS とアーキテクチャごとのビルド済みの `devkit` バイナリを取得し、PATH の通った場所に配置する。Go は dev-kit の開発言語であり、利用者の実行環境には不要である。
+当面はこのリポジトリをクローンして `install.sh` を実行し、利用者の環境に Go を必要とする。`install.sh` は Go で `devkit` をビルドし、PATH の通った場所に配置する。正式な配布方法は後で決める。
 
 - **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、kit のコピー、既定の雛形のコピー、観点ファイルと rules.md の初期内容、ignore、ホスト設定、既定のサブエージェント定義、skill とリンクを用意する。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
 - **持つデータ**: 導入する固定物と設定の断片、導入先との差分、doctor の照合結果を扱う。
