@@ -6,8 +6,9 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
-// ConfirmationInput の分類名は、実際の差分を調べた呼び出し側が渡す。
-// 宣言済みステージのメタループ編集は UndeclaredMetaLoopEdit に含めない。
+// ConfirmationInput receives category names from the caller after inspecting actual differences.
+// Include an empty category for each unclassified decision item.
+// Exclude meta-loop edits in declared stages from UndeclaredMetaLoopEdit.
 type ConfirmationInput struct {
 	Categories         []string
 	NeedsDecision      bool
@@ -23,20 +24,20 @@ type Confirmation struct {
 	Categories  []string
 }
 
-// ClassifyConfirmation は即時確認と、次のゲートまたは PR で確認する暫定判断を区別する。
-// 明示したゲートと人のステージは、未回答なら分類表にかかわらず確認する。
+// ClassifyConfirmation distinguishes immediate confirmation from provisional decisions reviewed at the next gate or PR.
+// Unanswered explicit gates and human stages require confirmation regardless of the table.
 func (t Table) ClassifyConfirmation(input ConfirmationInput) Confirmation {
 	result := Confirmation{Categories: []string{}}
-	matched := false
+	unclassified := len(input.Categories) == 0
 	for _, category := range input.Categories {
 		mode, ok := t.ConfirmationRules[category]
 		if !ok && slices.Contains(t.HumanConfirmation, category) {
 			mode, ok = ConfirmNow, true
 		}
 		if !ok {
+			unclassified = true
 			continue
 		}
-		matched = true
 		result.Categories = append(result.Categories, category)
 		switch mode {
 		case ConfirmNow:
@@ -45,7 +46,7 @@ func (t Table) ClassifyConfirmation(input ConfirmationInput) Confirmation {
 			result.Provisional = true
 		}
 	}
-	if input.NeedsDecision && !matched || input.Gate.Required && !input.GateApproved || input.HumanStage && !input.HumanStageAnswered {
+	if input.NeedsDecision && unclassified || input.Gate.Required && !input.GateApproved || input.HumanStage && !input.HumanStageAnswered {
 		result.Required = true
 	}
 	return result

@@ -29,9 +29,9 @@ const (
 	CommandCheck   ResultSource = "command"
 )
 
-// Provenance は hook または devkit の実行から得た来歴である。
-// サブエージェントの InstructionID と Runner は hook が照合済みの値を渡す。
-// Effort と Model は取得できた実測値だけを渡す。
+// Provenance records origin information obtained from hook or devkit execution.
+// For subagents, provide InstructionID and Runner values already verified by hook.
+// Provide Effort and Model only when observed values are available.
 type Provenance struct {
 	Source        ResultSource `json:"source"`
 	InstructionID string       `json:"instruction_id"`
@@ -42,7 +42,7 @@ type Provenance struct {
 	ResultPath    string       `json:"result_path,omitempty"`
 }
 
-// Judgment は受理した判定と来歴・元の内容を保持する。
+// Judgment holds an accepted result, its provenance, and its original content.
 type Judgment struct {
 	form.JudgmentResult
 	Runner     string          `json:"runner"`
@@ -51,7 +51,7 @@ type Judgment struct {
 	Command    *CommandResult  `json:"command,omitempty"`
 }
 
-// ValidFor は対象と規範の識別を照合する。規範は集合として扱う。
+// ValidFor compares target and norm identities, treating norms as a set.
 func (j Judgment) ValidFor(target form.TargetVersion, norms []form.NormReference) bool {
 	return j.TargetVersion == target && sameSet(j.Norms, norms)
 }
@@ -76,8 +76,8 @@ func sameSet[T comparable](a, b []T) bool {
 	return true
 }
 
-// AcceptResult は最初の結果だけを受理する。後着は解析せず既存の結果を返す。
-// サブエージェントの場合、呼び出し側は hook が書いた結果だけを渡す。
+// AcceptResult accepts only the first result and returns it without parsing later arrivals.
+// For subagents, the caller provides only results written by hook.
 func AcceptResult(request Request, data []byte, schema *form.Schema, provenance Provenance, accepted []Judgment) (Judgment, bool, error) {
 	for _, judgment := range accepted {
 		if judgment.InstructionID == request.InstructionID {
@@ -85,13 +85,13 @@ func AcceptResult(request Request, data []byte, schema *form.Schema, provenance 
 		}
 	}
 	if provenance.Source != SubagentResult && provenance.Source != JudgeCommand {
-		return Judgment{}, false, fmt.Errorf("判定結果の来歴が不正です: %q", provenance.Source)
+		return Judgment{}, false, fmt.Errorf("invalid judgment result source: %q", provenance.Source)
 	}
 	if provenance.InstructionID != request.InstructionID || provenance.Runner != request.Runner {
-		return Judgment{}, false, fmt.Errorf("判定結果の指示 ID または担当が一致しません")
+		return Judgment{}, false, fmt.Errorf("judgment result instruction ID or runner does not match")
 	}
 	if schema == nil {
-		return Judgment{}, false, fmt.Errorf("判定結果のスキーマが必要です")
+		return Judgment{}, false, fmt.Errorf("judgment result schema is required")
 	}
 	var result form.JudgmentResult
 	if err := schema.Decode(data, &result); err != nil {
@@ -99,24 +99,32 @@ func AcceptResult(request Request, data []byte, schema *form.Schema, provenance 
 	}
 	judgment := Judgment{JudgmentResult: result, Runner: request.Runner, Provenance: provenance, Content: slices.Clone(data)}
 	if result.InstructionID != request.InstructionID || result.Aspect != request.Aspect.ID || !judgment.ValidFor(request.TargetVersion, request.normReferences()) {
-		return Judgment{}, false, fmt.Errorf("判定結果の指示・観点・対象・規範が一致しません")
+		return Judgment{}, false, fmt.Errorf("judgment result instruction, aspect, target, or norms do not match")
 	}
 	for _, id := range result.CompletionConditionIDs {
 		if !slices.Contains(request.CompletionConditionIDs, id) {
-			return Judgment{}, false, fmt.Errorf("依頼にない完了条件 ID: %q", id)
+			return Judgment{}, false, fmt.Errorf("completion condition ID not in request: %q", id)
 		}
 	}
+	findingIDs := make(map[string]bool, len(result.Findings))
 	for _, finding := range result.Findings {
+		if findingIDs[finding.ID] {
+			return Judgment{}, false, fmt.Errorf("duplicate finding ID: %q", finding.ID)
+		}
+		findingIDs[finding.ID] = true
+		if result.Judgment == Pass && finding.Blocking {
+			return Judgment{}, false, fmt.Errorf("PASS judgment contains a blocking finding: %q", finding.ID)
+		}
 		for _, id := range finding.ResolvedFindingIDs {
 			if !slices.Contains(request.PreviousFindingIDs, id) {
-				return Judgment{}, false, fmt.Errorf("前回の指摘にない ID: %q", id)
+				return Judgment{}, false, fmt.Errorf("ID not in previous findings: %q", id)
 			}
 		}
 	}
 	return judgment, true, nil
 }
 
-// CommandResult は engine が照合を通した検証コマンドの実行結果である。
+// CommandResult holds a verification command result validated by engine.
 type CommandResult struct {
 	ExitCode    int    `json:"exit_code"`
 	TimedOut    bool   `json:"timed_out"`
@@ -125,10 +133,10 @@ type CommandResult struct {
 	Environment string `json:"environment"`
 }
 
-// FromCommand は終了コードと期限超過を Judgment に変換する。
+// FromCommand converts an exit code and timeout status into a Judgment.
 func FromCommand(request Request, result CommandResult) (Judgment, error) {
 	if !strings.HasPrefix(request.Runner, "command:") || request.Runner == "command:" || request.Aspect.ID != request.Runner {
-		return Judgment{}, fmt.Errorf("command の観点と実行主体が一致しません")
+		return Judgment{}, fmt.Errorf("command aspect and runner do not match")
 	}
 	value := Pass
 	findings := []Finding{}
@@ -143,7 +151,7 @@ func FromCommand(request Request, result CommandResult) (Judgment, error) {
 		value = Fail
 		findings = append(findings, Finding{
 			ID: request.InstructionID + ":command", Blocking: true, Kind: AutoFixable,
-			Scenario: fmt.Sprintf("%s が終了コード %d で失敗した。\n%s", request.Runner, result.ExitCode, result.Output),
+			Scenario: fmt.Sprintf("%s failed with exit code %d.\n%s", request.Runner, result.ExitCode, result.Output),
 		})
 	}
 	return Judgment{

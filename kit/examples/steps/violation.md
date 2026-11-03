@@ -1,10 +1,10 @@
-## 依頼
+## Request
 
-ボタンの文言を変更する手順について、各ステップが単独で検証できるか、人が一度で読める大きさかを確認する。
+Check whether each step in the button text change procedure can be verified independently and is small enough for a human to read in one pass.
 
-## 対象
+## Target
 
-# 保存ボタンの変更
+# Save button change
 
-1. 目的: 保存する操作だと分かるよう、文言を改善する。完了条件: よくなったら次へ進む。検証: 方法と判定基準は決めない。
-2. 目的: 既存機能を保つ。完了条件: 既存テストが通る。検証: テストを実行する。
+1. Purpose: Improve the text to make clear that the operation saves. Completion condition: Proceed when it is better. Verification: Do not define a method or criteria.
+2. Purpose: Preserve existing functionality. Completion condition: Existing tests pass. Verification: Run the tests.

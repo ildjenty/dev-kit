@@ -2,6 +2,7 @@ package router
 
 import (
 	"io/fs"
+	"slices"
 	"testing"
 
 	"github.com/BurntSushi/toml"
@@ -27,21 +28,80 @@ func defaultTable(t *testing.T) Table {
 func TestTableAndConfirmation(t *testing.T) {
 	base := defaultTable(t)
 	if !base.ClassifyConfirmation(ConfirmationInput{Categories: []string{DependencyChanged}}).Required {
-		t.Fatal("依存の変更を確認しない")
+		t.Fatal("dependency change did not require confirmation")
 	}
 	merged := MergeTables(base, Table{ConfirmationRules: map[string]ConfirmationMode{DependencyChanged: Provisional}})
 	confirmation := merged.ClassifyConfirmation(ConfirmationInput{Categories: []string{DependencyChanged}, NeedsDecision: true})
 	if confirmation.Required || !confirmation.Provisional {
-		t.Fatalf("名前ごとの上書きを適用できない: %+v", confirmation)
+		t.Fatalf("could not apply per-name override: %+v", confirmation)
 	}
 	if !base.ClassifyConfirmation(ConfirmationInput{Categories: []string{DependencyChanged}}).Required {
-		t.Fatal("既定の表を変更した")
+		t.Fatal("modified the default table")
 	}
 	if !merged.ClassifyConfirmation(ConfirmationInput{Gate: plan.Gate{Required: true}}).Required {
-		t.Fatal("明示したゲートを省略した")
+		t.Fatal("skipped an explicit gate")
 	}
+}
+
+func TestPreferredLesson(t *testing.T) {
+	base := defaultTable(t)
 	if destination, ok := base.PreferredLesson([]LessonDestination{Kit, Skill, HookLintType}); !ok || destination != HookLintType {
-		t.Fatalf("教訓の反映先: %q, %v", destination, ok)
+		t.Fatalf("lesson destination: %q, %v", destination, ok)
+	}
+}
+
+func TestMergeConfirmationCategories(t *testing.T) {
+	base := defaultTable(t)
+	additions := Table{
+		HumanConfirmation: []string{"billing_changed", DependencyChanged, "billing_changed"},
+		ConfirmationRules: map[string]ConfirmationMode{DependencyChanged: NoConfirm},
+	}
+	merged := MergeTables(base, additions)
+	want := append(slices.Clone(base.HumanConfirmation), "billing_changed")
+	if !slices.Equal(merged.HumanConfirmation, want) {
+		t.Fatalf("confirmation categories: %v; want: %v", merged.HumanConfirmation, want)
+	}
+	for _, category := range []string{"billing_changed", UndeclaredMetaLoopEdit, TargetChangedAgain} {
+		if !merged.ClassifyConfirmation(ConfirmationInput{Categories: []string{category}}).Required {
+			t.Fatalf("category did not require confirmation: %s", category)
+		}
+	}
+	if merged.ClassifyConfirmation(ConfirmationInput{Categories: []string{DependencyChanged}, NeedsDecision: true}).Required {
+		t.Fatal("ignored an explicit per-name override")
+	}
+	if slices.Contains(base.HumanConfirmation, "billing_changed") || len(additions.HumanConfirmation) != 3 {
+		t.Fatal("modified the original category lists")
+	}
+	if !slices.Equal(MergeTables(base, Table{HumanConfirmation: []string{}}).HumanConfirmation, base.HumanConfirmation) {
+		t.Fatal("empty additions removed default categories")
+	}
+}
+
+func TestConfirmationPerItem(t *testing.T) {
+	table := MergeTables(defaultTable(t), Table{ConfirmationRules: map[string]ConfirmationMode{
+		DependencyChanged: Provisional, "delegated": NoConfirm,
+	}})
+	cases := []struct {
+		name       string
+		categories []string
+		required   bool
+	}{
+		{"provisional only", []string{DependencyChanged}, false},
+		{"unclassified only", []string{"unclassified"}, true},
+		{"no category", nil, true},
+		{"unclassified after provisional", []string{DependencyChanged, "unclassified"}, true},
+		{"uncategorized after provisional", []string{DependencyChanged, ""}, true},
+		{"unclassified before provisional", []string{"unclassified", DependencyChanged}, true},
+		{"unclassified after delegation", []string{"delegated", "unclassified"}, true},
+		{"all classified", []string{DependencyChanged, "delegated"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			confirmation := table.ClassifyConfirmation(ConfirmationInput{Categories: tc.categories, NeedsDecision: true})
+			if confirmation.Required != tc.required {
+				t.Fatalf("confirmation: %+v; want required: %v", confirmation, tc.required)
+			}
+		})
 	}
 }
 
@@ -57,25 +117,25 @@ func TestRoutes(t *testing.T) {
 		change func(*Input)
 		want   plan.Transition
 	}{
-		{"完了処理", func(i *Input) {}, plan.Done},
-		{"修正", func(i *Input) { i.Summary.Judgment = check.Fail }, plan.Fix},
-		{"未評価", func(i *Input) { i.Summary.Judgment = check.NotAssessed }, plan.Ask},
-		{"前提の崩れ", func(i *Input) { i.PremiseBroken = true }, plan.Back},
-		{"ラウンド上限", func(i *Input) { i.Summary.Judgment = check.Fail; i.CompletedRounds = 3 }, plan.Ask},
-		{"進展なし上限", func(i *Input) {
+		{"completion processing", func(i *Input) {}, plan.Done},
+		{"correction", func(i *Input) { i.Summary.Judgment = check.Fail }, plan.Fix},
+		{"not assessed", func(i *Input) { i.Summary.Judgment = check.NotAssessed }, plan.Ask},
+		{"broken premise", func(i *Input) { i.PremiseBroken = true }, plan.Back},
+		{"round limit", func(i *Input) { i.Summary.Judgment = check.Fail; i.CompletedRounds = 3 }, plan.Ask},
+		{"no-progress limit", func(i *Input) {
 			i.Summary.Judgment = check.Fail
 			i.ProgressMade = false
 			i.PreviousNoProgressRounds = 1
 		}, plan.Ask},
-		{"完了時の上限", func(i *Input) { i.CompletedRounds = 3 }, plan.Done},
-		{"確認の申告", func(i *Input) { i.TerminationKind = form.TerminationQuestion }, plan.Ask},
-		{"停止の申告", func(i *Input) { i.TerminationKind = form.TerminationStopped }, plan.Ask},
-		{"未検証", func(i *Input) { i.Completion.ReadyToCommit = false }, plan.Ask},
-		{"ゲート", func(i *Input) { i.Stage.Gate.Required = true }, plan.Ask},
-		{"ゲート前の修正", func(i *Input) { i.Stage.Gate.Required = true; i.Summary.Judgment = check.Fail }, plan.Fix},
-		{"人のステージ", func(i *Input) { i.Stage.Assignee = plan.Human }, plan.Ask},
-		{"参考情報", func(i *Input) { i.Summary.Findings = []check.Finding{{Kind: check.NeedsDecision}} }, plan.Done},
-		{"判断が必要", func(i *Input) {
+		{"limit at completion", func(i *Input) { i.CompletedRounds = 3 }, plan.Done},
+		{"reported question", func(i *Input) { i.TerminationKind = form.TerminationQuestion }, plan.Ask},
+		{"reported stop", func(i *Input) { i.TerminationKind = form.TerminationStopped }, plan.Ask},
+		{"unverified", func(i *Input) { i.Completion.ReadyToCommit = false }, plan.Ask},
+		{"gate", func(i *Input) { i.Stage.Gate.Required = true }, plan.Ask},
+		{"correction before gate", func(i *Input) { i.Stage.Gate.Required = true; i.Summary.Judgment = check.Fail }, plan.Fix},
+		{"human stage", func(i *Input) { i.Stage.Assignee = plan.Human }, plan.Ask},
+		{"reference information", func(i *Input) { i.Summary.Findings = []check.Finding{{Kind: check.NeedsDecision}} }, plan.Done},
+		{"decision required", func(i *Input) {
 			i.Summary.Findings = []check.Finding{{ID: "F1", Blocking: true, Kind: check.NeedsDecision}}
 			i.Summary.Judgment = check.Fail
 		}, plan.Ask},
@@ -86,7 +146,7 @@ func TestRoutes(t *testing.T) {
 			tc.change(&input)
 			decision, err := table.Decide(input)
 			if err != nil || decision.Action != tc.want {
-				t.Fatalf("分類: %+v, %v; 期待: %s", decision, err, tc.want)
+				t.Fatalf("classification: %+v, %v; want: %s", decision, err, tc.want)
 			}
 		})
 	}
@@ -96,12 +156,12 @@ func TestRoutes(t *testing.T) {
 	input.Confirmation.Categories = []string{DependencyChanged}
 	decision, err := provisional.Decide(input)
 	if err != nil || decision.Action != plan.Ask {
-		t.Fatalf("別の確認対象を理由に指摘の判断を省略した: %+v, %v", decision, err)
+		t.Fatalf("skipped a finding decision because of another confirmation category: %+v, %v", decision, err)
 	}
 	input.FindingCategories = map[string]string{"F1": DependencyChanged}
 	decision, err = provisional.Decide(input)
 	if err != nil || decision.Action != plan.Fix || !decision.Confirmation.Provisional {
-		t.Fatalf("暫定判断: %+v, %v", decision, err)
+		t.Fatalf("provisional decision: %+v, %v", decision, err)
 	}
 }
 
@@ -124,19 +184,19 @@ func TestCompletion(t *testing.T) {
 	}
 	completion := CheckCompletion(input)
 	if !completion.ReadyToCommit || completion.Complete {
-		t.Fatalf("commit 前の判定: %+v", completion)
+		t.Fatalf("pre-commit assessment: %+v", completion)
 	}
 	input.CommitSucceeded, input.TargetMatches = true, true
 	if !CheckCompletion(input).Complete {
-		t.Fatal("完了条件を満たしても確定できない")
+		t.Fatal("could not finalize despite satisfied completion conditions")
 	}
 	input.Detection = nil
 	if CheckCompletion(input).ReadyToCommit {
-		t.Fatal("内容の同一性を照合せず合格にした")
+		t.Fatal("passed without checking content identity")
 	}
 	input.Detection = []check.DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}}
 	input.Judgments[0].TargetVersion.Tree = "stale"
 	if CheckCompletion(input).ReadyToCommit {
-		t.Fatal("古い対象の判定で完了した")
+		t.Fatal("completed using a judgment for a stale target")
 	}
 }

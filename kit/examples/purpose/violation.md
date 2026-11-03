@@ -1,12 +1,12 @@
-## 依頼
+## Request
 
-変更を使う人、目的、計画の完了条件の対応を確認する。実装方式の決定は対象に含めない。
+Check how users of the change, its purpose, and the plan's completion conditions correspond. Choosing an implementation approach is out of scope.
 
-## 対象
+## Target
 
-# 保存ボタンの変更
+# Save button change
 
-- 利用者: 日報を登録する担当者。
-- 目的: 日報の保存を分かりやすくする。
-- 完了条件 C1: 保存ボタンをいい感じにする。
-- 対応: C1 を満たせば目的を達成したものとする。
+- Users: Staff submitting daily reports.
+- Purpose: Make saving daily reports clearer.
+- Completion condition C1: Make the save button look good.
+- Relationship: Treat meeting C1 as achieving the purpose.

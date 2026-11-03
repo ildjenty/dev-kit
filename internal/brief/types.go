@@ -5,26 +5,26 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
-// Brief は呼び出し側から渡された指示 ID と、保存する依頼本文を表す。
+// Brief contains the caller-supplied instruction ID and request text to be stored.
 type Brief struct {
 	InstructionID string
 	Text          string
 }
 
-// Document は呼び出し側が解決した資料の参照先と本文を表す。
+// Document contains a reference and document text resolved by the caller.
 type Document struct {
 	Path    string
 	Content string
 }
 
-// StageOutput は採用した前のステージの出力を、内容を変えずに渡す。
+// StageOutput passes an adopted previous stage output without changing its content.
 type StageOutput struct {
 	StageID string
 	Content string
 }
 
-// RepositoryFacts は配置ガイド、規則とその変更困難な決定、利用可能な check を表す。
-// IrreversibleDecisions には rules.md の項目を渡し、計画の項目は Plan から取り込む。
+// RepositoryFacts contains layout guides, rules and their irreversible decisions, and available checks.
+// IrreversibleDecisions receives items from rules.md; plan items come from Plan.
 type RepositoryFacts struct {
 	LayoutGuides          []Document
 	Rules                 Document
@@ -32,16 +32,18 @@ type RepositoryFacts struct {
 	AvailableChecks       []plan.Check
 }
 
-// CommandOutput は呼び出し側が実行した必須の command: の check の結果を表す。
+// CommandOutput contains the result of a required command: check executed by the caller.
 type CommandOutput struct {
 	Check    plan.Check
 	ExitCode int
 	Output   string
 }
 
-// WorkInput は作業依頼に含める既知の情報を表す。
-// Norms と各資料は固定した参照元から読み出し、一時状態は無効なものを除いて渡す。
+// WorkInput contains known information to include in a work request.
+// Read Norms and documents from the fixed reference source and exclude invalid temporary state.
 type WorkInput struct {
+	// RequestTemplate is the request text resolved by the caller from the fixed kit copy.
+	RequestTemplate  string
 	InstructionID    string
 	Stage            plan.Stage
 	StageDefinition  string
@@ -59,18 +61,22 @@ type WorkInput struct {
 	OutputSchema     string
 }
 
-// JudgmentInput は check が決めた依頼内容と出力スキーマを受け取る。
-// Content には対象と場所、規範、観点、終了ブロック、前回の指摘 ID などを含める。
-// 観点「差分」の有効な承認・委任を含め、依頼内容の選定は check が担う。
+// JudgmentInput receives the request content and output schema selected by check.
+// Content includes the target and its location, norms, aspects, progress block, and previous finding IDs.
+// check selects the request content, including valid approvals and delegations for the difference aspect.
 type JudgmentInput struct {
-	InstructionID string
-	Content       string
-	OutputSchema  string
+	// RequestTemplate is the request text resolved by the caller from the fixed kit copy.
+	RequestTemplate string
+	InstructionID   string
+	Content         string
+	OutputSchema    string
 }
 
-// PlannerInput は初回の計画、再提案、残りの計画の作り直しに用いる情報を表す。
-// Version と TemplateHash は呼び出し側が決め、brief は生成や照合を行わない。
+// PlannerInput contains information for initial planning, revised proposals, and rebuilding the remaining plan.
+// The caller determines Version and TemplateHash; brief neither generates nor verifies them.
 type PlannerInput struct {
+	// RequestTemplate is the request text resolved by the caller from the fixed kit copy.
+	RequestTemplate   string
 	InstructionID     string
 	Version           int
 	Template          plan.PlanTemplate

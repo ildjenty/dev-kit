@@ -1,76 +1,76 @@
-# 規則と強制手段
+# Rules and enforcement
 
-共有する決定には、決定の内容、現在の強制手段、根拠を残す。変更経緯は git・PR に残し、共有に必要な根拠をローカルの作業記録だけに置かない。課題固有の元に戻せないものは計画に記入する。
+For shared decisions, record the decision, its current enforcement mechanism, and grounds. Keep change history in git and PRs; do not keep grounds needed for sharing only in local work records. Record task-specific irreversible items in the plan.
 
-以下の規則を対象のコードと文書に適用する。「手段: 未実装」は強制する実装がまだないことを表す。原則と契約の参照は、`devkit.toml` の `kit_version` に対応する `.devkit/kit/` 内を基準にする。
+Apply the following rules to the target code and documents. "Enforcement: Not implemented" means that no implementation enforces the rule yet. Resolve principle and contract references within `.devkit/kit/` for the `kit_version` in `devkit.toml`.
 
-## 共有する変更困難な決定
+## Shared difficult-to-change decisions
 
-未登録。追加時は決定・強制手段・根拠を併記する。作業 ID・決定 ID・課題や PR の URL は補助参照として添えてよい。
+None registered. When adding a decision, include its enforcement mechanism and grounds. Work IDs, decision IDs, and task or PR URLs may be added as supplementary references.
 
-## コードの構造
+## Code structure
 
-- **通信の型(リクエスト・レスポンス)を内部で再利用しない**。 `principles/structure.md` の原則6。手段: 未実装。
-- **提供側と下位レイヤーは、利用側と上位レイヤーの具体的な実装に依存しない。利用側に定義した抽象(ポート)への依存は許す**。 `principles/structure.md` の原則3。手段: 未実装。
-- **ドメインからフレームワーク・インフラ・アプリの設定の型を import しない**。 `principles/structure.md` の原則5・6。手段: 未実装。
-- **静的な依存関係に循環参照を含めない**。 `principles/structure.md` の原則3。手段: Go パッケージ間の import 循環はビルド check に任せる。設計上の依存の妥当性は別に確認する。
-- **ドメインの型にフレームワークの型やアノテーションを含めない**。 `principles/structure.md` の原則5。手段: 未実装。
-- **モジュールの公開入口を経由せずに内部のパスを直接 import しない**。 `principles/structure.md` の原則6。手段: 未実装。
-- **引数をそのまま渡すだけの関数を置かない**。 `principles/structure.md` の原則7。手段: 未実装。
+- **Do not reuse communication types (requests and responses) internally**. Principle 6 of `principles/structure.md`. Enforcement: Not implemented.
+- **Providers and lower layers must not depend on concrete implementations of consumers and upper layers. Dependencies on abstractions (ports) defined by consumers are allowed**. Principle 3 of `principles/structure.md`. Enforcement: Not implemented.
+- **Do not import framework, infrastructure, or application configuration types into the domain**. Principles 5 and 6 of `principles/structure.md`. Enforcement: Not implemented.
+- **Do not include cycles in static dependencies**. Principle 3 of `principles/structure.md`. Enforcement: Leave Go package import cycles to the build check. Assess the validity of design dependencies separately.
+- **Do not include framework types or annotations in domain types**. Principle 5 of `principles/structure.md`. Enforcement: Not implemented.
+- **Do not directly import internal paths without going through a module's public entry point**. Principle 6 of `principles/structure.md`. Enforcement: Not implemented.
+- **Do not add functions that only forward arguments unchanged**. Principle 7 of `principles/structure.md`. Enforcement: Not implemented.
 
-## 作業の進め方
+## Work procedures
 
-並行作業の配置は利用側のリポジトリ（`docs/architecture/layout.md#利用側のリポジトリ`）に従う。共有状態と共通の不変条件の扱いは `principles/data.md` の原則6に従う。
+Follow the consuming repository layout (`docs/architecture/layout.md#%E5%88%A9%E7%94%A8%E5%81%B4%E3%81%AE%E3%83%AA%E3%83%9D%E3%82%B8%E3%83%88%E3%83%AA`) for parallel work placement. Follow principle 6 of `principles/data.md` for shared state and common invariants.
 
-人による中断と再開、Stop の継続上限は中断（`docs/architecture/guarantees.md#中断`）に従う。
+Follow interruption (`docs/architecture/guarantees.md#%E4%B8%AD%E6%96%AD`) for human-initiated pause and resume and the Stop continuation limit.
 
-## コメントと lint
+## Comments and lint
 
-- **lint の抑制には、空でない理由を必ず記載する**。 `principles/engineering.md` の原則4。手段: 未実装。
+- **Always provide a nonempty reason for suppressing lint**. Principle 4 of `principles/engineering.md`. Enforcement: Not implemented.
 
-## テスト
+## Tests
 
-テスト ID は、リポジトリ内でテストを一意に指す識別子であり、テストファイルのリポジトリ相対パスとテストフレームワーク上の識別名の組で表す。
+A test ID uniquely identifies a test within the repository as the pair of its repository-relative test file path and its identifier in the test framework.
 
-テストの検出能力の確認は、検証対象を意図的に壊してテストが失敗することを確かめる操作である。観点ファイルを対象にする検出試験（`docs/architecture/guarantees.md#検出試験`）とは区別する。
+Checking a test's detection ability means deliberately breaking its subject and confirming that the test fails. This differs from detection tests of aspect files (`docs/architecture/guarantees.md#%E6%A4%9C%E5%87%BA%E8%A9%A6%E9%A8%93`).
 
-- **テスト(回帰テストを含む)は実装前に一度失敗することを確認する。テスト ID・対象のバージョン（`docs/architecture/data.md#対象のバージョン-targetversion`）(確認対象の状態)・実行結果を記録する。実装前に確認できない場合は、次項のテストの検出能力の確認で代替する**。 `principles/testing.md` の原則4。手段: 未実装。
-- **実装前に失敗を確認できなかったテストとセキュリティ上の処理のテストでは、検証対象を必要最小限の差分で意図的に壊し、失敗を引き起こした変更の差分と実行結果をテスト ID に結び付けて記録する**。 `principles/testing.md` の原則4。手段: 未実装。
-- **テストの検出能力の確認では、狙う性質を1つに絞り、必要最小限の差分で壊して1回実行し、直ちに元に戻して変更前のソースの状態が復元されたことを確認する**。 `principles/testing.md` の原則4。手段: 未実装。
-- **テストに `skip` や `only` を残さない**。 `principles/testing.md` の原則9。手段: 未実装。
+- **Confirm that tests, including regression tests, fail once before implementation. Record the test ID, target version (`docs/architecture/data.md#%E5%AF%BE%E8%B1%A1%E3%81%AE%E3%83%90%E3%83%BC%E3%82%B8%E3%83%A7%E3%83%B3-targetversion`, the state under verification), and execution result. If this cannot be checked before implementation, use the test detection ability check in the next rule instead**. Principle 4 of `principles/testing.md`. Enforcement: Not implemented.
+- **For tests whose failure could not be confirmed before implementation and tests of security-related processing, deliberately break the subject with the smallest necessary diff and record the failure-inducing diff and execution result linked to the test ID**. Principle 4 of `principles/testing.md`. Enforcement: Not implemented.
+- **When checking test detection ability, target one property, break it with the smallest necessary diff, run once, immediately revert, and confirm that the source state before the change is restored**. Principle 4 of `principles/testing.md`. Enforcement: Not implemented.
+- **Do not leave `skip` or `only` in tests**. Principle 9 of `principles/testing.md`. Enforcement: Not implemented.
 
-## 文章と記録
+## Writing and records
 
-- **確信度は「直接」「裏付けあり」「推論」「推測」「不明」の5値とする**。 `principles/verification.md` の原則2。手段: 未実装。
+- **Use five confidence values: "Direct", "Supported", "Inference", "Speculation", and "Unknown"**. Principle 2 of `principles/verification.md`. Enforcement: Not implemented.
 
-  - 「直接」: 一次情報を直接引用できる場合に用いる。
-  - 「裏付けあり」: 複数の間接的な証拠が同じ結論を支持する場合に用いる。
-  - 「推論」: 観測から導いた解釈を示す場合に用いる。
-  - 「推測」: ほかの説明も同じくらいありうる場合に用いる。
-  - 「不明」: 何をどのように調べて見つからなかったかを示す場合に用いる。
+  - "Direct": Primary information can be quoted directly.
+  - "Supported": Multiple pieces of indirect evidence support the same conclusion.
+  - "Inference": An interpretation derived from observations.
+  - "Speculation": Other explanations are equally plausible.
+  - "Unknown": State what was investigated, how, and what was not found.
 
-- **文章に「明らかに」「当然」「単に」を使わない**。 `principles/verification.md` の原則2。手段: 未実装。
-- **結論と判断材料を先に書く文章構成の検査から、次の機械が読む固定フォーマットを除外する**。 `principles/writing.md` の原則1。手段: 未実装。
+- **Do not use "obviously", "naturally", or "simply" in prose**. Principle 2 of `principles/verification.md`. Enforcement: Not implemented.
+- **Exclude the following machine-readable fixed format from checks requiring conclusions and decision material first**. Principle 1 of `principles/writing.md`. Enforcement: Not implemented.
 
-  - 終了ブロック（`docs/architecture/data.md#進捗-progress`）(ラウンドの結果を記す JSON)
+  - Termination blocks (`docs/architecture/data.md#%E9%80%B2%E6%8D%97-progress`, JSON recording round results)
 
-- **人に判断を求める質問には、選択肢、推奨案、その理由を添える**。 `principles/writing.md` の原則7。手段: 未実装。
-- **PR 本文とレビューコメントに「私は」と記述しない**。 `principles/writing.md` の原則2。手段: 未実装。
+- **Questions requesting human decisions must include options, a recommendation, and its reason**. Principle 7 of `principles/writing.md`. Enforcement: Not implemented.
+- **Do not write "I" in PR bodies or review comments**. Principle 2 of `principles/writing.md`. Enforcement: Not implemented.
 
-## 計測と報告
+## Measurement and reporting
 
-- **性能比較の両方を、結論の範囲に必要なビルド・フラグ・キャッシュ・データの条件を揃えて計測する**。 `principles/verification.md` の原則4。手段: 未実装。
-- **性能比較の両方を複数回、交互に(A, B, A, B)計測し、中央値と範囲を示す**。 `principles/verification.md` の原則4。手段: 未実装。
-- **計測区間で対象の処理が実際に実行されたことを、出力・処理件数などの根拠で確認する**。 `principles/verification.md` の原則4。手段: 未実装。
-- **性能の結論は「速い / 遅い / 差がない / 判定できない」のいずれかとする**。 `principles/verification.md` の原則4。手段: 未実装。
-- **性能報告には、実行回数とばらつきを記載する。原因や改善上限を説明する場合は、その説明に必要な観測を示す**。 `principles/verification.md` の原則4。手段: 未実装。
+- **Measure both sides of a performance comparison under matching build, flag, cache, and data conditions as needed for the scope of the conclusion**. Principle 4 of `principles/verification.md`. Enforcement: Not implemented.
+- **Measure both sides multiple times in alternating order (A, B, A, B), and show the median and range**. Principle 4 of `principles/verification.md`. Enforcement: Not implemented.
+- **Confirm from output, processed counts, or other evidence that the target processing actually ran during the measurement interval**. Principle 4 of `principles/verification.md`. Enforcement: Not implemented.
+- **Use one of "Faster / Slower / No difference / Cannot determine" as the performance conclusion**. Principle 4 of `principles/verification.md`. Enforcement: Not implemented.
+- **Performance reports must include the number of runs and variation. Explanations of causes or improvement limits must include the observations needed to support them**. Principle 4 of `principles/verification.md`. Enforcement: Not implemented.
 
-## 画面
+## Screens
 
-- **画像や埋め込みの読み込み後に、レイアウトを動かさない**。 `principles/ui.md` の原則7。手段: 未実装。
-- **文字と背景のコントラストは4.5:1 以上とする**。 `principles/ui.md` の原則8。手段: 未実装。
-- **必要な情報・操作をホバーだけに依存させない**。 `principles/ui.md` の原則8。手段: 未実装。
-- **モバイルの入力欄のフォントは16px 以上とする**。 `principles/ui.md` の原則8。手段: 未実装。
-- **メニューを開いている間に背景を操作対象から外す場合に限り、背景のスクロールを抑止する**。 `principles/ui.md` の原則9。手段: 未実装。
-- **アニメーションでは不要な描画処理がないか、実際の反応と描画品質を確認する**。 `principles/ui.md` の原則9。手段: 未実装。
-- **確認対象のページ・状態・対象のバージョン（`docs/architecture/data.md#対象のバージョン-targetversion`）に対応するスクリーンショットを撮影し、取得の記録を残す**。 `principles/ui.md` の原則9。手段: 未実装。
+- **Do not shift the layout after images or embeds load**. Principle 7 of `principles/ui.md`. Enforcement: Not implemented.
+- **Maintain a text-to-background contrast ratio of at least 4.5:1**. Principle 8 of `principles/ui.md`. Enforcement: Not implemented.
+- **Do not make necessary information or operations depend only on hover**. Principle 8 of `principles/ui.md`. Enforcement: Not implemented.
+- **Use a font size of at least 16px for mobile input fields**. Principle 8 of `principles/ui.md`. Enforcement: Not implemented.
+- **Suppress background scrolling only when opening a menu excludes the background from interaction**. Principle 9 of `principles/ui.md`. Enforcement: Not implemented.
+- **For animation, check actual responsiveness and rendering quality for unnecessary rendering work**. Principle 9 of `principles/ui.md`. Enforcement: Not implemented.
+- **Capture screenshots corresponding to the page, state, and target version (`docs/architecture/data.md#%E5%AF%BE%E8%B1%A1%E3%81%AE%E3%83%90%E3%83%BC%E3%82%B8%E3%83%A7%E3%83%B3-targetversion`) under verification, and retain capture records**. Principle 9 of `principles/ui.md`. Enforcement: Not implemented.

@@ -1,12 +1,12 @@
-## 依頼
+## Request
 
-合意した要求は、手元のファイルから税込金額を計算する関数を足すことだけ。外部接続、永続化、差し替えは不要。比較した既存箇所では計算関数を pricing に置く。以下の配置と依存を確認する。
+The agreed requirement is only to add a function calculating tax-inclusive amounts from a local file. No external connection, persistence, or substitution is needed. The existing locations compared put calculation functions in pricing. Check the following placement and dependencies.
 
-## 対象
+## Target
 
-# 税込金額の配置
+# Placement of tax-inclusive amount calculation
 
-- 配置: pricing の calculate に計算を置き、caller が検証した金額を渡す。可変状態は更新しない。
-- 比較案: 中継層を加える案は、契約・知識・制約を増やさず追う関数だけ増やすため採らない。
-- 固定される名前: 外部のコード生成規則が生成する入力の型名 PriceV1 は変更しない。生成定義 api.json の schema.name が PriceV1 を指定し、変更すると再生成時の参照が切れる。
-- 適用除外: principles/structure.md の原則1の名前に関する要求だけを外す。生成された型の受理は caller が担い、計算責務は pricing に保つ。既存の pricing の命名とエラー形式に揃える。
+- Placement: Put calculation in pricing's calculate, with caller passing validated amounts. Do not update mutable state.
+- Alternative: Reject adding forwarding layers because they add functions to follow without adding contracts, knowledge, or constraints.
+- Fixed name: Keep the generated input type name PriceV1 required by external code generation rules. schema.name in the generation definition api.json specifies PriceV1; changing it would break references on regeneration.
+- Exemption: Waive only the naming requirement of principle 1 of principles/structure.md. caller accepts generated types, while pricing retains calculation responsibility. Follow existing pricing naming and error formats.

@@ -1,13 +1,13 @@
-## 依頼
+## Request
 
-判定処理の変更を確認する。新しいセッションでは、README にある「開発ループを進める CLI」「go run ./cmd/devkit で起動」「go build ./... で確認」と、実行記録の「実装ステージで判定待ち」から4つの問いに答えられる。他の規範と契約は変更しない。
+Check the judgment processing change. A fresh session can answer the four questions from the README ("CLI for advancing a development loop", "Start with go run ./cmd/devkit", "Verify with go build ./...") and execution records ("Awaiting judgment in the implementation stage"). Other norms and contracts remain unchanged.
 
-## 対象
+## Target
 
-# 判定処理
+# Judgment processing
 
-- 入力: 合意条件は保存ボタンの文言が「保存」であること。
-- 対象: ボタンの実際の表示は「登録」。
-- 作成者の説明: 保存ボタンの修正は済んだ。
-- 判定処理: 作成者の説明は仮説として扱い、実際の表示と合意条件を独立に照合する。この入力では文言の不一致を理由に FAIL を返す。判断基準が欠ける入力は NOT ASSESSED を返す。
-- skill: description と配置・参照先は変更しない。check の必須化の変更はない。
+- Input: The agreed condition is that the save button text is "Save".
+- Target: The actual button displays "Register".
+- Author explanation: The save button fix is complete.
+- Judgment processing: Treat the author explanation as a hypothesis and independently compare the actual display against the agreed condition. Return FAIL for this input because the text differs. Return NOT ASSESSED for inputs lacking criteria.
+- Skill: description, placement, and references are unchanged. No changes make checks required.

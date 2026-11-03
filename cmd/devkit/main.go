@@ -6,6 +6,6 @@ import (
 )
 
 func main() {
-	fmt.Fprintln(os.Stderr, "devkit は未実装です。")
+	fmt.Fprintln(os.Stderr, "devkit is not implemented.")
 	os.Exit(2)
 }

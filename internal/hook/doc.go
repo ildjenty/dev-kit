@@ -1,5 +1,5 @@
-// hook はホストの5つのイベントを決定的に処理し、観測と結果を生成物にする。
-// モデルによる判定は置かず、ルート・作業 ID・規範の設定を読む関数値は cmd/devkit から受け取る。
-// ledger・config・host/event・form・ledger/fsstore に依存する。
-// 正本: docs/architecture/modules.md#hook
+// hook deterministically processes the host's five events and writes observations and results as generated files.
+// It performs no model-based judgments and receives function values for reading the root, work ID, and norm configuration from cmd/devkit.
+// It depends on ledger, config, host/event, form, and ledger/fsstore.
+// Source of truth: docs/architecture/modules.md#hook
 package hook

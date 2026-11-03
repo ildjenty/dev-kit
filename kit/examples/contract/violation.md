@@ -1,11 +1,11 @@
-## 依頼
+## Request
 
-承認状態の入力契約を確認する。要求は「承認済みなら承認者が必ず存在する」。外部の JSON は保存関数だけが受理し、そのまま保存される。
+Check the input contract for approval state. The requirement is that an approved state always has an approver. Only the save function accepts external JSON, which is stored as received.
 
-## 対象
+## Target
 
-# 承認の入力
+# Approval input
 
-- 入力: status は draft または approved、approved_by は省略可能な文字列。
-- 受理: status が approved でも approved_by を検証せず保存する。保存先にも制約はない。
-- 失敗: 保存先の障害はエラーとして返す。
+- Input: status is draft or approved; approved_by is an optional string.
+- Acceptance: Store without validating approved_by even when status is approved. Storage has no constraint either.
+- Failures: Return storage failures as errors.

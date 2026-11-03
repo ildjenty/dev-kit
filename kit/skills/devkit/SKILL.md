@@ -1,83 +1,83 @@
 ---
 name: devkit
-description: devkit の計画・作業・判定ループを進める。/devkit で課題を始めるとき、進行中の作業に回答するとき、中断・再開を頼まれたときに使う。
+description: Advance the devkit planning, work, and judgment loop. Use when starting a task with /devkit, answering questions for ongoing work, or asked to pause or resume.
 ---
 
-# devkit の進め方
+# Using devkit
 
-`devkit` が返す指示を実行する。ステージの順序、判定、承認、完了は `devkit` が決める。規範と形式は、作業が使う `.devkit/kit/<kit_version>/docs/`、依頼文から参照する原則とスキーマに従う。
+Carry out the instructions returned by `devkit`. It determines stage order, judgment, approval, and completion. Follow the norms and formats in the work's `.devkit/kit/<kit_version>/docs/` and the principles and schemas referenced by the request.
 
-## コマンドの呼び方
+## Invoking commands
 
-`devkit` は cwd を対象のチェックアウトにして、単独のコマンドとして呼ぶ。`cd`、リダイレクト、コマンドの連結、置換を付けない。ホストが許可した経路で sandbox の外で実行するためである。入力 JSON は先にファイルとして書き、コマンドの引数に渡す。
+Invoke `devkit` as a standalone command with cwd set to the target checkout. Do not add `cd`, redirection, command chaining, or substitution. This lets it run outside the sandbox through the path allowed by the host. Write input JSON to a file first, then pass it as a command argument.
 
-`next` が検証コマンドや完了時の commit を実行するときは、処理の期限に合わせてホストの timeout を指定する。失敗や期限超過を成功・完了と扱わず、返された理由を伝える。
+When `next` runs verification commands or the completion commit, set the host timeout to match the operation's deadline. Do not treat failures or timeouts as success or completion; convey the returned reason.
 
-## 開始と現在地
+## Starting and locating work
 
-1. 新しい課題は `devkit start --plan <name> <課題>` で始める。人の指定がなければ `--plan` を省略し、`.devkit/plans/default.json` を使う。雛形は `.devkit/plans/` からだけ選ぶ。
-2. `start` が返す計画者への指示 ID で `devkit-planner` を起動する。結果の到着後、`devkit next` を呼ぶ。
-3. 続きの作業では SessionStart の checkpoint と `devkit status` で現在地を確認し、`devkit next` を呼ぶ。ブランチが異なるとの警告があれば作業ブランチを確認し、書き込みや完了へ進めない。中断中なら人の再開指示を待つ。
+1. Start a new task with `devkit start --plan <name> <task>`. If the human has not specified a plan, omit `--plan` to use `.devkit/plans/default.json`. Select templates only from `.devkit/plans/`.
+2. Launch `devkit-planner` with the planner instruction ID returned by `start`. Call `devkit next` after its result arrives.
+3. For ongoing work, locate the current state from the SessionStart checkpoint and `devkit status`, then call `devkit next`. If warned of a branch mismatch, check the work branch and do not proceed to writes or completion. If paused, wait for the human to request resume.
 
-SessionStart の観測がなく開始を拒否されたら `devkit doctor` で不足を確認する。Codex の導入後は、人が対話モードでプロジェクトを信頼し、`/hooks` で各 hook を信頼する必要がある。その場の設定上書きで代用しない。
+If start is refused because no SessionStart observation exists, use `devkit doctor` to check what is missing. After Codex installation, the human must trust the project in interactive mode and trust each hook through `/hooks`. Do not substitute temporary configuration overrides.
 
-## next の指示を実行する
+## Following next instructions
 
-- **計画**: 指定された `devkit-planner` を起動する。計画の check・検出試験・判定は、指定された判定者を起動する。結果の到着後に `devkit next` を呼び、hook が採取した結果を受理させる。
-- **作業**: brief の本文と参照先を読み、合意した範囲を実行する。読めなかった入力とその影響は未確認事項に残す。他の skill や plugin も依頼の範囲で使える。
-- **判定待ち**: 起動済みの判定者・計画者の結果を待つ。同じ指示 ID で重複起動せず、到着後に `devkit next` を呼ぶ。
-- **問い・外部操作の確認**: 次節の手順でチャットに提示し、ターンを終えて人の回答を待つ。人が担当するステージも同様に扱う。
-- **完了・中止**: 記録された状態と実際に残る対応を伝えて終える。作業者自身の完了の主張では確定しない。
+- **Planning**: Launch the specified `devkit-planner`. For plan checks, detection tests, and judgments, launch the assigned judge. After results arrive, call `devkit next` to accept results captured by the hook.
+- **Work**: Read the brief and its references and carry out the agreed scope. Record unread inputs and their impact as unverified matters. Other skills and plugins may be used within the request's scope.
+- **Awaiting judgment**: Wait for results from judges or planners already launched. Do not launch duplicates for the same instruction ID; call `devkit next` after results arrive.
+- **Questions and external operation confirmation**: Present them in chat using the next section's procedure, end the turn, and wait for a human answer. Treat human-assigned stages the same way.
+- **Completion or abort**: Report the recorded state and actual remaining work, then finish. A worker's completion claim does not finalize completion.
 
-出力が本文の代わりにパスを返したらそのファイルを読む。指示が変わらないまま `next` を反復して進行や承認を代行しない。
+If output returns a path instead of the body, read that file. Do not repeat `next` with an unchanged instruction to substitute for progression or approval.
 
-## 判定者・計画者の起動
+## Launching judges and planners
 
-起動時の本文は、返された指示 ID を入れた次の1行だけにする。自己評価、作成者の推論、追加の依頼は混ぜない。
+Use only the following single line as the launch message, inserting the returned instruction ID. Do not add self-evaluation, author reasoning, or additional requests.
 
 ```text
-devkit-instruction <指示 ID>
+devkit-instruction <instruction_id>
 ```
 
-これは実行するコマンドではない。サブエージェントは指示 ID に含まれる作業 ID から `.devkit/run/work/<作業 ID>/brief/<指示 ID>.md` を読み、依頼を解決する。
+This is not a command to execute. The subagent resolves the request by reading `.devkit/run/work/<work_id>/brief/<instruction_id>.md`, using the work ID contained in the instruction ID.
 
-- Claude Code は Agent の `subagent_type` に指定された `devkit-judge` または `devkit-planner` を使う。親の履歴を継承せず、担当定義の model・effort を変更する上書きをしない。
-- Codex は `spawn_agent` の `agent_type` に指定された担当を使い、`fork_turns: "none"` を必ず指定する。`message` は上の1行だけにする。
+- In Claude Code, use the assigned `devkit-judge` or `devkit-planner` as Agent's `subagent_type`. Do not inherit the parent's history or override the model or effort in the role definition.
+- In Codex, use the assigned role as `spawn_agent`'s `agent_type` and always specify `fork_turns: "none"`. Use only the single line above as `message`.
 
-結果はサブエージェントの最終メッセージで返す。親は結果を転記・修正して提出しない。`.devkit/run/**/results/` と `records/` は通常のファイル編集で書かない。判定・検証コマンドが runner の場合は `devkit` が実行するので、代わりの判定者を起動しない。
+Subagents return results in their final messages. The parent must not transcribe, modify, or submit their results. Do not write `.devkit/run/**/results/` or `records/` through ordinary file editing. When a judgment or verification command is the runner, devkit executes it; do not launch a substitute judge.
 
-## 記録と提出
+## Recording and submitting
 
-途中の決定、証拠、教訓は `devkit note <種別> <ファイル>` で記録する。再現手順の保存先とバージョンは修正を始める前に、仮説の結果は次の仮説を始める前に記録する。暫定判断で進める分類なら、決定と適用条件を note に残し、次のゲートまたは PR レビューで人が確認できるようにする。
+Record intermediate decisions, evidence, and lessons with `devkit note <kind> <file>`. Record the reproduction procedure's location and version before starting a fix, and a hypothesis result before starting the next hypothesis. For classifications allowing provisional decisions, record the decision and applicability in a note so a human can check them at the next gate or PR review.
 
-ラウンドの結果は、依頼文が指定する終了ブロックの JSON Schema に合わせてファイルに書き、`devkit submit <ファイル>` で提出する。既定の入力先は `.devkit/run/work/<作業 ID>/inbox/` である。
+Write round results to a file following the termination block JSON Schema specified by the request, then submit with `devkit submit <file>`. The default input location is `.devkit/run/work/<work_id>/inbox/`.
 
-終了ブロックには現行の作業指示の `instruction_id`、実施内容、確認済み事項、未確認事項、障害、終了の種別、一時状態とその確認方法・出典・無効になる条件、再開条件を含める。変更ファイル一覧は `devkit` が差分から生成する。終了の種別は「完了を主張」「停止して確認」「作業停止の申告」から選び、判定を自分で `PASS` にしない。「停止して確認」は検証・判定を通さず問い待ちになる。「作業停止の申告」は `pause` の代わりにならない。
+The termination block includes the current work instruction's `instruction_id`, work performed, confirmed and unconfirmed matters, obstacles, termination kind, temporary state with its verification method, source, and invalidation conditions, and resume conditions. Devkit generates the changed-file list from the diff. Choose `completion-claimed`, `confirmation-required`, or `work-stopped` as the termination kind; do not assign yourself `PASS`. `confirmation-required` waits for a question without verification or judgment. `work-stopped` does not replace `pause`.
 
-提出後は `devkit next` の指示に従う。コミットはステージ完了時に `devkit` が行うので、エージェント自身では実行しない。
+After submission, follow `devkit next`. Devkit commits on stage completion; agents do not commit themselves.
 
-## 問いと回答
+## Questions and answers
 
-`next` または Stop が返した問いは、form の文面を保ってチャットに見せる。問い ID、承認対象、停止しているステージと理由、選択肢、推奨案とその理由、回答後に進むステージ、根拠への参照を伝える。自由な言葉、選択肢にない答え、条件付きの答え、質問で答えられることを案内する。
+Show questions returned by `next` or Stop in chat, preserving the form's wording. Include the question ID, approval target, paused stage and reason, options, recommendation and reason, stage to proceed to after the answer, and references to grounds. Explain that the human may answer freely, give an unlisted or conditional answer, or respond with a question.
 
-人が答えたら、hook が観測した入力原文に対応させて意味を読み、`devkit answer <問い ID>` で回答を記録する。引用・説明・別の主体の報告を承認と読み替えない。曖昧で判断できなければ確認し、承認として進めない。CLI が求める回答の入力形式に従い、受理後は `devkit next` で続ける。訂正は新しい回答として記録し、置換元を参照する。
+When the human answers, interpret it against the original input observed by the hook and record it with `devkit answer <question_id>`. Do not reinterpret quotations, explanations, or another actor's report as approval. If the meaning is ambiguous, clarify rather than proceeding as approved. Follow the CLI's required answer input format; after acceptance, continue with `devkit next`. Record corrections as new answers referencing the answer being replaced.
 
-人の計画変更は `devkit plan <ファイル>`、撤回は `devkit plan --withdraw`、作業の中止は人の依頼に従い `devkit abort` で記録する。
+Record human-requested plan changes with `devkit plan <file>`, withdrawals with `devkit plan --withdraw`, and work cancellation with `devkit abort` at the human's request.
 
-## 中断と再開
+## Pause and resume
 
-人が止めるよう頼んだら、言い回しによらず、終了ブロックの提出やサブエージェント・外部操作の終了を待たずに `devkit pause` を呼ぶ。人がターミナルやホストの `!` で直接実行してもよい。中断は作業と記録を残す操作である。
+When a human asks to stop, regardless of wording, call `devkit pause` without waiting for a termination block submission or for subagents or external operations to finish. The human may also invoke it directly in a terminal or through the host's `!`. Pausing retains work and records.
 
-中断中は新しい作業・判定・計画・検証・外部操作・完了処理を始めない。結果の到着、`next` の反復、セッションの切り替え、compaction を再開と解釈しない。実行中の外部操作の取り消しや、結果不明の操作の再実行をしない。
+While paused, do not start new work, judgments, planning, verification, external operations, or completion processing. Do not interpret result arrival, repeated `next`, session changes, or compaction as resume. Do not cancel running external operations or rerun operations whose results are unknown.
 
-人が明示して再開を頼んだときだけ `devkit resume` を呼び、その後 `devkit next` で続ける。Stop の継続上限による問いも人に示して回答を待つ。ツール呼び出しで継続回数をリセットしようとしない。
+Call `devkit resume` only when the human explicitly requests resume, then continue with `devkit next`. Also present questions caused by the Stop continuation limit and wait for an answer. Do not try to reset continuation counts through tool calls.
 
-## 外部操作
+## External operations
 
-外部への書き込みは、登録された `devkit external <種別> <入力ファイル>` を通す。確認待ちなら問いを示し、回答を `answer` で記録してから同じ呼び出しを実行する。実行中・結果不明・成功済みの扱いは返された状態に従い、別経路で再送しない。
+Route external writes through registered `devkit external <kind> <input_file>` operations. If confirmation is pending, present the question, record the answer with `answer`, then make the same call. Follow the returned state for running, unknown-result, and successful operations; do not resend through another path.
 
-## 振り返り
+## Retrospective
 
-指摘、失敗、人が見つけた見逃しを手がかりに、必要に応じて会話の記録や原因を調べる。教訓を `devkit note` に残し、改善の反映先と理由を提示する。優先順は hook・lint・型、ループの雛形、原則、skill の手順、kit への反映とする。
+Use findings, failures, and human-discovered misses to investigate conversation records and causes as needed. Record lessons with `devkit note` and propose where to apply improvements and why. The priority order is hooks, lint, and types; plan templates; principles; skill procedures; then the kit.
 
-案の採用・却下・保留と理由を記録し、必要な変更承認を受ける。メタループの編集を宣言していないステージでは、ループ自身の編集について人に確認する。規則違反の再発に文章の追記だけで対処せず、防ぐ失敗と実行・保守・誤検出への負担から手段を選ぶ。検出試験と仕組みの整理・削減を同じ作業で同時に行わない。
+Record adoption, rejection, or deferral of proposals and the reasons, and obtain required change approvals. In stages that have not declared meta-loop edits, ask the human before changing the loop itself. Do not address recurring rule violations only by adding prose; choose mechanisms based on the failure to prevent and the execution, maintenance, and false-positive burden. Do not combine detection tests with organizing or reducing mechanisms in the same work.

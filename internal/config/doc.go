@@ -1,5 +1,5 @@
-// config は渡された TOML の解析・検証と、設定やコマンド登録の内部型への変換を担う。
-// 読み出し元の決定、動作の分岐の仕組み、モデル名、セッションのホストの起動用パス設定は置かない。
-// 他のモジュールに依存せず、判定・検証コマンドの準備と掃除はコマンド側に置く。
-// 正本: docs/architecture/modules.md#config
+// Package config parses and validates supplied TOML and converts settings and command registrations to internal types.
+// It excludes source selection, behavior branching mechanisms, model names, and paths for launching session hosts.
+// It depends on no other modules; judge and verification commands handle their own setup and cleanup.
+// Canonical design: docs/architecture/modules.md#config
 package config

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "終了ブロック",
+  "title": "Termination block",
   "type": "object",
   "properties": {
     "instruction_id": {
@@ -9,9 +9,9 @@
     },
     "termination_kind": {
       "enum": [
-        "完了を主張",
-        "停止して確認",
-        "作業停止の申告"
+        "completion-claimed",
+        "confirmation-required",
+        "work-stopped"
       ]
     },
     "work_performed": {

@@ -1,29 +1,29 @@
-# 同名の分類は利用側の devkit.toml の追記で上書きする。
-# 依存のマニフェスト・ロックファイルの差分、宣言のないメタループの編集、
-# commit 前後の対象を取り直した後の再変化を人に確認する。
+# Same-named classifications are overridden by additions in the consuming devkit.toml.
+# Ask a human about dependency manifest or lockfile diffs, undeclared meta-loop edits,
+# and another target change after refreshing the target around commit.
 human_confirmation = [
   "dependency_changed",
   "undeclared_meta_loop_edit",
   "target_changed_again",
 ]
 
-# メタループには .devkit/（run/ を除く）、devkit.toml、ホスト設定、
-# 指示ファイル、skill、有効な pre-commit の変更を含める。
-# 宣言済みステージの編集を undeclared_meta_loop_edit に含めない。
+# Meta-loop edits include .devkit/ (except run/), devkit.toml, host settings,
+# instruction files, skills, and the active pre-commit hook.
+# Exclude edits in stages declaring them from undeclared_meta_loop_edit.
 
-# PASS でも plan の完了条件を満たすまでは完了を確定しない。
-# 上限、進展、前提が崩れたときの戻り先、終了の種別も判断の入力とする。
+# PASS does not finalize completion until the plan's completion conditions are met.
+# Limits, progress, return stages for broken premises, and termination kinds are also inputs.
 [check_results]
 "FAIL" = "fix"
 "NOT ASSESSED" = "ask"
 "PASS" = "done"
 
-# ロールは実行主体を選ぶ設定ではない。runner は雛形の check で指定する。
+# Roles do not select runners. Assign runners in the template's checks.
 [roles]
-worker = "作業者"
-human = "人"
-judge = "判定者"
-planner = "計画者"
+worker = "Worker"
+human = "Human"
+judge = "Judge"
+planner = "Planner"
 
 [lessons]
 destinations = ["hook_lint_type", "plan_template", "principle", "skill", "kit"]

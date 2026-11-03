@@ -1,5 +1,5 @@
-// view は ledger と解析済みの構造の値から、1作業を人に表示する静的 HTML を生成する。
-// サーバや HTML からの状態変更は置かず、構造の履歴は cmd/devkit が workspace で取得して渡す。
-// ledger・問いを描画する form・ステージ名を持つ plan に依存する。
-// 正本: docs/architecture/modules.md#view
+// view generates static HTML for people to view one work item from ledger and parsed structure values.
+// It provides no server or state changes from HTML; cmd/devkit retrieves structure history through workspace and passes it to view.
+// It depends on ledger, form for rendering questions, and plan for stage names.
+// Source of truth: docs/architecture/modules.md#view
 package view

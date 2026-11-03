@@ -2,6 +2,7 @@ package brief
 
 import (
 	"encoding/json"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -10,33 +11,77 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
+func requestTemplate(t *testing.T, name string) string {
+	t.Helper()
+	source, err := os.ReadFile("../../kit/templates/brief/" + name + ".md.tmpl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(source)
+}
+
+func TestSuppliedTemplates(t *testing.T) {
+	builders := []struct {
+		name  string
+		build func(string) (Brief, error)
+	}{
+		{"work", func(source string) (Brief, error) {
+			return BuildWork(WorkInput{InstructionID: "custom-id", RequestTemplate: source})
+		}},
+		{"judgment", func(source string) (Brief, error) {
+			return BuildJudgment(JudgmentInput{InstructionID: "custom-id", RequestTemplate: source})
+		}},
+		{"planner", func(source string) (Brief, error) {
+			return BuildPlanner(PlannerInput{InstructionID: "custom-id", RequestTemplate: source})
+		}},
+	}
+	for _, builder := range builders {
+		t.Run(builder.name, func(t *testing.T) {
+			got, err := builder.build("Custom request: {{.InstructionID}}")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != (Brief{InstructionID: "custom-id", Text: "Custom request: custom-id"}) {
+				t.Fatalf("supplied template was not applied: %+v", got)
+			}
+			for _, source := range []string{"{{", "{{.UnknownField}}"} {
+				got, err := builder.build(source)
+				if err == nil || got != (Brief{}) {
+					t.Errorf("invalid template %q returned %+v, %v", source, got, err)
+				}
+			}
+		})
+	}
+}
+
 func TestBuildWork(t *testing.T) {
-	previous := "  前段の出力\n\n```text\n{{そのまま}}\n```\n末尾の空白  \n"
-	command := "検証失敗\n  expected: A\n  actual: B\n"
+	previous := "  Previous stage output\n\n```text\n{{verbatim}}\n```\nTrailing spaces  \n"
+	command := "Verification failed\n  expected: A\n  actual: B\n"
 	input := WorkInput{
+		RequestTemplate: requestTemplate(t, "work"),
 		InstructionID:   "work-round-1",
 		Stage:           plan.Stage{ID: "implement", Limits: plan.Limits{MaxRounds: 3, MaxNoProgress: 2}},
-		StageDefinition: "合意した契約を実装する。",
+		StageDefinition: "Implement the agreed contract.",
 		Plan: plan.Plan{
-			Task:                  "利用者が保存できるようにする",
-			CompletionConditions:  []plan.CompletionCondition{{ID: "C1", Description: "保存した内容を読める"}},
-			IrreversibleDecisions: []string{"計画の変更困難な決定"},
+			Task:                  "Allow users to save content",
+			CompletionConditions:  []plan.CompletionCondition{{ID: "C1", Description: "Saved content can be read"}},
+			IrreversibleDecisions: []string{"Irreversible plan decision"},
 		},
-		Purpose:          "利用者の記録を保存する",
+		Purpose:          "Save user records",
 		AllowedChanges:   []string{"internal/save/"},
-		ForbiddenChanges: []string{"公開 API"},
-		Verification:     []string{"C1: 保存後に読み出し、内容を比較する"},
+		ForbiddenChanges: []string{"Public API"},
+		Verification:     []string{"C1: Read after saving and compare the content"},
 		PreviousOutputs:  []StageOutput{{StageID: "contract", Content: previous}},
 		Repository: RepositoryFacts{
-			LayoutGuides:          []Document{{Path: "internal/save/README.md", Content: "保存の配置ガイド"}},
-			Rules:                 Document{Path: ".devkit/rules.md", Content: "既存の規則"},
-			IrreversibleDecisions: []string{"規則の変更困難な決定"},
+			LayoutGuides:          []Document{{Path: "internal/save/README.md", Content: "Storage layout guide"}},
+			Rules:                 Document{Path: ".devkit/rules.md", Content: "Existing rules"},
+			IrreversibleDecisions: []string{"Irreversible rule decision"},
 			AvailableChecks:       []plan.Check{{Aspect: "command:test", Runner: "command:test"}},
 		},
-		Norms:            []Document{{Path: "AGENTS.md", Content: "固定した指示"}},
-		PreviousFindings: []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "保存に失敗する"}},
+		Norms:            []Document{{Path: "AGENTS.md", Content: "Fixed instructions"}},
+		PreviousFindings: []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "Saving fails"}},
 		CommandOutputs:   []CommandOutput{{Check: plan.Check{Aspect: "command:test", Runner: "command:test", Required: true}, ExitCode: 1, Output: command}},
-		PreCommitOutput:  "pre-commit の検証失敗\n詳細\n",
+		PreCommitOutput:  "pre-commit verification failed\nDetails\n",
 		OutputSchema:     `{"type":"object","required":["instruction_id"]}`,
 	}
 	before, err := json.Marshal(input)
@@ -52,18 +97,18 @@ func TestBuildWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got != again || got.InstructionID != input.InstructionID {
-		t.Fatal("同じ入力から異なる依頼を組み立てた")
+		t.Fatal("assembled different requests from identical inputs")
 	}
 	for _, want := range []string{
 		previous, command, input.StageDefinition, input.Purpose, input.OutputSchema,
-		"C1", "保存した内容を読める", "internal/save/", "公開 API", input.Verification[0],
-		"ラウンド数 3", "進展がない回数 2", "internal/save/README.md", "保存の配置ガイド",
-		".devkit/rules.md", "既存の規則", "規則の変更困難な決定", "計画の変更困難な決定",
-		"AGENTS.md", "固定した指示", "F1", "保存に失敗する", "command:test", "終了コード: 1",
-		input.PreCommitOutput, `"instruction_id": "work-round-1"`, "停止して確認", "作業停止の申告",
+		"C1", "Saved content can be read", "internal/save/", "Public API", input.Verification[0],
+		"3 rounds", "2 consecutive rounds without progress", "internal/save/README.md", "Storage layout guide",
+		".devkit/rules.md", "Existing rules", "Irreversible rule decision", "Irreversible plan decision",
+		"AGENTS.md", "Fixed instructions", "F1", "Saving fails", "command:test", "Exit code: 1",
+		input.PreCommitOutput, `"instruction_id": "work-round-1"`, string(form.TerminationQuestion), string(form.TerminationStopped),
 	} {
 		if !strings.Contains(got.Text, want) {
-			t.Errorf("依頼に %q がない", want)
+			t.Errorf("request does not contain %q", want)
 		}
 	}
 	after, err := json.Marshal(input)
@@ -71,15 +116,16 @@ func TestBuildWork(t *testing.T) {
 		t.Fatal(err)
 	}
 	if string(before) != string(after) {
-		t.Fatal("組み立てで入力を変更した")
+		t.Fatal("assembly modified the input")
 	}
 }
 
 func TestBuildJudgment(t *testing.T) {
 	input := JudgmentInput{
-		InstructionID: "judge-round-1",
-		Content:       "check が選んだ本文\n  対象: snap/tree\n前回の指摘 ID: F1\n{{展開しない}}\n",
-		OutputSchema:  `{"required":["instruction_id","judgment"]}`,
+		RequestTemplate: requestTemplate(t, "judgment"),
+		InstructionID:   "judge-round-1",
+		Content:         "Content selected by check\n  Target: snap/tree\nPrevious finding ID: F1\n{{do_not_expand}}\n",
+		OutputSchema:    `{"required":["instruction_id","judgment"]}`,
 	}
 	got, err := BuildJudgment(input)
 	if err != nil {
@@ -90,32 +136,33 @@ func TestBuildJudgment(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got != again || got.InstructionID != input.InstructionID {
-		t.Fatal("同じ入力から異なる依頼を組み立てた")
+		t.Fatal("assembled different requests from identical inputs")
 	}
-	for _, want := range []string{input.Content, input.OutputSchema, `"judge-round-1"`, "JSON だけの最終メッセージ", "instruction_id"} {
+	for _, want := range []string{input.Content, input.OutputSchema, `"judge-round-1"`, "JSON-only final message", "instruction_id"} {
 		if !strings.Contains(got.Text, want) {
-			t.Errorf("依頼に %q がない", want)
+			t.Errorf("request does not contain %q", want)
 		}
 	}
 }
 
 func TestBuildPlanner(t *testing.T) {
-	current := plan.Plan{Version: 1, Task: "旧計画の課題"}
-	remaining := plan.Plan{Task: "残りの課題", Stages: []plan.Stage{{ID: "implement"}}}
+	current := plan.Plan{Version: 1, Task: "Previous plan task"}
+	remaining := plan.Plan{Task: "Remaining task", Stages: []plan.Stage{{ID: "implement"}}}
 	input := PlannerInput{
+		RequestTemplate:   requestTemplate(t, "planner"),
 		InstructionID:     "plan-2",
 		Version:           2,
 		Template:          plan.PlanTemplate{Name: "fix", StartStage: "implement", PlanLimits: &plan.PlanLimits{MaxRounds: 4}},
 		TemplateHash:      "template-hash",
-		Task:              "保存の失敗を直す",
-		StageDefinitions:  []Document{{Path: "stages/implement.md", Content: "実装の定義"}},
-		Repository:        RepositoryFacts{Rules: Document{Path: ".devkit/rules.md", Content: "リポジトリの規則"}},
-		Norms:             []Document{{Path: "principles/harness.md", Content: "ループの原則"}},
+		Task:              "Fix the save failure",
+		StageDefinitions:  []Document{{Path: "stages/implement.md", Content: "Implementation definition"}},
+		Repository:        RepositoryFacts{Rules: Document{Path: ".devkit/rules.md", Content: "Repository rules"}},
+		Norms:             []Document{{Path: "principles/harness.md", Content: "Loop principles"}},
 		CurrentPlan:       &current,
 		RemainingPlan:     &remaining,
-		HumanInstructions: "  人の修正指示を保つ\n{{補間しない}}\n",
-		PreviousFindings:  []form.Finding{{ID: "PF1", Scenario: "完了条件がない"}},
-		PreviousOutputs:   []StageOutput{{StageID: "research", Content: "調査結果\n  詳細\n"}},
+		HumanInstructions: "  Preserve human revision instructions\n{{do_not_interpolate}}\n",
+		PreviousFindings:  []form.Finding{{ID: "PF1", Scenario: "Missing completion conditions"}},
+		PreviousOutputs:   []StageOutput{{StageID: "research", Content: "Research results\n  Details\n"}},
 		OutputSchema:      `{"required":["instruction_id","plan"]}`,
 	}
 	got, err := BuildPlanner(input)
@@ -127,25 +174,25 @@ func TestBuildPlanner(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(got, again) || got.InstructionID != input.InstructionID {
-		t.Fatal("同じ入力から異なる依頼を組み立てた")
+		t.Fatal("assembled different requests from identical inputs")
 	}
 	for _, want := range []string{
-		input.Task, input.TemplateHash, `"max_rounds": 4`, "旧計画の課題", "残りの課題", "番号は 2",
-		"stages/implement.md", "実装の定義", "リポジトリの規則", "principles/harness.md", "ループの原則",
-		input.HumanInstructions, "PF1", "完了条件がない", input.PreviousOutputs[0].Content,
-		input.OutputSchema, "instruction_id", `"plan-2"`, "JSON だけの最終メッセージ",
+		input.Task, input.TemplateHash, `"max_rounds": 4`, "Previous plan task", "Remaining task", "version to 2",
+		"stages/implement.md", "Implementation definition", "Repository rules", "principles/harness.md", "Loop principles",
+		input.HumanInstructions, "PF1", "Missing completion conditions", input.PreviousOutputs[0].Content,
+		input.OutputSchema, "instruction_id", `"plan-2"`, "JSON-only final message",
 	} {
 		if !strings.Contains(got.Text, want) {
-			t.Errorf("依頼に %q がない", want)
+			t.Errorf("request does not contain %q", want)
 		}
 	}
-	initial, err := BuildPlanner(PlannerInput{InstructionID: "plan-1", Version: 1, Template: input.Template, Task: input.Task})
+	initial, err := BuildPlanner(PlannerInput{RequestTemplate: input.RequestTemplate, InstructionID: "plan-1", Version: 1, Template: input.Template, Task: input.Task})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, unwanted := range []string{"## 現在の計画", "## 残りの実行内容", "## 人の修正指示", "## 計画の check の指摘と指摘 ID"} {
+	for _, unwanted := range []string{"## Current plan", "## Remaining work", "## Human revision instructions", "## Plan check findings and finding IDs"} {
 		if strings.Contains(initial.Text, unwanted) {
-			t.Errorf("初回の依頼に %q を含めた", unwanted)
+			t.Errorf("initial request contains %q", unwanted)
 		}
 	}
 }

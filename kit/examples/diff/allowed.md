@@ -1,13 +1,13 @@
-## 依頼
+## Request
 
-依頼は保存ボタンの文言を「登録」から「保存」に変えること。コード、承認・委任、流儀、報告を照合する。PR 本文は対象外。
+The request is to change the save button text from "Register" to "Save". Compare code, approvals and delegation, style, and reporting. The PR body is out of scope.
 
-## 対象
+## Target
 
-# 差分と報告
+# Diff and report
 
-- 有効な承認・委任: 保存ボタンの文言を「保存」に変え、同じ文言を照合する既存テストの期待値も追従させること。表示仕様と期待値の変更は依頼者が承認済み。
-- 差分: save ボタンの文言と、その文言を照合するテストの期待値を「登録」から「保存」に変更。保存処理は変更しない。
-- 流儀: 対象ファイル内の文言定義と既存テストの形式に揃えた。
-- 検証: 変更後のツリーで対象画面の文言を確認。期待値だけを先に直した時点ではテストが失敗し、文言を変更した後は成功した。描画とテストの記録は添付済み。
-- 報告: 合意した文言と対応する期待値を変更した。採否を左右する未確認事項はなく、人の追加対応は不要。
+- Valid approval and delegation: Change the save button text to "Save" and update the expected value in the existing test comparing the same text. The requester approved the display specification and expected value changes.
+- Diff: Changed the save button text and the corresponding test's expected value from "Register" to "Save". Storage processing is unchanged.
+- Style: Followed the target file's text definitions and existing test format.
+- Verification: Checked the target screen text in the changed tree. The test failed when only the expected value had been updated, and passed after changing the button text. Rendering and test records are attached.
+- Report: Changed the agreed text and corresponding expected value. No unverified matters affect adoption, and no further human action is needed.

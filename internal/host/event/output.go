@@ -6,7 +6,7 @@ import (
 	"unicode/utf8"
 )
 
-// Decision は hook が決めた停止またはツールの扱いである。空値は介入しない。
+// Decision is the hook's decision about stopping or tool use. An empty value does not intervene.
 type Decision string
 
 const (
@@ -15,9 +15,9 @@ const (
 	Deny  Decision = "deny"
 )
 
-// Result は hook の処理結果である。判断や要約の作成は hook が担う。
-// AdditionalContext は SessionStart・PreToolUse・UserPromptSubmit で使う。
-// Stop の問いなど、人向けの通知は SystemMessage で渡す。
+// Result is the hook processing result. The hook creates decisions and summaries.
+// AdditionalContext is used for SessionStart, PreToolUse, and UserPromptSubmit.
+// SystemMessage carries notifications for humans, such as Stop questions.
 type Result struct {
 	Decision          Decision
 	Reason            string
@@ -40,8 +40,8 @@ type specificOutput struct {
 	Context    string `json:"additionalContext,omitempty"`
 }
 
-// Format は処理結果をホストの出力 JSON にする。何もしない場合も {} を返す。
-// 本文が上限を超えると Summary と全文への案内を使う。
+// Format converts a processing result to host output JSON, returning {} even when no action is needed.
+// If the output exceeds the host limit, it uses Summary and guidance to the full text.
 func Format(host Host, name Name, result Result) ([]byte, error) {
 	if err := validHost(host); err != nil {
 		return nil, err
@@ -49,72 +49,85 @@ func Format(host Host, name Name, result Result) ([]byte, error) {
 	if err := validName(name); err != nil {
 		return nil, err
 	}
-	out := output{SystemMessage: limited(host, result.SystemMessage)}
+	out := output{SystemMessage: result.SystemMessage}
 	var specific specificOutput
 	specific.Name = name
 	switch result.Decision {
 	case "":
 	case Block:
 		if name != Stop {
-			return nil, fmt.Errorf("%s では block を出力できません", name)
+			return nil, fmt.Errorf("cannot output block for %s", name)
 		}
 		out.Decision = "block"
-		out.Reason = limited(host, result.Reason)
+		out.Reason = result.Reason
 	case Allow, Deny:
 		if name != PreToolUse {
-			return nil, fmt.Errorf("%s ではツールの許可・拒否を出力できません", name)
+			return nil, fmt.Errorf("cannot output tool permission decisions for %s", name)
 		}
 		specific.Permission = string(result.Decision)
-		specific.Reason = limited(host, result.Reason)
+		specific.Reason = result.Reason
 	default:
-		return nil, fmt.Errorf("未対応の処理結果です: %q", result.Decision)
+		return nil, fmt.Errorf("unsupported result: %q", result.Decision)
 	}
 	if result.AdditionalContext != "" {
 		switch name {
 		case SessionStart, PreToolUse, UserPromptSubmit:
 		default:
-			return nil, fmt.Errorf("%s では additionalContext を出力できません", name)
+			return nil, fmt.Errorf("cannot output additionalContext for %s", name)
 		}
-		context := result.AdditionalContext
-		if !fits(host, context) {
-			const guide = "\n`devkit status` で全文"
-			context = limitedWithSuffix(host, result.Summary, guide)
-		}
-		specific.Context = context
+		specific.Context = result.AdditionalContext
 	}
 	if specific.Permission != "" || specific.Context != "" {
 		out.Specific = &specific
 	}
-	return json.Marshal(out)
+	data, err := json.Marshal(out)
+	if err != nil || fits(host, string(data)) {
+		return data, err
+	}
+	const guide = "\nRun `devkit status` for the full text"
+	if specific.Context != "" {
+		specific.Context = result.Summary + guide
+		data, err = json.Marshal(out)
+		if err != nil || fits(host, string(data)) {
+			return data, err
+		}
+	}
+	// Shorten text against the serialized output budget, preserving the full-text guide.
+	for _, field := range []*string{&out.SystemMessage, &out.Reason, &specific.Reason, &specific.Context} {
+		suffix := ""
+		text := *field
+		if field == &specific.Context && text != "" {
+			text = result.Summary
+			suffix = guide
+		}
+		runes := []rune(text)
+		low, high := 0, len(runes)
+		for low < high {
+			mid := low + (high-low+1)/2
+			*field = string(runes[:mid]) + suffix
+			data, err = json.Marshal(out)
+			if err != nil {
+				return nil, err
+			}
+			if fits(host, string(data)) {
+				low = mid
+			} else {
+				high = mid - 1
+			}
+		}
+		*field = string(runes[:low]) + suffix
+		data, err = json.Marshal(out)
+		if err != nil || fits(host, string(data)) {
+			return data, err
+		}
+	}
+	return data, nil
 }
 
 func fits(host Host, text string) bool {
 	if host == ClaudeCode {
 		return utf8.RuneCountInString(text) <= 10000
 	}
-	// トークナイザーは持たず、約 2500 トークンに対して UTF-8 のバイト数で抑える。
-	return len(text) <= 2500
-}
-
-func limited(host Host, text string) string {
-	return limitedWithSuffix(host, text, "")
-}
-
-func limitedWithSuffix(host Host, text, suffix string) string {
-	if host == ClaudeCode {
-		runes := []rune(text)
-		limit := 10000 - utf8.RuneCountInString(suffix)
-		if len(runes) > limit {
-			text = string(runes[:limit])
-		}
-	} else {
-		limit := 2500 - len(suffix)
-		if len(text) > limit {
-			for !utf8.RuneStart(text[limit]) {
-				limit--
-			}
-			text = text[:limit]
-		}
-	}
-	return text + suffix
+	// Approximate 2,500 tokens as 10,000 UTF-8 bytes, at four bytes per token.
+	return len(text) <= 10000
 }

@@ -15,7 +15,7 @@
       ],
       "gate": {
         "required": false,
-        "reason": "課題に必要な作業の結果を確認する"
+        "reason": "Review the results of work required for the task"
       },
       "limits": {
         "max_rounds": 3,
@@ -40,7 +40,7 @@
       ],
       "gate": {
         "required": true,
-        "reason": "変更困難な決定を含むスコープを確認する"
+        "reason": "Review the scope, including hard-to-change decisions"
       },
       "limits": {
         "max_rounds": 3,
@@ -65,7 +65,7 @@
       ],
       "gate": {
         "required": false,
-        "reason": "課題に必要な作業の結果を確認する"
+        "reason": "Review the results of work required for the task"
       },
       "limits": {
         "max_rounds": 3,
@@ -90,7 +90,7 @@
       ],
       "gate": {
         "required": false,
-        "reason": "課題に必要な作業の結果を確認する"
+        "reason": "Review the results of work required for the task"
       },
       "limits": {
         "max_rounds": 3,
@@ -115,7 +115,7 @@
       ],
       "gate": {
         "required": false,
-        "reason": "課題に必要な作業の結果を確認する"
+        "reason": "Review the results of work required for the task"
       },
       "limits": {
         "max_rounds": 3,
@@ -145,7 +145,7 @@
       ],
       "gate": {
         "required": false,
-        "reason": "課題に必要な作業の結果を確認する"
+        "reason": "Review the results of work required for the task"
       },
       "limits": {
         "max_rounds": 3,
@@ -166,7 +166,7 @@
       "checks": [],
       "gate": {
         "required": false,
-        "reason": "調査結果を次のステージに渡す"
+        "reason": "Pass research findings to the next stage"
       },
       "limits": {
         "max_rounds": 1,
@@ -191,7 +191,7 @@
       ],
       "gate": {
         "required": false,
-        "reason": "未確認の前提を試し、試作を本番から分離する"
+        "reason": "Test unverified assumptions and keep prototypes separate from production"
       },
       "limits": {
         "max_rounds": 3,

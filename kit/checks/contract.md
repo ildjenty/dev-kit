@@ -1,6 +1,6 @@
 # contract
 
-- 確認事項: 状態と値の受け入れは `principles/data.md` の原則3（`principles/data.md#3-不正な状態や値の受け入れを型と検証で防ぐ`）、失敗の分類と公開応答は `principles/engineering.md` の原則1（`principles/engineering.md#1-失敗を隠さない`）に従う。
-- blocking: 照合した原則の blocking 条件に該当する。
-- 報告しない事項: この観点の確認事項に含まれない事項。失敗のシナリオを示せない指摘。
-- 出力形式: 依頼で渡された Judgment の JSON Schema と `docs/architecture/data.md` の Judgment・Finding に従う。必要な判断基準や必須の確認を得られない場合は `NOT ASSESSED` とし、確認済み・未確認の範囲と方法・環境を残す。失敗のシナリオを示せない指摘は返さず、重大度は付けない。指摘は全件残し、blocking でない指摘は参考情報とし修正を求めない。適用除外の主張と根拠を照合し、外れる要求に限って違反としない。
+- Checks: Follow principle 3 of `principles/data.md` (`principles/data.md#3-%E4%B8%8D%E6%AD%A3%E3%81%AA%E7%8A%B6%E6%85%8B%E3%82%84%E5%80%A4%E3%81%AE%E5%8F%97%E3%81%91%E5%85%A5%E3%82%8C%E3%82%92%E5%9E%8B%E3%81%A8%E6%A4%9C%E8%A8%BC%E3%81%A7%E9%98%B2%E3%81%90`) for accepting states and values, and principle 1 of `principles/engineering.md` (`principles/engineering.md#1-%E5%A4%B1%E6%95%97%E3%82%92%E9%9A%A0%E3%81%95%E3%81%AA%E3%81%84`) for failure classification and public responses.
+- blocking: A blocking condition in a referenced principle applies.
+- Do not report: Items outside this aspect's checks. Findings without a failure scenario.
+- Output format: Follow the Judgment JSON Schema supplied in the request and the Judgment and Finding definitions in `docs/architecture/data.md`. Return `NOT ASSESSED` when necessary criteria or required verification are unavailable, and record the verified and unverified scope, method, and environment. Do not return findings without a failure scenario, and do not assign severity. Retain all findings; treat nonblocking findings as reference information without requiring fixes. Compare exemption claims with their grounds, and waive only the requirements covered by the exemption.

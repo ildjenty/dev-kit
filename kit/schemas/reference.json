@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:devkit:form:reference",
+  "title": "Reference",
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "record_id"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "external": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "external"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

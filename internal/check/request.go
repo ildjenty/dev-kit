@@ -15,21 +15,21 @@ const (
 	DetectionRequest RequestKind = "detection"
 )
 
-// Norm は固定済みの規範の識別と本文である。brief と計画も規範として渡す。
+// Norm holds a fixed norm identity and content. Provide the brief and plan as norms too.
 type Norm struct {
 	Reference form.NormReference `json:"reference"`
 	Content   string             `json:"content"`
 }
 
-// Authorization は判定対象に適用される承認または委任の範囲である。
+// Authorization describes an approval or delegation scope applicable to the judgment target.
 type Authorization struct {
 	Target   form.ApprovalTarget `json:"target"`
 	Scope    string              `json:"scope"`
 	Evidence []form.Reference    `json:"evidence"`
 }
 
-// RequestInput は呼び出し側が解決した判定の入力である。
-// ラウンドでは Progress、差分の観点では有効な Authorizations の一覧を渡す。
+// RequestInput holds judgment inputs resolved by the caller.
+// Provide Progress for rounds and valid Authorizations for the diff aspect.
 type RequestInput struct {
 	Kind                   RequestKind
 	InstructionID          string
@@ -45,28 +45,28 @@ type RequestInput struct {
 	Authorizations         []Authorization
 }
 
-// Request は brief に渡す判定依頼の内容であり、依頼文自体は組み立てない。
+// Request holds judgment request content for brief without composing the request text.
 type Request struct {
 	RequestInput
 	PreviousFindingIDs []string
 }
 
-// PrepareRequest は修正ラウンドの指摘 ID を付けて依頼の内容を決める。
+// PrepareRequest prepares request content with finding IDs for correction rounds.
 func PrepareRequest(input RequestInput) (Request, error) {
 	switch input.Kind {
 	case RoundRequest:
 		if input.Progress == nil {
-			return Request{}, fmt.Errorf("ラウンドの判定には終了ブロックが必要です")
+			return Request{}, fmt.Errorf("round judgment requires a termination block")
 		}
 	case PlanRequest, DetectionRequest:
 	default:
-		return Request{}, fmt.Errorf("不明な判定依頼の種別: %q", input.Kind)
+		return Request{}, fmt.Errorf("unknown judgment request kind: %q", input.Kind)
 	}
 	if input.InstructionID == "" || input.Runner == "" || input.Aspect.ID == "" || input.TargetPath == "" {
-		return Request{}, fmt.Errorf("指示 ID・実行主体・観点・対象の場所が必要です")
+		return Request{}, fmt.Errorf("instruction ID, runner, aspect, and target path are required")
 	}
 	if !json.Valid(input.OutputSchema) {
-		return Request{}, fmt.Errorf("出力スキーマの JSON が必要です")
+		return Request{}, fmt.Errorf("output schema JSON is required")
 	}
 	request := Request{RequestInput: input, PreviousFindingIDs: []string{}}
 	for _, finding := range input.PreviousFindings {

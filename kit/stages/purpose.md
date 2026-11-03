@@ -1,29 +1,29 @@
-# 0 目的
+# 0 Purpose
 
-## 入力
+## Inputs
 
-課題、変更の利用者と既知の目的、計画の ID 付き完了条件とその根拠。
+The task, users of the change and its known purpose, and the plan's completion conditions with IDs and their grounds.
 
-共通の入力は、固定した規範、計画の上限、変更対象の配置ガイド、rules.md と計画にある変更困難な決定、利用可能な check、前のステージの出力。修正ラウンドでは前回の指摘と指摘 ID、必須の command: の check の出力、pre-commit の出力を加える。前段は計画が採用したステージの出力を用い、ないステージを必須にしない。
+Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in rules.md and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required command: check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
-## 決めること
+## Decisions
 
-変更の利用者と目的、計画の完了条件の根拠。完了条件は利用者の言葉で言い直し、変更が必要なら計画の作り直し（`docs/architecture/data.md#計画のバージョン`）として提案する。
+Users and purpose of the change, and grounds for the plan's completion conditions. Restate the conditions in users' words; if changes are needed, propose replanning (`docs/architecture/data.md#%E8%A8%88%E7%94%BB%E3%81%AE%E3%83%90%E3%83%BC%E3%82%B8%E3%83%A7%E3%83%B3`).
 
-## 決めずに次のステージへ渡すこと
+## Deferred to later stages
 
-手段全般。
+All means of achieving the purpose.
 
-## 元に戻せないもの
+## Irreversible items
 
-なし。
+None.
 
-## 成果物
+## Artifacts
 
-目的と完了条件の対応の説明（`docs/checks.md#目的`）。変更が必要なら計画の作り直しの提案。
+An explanation of how the purpose corresponds to the completion conditions (`docs/checks.md#%E7%9B%AE%E7%9A%84`). A replanning proposal if changes are needed.
 
-## 終わる条件
+## Completion conditions
 
-目的と完了条件の対応を利用者の言葉で説明し、完了を判定できる。完了条件を変える必要がある場合は、実施済みの変更として扱わず計画の作り直しを提案している。
+Explain the relationship between the purpose and completion conditions in users' words so completion can be judged. If completion conditions need changing, propose replanning rather than treating the change as already made.
 
-返却後の対象と規範に有効な必須 check がすべて `PASS` であり、判定者が担当する必須観点とその担当に対する検出試験に合格し、devkit が行う対象の照合と `git commit` が成功している。検証の選定と必須化は計画に従い、この定義から check を追加しない。確定の責務は `docs/architecture/guarantees.md#完了条件` に従う。
+All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully checked the target and run `git commit`. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6` for finalization responsibilities.

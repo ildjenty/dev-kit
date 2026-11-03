@@ -11,19 +11,19 @@ import (
 	"strings"
 )
 
-// Workspace は1つのチェックアウトで git CLI を実行する。
+// Workspace runs the git CLI in a single checkout.
 type Workspace struct {
 	root string
 }
 
-// Snapshot はブランチに含めないコミットと、そのツリーで表す対象のバージョンである。
+// Snapshot holds a commit outside the branches and the target version represented by its tree.
 type Snapshot struct {
 	Tree   string
 	Commit string
 }
 
-// CommitResult は照合したツリーと、実際のコミットおよび hook の出力を保持する。
-// Commit が空でなければ、エラーがあってもコミットは作成済みである。
+// CommitResult holds the compared tree, the actual commit, and hook output.
+// A nonempty Commit means the commit was created, even if an error is returned.
 type CommitResult struct {
 	BeforeTree string
 	Commit     string
@@ -31,10 +31,10 @@ type CommitResult struct {
 	Output     string
 }
 
-// ErrTargetChanged は commit 前後に判定済みのツリーとの不一致を検出したことを表す。
-var ErrTargetChanged = errors.New("判定済みの対象とツリーが一致しません")
+// ErrTargetChanged indicates a mismatch with the evaluated tree before or after a commit.
+var ErrTargetChanged = errors.New("tree does not match the evaluated target")
 
-// StructureRevision は structure.json の履歴を新しいコミットから順に表す。
+// StructureRevision represents structure.json history, ordered from newest to oldest commit.
 type StructureRevision struct {
 	Commit  string
 	Blob    string
@@ -42,7 +42,7 @@ type StructureRevision struct {
 	Deleted bool
 }
 
-// Open は cwd が属するチェックアウトのルートを解決する。
+// Open resolves the root of the checkout containing cwd.
 func Open(ctx context.Context, cwd string) (*Workspace, error) {
 	w := &Workspace{root: cwd}
 	root, err := w.run(ctx, nil, "rev-parse", "--show-toplevel")
@@ -53,46 +53,46 @@ func Open(ctx context.Context, cwd string) (*Workspace, error) {
 	return w, nil
 }
 
-// Root はチェックアウトのルートの絶対パスを返す。
+// Root returns the absolute path of the checkout root.
 func (w *Workspace) Root() string {
 	return w.root
 }
 
-// Branch は現在のブランチ名を返す。detached HEAD では git のエラーを返す。
+// Branch returns the current branch name, or a git error for a detached HEAD.
 func (w *Workspace) Branch(ctx context.Context) (string, error) {
 	return w.line(ctx, nil, "symbolic-ref", "--quiet", "--short", "HEAD")
 }
 
-// Head は現在の HEAD のコミット ID を返す。
+// Head returns the commit ID of the current HEAD.
 func (w *Workspace) Head(ctx context.Context) (string, error) {
 	return w.line(ctx, nil, "rev-parse", "--verify", "HEAD^{commit}")
 }
 
-// CreateBranch は現在の HEAD からブランチを作成して切り替える。
-// 作業のブランチ名には devkit/<作業 ID> を渡す。
+// CreateBranch creates a branch from the current HEAD and switches to it.
+// Pass devkit/<work ID> as the work branch name.
 func (w *Workspace) CreateBranch(ctx context.Context, name string) error {
 	_, err := w.run(ctx, nil, "switch", "-c", name)
 	return err
 }
 
-// SwitchBranch は既存のブランチに切り替える。
+// SwitchBranch switches to an existing branch.
 func (w *Workspace) SwitchBranch(ctx context.Context, name string) error {
 	_, err := w.run(ctx, nil, "switch", "--", name)
 	return err
 }
 
-// SnapshotTree は追跡ファイルと ignore されていない未追跡ファイルのツリーを作る。
-// 通常の index と HEAD は変更しない。
-func (w *Workspace) SnapshotTree(ctx context.Context) (string, error) {
+// SnapshotTree creates a tree from tracked files and untracked files that are not ignored.
+// It leaves the normal index and HEAD unchanged.
+func (w *Workspace) SnapshotTree(ctx context.Context) (tree string, err error) {
 	index, cleanup, err := w.workingIndex(ctx)
 	if err != nil {
 		return "", err
 	}
-	defer cleanup()
+	defer func() { err = errors.Join(err, cleanup()) }()
 	return w.line(ctx, index, "write-tree")
 }
 
-// Snapshot は作業ツリーの対象を取得し、refs/devkit/<作業 ID>/<ツリー ID> で保持する。
+// Snapshot captures the working tree target and retains it at refs/devkit/<work ID>/<tree ID>.
 func (w *Workspace) Snapshot(ctx context.Context, workID string) (Snapshot, error) {
 	tree, err := w.SnapshotTree(ctx)
 	if err != nil {
@@ -105,7 +105,7 @@ func (w *Workspace) Snapshot(ctx context.Context, workID string) (Snapshot, erro
 	return w.SnapshotFromCommit(ctx, workID, commit)
 }
 
-// SnapshotFromCommit は既存のコミットを対象として保持する。hook が変更した commit にも使える。
+// SnapshotFromCommit retains an existing commit as a target, including commits changed by hooks.
 func (w *Workspace) SnapshotFromCommit(ctx context.Context, workID, commit string) (Snapshot, error) {
 	commitID, err := w.line(ctx, nil, "rev-parse", "--verify", commit+"^{commit}")
 	if err != nil {
@@ -121,7 +121,7 @@ func (w *Workspace) SnapshotFromCommit(ctx context.Context, workID, commit strin
 	return Snapshot{Tree: tree, Commit: commitID}, nil
 }
 
-// DeleteSnapshots は完了・中止と成果物の永続化がそろった作業の refs を削除する。
+// DeleteSnapshots deletes refs for completed or canceled work after its artifacts are persisted.
 func (w *Workspace) DeleteSnapshots(ctx context.Context, workID string) error {
 	refs, err := w.run(ctx, nil, "for-each-ref", "--format=%(refname)", "refs/devkit/"+workID+"/")
 	if err != nil {
@@ -135,25 +135,25 @@ func (w *Workspace) DeleteSnapshots(ctx context.Context, workID string) error {
 	return nil
 }
 
-// CommitTree はコミットのツリー ID を返す。
+// CommitTree returns the tree ID of a commit.
 func (w *Workspace) CommitTree(ctx context.Context, commit string) (string, error) {
 	return w.line(ctx, nil, "rev-parse", "--verify", commit+"^{tree}")
 }
 
-// ReadFile は指定した規範の参照元から git show でファイルを読む。
+// ReadFile reads a file from the specified normative reference using git show.
 func (w *Workspace) ReadFile(ctx context.Context, ref, path string) ([]byte, error) {
 	return w.run(ctx, nil, "show", ref+":"+path)
 }
 
-// NormativeIDs は規範のルートごとのツリー ID と blob ID を返す。存在しないものは含めない。
+// NormativeIDs returns tree and blob IDs for each normative root, omitting missing roots.
 func (w *Workspace) NormativeIDs(ctx context.Context, ref string) (map[string]string, error) {
 	return w.treeEntries(ctx, ref, ".devkit", "devkit.toml", ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md")
 }
 
-// Expand は対象を新しいディレクトリへ展開する。export-ignore と export-subst は適用しない。
-// 展開先は対象のバージョンごとに一度だけ作成し、判定者には読み取り用として渡す。
-func (w *Workspace) Expand(ctx context.Context, tree, destination string) error {
-	destination, err := filepath.Abs(destination)
+// Expand extracts a target into a new directory without applying export-ignore or export-subst.
+// Create the destination once per target version and give evaluators read-only access to it.
+func (w *Workspace) Expand(ctx context.Context, tree, destination string) (err error) {
+	destination, err = filepath.Abs(destination)
 	if err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func (w *Workspace) Expand(ctx context.Context, tree, destination string) error 
 	if err != nil {
 		return err
 	}
-	defer cleanup()
+	defer func() { err = errors.Join(err, cleanup()) }()
 	if _, err := w.run(ctx, index, "read-tree", tree); err != nil {
 		return err
 	}
@@ -178,16 +178,15 @@ func (w *Workspace) Expand(ctx context.Context, tree, destination string) error 
 	return nil
 }
 
-// Commit は直前の作業ツリーを照合し、その一時 index で hook を有効にして commit する。
-// 成功後は通常の index を新しい HEAD に reset し、作業ツリーには触れない。
-// 前後の不一致では ErrTargetChanged を返し、作成済みのコミットは取り消さない。
-func (w *Workspace) Commit(ctx context.Context, expectedTree, workID, stage, message string) (CommitResult, error) {
-	var result CommitResult
+// Commit compares the current working tree and commits its temporary index with hooks enabled.
+// After success, it resets the normal index to the new HEAD without touching the working tree.
+// A mismatch before or after the commit returns ErrTargetChanged without undoing any created commit.
+func (w *Workspace) Commit(ctx context.Context, expectedTree, workID, stage, message string) (result CommitResult, err error) {
 	index, cleanup, err := w.workingIndex(ctx)
 	if err != nil {
 		return result, err
 	}
-	defer cleanup()
+	defer func() { err = errors.Join(err, cleanup()) }()
 	result.BeforeTree, err = w.line(ctx, index, "write-tree")
 	if err != nil {
 		return result, err
@@ -217,7 +216,7 @@ func (w *Workspace) Commit(ctx context.Context, expectedTree, workID, stage, mes
 	return result, err
 }
 
-// ChangedFiles は二つの対象間で変更されたパスを返す。改名は削除と追加として返す。
+// ChangedFiles returns paths changed between two targets, treating renames as deletions and additions.
 func (w *Workspace) ChangedFiles(ctx context.Context, before, after string) ([]string, error) {
 	output, err := w.run(ctx, nil, "diff", "--name-only", "--no-renames", "-z", before, after, "--")
 	if err != nil {
@@ -229,7 +228,7 @@ func (w *Workspace) ChangedFiles(ctx context.Context, before, after string) ([]s
 	return strings.Split(strings.TrimSuffix(string(output), "\x00"), "\x00"), nil
 }
 
-// StructureHistory は指定した参照から structure.json の追加・変更・削除の履歴を読む。
+// StructureHistory reads additions, changes, and deletions of structure.json from the given reference.
 func (w *Workspace) StructureHistory(ctx context.Context, ref string) ([]StructureRevision, error) {
 	const path = ".devkit/structure.json"
 	output, err := w.run(ctx, nil, "log", "--format=%H", ref, "--", path)
@@ -269,30 +268,29 @@ func (w *Workspace) treeEntries(ctx context.Context, ref string, paths ...string
 		metadata, path, ok := strings.Cut(string(entry), "\t")
 		fields := strings.Fields(metadata)
 		if !ok || len(fields) != 3 {
-			return nil, fmt.Errorf("git ls-tree の出力が不正です: %q", entry)
+			return nil, fmt.Errorf("invalid git ls-tree output: %q", entry)
 		}
 		entries[path] = fields[2]
 	}
 	return entries, nil
 }
 
-func (w *Workspace) emptyIndex() ([]string, func(), error) {
+func (w *Workspace) emptyIndex() ([]string, func() error, error) {
 	directory, err := os.MkdirTemp("", "devkit-index-")
 	if err != nil {
 		return nil, nil, err
 	}
-	return []string{"GIT_INDEX_FILE=" + filepath.Join(directory, "index")}, func() { _ = os.RemoveAll(directory) }, nil
+	return []string{"GIT_INDEX_FILE=" + filepath.Join(directory, "index")}, func() error { return os.RemoveAll(directory) }, nil
 }
 
-func (w *Workspace) workingIndex(ctx context.Context) ([]string, func(), error) {
+func (w *Workspace) workingIndex(ctx context.Context) ([]string, func() error, error) {
 	env, cleanup, err := w.emptyIndex()
 	if err != nil {
 		return nil, nil, err
 	}
 	indexPath, err := w.line(ctx, nil, "rev-parse", "--path-format=absolute", "--git-path", "index")
 	if err != nil {
-		cleanup()
-		return nil, nil, err
+		return nil, nil, errors.Join(err, cleanup())
 	}
 	data, err := os.ReadFile(indexPath)
 	if err == nil {
@@ -301,11 +299,22 @@ func (w *Workspace) workingIndex(ctx context.Context) ([]string, func(), error) 
 		_, err = w.run(ctx, env, "read-tree", "--empty")
 	}
 	if err == nil {
+		var paths []byte
+		paths, err = w.run(ctx, env, "ls-files", "-z")
+		if err == nil {
+			cmd := w.command(ctx, env, "update-index", "--no-assume-unchanged", "-z", "--stdin")
+			cmd.Stdin = bytes.NewReader(paths)
+			output, updateErr := cmd.CombinedOutput()
+			if updateErr != nil {
+				err = fmt.Errorf("git update-index: %w: %s", updateErr, output)
+			}
+		}
+	}
+	if err == nil {
 		_, err = w.run(ctx, env, "add", "--all", "--", ".")
 	}
 	if err != nil {
-		cleanup()
-		return nil, nil, err
+		return nil, nil, errors.Join(err, cleanup())
 	}
 	return env, cleanup, nil
 }

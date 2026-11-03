@@ -7,15 +7,15 @@ import (
 	"github.com/ildjenty/dev-kit/internal/form"
 )
 
-// Aspect は form の観点テンプレートを解析した値である。
+// Aspect is a parsed form aspect template.
 type Aspect = form.AspectTemplate
 
-// ParseAspect は観点の見出しと4つの項目を解析する。ファイルは読まない。
+// ParseAspect parses the aspect heading and four fields without reading files.
 func ParseAspect(source string) (Aspect, error) {
 	var aspect Aspect
 	fields := map[string]*string{
-		"確認事項": &aspect.Checks, "blocking": &aspect.Blocking,
-		"報告しない事項": &aspect.DoNotReport, "出力形式": &aspect.OutputFormat,
+		"checks": &aspect.Checks, "blocking": &aspect.Blocking,
+		"do_not_report": &aspect.DoNotReport, "output_format": &aspect.OutputFormat,
 	}
 	seen := make(map[string]bool)
 	var current *string
@@ -27,9 +27,18 @@ func ParseAspect(source string) (Aspect, error) {
 		}
 		if strings.HasPrefix(line, "- ") {
 			label, value, found := strings.Cut(strings.TrimPrefix(line, "- "), ":")
+			// Preserve existing field keys alongside the English kit labels.
+			switch label {
+			case "Checks", "\u78ba\u8a8d\u4e8b\u9805":
+				label = "checks"
+			case "Do not report", "\u5831\u544a\u3057\u306a\u3044\u4e8b\u9805":
+				label = "do_not_report"
+			case "Output format", "\u51fa\u529b\u5f62\u5f0f":
+				label = "output_format"
+			}
 			if field, ok := fields[label]; found && ok {
 				if seen[label] {
-					return Aspect{}, fmt.Errorf("観点の項目が重複: %s", label)
+					return Aspect{}, fmt.Errorf("duplicate aspect field: %s", label)
 				}
 				seen[label] = true
 				*field = strings.TrimSpace(value)
@@ -40,17 +49,17 @@ func ParseAspect(source string) (Aspect, error) {
 		if current != nil {
 			*current += "\n" + line
 		} else if trimmed != "" {
-			return Aspect{}, fmt.Errorf("観点の形式にない行: %s", line)
+			return Aspect{}, fmt.Errorf("invalid aspect line: %s", line)
 		}
 	}
 	if aspect.ID == "" {
-		return Aspect{}, fmt.Errorf("観点 ID が必要です")
+		return Aspect{}, fmt.Errorf("aspect ID is required")
 	}
-	for _, label := range []string{"確認事項", "blocking", "報告しない事項", "出力形式"} {
+	for _, label := range []string{"checks", "blocking", "do_not_report", "output_format"} {
 		field := fields[label]
 		*field = strings.TrimSpace(*field)
 		if *field == "" {
-			return Aspect{}, fmt.Errorf("観点の項目が必要です: %s", label)
+			return Aspect{}, fmt.Errorf("aspect field is required: %s", label)
 		}
 	}
 	return aspect, nil

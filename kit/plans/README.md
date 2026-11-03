@@ -1,3 +1,3 @@
-default・feature・fix・docs など、既定の計画の雛形を置く。
-計画の検証や遷移の処理は internal/plan、利用者が組む雛形は利用側の .devkit/plans/ に置く。
-配置は [kit](../../docs/architecture/modules.md#kit)、意味論は [plan](../../docs/architecture/modules.md#plan) に従う。
+Store default plan templates such as default, feature, fix, and docs here.
+Plan validation and transition handling belong in internal/plan; user-defined templates belong in .devkit/plans/ in the consuming repository.
+For placement, see `docs/architecture/modules.md#kit`; for semantics, see `docs/architecture/modules.md#plan` (paths from the repository root).

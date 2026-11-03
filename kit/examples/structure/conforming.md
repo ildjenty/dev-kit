@@ -1,12 +1,12 @@
-## 依頼
+## Request
 
-合意した要求は、手元のファイルから税込金額を計算する関数を足すことだけ。外部接続、永続化、差し替えは不要。比較した既存箇所では計算関数を pricing に置く。以下の配置と依存を確認する。
+The agreed requirement is only to add a function calculating tax-inclusive amounts from a local file. No external connection, persistence, or substitution is needed. The existing locations compared put calculation functions in pricing. Check the following placement and dependencies.
 
-## 対象
+## Target
 
-# 税込金額の配置
+# Placement of tax-inclusive amount calculation
 
-- 配置: 金額の計算を担う pricing の calculate に計算を置く。既存の pricing の命名とエラー形式に揃える。
-- 呼び出し経路: caller → calculate。
-- 比較案: service と manager の追加は、隠す知識や強制する制約を増やさず、追う関数だけが2つ増えるため採らない。
-- 境界: caller でファイルを読み検証してから金額を渡す。calculate は可変状態を更新しない。
+- Placement: Put calculation in calculate in pricing, which handles amount calculations. Follow existing pricing naming and error formats.
+- Call path: caller → calculate.
+- Alternative: Reject adding service and manager because they add two functions to follow without adding hidden knowledge or enforced constraints.
+- Boundary: Read and validate the file in caller, then pass the amount. calculate does not update mutable state.

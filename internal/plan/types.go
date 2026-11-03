@@ -48,7 +48,7 @@ func (t Transitions) Next(action Transition) (*string, error) {
 	case Done:
 		return t.Done, nil
 	default:
-		return nil, fmt.Errorf("不明な遷移: %q", action)
+		return nil, fmt.Errorf("unknown transition: %q", action)
 	}
 }
 
@@ -57,7 +57,7 @@ type Limits struct {
 	MaxNoProgress int `json:"max_no_progress"`
 }
 
-// Reached は完了済みのラウンド数と連続して進展がなかった回数を受け取る。
+// Reached takes the completed round count and the consecutive rounds without progress.
 func (l Limits) Reached(rounds, noProgress int) bool {
 	return rounds >= l.MaxRounds || noProgress >= l.MaxNoProgress
 }
@@ -75,7 +75,7 @@ type Runner string
 
 func (r Runner) IsCommand() bool { return strings.HasPrefix(string(r), "command:") }
 
-// 判定者のサブエージェント名と判定コマンド名の解決は呼び出し側が行う。
+// The caller resolves judge subagent names and judgment command names.
 type Check struct {
 	Aspect                 string   `json:"aspect"`
 	Runner                 Runner   `json:"runner"`
@@ -103,7 +103,7 @@ func (s Stage) RequiredChecks() []Check {
 	return checks
 }
 
-// CompletionRule の検出試験は、必須 check のうち判定者が担当する観点に適用する。
+// Detection tests in CompletionRule apply to aspects of required checks handled by judges.
 type CompletionRule struct {
 	Checks                []Check
 	RequireDetectionTests bool
@@ -132,7 +132,7 @@ func (t PlanTemplate) PlanRoundsReached(rounds int) bool {
 	return rounds >= limit
 }
 
-// ContentHash は末尾の改行も含む雛形の元のバイト列から求める。
+// ContentHash hashes the original template bytes, including any trailing newline.
 func ContentHash(data []byte) string { return fmt.Sprintf("%x", sha256.Sum256(data)) }
 
 type TemplateRef struct {
@@ -177,7 +177,7 @@ func (p Plan) Stage(id string) (Stage, bool) {
 func (p Plan) Next(stageID string, action Transition) (*string, error) {
 	stage, ok := p.Stage(stageID)
 	if !ok {
-		return nil, fmt.Errorf("ステージがない: %q", stageID)
+		return nil, fmt.Errorf("stage not found: %q", stageID)
 	}
 	return stage.Transitions.Next(action)
 }

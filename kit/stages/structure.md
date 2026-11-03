@@ -1,29 +1,29 @@
-# 2 構造
+# 2 Structure
 
-## 入力
+## Inputs
 
-計画の ID 付き完了条件、スコープ、変更困難な決定の一覧、既存の構造・配置ガイドと同種の処理。
+The plan's completion conditions with IDs, scope, the list of difficult-to-change decisions, existing structure and placement guides, and similar processing.
 
-共通の入力は、固定した規範、計画の上限、変更対象の配置ガイド、rules.md と計画にある変更困難な決定、利用可能な check、前のステージの出力。修正ラウンドでは前回の指摘と指摘 ID、必須の command: の check の出力、pre-commit の出力を加える。前段は計画が採用したステージの出力を用い、ないステージを必須にしない。
+Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in rules.md and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required command: check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
-## 決めること
+## Decisions
 
-モジュール、責務、配置、依存の向き。
+Modules, responsibilities, placement, and dependency direction.
 
-## 決めずに次のステージへ渡すこと
+## Deferred to later stages
 
-関数の内部。
+Function internals.
 
-## 元に戻せないもの
+## Irreversible items
 
-配置のうち、該当すると判断したもの。
+Placement choices identified as difficult to change.
 
-## 成果物
+## Artifacts
 
-`.devkit/structure.json`（`docs/architecture/data.md#構造の記録-structure`） の新しいバージョン(図は view（`docs/architecture/modules.md#view`）(作業の表示を生成する部品)が生成する)、流儀を揃える既存の箇所、不採用とした案と理由、未確認の前提。git で戻せない作用や特別な復元順序がある場合は、その復元手段。
+A new version of `.devkit/structure.json` (`docs/architecture/data.md#%E6%A7%8B%E9%80%A0%E3%81%AE%E8%A8%98%E9%8C%B2-structure`; view (`docs/architecture/modules.md#view`, the component generating work displays) generates diagrams), existing locations whose style to follow, rejected alternatives and reasons, and unverified premises. Include recovery methods if effects cannot be reverted with git or require a special recovery order.
 
-## 終わる条件
+## Completion conditions
 
-モジュール・責務・配置・依存の向きを構造の記録へ反映し、揃える既存箇所、不採用案と理由、未確認の前提を示している。必要な場合は復元手段を示している。変更困難な配置の確定は、選択を左右する未確認事項の解消後に行っている。
+Reflect modules, responsibilities, placement, and dependency direction in the structure record. Show existing locations to follow, rejected alternatives and reasons, and unverified premises. Provide recovery methods when needed. Finalize difficult-to-change placement only after resolving unverified matters affecting the choice.
 
-返却後の対象と規範に有効な必須 check がすべて `PASS` であり、判定者が担当する必須観点とその担当に対する検出試験に合格し、devkit が行う対象の照合と `git commit` が成功している。検証の選定と必須化は計画に従い、この定義から check を追加しない。確定の責務は `docs/architecture/guarantees.md#完了条件` に従う。
+All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully checked the target and run `git commit`. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6` for finalization responsibilities.

@@ -6,7 +6,7 @@ import (
 	"slices"
 )
 
-// NewPlan は既定ステージを複製する。check の対象と完了条件の対応は呼び出し側で埋め、受理時に検証する。
+// NewPlan clones the default stages. The caller fills in check targets and completion condition mappings, which are validated on acceptance.
 func NewPlan(template PlanTemplate, contentHash, task string, conditions []CompletionCondition) Plan {
 	p := Plan{
 		Version: 1, Template: TemplateRef{template.Name, contentHash}, Task: task,
@@ -17,11 +17,11 @@ func NewPlan(template PlanTemplate, contentHash, task string, conditions []Compl
 	return clonePlan(p)
 }
 
-// SelectStages は雛形のステージを外し、候補を指定順の位置に足す。先頭を開始ステージとする。
-// 構成は雛形から取り直すため、check の対象と完了条件の対応は選択後に設定する。
+// SelectStages removes template stages and inserts optional stages in the specified order. The first stage becomes the start stage.
+// Configuration is copied from the template, so check targets and completion condition mappings must be set after selection.
 func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 	if len(ids) == 0 {
-		return Plan{}, fmt.Errorf("ステージを1つ以上選ぶ必要がある")
+		return Plan{}, fmt.Errorf("at least one stage must be selected")
 	}
 	known := make(map[string]Stage)
 	for _, s := range append(slices.Clone(template.Stages), template.OptionalStages...) {
@@ -30,10 +30,10 @@ func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 	selected := make(map[string]bool)
 	for _, id := range ids {
 		if _, ok := known[id]; !ok {
-			return Plan{}, fmt.Errorf("雛形にも候補にもないステージ: %q", id)
+			return Plan{}, fmt.Errorf("stage is neither a default nor an optional template stage: %q", id)
 		}
 		if selected[id] {
-			return Plan{}, fmt.Errorf("ステージ ID の重複: %q", id)
+			return Plan{}, fmt.Errorf("duplicate stage ID: %q", id)
 		}
 		selected[id] = true
 	}
@@ -42,6 +42,11 @@ func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 	for _, stage := range template.Stages {
 		result.Stages = append(result.Stages, cloneStage(stage))
 	}
+	for _, stage := range template.OptionalStages {
+		if selected[stage.ID] {
+			result.Stages = append(result.Stages, cloneStage(stage))
+		}
+	}
 	for _, stage := range template.Stages {
 		if !selected[stage.ID] {
 			result.Stages = removeStage(result.Stages, stage.ID)
@@ -49,10 +54,11 @@ func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 	}
 	for i := len(ids) - 1; i >= 0; i-- {
 		id := ids[i]
-		if slices.ContainsFunc(result.Stages, func(s Stage) bool { return s.ID == id }) {
+		if slices.ContainsFunc(template.Stages, func(s Stage) bool { return s.ID == id }) {
 			continue
 		}
-		stage := cloneStage(known[id])
+		index := slices.IndexFunc(result.Stages, func(s Stage) bool { return s.ID == id })
+		stage := result.Stages[index]
 		if i+1 < len(ids) {
 			before := ids[i+1]
 			stage.Transitions.Done = &before
@@ -70,11 +76,17 @@ func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 				}
 			}
 		}
-		result.Stages = append(result.Stages, stage)
+		result.Stages[index] = stage
 	}
 	ordered := make([]Stage, 0, len(ids))
 	for _, id := range ids {
 		stage, _ := result.Stage(id)
+		for _, action := range []Transition{Fix, Ask, Back, Done} {
+			target, _ := stage.Transitions.Next(action)
+			if target != nil && !selected[*target] {
+				return Plan{}, fmt.Errorf("%s: %s transition target not found: %q", id, action, *target)
+			}
+		}
 		ordered = append(ordered, stage)
 	}
 	result.Stages = ordered
@@ -88,7 +100,7 @@ func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 	return result, nil
 }
 
-// 省略したステージへの辺を同じ分類の次の辺につなぎ、自己参照なら元のステージに戻す。
+// Redirect edges to an omitted stage along its edge of the same action; a self-reference returns to the source stage.
 func removeStage(stages []Stage, id string) []Stage {
 	index := slices.IndexFunc(stages, func(s Stage) bool { return s.ID == id })
 	removed := stages[index]
@@ -157,12 +169,14 @@ func Deviations(template PlanTemplate, p Plan) []Deviation {
 		expected, _ = p.SelectStages(template, ids)
 	}
 	result := make([]Deviation, 0)
-	// 先頭の省略と候補の挿入を除き、採用済みの開始ステージを変更することは逸脱とする。
-	start := ""
-	for _, stage := range template.Stages {
-		if slices.Contains(ids, stage.ID) {
-			start = stage.ID
-			break
+	// Changing a retained start stage is a deviation, except when omitting leading stages or inserting optional stages.
+	start := template.StartStage
+	if !slices.Contains(ids, start) {
+		for _, stage := range template.Stages {
+			if slices.Contains(ids, stage.ID) {
+				start = stage.ID
+				break
+			}
 		}
 	}
 	if len(ids) > 0 && slices.ContainsFunc(template.OptionalStages, func(s Stage) bool { return s.ID == ids[0] }) {

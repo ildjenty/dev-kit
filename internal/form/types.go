@@ -2,16 +2,16 @@ package form
 
 import "encoding/json"
 
-// TerminationKind は作業者が報告する終了の種別を表す。
+// TerminationKind identifies the termination kind reported by the worker.
 type TerminationKind string
 
 const (
-	TerminationCompleted TerminationKind = "完了を主張"
-	TerminationQuestion  TerminationKind = "停止して確認"
-	TerminationStopped   TerminationKind = "作業停止の申告"
+	TerminationCompleted TerminationKind = "completion-claimed"
+	TerminationQuestion  TerminationKind = "confirmation-required"
+	TerminationStopped   TerminationKind = "work-stopped"
 )
 
-// Progress は submit に渡す終了ブロックを表す。
+// Progress is the termination block passed to submit.
 type Progress struct {
 	InstructionID    string           `json:"instruction_id"`
 	TerminationKind  TerminationKind  `json:"termination_kind"`
@@ -25,7 +25,7 @@ type Progress struct {
 	ChangeReason     string           `json:"change_reason,omitempty"`
 }
 
-// TemporaryState は再開時に有効性を確認する一時状態を表す。
+// TemporaryState describes temporary state whose validity must be checked on resumption.
 type TemporaryState struct {
 	Content            string `json:"content"`
 	VerificationMethod string `json:"verification_method"`
@@ -33,13 +33,13 @@ type TemporaryState struct {
 	InvalidWhen        string `json:"invalid_when"`
 }
 
-// Reference は作業内の記録か、明示した外部の出典を参照する。
+// Reference points to a record within the work or an explicit external source.
 type Reference struct {
 	RecordID string `json:"record_id,omitempty"`
 	External string `json:"external,omitempty"`
 }
 
-// TargetKind は判定対象の種別を表す。
+// TargetKind identifies the kind of judgment target.
 type TargetKind string
 
 const (
@@ -48,7 +48,7 @@ const (
 	TargetStructure TargetKind = "structure"
 )
 
-// TargetVersion は Kind に対応する項目で対象を識別する。
+// TargetVersion identifies the target using the field corresponding to Kind.
 type TargetVersion struct {
 	Kind      TargetKind `json:"kind"`
 	Tree      string     `json:"tree,omitempty"`
@@ -56,14 +56,14 @@ type TargetVersion struct {
 	Structure string     `json:"structure,omitempty"`
 }
 
-// NormReference は規範のパスと、その tree ID または blob ID を表す。
+// NormReference contains a norm path and its tree ID or blob ID.
 type NormReference struct {
 	Path   string `json:"path"`
 	TreeID string `json:"tree_id,omitempty"`
 	BlobID string `json:"blob_id,omitempty"`
 }
 
-// JudgmentValue は形式上受け付ける判定値を表す。
+// JudgmentValue is a judgment value accepted by the format.
 type JudgmentValue string
 
 const (
@@ -72,7 +72,7 @@ const (
 	NotAssessed JudgmentValue = "NOT ASSESSED"
 )
 
-// FindingKind は指摘の解決に人の判断が必要かを表す。
+// FindingKind indicates whether resolving a finding requires human judgment.
 type FindingKind string
 
 const (
@@ -80,13 +80,13 @@ const (
 	NeedsDecision FindingKind = "needs-decision"
 )
 
-// Exemption は適用除外の主張と根拠を表す。適用の判断は check が担う。
+// Exemption contains an exemption claim and its evidence. The check package decides applicability.
 type Exemption struct {
 	Claim    string      `json:"claim"`
 	Evidence []Reference `json:"evidence"`
 }
 
-// Finding は判定者が返す指摘の形式を表す。
+// Finding is the format of a finding returned by a judge.
 type Finding struct {
 	ID                 string      `json:"id"`
 	Blocking           bool        `json:"blocking"`
@@ -96,8 +96,8 @@ type Finding struct {
 	ResolvedFindingIDs []string    `json:"resolved_finding_ids,omitempty"`
 }
 
-// JudgmentResult は判定者の最終メッセージの形式を表す。
-// 受理・集約と、runner や観測した来歴の付加は利用側が担う。
+// JudgmentResult is the format of a judge's final message.
+// The caller handles acceptance, aggregation, and the addition of runner and observed provenance.
 type JudgmentResult struct {
 	InstructionID          string          `json:"instruction_id"`
 	Aspect                 string          `json:"aspect"`
@@ -112,13 +112,13 @@ type JudgmentResult struct {
 	Environment            string          `json:"environment"`
 }
 
-// PlannerResult は計画者の最終メッセージを表す。Plan の検証は plan が担う。
+// PlannerResult is the planner's final message. The plan package validates Plan.
 type PlannerResult struct {
 	InstructionID string          `json:"instruction_id"`
 	Plan          json.RawMessage `json:"plan"`
 }
 
-// ExternalOperationTarget は外部操作の承認対象を識別する。
+// ExternalOperationTarget identifies the approval target of an external operation.
 type ExternalOperationTarget struct {
 	OperationID    string `json:"operation_id"`
 	Kind           string `json:"kind"`
@@ -128,7 +128,7 @@ type ExternalOperationTarget struct {
 	ExecutableHash string `json:"executable_hash"`
 }
 
-// ApprovalTargetKind は問いの承認対象の種別を表す。
+// ApprovalTargetKind identifies the kind of approval target in a question.
 type ApprovalTargetKind string
 
 const (
@@ -139,7 +139,7 @@ const (
 	ApprovalWork     ApprovalTargetKind = "work"
 )
 
-// ApprovalTarget は Kind に対応する項目で承認対象を識別する。
+// ApprovalTarget identifies the approval target using the field corresponding to Kind.
 type ApprovalTarget struct {
 	Kind       ApprovalTargetKind       `json:"kind"`
 	Tree       string                   `json:"tree,omitempty"`
@@ -149,7 +149,7 @@ type ApprovalTarget struct {
 	WorkID     string                   `json:"work_id,omitempty"`
 }
 
-// Question は人に提示する問いを表す。ScreenID は画面のデザインの承認時に使う。
+// Question is a question presented to a person. ScreenID is used for screen design approval.
 type Question struct {
 	ID                   string         `json:"id"`
 	Text                 string         `json:"text"`
@@ -166,7 +166,7 @@ type Question struct {
 	StopObservation      *Reference     `json:"stop_observation,omitempty"`
 }
 
-// InstructionKind は next が返す指示の種別を表す。
+// InstructionKind identifies the kind of instruction returned by next.
 type InstructionKind string
 
 const (
@@ -182,7 +182,7 @@ const (
 	InstructionAborted       InstructionKind = "aborted"
 )
 
-// Instruction は発行済みの指示を表す。ID の導出と出し直しは利用側が担う。
+// Instruction is an issued instruction. The caller handles ID derivation and reissuance.
 type Instruction struct {
 	ID         string                   `json:"id"`
 	Kind       InstructionKind          `json:"kind"`
@@ -196,15 +196,15 @@ type Instruction struct {
 	External   *ExternalOperationTarget `json:"external,omitempty"`
 }
 
-// RejectedAlternative は却下した案と、その理由・具体例を表す。
+// RejectedAlternative describes a rejected proposal, its reason, and a concrete example.
 type RejectedAlternative struct {
 	Proposal string `json:"proposal"`
 	Reason   string `json:"reason"`
 	Example  string `json:"example"`
 }
 
-// Decision は判断の内容と、有効性・置換・依存を解決するための情報を表す。
-// 承認・却下・保留の状態は持たず、記録から利用側が導く。
+// Decision contains a decision and information for resolving validity, supersession, and dependencies.
+// It has no approval, rejection, or deferral state; the caller derives that state from records.
 type Decision struct {
 	ID                   string                `json:"id"`
 	Content              string                `json:"content"`
@@ -218,7 +218,7 @@ type Decision struct {
 	Evidence             []Reference           `json:"evidence"`
 }
 
-// Evidence は出典と確認方法を添えた調査結果を表す。
+// Evidence contains investigation results with sources and a verification method.
 type Evidence struct {
 	ID                 string      `json:"id"`
 	Content            string      `json:"content"`

@@ -1,29 +1,29 @@
-# 5 実装
+# 5 Implementation
 
-## 入力
+## Inputs
 
-計画の ID 付き完了条件、採用した前段のスコープ・構造・契約・手順、変更対象のコードと利用できる検証方法。
+The plan's completion conditions with IDs; scope, structure, contracts, and steps from adopted preceding stages; code to change; and available verification methods.
 
-共通の入力は、固定した規範、計画の上限、変更対象の配置ガイド、rules.md と計画にある変更困難な決定、利用可能な check、前のステージの出力。修正ラウンドでは前回の指摘と指摘 ID、必須の command: の check の出力、pre-commit の出力を加える。前段は計画が採用したステージの出力を用い、ないステージを必須にしない。
+Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in rules.md and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required command: check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
-## 決めること
+## Decisions
 
-コード。
+Code.
 
-## 決めずに次のステージへ渡すこと
+## Deferred to later stages
 
-なし。
+None.
 
-## 元に戻せないもの
+## Irreversible items
 
-なし。
+None.
 
-## 成果物
+## Artifacts
 
-差分。
+The diff.
 
-## 終わる条件
+## Completion conditions
 
-合意したスコープと契約に沿った差分を提出し、計画の当該ステージの完了条件に対応する確認結果を示している。調査用の不要な挙動や次の検証への干渉を残していない。
+Submit a diff that follows the agreed scope and contracts, with verification results corresponding to the completion conditions of this stage in the plan. Leave no unnecessary investigative behavior or interference with subsequent verification.
 
-返却後の対象と規範に有効な必須 check がすべて `PASS` であり、判定者が担当する必須観点とその担当に対する検出試験に合格し、devkit が行う対象の照合と `git commit` が成功している。検証の選定と必須化は計画に従い、この定義から check を追加しない。確定の責務は `docs/architecture/guarantees.md#完了条件` に従う。
+All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully checked the target and run `git commit`. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6` for finalization responsibilities.

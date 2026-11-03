@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "決定",
+  "title": "Decision",
   "type": "object",
   "properties": {
     "id": {
@@ -68,34 +68,7 @@
   "additionalProperties": false,
   "$defs": {
     "reference": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "record_id": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "record_id"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "external": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "external"
-          ],
-          "additionalProperties": false
-        }
-      ]
+      "$ref": "urn:devkit:form:reference"
     },
     "rejected_alternative": {
       "type": "object",

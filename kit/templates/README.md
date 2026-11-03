@@ -1,14 +1,14 @@
-form が扱う固定フォーマットのテンプレートを置く。
-テンプレートの適用と Markdown の描画は internal/form、HTML の生成は internal/view に置く。
-配置は [kit](../../docs/architecture/modules.md#kit)、形式は [form](../../docs/architecture/modules.md#form) に従う。
+This directory contains templates for the fixed formats handled by form.
+Template application and Markdown rendering belong to internal/form; HTML generation belongs to internal/view.
+For placement, see `docs/architecture/modules.md#kit` from the repository root. For formats, see `docs/architecture/modules.md#form`.
 
-`text/template` の構文を使い、読み込んだ文面と次の入力を `form.ApplyTemplate` に渡す。
+The templates use `text/template` syntax. Pass the loaded text and the following input to `form.ApplyTemplate`.
 
-- `skill.md.tmpl`: `form.SkillTemplate`。目的・入力・手順・出力・参照から skill を構成する。
-- `aspect.md.tmpl`: `form.AspectTemplate`。確認事項・blocking・報告しない事項・出力形式から観点ファイルを構成する。
-- `pr.md.tmpl`: `form.PRTemplate`。変更範囲・計画の要約・決定・何をどう確認したか・未確認事項とリスク・参照を載せる。
-- `design.md.tmpl`: `form.DesignTemplate`。提案・制約・元に戻せないもの・比較した案・検証方法を載せる。
+- `skill.md.tmpl`: `form.SkillTemplate`. Composes a skill from its purpose, inputs, steps, outputs, and references.
+- `aspect.md.tmpl`: `form.AspectTemplate`. Composes an aspect file from checks, blocking conditions, items not to report, and the output format.
+- `pr.md.tmpl`: `form.PRTemplate`. Includes the change scope, plan summary, decisions, what was verified and how, unconfirmed items and risks, and references.
+- `design.md.tmpl`: `form.DesignTemplate`. Includes the proposal, constraints, irreversible decisions, alternatives considered, and verification method.
 
-PR の既存テンプレートがあるリポジトリでは、その文面を渡して見出しを維持する。設計案の「元に戻せないもの」には、計画が持つ一覧への参照と必要な更新内容を渡す。
+If a repository has an existing PR template, pass its text to preserve its headings. For the design proposal's "Irreversible decisions" section, supply a reference to the plan's list and any required updates.
 
-固定フォーマットの値は `form.RenderMarkdown` で描画する。問いには自由な言葉での回答、選択肢にない回答、条件付きの回答、質問返し、回答の訂正を案内する。画面のデザインの承認を求める場合は、問いの `screen_id` と表示内容を含むツリーの承認対象を利用側で設定する。
+Render fixed-format values with `form.RenderMarkdown`. Questions explain that people may answer in their own words, give answers outside the options or conditional answers, ask questions in return, and revise their answers. When requesting screen design approval, the caller sets the question's `screen_id` and a tree approval target that includes the displayed content.

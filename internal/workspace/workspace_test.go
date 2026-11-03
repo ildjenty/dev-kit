@@ -14,6 +14,12 @@ import (
 
 func newWorkspace(t *testing.T) *Workspace {
 	t.Helper()
+	for _, name := range strings.Fields(git(t, "", "rev-parse", "--local-env-vars")) {
+		t.Setenv(name, "")
+		if err := os.Unsetenv(name); err != nil {
+			t.Fatal(err)
+		}
+	}
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	root := t.TempDir()
@@ -77,17 +83,21 @@ func TestResolveAndBranches(t *testing.T) {
 	write(t, w.Root(), "sub/file", "content")
 	sub, err := Open(ctx, filepath.Join(w.Root(), "sub"))
 	if err != nil || sub.Root() != w.Root() {
-		t.Fatalf("ルートの解決: %v, %v", sub, err)
+		t.Fatalf("root resolution: %v, %v", sub, err)
 	}
 	if err := w.CreateBranch(ctx, "devkit/work"); err != nil {
 		t.Fatal(err)
 	}
 	branch, err := w.Branch(ctx)
 	if err != nil || branch != "devkit/work" {
-		t.Fatalf("ブランチ: %q, %v", branch, err)
+		t.Fatalf("branch: %q, %v", branch, err)
 	}
 	if err := w.SwitchBranch(ctx, "main"); err != nil {
 		t.Fatal(err)
+	}
+	branch, err = w.Branch(ctx)
+	if err != nil || branch != "main" {
+		t.Fatalf("branch after switch: %q, %v", branch, err)
 	}
 	linkedPath := filepath.Join(t.TempDir(), "checkout")
 	git(t, w.Root(), "worktree", "add", "-b", "linked", linkedPath)
@@ -100,15 +110,15 @@ func TestResolveAndBranches(t *testing.T) {
 	index := read(t, indexPath)
 	linkedSnapshot, err := linked.Snapshot(ctx, "linked")
 	if err != nil || !bytes.Equal(index, read(t, indexPath)) {
-		t.Fatalf("linked worktree の index が変わりました: %v", err)
+		t.Fatalf("linked worktree index changed: %v", err)
 	}
 	content, err := linked.ReadFile(ctx, linkedSnapshot.Tree, "tracked")
 	if err != nil || string(content) != "linked change\n" {
-		t.Fatalf("linked worktree の対象: %q, %v", content, err)
+		t.Fatalf("linked worktree target: %q, %v", content, err)
 	}
 	git(t, w.Root(), "checkout", "--detach")
 	if _, err := w.Branch(ctx); err == nil {
-		t.Fatal("detached HEAD のエラーがありません")
+		t.Fatal("missing detached HEAD error")
 	}
 }
 
@@ -120,6 +130,7 @@ func TestSnapshotAndExpand(t *testing.T) {
 	write(t, w.Root(), "ignored", "forced\n")
 	git(t, w.Root(), "add", "tracked")
 	git(t, w.Root(), "add", "-f", "ignored")
+	git(t, w.Root(), "update-index", "--assume-unchanged", "tracked")
 	index := read(t, filepath.Join(w.Root(), ".git/index"))
 	write(t, w.Root(), "tracked", "working\n")
 	write(t, w.Root(), "untracked\nfile", "new\n")
@@ -131,14 +142,14 @@ func TestSnapshotAndExpand(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(index, read(t, filepath.Join(w.Root(), ".git/index"))) || head != git(t, w.Root(), "rev-parse", "HEAD") {
-		t.Fatal("スナップショットが通常の index または HEAD を変更しました")
+		t.Fatal("snapshot changed the normal index or HEAD")
 	}
 	if got := git(t, w.Root(), "rev-parse", "refs/devkit/work/"+snap.Tree); got != snap.Commit {
 		t.Fatalf("ref: %s", got)
 	}
 	files, err := w.ChangedFiles(ctx, head, snap.Tree)
 	if err != nil || !strings.Contains(strings.Join(files, "\x00"), "untracked\nfile") {
-		t.Fatalf("変更パス: %q, %v", files, err)
+		t.Fatalf("changed paths: %q, %v", files, err)
 	}
 	destination := filepath.Join(t.TempDir(), "snap", snap.Tree)
 	if err := w.Expand(ctx, snap.Tree, destination); err != nil {
@@ -150,13 +161,13 @@ func TestSnapshotAndExpand(t *testing.T) {
 		}
 	}
 	if _, err := os.Stat(filepath.Join(destination, ".devkit/run")); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("ignore された生成物が含まれています: %v", err)
+		t.Fatalf("ignored artifacts are included: %v", err)
 	}
 	if err := w.DeleteSnapshots(ctx, "work"); err != nil {
 		t.Fatal(err)
 	}
 	if got := git(t, w.Root(), "for-each-ref", "--format=%(refname)", "refs/devkit/work/"); got != "" {
-		t.Fatalf("ref が残っています: %s", got)
+		t.Fatalf("ref remains: %s", got)
 	}
 }
 
@@ -164,15 +175,15 @@ func TestNormativeIDsAndReadFile(t *testing.T) {
 	w := newWorkspace(t)
 	ctx := context.Background()
 	write(t, w.Root(), "devkit.toml", "kit_version = 'v1'\n")
-	write(t, w.Root(), ".devkit/rules.md", "規則\n")
-	write(t, w.Root(), ".claude/agents/judge.md", "判定者\n")
+	write(t, w.Root(), ".devkit/rules.md", "rules\n")
+	write(t, w.Root(), ".claude/agents/judge.md", "evaluator\n")
 	before, err := w.Snapshot(ctx, "work")
 	if err != nil {
 		t.Fatal(err)
 	}
 	ids, err := w.NormativeIDs(ctx, before.Tree)
 	if err != nil || len(ids) != 3 || ids[".claude/agents"] == "" {
-		t.Fatalf("規範の識別: %v, %v", ids, err)
+		t.Fatalf("normative IDs: %v, %v", ids, err)
 	}
 	write(t, w.Root(), "tracked", "code changed\n")
 	after, err := w.Snapshot(ctx, "work")
@@ -181,12 +192,20 @@ func TestNormativeIDsAndReadFile(t *testing.T) {
 	}
 	newIDs, err := w.NormativeIDs(ctx, after.Tree)
 	if err != nil || !reflect.DeepEqual(ids, newIDs) {
-		t.Fatalf("コードだけの変更で規範が変わりました: %v, %v", newIDs, err)
+		t.Fatalf("normative IDs changed after a code-only change: %v, %v", newIDs, err)
 	}
 	write(t, w.Root(), "devkit.toml", "kit_version = 'v2'\n")
+	changed, err := w.Snapshot(ctx, "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	changedIDs, err := w.NormativeIDs(ctx, changed.Tree)
+	if err != nil || changedIDs["devkit.toml"] == ids["devkit.toml"] {
+		t.Fatalf("normative ID did not change after a configuration change: %v, %v", changedIDs, err)
+	}
 	content, err := w.ReadFile(ctx, before.Tree, "devkit.toml")
 	if err != nil || string(content) != "kit_version = 'v1'\n" {
-		t.Fatalf("固定した規範の読み出し: %q, %v", content, err)
+		t.Fatalf("read pinned normative file: %q, %v", content, err)
 	}
 }
 
@@ -196,6 +215,9 @@ func TestCommit(t *testing.T) {
 			w := newWorkspace(t)
 			ctx := context.Background()
 			head := git(t, w.Root(), "rev-parse", "HEAD")
+			if mode == "before_changed" {
+				git(t, w.Root(), "update-index", "--assume-unchanged", "tracked")
+			}
 			if mode != "empty" {
 				write(t, w.Root(), "tracked", "judged\n")
 			}
@@ -217,24 +239,24 @@ func TestCommit(t *testing.T) {
 			switch mode {
 			case "before_changed", "hook_failed":
 				if err == nil || result.Commit != "" || git(t, w.Root(), "rev-parse", "HEAD") != head {
-					t.Fatalf("commit を止めていません: %+v, %v", result, err)
+					t.Fatalf("commit was not stopped: %+v, %v", result, err)
 				}
 				if !bytes.Equal(index, read(t, filepath.Join(w.Root(), ".git/index"))) {
-					t.Fatal("失敗時に通常の index が変わりました")
+					t.Fatal("normal index changed on failure")
 				}
 				if mode == "before_changed" && !errors.Is(err, ErrTargetChanged) {
-					t.Fatalf("対象の変化を報告していません: %v", err)
+					t.Fatalf("target change was not reported: %v", err)
 				}
 				if mode == "hook_failed" && (!strings.Contains(result.Output, "failure") || string(read(t, filepath.Join(w.Root(), "tracked"))) != "formatted\n") {
-					t.Fatalf("hook の失敗内容が残っていません: %+v", result)
+					t.Fatalf("hook failure details were not retained: %+v", result)
 				}
 			case "hook_changed":
 				if !errors.Is(err, ErrTargetChanged) || result.Commit == "" || result.Tree == snap.Tree {
-					t.Fatalf("hook による変更を報告していません: %+v, %v", result, err)
+					t.Fatalf("hook changes were not reported: %+v, %v", result, err)
 				}
 				updated, err := w.SnapshotFromCommit(ctx, "work", result.Commit)
 				if err != nil || updated.Tree != result.Tree {
-					t.Fatalf("新しい対象を保持できません: %+v, %v", updated, err)
+					t.Fatalf("failed to retain the new target: %+v, %v", updated, err)
 				}
 			default:
 				if err != nil || result.Tree != snap.Tree || !strings.Contains(result.Output, "hook-ran") {
@@ -242,7 +264,7 @@ func TestCommit(t *testing.T) {
 				}
 			}
 			if result.Commit != "" && git(t, w.Root(), "diff", "--cached", "--name-only") != "" {
-				t.Fatal("通常の index と HEAD が食い違っています")
+				t.Fatal("normal index and HEAD differ")
 			}
 		})
 	}
@@ -261,9 +283,9 @@ func TestStructureHistory(t *testing.T) {
 	git(t, w.Root(), "commit", "-m", "delete structure")
 	history, err := w.StructureHistory(ctx, "HEAD")
 	if err != nil || len(history) != 3 {
-		t.Fatalf("履歴: %+v, %v", history, err)
+		t.Fatalf("history: %+v, %v", history, err)
 	}
 	if !history[0].Deleted || history[1].Blob == "" || string(history[1].Content) != "{\"modules\": [\"workspace\"]}\n" {
-		t.Fatalf("履歴の内容: %+v", history)
+		t.Fatalf("history content: %+v", history)
 	}
 }

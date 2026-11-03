@@ -1,13 +1,13 @@
-## 依頼
+## Request
 
-依頼は保存ボタンの文言を「登録」から「保存」に変えること。コード、承認・委任、流儀、報告を照合する。PR 本文は対象外。
+The request is to change the save button text from "Register" to "Save". Compare code, approvals and delegation, style, and reporting. The PR body is out of scope.
 
-## 対象
+## Target
 
-# 差分と報告
+# Diff and report
 
-- 有効な承認・委任: 保存ボタンの文言の変更だけ。保存処理は変更しない。
-- 差分: save ボタンの文言を「登録」から「保存」に変更。
-- 流儀: 対象ファイル内の既存の文言定義に揃えた。
-- 検証: 対象画面の描画で「保存」を確認し、既存の保存処理のテストが成功した。確認の対象と環境は同じ変更後のツリーと開発環境。結果は添付の描画・テスト記録で照合できる。
-- 報告: 変更は文言だけ。保存処理は変更していない。採否を左右する未確認事項はなく、人の追加対応は不要。
+- Valid approval and delegation: Only the save button text may change. Storage processing must remain unchanged.
+- Diff: Changed the save button text from "Register" to "Save".
+- Style: Followed the target file's existing text definitions.
+- Verification: Confirmed "Save" in the rendered target screen, and existing storage tests passed. Verification used the same changed tree and development environment. Results can be checked against the attached rendering and test records.
+- Report: Only the text changed; storage processing is unchanged. No unverified matters affect adoption, and no further human action is needed.

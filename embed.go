@@ -1,6 +1,6 @@
-// devkit は principles・docs・kit の固定物を埋め込み、fs.FS として公開する。
-// 実装パッケージに依存せず、固定物の供給と照合は internal/kit に置く。
-// 正本: docs/architecture/modules.md#ルートパッケージ
+// devkit embeds the README and assets from principles, docs, and kit as an fs.FS.
+// It does not depend on implementation packages; internal/kit supplies and verifies assets.
+// Source of truth: the root package section in docs/architecture/modules.md.
 package devkit
 
 import (
@@ -8,10 +8,10 @@ import (
 	"io/fs"
 )
 
-//go:embed principles docs kit
+//go:embed README.md principles docs kit
 var assets embed.FS
 
-// FS は埋め込んだ固定物を返す。
+// FS returns the embedded assets.
 func FS() fs.FS {
 	return assets
 }

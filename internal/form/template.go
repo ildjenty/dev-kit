@@ -5,8 +5,8 @@ import (
 	"text/template"
 )
 
-// ApplyTemplate は供給された text/template の文面を適用する。
-// PR の見出しも供給されたテンプレートに従う。
+// ApplyTemplate applies supplied text/template content.
+// PR headings also follow the supplied template.
 func ApplyTemplate(source string, value any) (string, error) {
 	t, err := template.New("form").Option("missingkey=error").Parse(source)
 	if err != nil {
@@ -19,7 +19,7 @@ func ApplyTemplate(source string, value any) (string, error) {
 	return out.String(), nil
 }
 
-// SkillTemplate は skill の構成テンプレートへの入力を表す。
+// SkillTemplate is the input to a skill composition template.
 type SkillTemplate struct {
 	Name        string
 	Description string
@@ -30,7 +30,7 @@ type SkillTemplate struct {
 	References  string
 }
 
-// AspectTemplate は観点ファイルのテンプレートへの入力を表す。
+// AspectTemplate is the input to an aspect file template.
 type AspectTemplate struct {
 	ID           string
 	Checks       string
@@ -39,7 +39,7 @@ type AspectTemplate struct {
 	OutputFormat string
 }
 
-// PRTemplate は PR 本文のテンプレートへの入力を表す。
+// PRTemplate is the input to a PR body template.
 type PRTemplate struct {
 	Summary      string
 	Scope        string
@@ -50,8 +50,8 @@ type PRTemplate struct {
 	References   string
 }
 
-// DesignTemplate は設計案のテンプレートへの入力を表す。
-// Irreversible は計画の一覧への参照・更新内容を渡す。
+// DesignTemplate is the input to a design proposal template.
+// Irreversible supplies a reference to the plan's list and any required updates.
 type DesignTemplate struct {
 	Title        string
 	Proposal     string

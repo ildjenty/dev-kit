@@ -1,29 +1,29 @@
-# 4 手順
+# 4 Steps
 
-## 入力
+## Inputs
 
-計画の ID 付き完了条件、スコープ、構造、契約の型のシグネチャ、利用できる検証方法。
+The plan's completion conditions with IDs, scope, structure, contract type signatures, and available verification methods.
 
-共通の入力は、固定した規範、計画の上限、変更対象の配置ガイド、rules.md と計画にある変更困難な決定、利用可能な check、前のステージの出力。修正ラウンドでは前回の指摘と指摘 ID、必須の command: の check の出力、pre-commit の出力を加える。前段は計画が採用したステージの出力を用い、ないステージを必須にしない。
+Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in rules.md and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required command: check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
-## 決めること
+## Decisions
 
-ステップの分け方と、各ステップの検証方法。
+How to divide steps and how to verify each step.
 
-## 決めずに次のステージへ渡すこと
+## Deferred to later stages
 
-コード。
+Code.
 
-## 元に戻せないもの
+## Irreversible items
 
-なし。
+None.
 
-## 成果物
+## Artifacts
 
-各ステップの目的・完了条件・根拠・スコープを記した一覧。後続ステージの brief への取り込みは作業の指示（`docs/architecture/flow.md#作業の指示`）に従う。
+A list showing each step's purpose, completion conditions, grounds, and scope. Follow the work instruction contract (`docs/architecture/flow.md#%E4%BD%9C%E6%A5%AD%E3%81%AE%E6%8C%87%E7%A4%BA`) for inclusion in later-stage briefs.
 
-## 終わる条件
+## Completion conditions
 
-各ステップの目的・完了条件・根拠・スコープと検証方法を示し、各ステップを単独で検証でき、人が一度で読める大きさになっている。
+Show each step's purpose, completion conditions, grounds, scope, and verification method. Each step can be verified independently and is small enough for a human to read in one pass.
 
-返却後の対象と規範に有効な必須 check がすべて `PASS` であり、判定者が担当する必須観点とその担当に対する検出試験に合格し、devkit が行う対象の照合と `git commit` が成功している。検証の選定と必須化は計画に従い、この定義から check を追加しない。確定の責務は `docs/architecture/guarantees.md#完了条件` に従う。
+All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully checked the target and run `git commit`. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6` for finalization responsibilities.

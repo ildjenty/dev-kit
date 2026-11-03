@@ -45,8 +45,8 @@ type Lessons struct {
 	Destinations []LessonDestination `toml:"destinations"`
 }
 
-// Table は kit の分類表と利用側の追記を、境界で解析済みの値として受け取る。
-// ConfirmationRules は名前ごとの上書きであり、保存形式は呼び出し側で解決する。
+// Table receives kit classifications and repository additions parsed at the boundary.
+// ConfirmationRules provides per-name overrides; the caller resolves the storage format.
 type Table struct {
 	HumanConfirmation []string                                `toml:"human_confirmation"`
 	CheckResults      map[check.JudgmentValue]plan.Transition `toml:"check_results"`
@@ -55,8 +55,8 @@ type Table struct {
 	ConfirmationRules map[string]ConfirmationMode             `toml:"-"`
 }
 
-// MergeTables は同名の分類を利用側の値で上書きする。元の表は変更しない。
-// human_confirmation は追記で指定された場合に列全体を置き換える。
+// MergeTables overrides classifications by name with repository values without modifying the originals.
+// HumanConfirmation additions extend the existing categories without duplicates.
 func MergeTables(base, additions Table) Table {
 	result := Table{
 		HumanConfirmation: slices.Clone(base.HumanConfirmation),
@@ -64,8 +64,10 @@ func MergeTables(base, additions Table) Table {
 		Lessons:           Lessons{Destinations: slices.Clone(base.Lessons.Destinations)},
 		ConfirmationRules: maps.Clone(base.ConfirmationRules),
 	}
-	if additions.HumanConfirmation != nil {
-		result.HumanConfirmation = slices.Clone(additions.HumanConfirmation)
+	for _, category := range additions.HumanConfirmation {
+		if !slices.Contains(result.HumanConfirmation, category) {
+			result.HumanConfirmation = append(result.HumanConfirmation, category)
+		}
 	}
 	if result.CheckResults == nil {
 		result.CheckResults = make(map[check.JudgmentValue]plan.Transition)
@@ -85,7 +87,7 @@ func MergeTables(base, additions Table) Table {
 	return result
 }
 
-// PreferredLesson は候補のうち分類表の優先順で最初の反映先を返す。
+// PreferredLesson returns the first candidate destination in table priority order.
 func (t Table) PreferredLesson(candidates []LessonDestination) (LessonDestination, bool) {
 	for _, destination := range t.Lessons.Destinations {
 		if slices.Contains(candidates, destination) {

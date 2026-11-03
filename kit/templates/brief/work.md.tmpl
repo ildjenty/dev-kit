@@ -1,0 +1,124 @@
+# Work instruction
+
+Instruction ID: {{.InstructionID}}
+
+## Users and purpose
+
+{{.Purpose}}
+
+## Stage definitions
+
+{{.StageDefinition}}
+
+## Current stage
+
+```json
+{{.StageJSON}}
+```
+
+## Task and plan
+
+```json
+{{.PlanJSON}}
+```
+
+Verify completion conditions against their IDs in the plan.
+The current stage allows {{.Stage.Limits.MaxRounds}} rounds and {{.Stage.Limits.MaxNoProgress}} consecutive rounds without progress.
+
+## Allowed changes
+{{range .AllowedChanges}}
+- {{.}}
+{{end}}
+## Forbidden changes
+{{range .ForbiddenChanges}}
+- {{.}}
+{{end}}
+## Verification of completion conditions
+{{range .Verification}}
+- {{.}}
+{{end}}
+{{template "repository" .Repository}}
+Items from the plan:
+{{range .Plan.IrreversibleDecisions}}
+- {{.}}
+{{end}}
+## Available checks
+
+```json
+{{.ChecksJSON}}
+```
+{{template "norms" .Norms}}
+{{template "previousOutputs" .PreviousOutputs}}
+{{if .PreviousFindings}}
+## Previous findings and finding IDs
+
+```json
+{{.FindingsJSON}}
+```
+{{end}}
+{{range .CommandOutputs}}
+## Required command: check output
+
+Aspect: {{.Check.Aspect}}
+
+Runner: {{.Check.Runner}}
+
+Exit code: {{.ExitCode}}
+
+{{.Output}}
+{{end}}
+{{if .PreCommitOutput}}
+## pre-commit output
+
+{{.PreCommitOutput}}
+{{end}}
+## Returning the progress block
+
+Write the work result as JSON and submit it with `devkit submit <file>`.
+Set `instruction_id` to this work instruction's ID. Use one of these termination kinds: `{{.TerminationCompleted}}` (claim completion), `{{.TerminationQuestion}}` (stop to ask), or `{{.TerminationStopped}}` (report a work stop).
+Record the work performed, confirmed items, unconfirmed items, obstacles, and resume conditions in the corresponding fields. For temporary state, record its content, verification method, source, and conditions that invalidate it.
+Record unreadable inputs and their effects as unconfirmed items. Add out-of-scope work and reasons for changes as needed.
+devkit confirms completion and runs git commit.
+
+```json
+{{.ProgressJSON}}
+```
+{{if .OutputSchema}}
+### Progress block JSON Schema
+
+{{.OutputSchema}}
+{{end}}
+{{define "repository"}}
+## Layout guides
+{{range .LayoutGuides}}
+Reference: {{.Path}}
+
+{{.Content}}
+{{end}}
+## Rules and enforcement
+
+Reference: {{.Rules.Path}}
+
+{{.Rules.Content}}
+
+## Irreversible decisions
+
+Items from the rules:
+{{range .IrreversibleDecisions}}
+- {{.}}
+{{end}}
+{{end}}{{define "norms"}}
+## Fixed norms
+{{range .}}
+Reference: {{.Path}}
+
+{{.Content}}
+{{end}}
+{{end}}{{define "previousOutputs"}}
+## Previous stage outputs
+{{range .}}
+### {{.StageID}}
+
+{{.Content}}
+{{end}}
+{{end}}

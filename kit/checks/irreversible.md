@@ -1,6 +1,6 @@
 # irreversible
 
-- 確認事項: 元に戻せないもの(変更困難な決定)の一覧に漏れがないか。判断と確定の時期は `principles/designing.md` の原則1（`principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する`）に従う。
-- blocking: 一覧に漏れがある、または同原則1の blocking 条件に該当する。
-- 報告しない事項: この観点の確認事項に含まれない事項。失敗のシナリオを示せない指摘。
-- 出力形式: 依頼で渡された Judgment の JSON Schema と `docs/architecture/data.md` の Judgment・Finding に従う。必要な判断基準や必須の確認を得られない場合は `NOT ASSESSED` とし、確認済み・未確認の範囲と方法・環境を残す。失敗のシナリオを示せない指摘は返さず、重大度は付けない。指摘は全件残し、blocking でない指摘は参考情報とし修正を求めない。適用除外の主張と根拠を照合し、外れる要求に限って違反としない。
+- Checks: Check the list of irreversible items (decisions that are difficult to change) for omissions. Follow principle 1 of `principles/designing.md` (`principles/designing.md#1-%E5%A4%89%E6%9B%B4%E5%9B%B0%E9%9B%A3%E3%81%AA%E6%B1%BA%E5%AE%9A%E3%81%AF%E5%85%88%E3%81%AB%E7%89%B9%E5%AE%9A%E3%81%97%E5%88%A4%E6%96%AD%E6%9D%90%E6%96%99%E3%82%92%E5%BE%97%E3%81%A6%E3%81%8B%E3%82%89%E7%A2%BA%E5%AE%9A%E3%81%99%E3%82%8B`) for when to decide and finalize them.
+- blocking: The list has an omission, or a blocking condition in principle 1 applies.
+- Do not report: Items outside this aspect's checks. Findings without a failure scenario.
+- Output format: Follow the Judgment JSON Schema supplied in the request and the Judgment and Finding definitions in `docs/architecture/data.md`. Return `NOT ASSESSED` when necessary criteria or required verification are unavailable, and record the verified and unverified scope, method, and environment. Do not return findings without a failure scenario, and do not assign severity. Retain all findings; treat nonblocking findings as reference information without requiring fixes. Compare exemption claims with their grounds, and waive only the requirements covered by the exemption.

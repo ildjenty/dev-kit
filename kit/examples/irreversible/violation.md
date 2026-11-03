@@ -1,11 +1,11 @@
-## 依頼
+## Request
 
-保存済みの日報を扱う設計案と、変更困難な決定の一覧を照合する。
+Compare the design proposal for stored daily reports with the list of difficult-to-change decisions.
 
-## 対象
+## Target
 
-# 日報の保持
+# Daily report retention
 
-- 要求: 送信済みの日報を削除する。
-- 設計: 毎晩、送信済みの日報を保存先から完全に削除する。復旧用の複製はない。
-- 変更困難な決定の一覧: なし。保持期間は後から変更できるので、削除処理を先に公開する。
+- Requirement: Delete submitted daily reports.
+- Design: Permanently delete submitted daily reports from storage every night. No recovery copy exists.
+- List of difficult-to-change decisions: None. Since retention can be changed later, publish deletion processing first.

@@ -1,15 +1,15 @@
-brief の組み立てに渡すステージ定義を置く。
-計画の意味論は internal/plan、brief の組み立ては internal/brief、進行処理は internal/engine に置く。
-配置は [kit](../../docs/architecture/modules.md#kit)、組み立ては [brief](../../docs/architecture/modules.md#brief) に従う。
+Stores stage definitions passed to brief assembly.
+Plan semantics belong in internal/plan, brief assembly in internal/brief, and progression in internal/engine.
+For placement, see `docs/architecture/modules.md#kit`; for assembly, see `docs/architecture/modules.md#brief`.
 
-ステージ定義は `<ステージID>.md` とし、先頭の `# <名前>` と、`## 入力`、`## 決めること`、`## 決めずに次のステージへ渡すこと`、`## 元に戻せないもの`、`## 成果物`、`## 終わる条件` をこの順で持つ Markdown とする。ファイル名が ID を表し、各節は次の第2階層見出しまでを値として機械で読み取る。内容の正本は `docs/stages.md` の同名のステージであり、変更時は対応する定義も更新する。`docs/`・`principles/` で始まるコード表記の参照パスは、開発時はリポジトリのルート、導入後は kit のコピーのルートを基準に解決する。入力は `docs/parts/brief.md`、終了の共通条件は `docs/architecture/guarantees.md#完了条件` に従い、採用するステージ・順序・check・runner・ゲート・上限・遷移はループの雛形と計画で決める。
+A stage definition is Markdown named `<stage_id>.md`, with an initial `# <name>` and the following headings in order: `## Inputs`, `## Decisions`, `## Deferred to later stages`, `## Irreversible items`, `## Artifacts`, and `## Completion conditions`. The filename is the ID; each section is machine-readable through the next second-level heading. The corresponding stage in `docs/stages.md` is the source of truth; update the corresponding definition when changing it. Code-formatted references starting with `docs/` or `principles/` are relative to the repository root during development and to the kit copy root after installation. Inputs follow `docs/parts/brief.md`, and common completion conditions follow `docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6`. The plan template and plan determine adopted stages, order, checks, runners, gates, limits, and transitions.
 
-- `purpose.md`: 0 目的。
-- `scope.md`: 1 スコープ。
-- `structure.md`: 2 構造。
-- `contract.md`: 3 契約。
-- `steps.md`: 4 手順。
-- `implement.md`: 5 実装。
-- `research.md`: 調査。
-- `prototype.md`: 試作。
-- `initialize.md`: 初期化。
+- `purpose.md`: 0 Purpose.
+- `scope.md`: 1 Scope.
+- `structure.md`: 2 Structure.
+- `contract.md`: 3 Contract.
+- `steps.md`: 4 Steps.
+- `implement.md`: 5 Implementation.
+- `research.md`: Research.
+- `prototype.md`: Prototype.
+- `initialize.md`: Initialization.

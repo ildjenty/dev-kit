@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// Host はイベントを送ったホストを表す。
+// Host identifies the host that sent the event.
 type Host string
 
 const (
@@ -13,7 +13,7 @@ const (
 	Codex      Host = "codex"
 )
 
-// Name は devkit が処理するイベント名を表す。
+// Name identifies an event handled by devkit.
 type Name string
 
 const (
@@ -24,8 +24,8 @@ const (
 	UserPromptSubmit Name = "UserPromptSubmit"
 )
 
-// Event は両ホストから観測できるイベントの共通表現である。
-// Effort は Claude Code、Model は Codex が報告した値だけを持つ。
+// Event is a common representation of events observable from both hosts.
+// Effort holds only values reported by Claude Code; Model holds only values reported by Codex.
 type Event struct {
 	Host                 Host
 	Name                 Name
@@ -46,8 +46,8 @@ type Event struct {
 	Model                string
 }
 
-// AgentInvocation はサブエージェント起動で観測できる引数を表す。
-// Codex の暗号化された message は含めない。
+// AgentInvocation holds observable arguments for a subagent invocation.
+// It does not include the encrypted Codex message.
 type AgentInvocation struct {
 	Type      string
 	Prompt    string
@@ -74,15 +74,15 @@ type input struct {
 	AgentTranscriptPath  string          `json:"agent_transcript_path"`
 }
 
-// Parse はホストの JSON を変換する。未知のホストとイベントはエラーにする。
-// 未知の入力項目はホストの拡張を妨げないよう読み飛ばす。
+// Parse converts host JSON and rejects unknown hosts and events.
+// Unknown input fields are ignored to allow host extensions.
 func Parse(host Host, data []byte) (Event, error) {
 	if err := validHost(host); err != nil {
 		return Event{}, err
 	}
 	var in input
 	if err := json.Unmarshal(data, &in); err != nil {
-		return Event{}, fmt.Errorf("%s のイベント入力: %w", host, err)
+		return Event{}, fmt.Errorf("%s event input: %w", host, err)
 	}
 	if err := validName(in.Name); err != nil {
 		return Event{}, err
@@ -101,7 +101,7 @@ func Parse(host Host, data []byte) (Event, error) {
 			} `json:"effort"`
 		}
 		if err := json.Unmarshal(data, &observed); err != nil {
-			return Event{}, fmt.Errorf("%s の effort: %w", host, err)
+			return Event{}, fmt.Errorf("%s effort: %w", host, err)
 		}
 		e.Effort = observed.Effort.Level
 	} else {
@@ -109,7 +109,7 @@ func Parse(host Host, data []byte) (Event, error) {
 			Model string `json:"model"`
 		}
 		if err := json.Unmarshal(data, &observed); err != nil {
-			return Event{}, fmt.Errorf("%s の model: %w", host, err)
+			return Event{}, fmt.Errorf("%s model: %w", host, err)
 		}
 		e.Model = observed.Model
 	}
@@ -120,7 +120,7 @@ func Parse(host Host, data []byte) (Event, error) {
 		Command string `json:"command"`
 	}
 	if err := json.Unmarshal(in.ToolInput, &tool); err != nil {
-		return Event{}, fmt.Errorf("%s のツール入力: %w", host, err)
+		return Event{}, fmt.Errorf("%s tool input: %w", host, err)
 	}
 	e.Command = tool.Command
 	if host == ClaudeCode && in.ToolName == "Agent" {
@@ -132,7 +132,7 @@ func Parse(host Host, data []byte) (Event, error) {
 			Isolation string `json:"isolation"`
 		}
 		if err := json.Unmarshal(in.ToolInput, &args); err != nil {
-			return Event{}, fmt.Errorf("Claude Code の Agent 入力: %w", err)
+			return Event{}, fmt.Errorf("Claude Code Agent input: %w", err)
 		}
 		e.Agent = &AgentInvocation{
 			Type: args.Type, Prompt: args.Prompt, Model: args.Model,
@@ -145,7 +145,7 @@ func Parse(host Host, data []byte) (Event, error) {
 			TaskName  string `json:"task_name"`
 		}
 		if err := json.Unmarshal(in.ToolInput, &args); err != nil {
-			return Event{}, fmt.Errorf("Codex の spawn_agent 入力: %w", err)
+			return Event{}, fmt.Errorf("Codex spawn_agent input: %w", err)
 		}
 		e.Agent = &AgentInvocation{Type: args.Type, ForkTurns: args.ForkTurns, TaskName: args.TaskName}
 	}
@@ -154,7 +154,7 @@ func Parse(host Host, data []byte) (Event, error) {
 
 func validHost(host Host) error {
 	if host != ClaudeCode && host != Codex {
-		return fmt.Errorf("未対応のホストです: %q", host)
+		return fmt.Errorf("unsupported host: %q", host)
 	}
 	return nil
 }
@@ -164,6 +164,6 @@ func validName(name Name) error {
 	case SessionStart, Stop, PreToolUse, SubagentStop, UserPromptSubmit:
 		return nil
 	default:
-		return fmt.Errorf("未対応のイベントです: %q", name)
+		return fmt.Errorf("unsupported event: %q", name)
 	}
 }

@@ -1,16 +1,19 @@
-計画や固定フォーマットの JSON Schema を置く。
-計画の検証は internal/plan、供給されたスキーマの適用は internal/form に置く。
-配置は [kit](../../docs/architecture/modules.md#kit)、扱いは [plan](../../docs/architecture/modules.md#plan) と [form](../../docs/architecture/modules.md#form) に従う。
+This directory contains JSON Schema definitions for plans and fixed formats.
+Plan validation belongs to internal/plan; applying supplied schemas belongs to internal/form.
+For placement, see `docs/architecture/modules.md#kit` from the repository root. For responsibilities, see `docs/architecture/modules.md#plan` and `docs/architecture/modules.md#form`.
 
-- `progress.json`: `form.Progress`。終了ブロックの指示 ID と終了の種別を必須とする。
-- `judgment.json`: `form.JudgmentResult`。判定者の最終メッセージに用い、指示 ID を含める。
-- `planner-result.json`: `form.PlannerResult`。指示 ID と計画の JSON を包む。計画の内容は plan が検証する。
-- `finding.json`: `form.Finding`。指摘と適用除外の主張・根拠、解決した指摘への参照を扱う。
-- `question.json`: `form.Question`。承認対象、回答の選択肢、推奨、停止理由、ステージ、根拠を扱う。
-- `instruction.json`: `form.Instruction`。指示の種別に応じて brief、展開先、問い、外部操作の確認対象を扱う。
-- `decision.json`: `form.Decision`。判断の内容、適用条件、置換と依存、却下案と証拠を扱う。
-- `evidence.json`: `form.Evidence`。調査結果、出典と確認方法を扱う。
+- `progress.json`: `form.Progress`. Requires the instruction ID and termination kind in a termination block. The kinds are `completion-claimed`, `confirmation-required`, and `work-stopped`.
+- `judgment.json`: `form.JudgmentResult`. Used for a judge's final message and includes the instruction ID.
+- `planner-result.json`: `form.PlannerResult`. Wraps the instruction ID and plan JSON. The plan package validates the plan content.
+- `finding.json`: `form.Finding`. Contains a finding, an exemption claim and evidence, and references to resolved findings.
+- `question.json`: `form.Question`. Contains the approval target, answer options, recommendation, stop reason, stages, and evidence. Decision approval options are `approve`, `reject`, and `defer`.
+- `instruction.json`: `form.Instruction`. Contains the brief, extraction path, question, or external operation approval target according to the instruction kind.
+- `decision.json`: `form.Decision`. Contains a decision, applicability conditions, supersession and dependencies, rejected alternatives, and evidence.
+- `evidence.json`: `form.Evidence`. Contains investigation results, sources, and a verification method.
+- `reference.json`: `form.Reference`. Defines a reference to a record within the work or an explicit external source.
 
-各スキーマは参照する定義を自身の `$defs` に含める。kit が読み込んだ JSON を `form.CompileSchema` に渡し、`Schema.Validate` または `Schema.Decode` で適用する。form はファイルを読まず、対象の一致、記録参照の存在、判定の受理、決定の状態は利用側が解決する。
+Finding, Question, and Reference are defined once in `finding.json`, `question.json`, and `reference.json`. Other schemas use `$ref` to share these definitions. Their resource URIs are `urn:devkit:form:finding`, `urn:devkit:form:question`, and `urn:devkit:form:reference`.
 
-終了の種別ごとの追加必須項目は正本に列挙されていないため、`progress.json` は種別による追加の必須条件を設けない。実施内容などの項目は省略できる。終了ブロックの補足項目を、未知のキーであることだけでは拒否しない。
+Pass the JSON loaded by kit to `form.CompileSchemaWithResources`, with referenced schemas in a `map[string][]byte` keyed by resource URI. `judgment.json` needs Finding and Reference; `instruction.json` needs Question and Reference; `finding.json`, `question.json`, `decision.json`, and `evidence.json` need Reference. Schemas with no external references can use `form.CompileSchema`. Apply the result with `Schema.Validate` or `Schema.Decode`. The form package does not read files. The caller resolves target matching, record reference existence, judgment acceptance, and decision state.
+
+The source of truth does not list additional required fields for each termination kind, so `progress.json` imposes no kind-specific requirements. Fields such as work performed may be omitted. Supplemental termination block fields are not rejected solely because their keys are unknown.

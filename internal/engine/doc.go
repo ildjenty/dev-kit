@@ -1,5 +1,5 @@
-// engine は状態機械の進行、指示の計算、判定・検証コマンドの実行、結果の受理と記録、brief の書き出しを担う。
-// git 操作は workspace、外部書き込みは external、保存は ledger/fsstore に置き、サブエージェントは起動しない。
-// plan・brief・check・router・ledger・form・workspace・external・ledger/fsstore に依存する。
-// 正本: docs/architecture/modules.md#engine
+// engine advances the state machine, computes instructions, runs judge and verification commands, accepts and records results, and writes briefs.
+// Git operations belong to workspace, external writes to external, and storage to ledger/fsstore; engine does not launch subagents.
+// It depends on plan, brief, check, router, ledger, form, workspace, external, and ledger/fsstore.
+// Source of truth: docs/architecture/modules.md#engine
 package engine

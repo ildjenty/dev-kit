@@ -1,10 +1,10 @@
-## 依頼
+## Request
 
-次の設計案の中の矛盾、未定義の事項、用語の違いを確認する。
+Check the following design proposal for contradictions, undefined matters, and terminology differences.
 
-## 対象
+## Target
 
-# 日報の削除
+# Deleting daily reports
 
-- 保存の規則: 送信済みの日報は30日間保持し、期間内は削除しない。
-- 実行の規則: 送信の翌日に、その日報を完全に削除する。
+- Retention rule: Keep submitted daily reports for 30 days; do not delete them during this period.
+- Execution rule: Permanently delete each report the day after submission.

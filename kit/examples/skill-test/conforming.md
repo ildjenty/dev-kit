@@ -1,12 +1,12 @@
-## 依頼
+## Request
 
-文字列の一致を判定する skill の実行記録を期待結果と照合する。skill に渡すのは各ケースの依頼と入力だけであり、期待結果・ケース名・評価中と分かる表現は渡していない。
+Compare execution records of a skill judging string equality with expected results. Only each case's request and input were given to the skill; expected results, case names, and wording revealing evaluation were not provided.
 
-## 対象
+## Target
 
-# 実行記録
+# Execution records
 
-- 共通の依頼: 2つの文字列が同じなら「一致」、違うなら「不一致」、片方がないなら「判定できない」と返す。
-- 入力1: 「保存」「保存」。期待結果は「一致」、実際の結果は「一致」。
-- 入力2: 「保存」「登録」。期待結果は「不一致」、実際の結果は「不一致」。
-- 入力3: 「保存」と未指定。期待結果は「判定できない」、実際の結果は「判定できない」。
+- Common request: Return "Match" if two strings are equal, "Mismatch" if different, and "Cannot determine" if either is absent.
+- Input 1: "Save", "Save". Expected "Match"; actual "Match".
+- Input 2: "Save", "Register". Expected "Mismatch"; actual "Mismatch".
+- Input 3: "Save" and absent. Expected "Cannot determine"; actual "Cannot determine".

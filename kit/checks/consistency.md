@@ -1,6 +1,6 @@
 # consistency
 
-- 確認事項: 文書や設計案の中に矛盾、未定義の事項、意味・実装・判断が分かれる用語の違いがないか。
-- blocking: 矛盾がある。未定義の事項と、意味・実装・判断が分かれる用語の違いは記録のみとする。
-- 報告しない事項: この観点の確認事項に含まれない事項。失敗のシナリオを示せない指摘。
-- 出力形式: 依頼で渡された Judgment の JSON Schema と `docs/architecture/data.md` の Judgment・Finding に従う。必要な判断基準や必須の確認を得られない場合は `NOT ASSESSED` とし、確認済み・未確認の範囲と方法・環境を残す。失敗のシナリオを示せない指摘は返さず、重大度は付けない。指摘は全件残し、blocking でない指摘は参考情報とし修正を求めない。適用除外の主張と根拠を照合し、外れる要求に限って違反としない。
+- Checks: Check documents and design proposals for contradictions, undefined matters, and terminology differences that lead to different meanings, implementations, or decisions.
+- blocking: There is a contradiction. Record undefined matters and terminology differences that lead to different meanings, implementations, or decisions without making them blocking.
+- Do not report: Items outside this aspect's checks. Findings without a failure scenario.
+- Output format: Follow the Judgment JSON Schema supplied in the request and the Judgment and Finding definitions in `docs/architecture/data.md`. Return `NOT ASSESSED` when necessary criteria or required verification are unavailable, and record the verified and unverified scope, method, and environment. Do not return findings without a failure scenario, and do not assign severity. Retain all findings; treat nonblocking findings as reference information without requiring fixes. Compare exemption claims with their grounds, and waive only the requirements covered by the exemption.

@@ -1,29 +1,29 @@
-# 試作
+# Prototype
 
-## 入力
+## Inputs
 
-計画の ID 付き完了条件、真偽を確かめる未確認の前提、判断に必要な観測項目と実験の条件。
+The plan's completion conditions with IDs, unverified premises to test, observations needed for decisions, and experimental conditions.
 
-共通の入力は、固定した規範、計画の上限、変更対象の配置ガイド、rules.md と計画にある変更困難な決定、利用可能な check、前のステージの出力。修正ラウンドでは前回の指摘と指摘 ID、必須の command: の check の出力、pre-commit の出力を加える。前段は計画が採用したステージの出力を用い、ないステージを必須にしない。
+Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in rules.md and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required command: check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
-## 決めること
+## Decisions
 
-未確認の前提の真偽。
+Whether unverified premises are true.
 
-## 決めずに次のステージへ渡すこと
+## Deferred to later stages
 
-本番のコード。
+Production code.
 
-## 元に戻せないもの
+## Irreversible items
 
-なし。
+None.
 
-## 成果物
+## Artifacts
 
-実験の結果と決定。決定は `devkit note`（`docs/architecture/data.md#決定と証拠-decision--evidence`） で記録する。試作は本番のコードから分離し、`devkit submit`（`docs/architecture/flow.md#作業結果の提出`）(作業結果を提出するコマンド)の実行前に削除するか、追跡対象外で ignore された場所に置いて完了時のコミット（`docs/architecture/guarantees.md#完了条件`）に含めない。
+Experimental results and decisions. Record decisions with `devkit note` (`docs/architecture/data.md#%E6%B1%BA%E5%AE%9A%E3%81%A8%E8%A8%BC%E6%8B%A0-decision--evidence`). Keep prototypes separate from production code. Before running `devkit submit` (`docs/architecture/flow.md#%E4%BD%9C%E6%A5%AD%E7%B5%90%E6%9E%9C%E3%81%AE%E6%8F%90%E5%87%BA`, the command for submitting work results), delete them or put them in an untracked, ignored location so that the completion commit (`docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6`) excludes them.
 
-## 終わる条件
+## Completion conditions
 
-実験結果と、前提の真偽に関する決定を示し、決定を devkit note で記録している。試作は本番のコードから分離し、devkit submit の実行前に削除するか、追跡対象外で ignore された場所に置き、完了時の commit に含めていない。
+Show experimental results and decisions about the premises, recording decisions with devkit note. Keep prototypes separate from production code, and delete them before devkit submit or place them in an untracked, ignored location so the completion commit excludes them.
 
-返却後の対象と規範に有効な必須 check がすべて `PASS` であり、判定者が担当する必須観点とその担当に対する検出試験に合格し、devkit が行う対象の照合と `git commit` が成功している。検証の選定と必須化は計画に従い、この定義から check を追加しない。確定の責務は `docs/architecture/guarantees.md#完了条件` に従う。
+All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully checked the target and run `git commit`. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6` for finalization responsibilities.

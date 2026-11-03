@@ -33,11 +33,28 @@ func TestKitAspects(t *testing.T) {
 			t.Fatalf("%s: %+v, %v", path, aspect, err)
 		}
 		if _, err := ParseDetectionSpec(asset(t, "kit/examples/"+aspect.ID+"/spec.json")); err != nil {
-			t.Fatalf("%s の検出試験: %v", aspect.ID, err)
+			t.Fatalf("%s detection test: %v", aspect.ID, err)
 		}
 	}
-	if _, err := ParseAspect("# incomplete\n- blocking: 条件"); err == nil {
-		t.Fatal("不足した観点を受け付けた")
+	if _, err := ParseAspect("# incomplete\n- blocking: condition"); err == nil {
+		t.Fatal("accepted an incomplete aspect")
+	}
+}
+
+func TestAspectTemplateAndExistingKeys(t *testing.T) {
+	want := Aspect{ID: "example", Checks: "checks", Blocking: "condition", DoNotReport: "outside scope", OutputFormat: "JSON"}
+	rendered, err := form.ApplyTemplate(string(asset(t, "kit/templates/aspect.md.tmpl")), want)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range []string{
+		rendered,
+		"# example\n- \u78ba\u8a8d\u4e8b\u9805: checks\n- blocking: condition\n- \u5831\u544a\u3057\u306a\u3044\u4e8b\u9805: outside scope\n- \u51fa\u529b\u5f62\u5f0f: JSON",
+	} {
+		aspect, err := ParseAspect(source)
+		if err != nil || aspect.ID != want.ID || aspect.Checks != want.Checks || aspect.Blocking != want.Blocking || aspect.DoNotReport != want.DoNotReport || aspect.OutputFormat == "" {
+			t.Fatalf("parsed aspect: %+v, %v", aspect, err)
+		}
 	}
 }
 
@@ -59,15 +76,18 @@ func judgmentRequest(t *testing.T) Request {
 
 func TestAcceptResult(t *testing.T) {
 	request := judgmentRequest(t)
-	schema, err := form.CompileSchema(request.OutputSchema)
+	schema, err := form.CompileSchemaWithResources(request.OutputSchema, map[string][]byte{
+		"urn:devkit:form:finding":   asset(t, "kit/schemas/finding.json"),
+		"urn:devkit:form:reference": asset(t, "kit/schemas/reference.json"),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	result := form.JudgmentResult{
 		InstructionID: request.InstructionID, Aspect: request.Aspect.ID, TargetVersion: request.TargetVersion,
 		Norms: request.normReferences(), CompletionConditionIDs: []string{"C1"}, Judgment: Pass,
-		Findings:     []Finding{{ID: "new", Kind: AutoFixable, Scenario: "対象外の参考情報", ResolvedFindingIDs: []string{"old"}}},
-		CheckedScope: []string{"目的"}, UncheckedScope: []string{}, Method: "完了条件との照合", Environment: "例の対象",
+		Findings:     []Finding{{ID: "new", Kind: AutoFixable, Scenario: "out-of-scope reference information", ResolvedFindingIDs: []string{"old"}}},
+		CheckedScope: []string{"purpose"}, UncheckedScope: []string{}, Method: "comparison against completion conditions", Environment: "example target",
 	}
 	data, err := json.Marshal(result)
 	if err != nil {
@@ -76,7 +96,7 @@ func TestAcceptResult(t *testing.T) {
 	provenance := Provenance{Source: SubagentResult, InstructionID: request.InstructionID, Runner: "review"}
 	judgment, accepted, err := AcceptResult(request, data, schema, provenance, nil)
 	if err != nil || !accepted || judgment.Judgment != Pass || !slices.Equal(judgment.Content, data) {
-		t.Fatalf("判定を受理できない: %+v, %v, %v", judgment, accepted, err)
+		t.Fatalf("could not accept judgment: %+v, %v, %v", judgment, accepted, err)
 	}
 	for _, change := range []func(*form.JudgmentResult){
 		func(r *form.JudgmentResult) { r.InstructionID = "other" },
@@ -91,15 +111,39 @@ func TestAcceptResult(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, _, err := AcceptResult(request, data, schema, provenance, nil); err == nil {
-			t.Fatal("依頼と一致しない結果を受理した")
+			t.Fatal("accepted a result that does not match the request")
 		}
 	}
-	if _, _, err := AcceptResult(request, data, schema, Provenance{}, nil); err == nil {
-		t.Fatal("来歴のない結果を受理した")
+	for _, tc := range []struct {
+		name      string
+		value     JudgmentValue
+		findings  []Finding
+		wantError bool
+	}{
+		{"PASS with blocking correction", Pass, []Finding{{ID: "F1", Blocking: true, Kind: AutoFixable, Scenario: "required correction"}}, true},
+		{"PASS with blocking decision", Pass, []Finding{{ID: "F1", Blocking: true, Kind: NeedsDecision, Scenario: "required decision"}}, true},
+		{"duplicate finding IDs", Pass, []Finding{result.Findings[0], result.Findings[0]}, true},
+		{"FAIL with blocking correction", Fail, []Finding{{ID: "F1", Blocking: true, Kind: AutoFixable, Scenario: "required correction"}}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			changed := result
+			changed.Judgment, changed.Findings = tc.value, tc.findings
+			data, err := json.Marshal(changed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, accepted, err := AcceptResult(request, data, schema, provenance, nil)
+			if (err != nil) != tc.wantError || accepted == tc.wantError {
+				t.Fatalf("acceptance: %v, %v; want error: %v", accepted, err, tc.wantError)
+			}
+		})
 	}
-	late, accepted, err := AcceptResult(request, []byte("不正な後着"), nil, Provenance{}, []Judgment{judgment})
+	if _, _, err := AcceptResult(request, data, schema, Provenance{}, nil); err == nil {
+		t.Fatal("accepted a result without provenance")
+	}
+	late, accepted, err := AcceptResult(request, []byte("invalid late arrival"), nil, Provenance{}, []Judgment{judgment})
 	if err != nil || accepted || late.Judgment != Pass {
-		t.Fatalf("後着によって最初の判定が変わった: %+v, %v", late, err)
+		t.Fatalf("late arrival changed the first judgment: %+v, %v", late, err)
 	}
 }
 
@@ -107,7 +151,7 @@ func TestAggregateExemptionAndCommand(t *testing.T) {
 	request := judgmentRequest(t)
 	request.Runner, request.Aspect.ID = "command:test", "command:test"
 	var judgments []Judgment
-	for _, command := range []CommandResult{{ExitCode: 0}, {ExitCode: 1, Output: "失敗の出力"}, {ExitCode: 1, TimedOut: true}} {
+	for _, command := range []CommandResult{{ExitCode: 0}, {ExitCode: 1, Output: "failure output"}, {ExitCode: 1, TimedOut: true}} {
 		judgment, err := FromCommand(request, command)
 		if err != nil {
 			t.Fatal(err)
@@ -115,29 +159,29 @@ func TestAggregateExemptionAndCommand(t *testing.T) {
 		judgments = append(judgments, judgment)
 	}
 	if judgments[0].Judgment != Pass || judgments[1].Judgment != Fail || judgments[2].Judgment != NotAssessed {
-		t.Fatalf("コマンドの判定: %+v", judgments)
+		t.Fatalf("command judgments: %+v", judgments)
 	}
 	if Aggregate(judgments).Judgment != Fail || Aggregate([]Judgment{judgments[0], judgments[2]}).Judgment != NotAssessed || Aggregate(nil).Judgment != Pass {
-		t.Fatal("集約の優先順が異なる")
+		t.Fatal("unexpected aggregation priority")
 	}
 	judgment := judgments[1]
-	judgment.Findings[0].Exemption = &form.Exemption{Claim: "合意した範囲の外", Evidence: []form.Reference{{RecordID: "agreement"}}}
-	decision := ExemptionDecision{FindingID: judgment.Findings[0].ID, ExcludedRequirements: []string{"範囲外の要求"}, Reason: "合意した範囲との照合"}
+	judgment.Findings[0].Exemption = &form.Exemption{Claim: "outside the agreed scope", Evidence: []form.Reference{{RecordID: "agreement"}}}
+	decision := ExemptionDecision{FindingID: judgment.Findings[0].ID, ExcludedRequirements: []string{"out-of-scope requirement"}, Reason: "comparison against the agreed scope"}
 	partial, err := ApplyExemptions(judgment, []ExemptionDecision{decision})
 	if err != nil || partial.Judgment != Fail {
-		t.Fatalf("部分的な適用除外で違反全体を外した: %+v, %v", partial, err)
+		t.Fatalf("partial exemption removed the entire violation: %+v, %v", partial, err)
 	}
 	decision.CoversFinding = true
 	exempted, err := ApplyExemptions(judgment, []ExemptionDecision{decision})
 	if err != nil || exempted.Judgment != Pass || exempted.Findings[0].Blocking || !judgment.Findings[0].Blocking {
-		t.Fatalf("適用除外の結果または元の値が不正: %+v, %v", exempted, err)
+		t.Fatalf("invalid exemption result or original value: %+v, %v", exempted, err)
 	}
 	required := []Requirement{{Aspect: request.Aspect.ID, Runner: request.Runner, TargetVersion: request.TargetVersion, Norms: request.normReferences(), CompletionConditionIDs: []string{"C1", "C2"}}}
 	if CheckRequired(required, []Judgment{judgments[0]})[0].Judgment != NotAssessed {
-		t.Fatal("未確認の完了条件を PASS にした")
+		t.Fatal("marked an unchecked completion condition PASS")
 	}
 	if CheckRequired(required, nil)[0].Judgment != NotAssessed {
-		t.Fatal("結果のない必須 check を PASS にした")
+		t.Fatal("marked a required check without results PASS")
 	}
 }
 
@@ -153,37 +197,37 @@ func TestDetection(t *testing.T) {
 		examples[example.File] = asset(t, "kit/examples/purpose/"+example.File)
 		findings := []Finding{}
 		if example.Kind == Violation {
-			findings = append(findings, Finding{ID: "violation", Blocking: true, Kind: AutoFixable, Scenario: "完了を判定できない"})
+			findings = append(findings, Finding{ID: "violation", Blocking: true, Kind: AutoFixable, Scenario: "completion cannot be determined"})
 		}
 		observations = append(observations, DetectionObservation{
 			File: example.File, Judgment: Judgment{JudgmentResult: form.JudgmentResult{Aspect: "purpose", Judgment: example.Expected, Findings: findings}, Runner: "review"},
-			Reason: "狙った条件と結果を照合した", MatchesBlocking: true, RespectsDifference: true,
+			Reason: "compared the intended condition and result", MatchesBlocking: true, RespectsDifference: true,
 		})
 	}
-	identity, err := NewDetectionIdentity(asset(t, "kit/checks/purpose.md"), source, []byte("担当定義"), examples)
+	identity, err := NewDetectionIdentity(asset(t, "kit/checks/purpose.md"), source, []byte("runner definition"), examples)
 	if err != nil {
 		t.Fatal(err)
 	}
 	record, err := AssessDetection(spec, "review", identity, observations)
 	if err != nil || !record.Passed {
-		t.Fatalf("検出試験: %+v, %v", record, err)
+		t.Fatalf("detection test: %+v, %v", record, err)
 	}
 	observations[0].MatchesBlocking = false
 	failed, err := AssessDetection(spec, "review", identity, observations)
 	if err != nil || failed.Passed {
-		t.Fatalf("違う理由の FAIL が合格した: %+v, %v", failed, err)
+		t.Fatalf("FAIL for a different reason passed: %+v, %v", failed, err)
 	}
 	required := []DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}}
 	if len(MissingDetection(required, []DetectionTest{record})) != 0 {
-		t.Fatal("同じ内容の合格を再利用できない")
+		t.Fatal("could not reuse a passing record for identical content")
 	}
 	examples["allowed.md"] = append(examples["allowed.md"], '\n')
-	changed, err := NewDetectionIdentity(asset(t, "kit/checks/purpose.md"), source, []byte("担当定義"), examples)
+	changed, err := NewDetectionIdentity(asset(t, "kit/checks/purpose.md"), source, []byte("runner definition"), examples)
 	if err != nil {
 		t.Fatal(err)
 	}
 	required[0].Identity = changed
 	if identity == changed || len(MissingDetection(required, []DetectionTest{record})) != 1 {
-		t.Fatal("例の変更で合格記録が失効しない")
+		t.Fatal("changing an example did not invalidate the passing record")
 	}
 }

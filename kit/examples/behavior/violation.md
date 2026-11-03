@@ -1,14 +1,14 @@
-## 依頼
+## Request
 
-変更は手元の日報データの保存処理だけであり、画面と外部通信の変更はない。仕様は、入力された件数を変えずに保存し、その件数を読み出せること。独立した観測記録と照合する。
+The change affects only local daily report storage; there are no UI or external communication changes. The specification requires storing the input count unchanged and retrieving that count. Compare against the independent observation record.
 
-## 対象
+## Target
 
-# 保存の観測記録
+# Storage observation record
 
-- 環境: 一時ディレクトリを保存先に指定して CLI を起動した。
-- 操作: 件数0の日報を保存し、保存ファイルを読み、CLI でも再取得した。
-- 結果: 入力は0、保存ファイルは1、再取得は1。
-- コンソールエラー: なし。
-- 証拠: 上記の入力・保存ファイル・読み出し値を記録した。
-- 後片付け: CLI を終了し、一時ディレクトリを削除した。
+- Environment: Started the CLI with a temporary directory as the storage location.
+- Operation: Saved a daily report count of 0, read the stored file, and retrieved it through the CLI.
+- Results: The input count was 0, the stored file count was 1, and the retrieved count was 1.
+- Console errors: None.
+- Evidence: Recorded the input, stored file, and retrieved value above.
+- Cleanup: Stopped the CLI and deleted the temporary directory.

@@ -1,10 +1,10 @@
-## 依頼
+## Request
 
-会話を読んでいない運用担当者が、保存済みの日報を削除する手順を読んで実行する。担当者が使える資料は以下の手順だけとする。
+An operator who has not read the conversation will read and execute the procedure for deleting stored daily reports. The following procedure is the only material available to the operator.
 
-## 対象
+## Target
 
-# 日報の削除手順
+# Daily report deletion procedure
 
-1. あの画面で例のものを消す。
-2. いつものところを確認する。
+1. Delete that thing on that screen.
+2. Check the usual place.

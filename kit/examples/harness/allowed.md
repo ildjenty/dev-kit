@@ -1,12 +1,12 @@
-## 依頼
+## Request
 
-判定処理の変更を確認する。新しいセッションでは、README にある「開発ループを進める CLI」「go run ./cmd/devkit で起動」「go build ./... で確認」と、実行記録の「実装ステージで判定待ち」から4つの問いに答えられる。他の規範と契約は変更しない。
+Check the judgment processing change. A fresh session can answer the four questions from the README ("CLI for advancing a development loop", "Start with go run ./cmd/devkit", "Verify with go build ./...") and execution records ("Awaiting judgment in the implementation stage"). Other norms and contracts remain unchanged.
 
-## 対象
+## Target
 
-# 判定処理
+# Judgment processing
 
-- 入力: 過去の独立した判定と同じ対象の再確認。
-- 再利用する判定: J1。対象、合意条件、観点と規範、確認範囲、環境、入力が今回と一致し、新たな反証がないことを照合済み。照合した項目と J1 への参照を成果物に残す。
-- 判定処理: principles/harness.md の原則1の適用除外に従い、一致した範囲だけ再照合を省略する。異なる範囲には流用しない。判断基準が欠ける入力は NOT ASSESSED を返す。
-- skill: description と配置・参照先は変更しない。check の必須化の変更はない。
+- Input: Rechecking the same target as a previous independent judgment.
+- Reused judgment: J1. Confirmed that the target, agreed conditions, aspects and norms, verification scope, environment, and input match the current request and that there is no new counterevidence. Retain the compared items and reference to J1 in the artifact.
+- Judgment processing: Under the exemption in principle 1 of principles/harness.md, skip repeated comparison only for the matching scope. Do not reuse it for other scope. Return NOT ASSESSED for inputs lacking criteria.
+- Skill: description, placement, and references are unchanged. No changes make checks required.

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"time"
 )
 
 const (
@@ -21,7 +22,7 @@ func TestRecords(t *testing.T) {
 	root := t.TempDir()
 	store := New(root)
 	if records, err := store.List(); err != nil || len(records) != 0 {
-		t.Fatalf("空の記録: %v, %v", records, err)
+		t.Fatalf("empty records: %v, %v", records, err)
 	}
 	for _, id := range []string{secondID, firstID} {
 		data := json.RawMessage(`{"id":"` + id + `","kind":"work"}`)
@@ -30,7 +31,7 @@ func TestRecords(t *testing.T) {
 		}
 	}
 	if err := store.Append(firstID, json.RawMessage(`{"changed":true}`)); !errors.Is(err, fs.ErrExist) {
-		t.Fatalf("上書きを拒否しませんでした: %v", err)
+		t.Fatalf("overwrite was not rejected: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "records", ".unfinished.tmp"), []byte(`{`), 0o600); err != nil {
 		t.Fatal(err)
@@ -40,55 +41,125 @@ func TestRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(records) != 2 || records[0].ID != firstID || records[1].ID != secondID {
-		t.Fatalf("記録の順序と件数: %v", records)
+		t.Fatalf("record order and count: %v", records)
 	}
 	if !strings.Contains(string(records[0].Data), `"kind":"work"`) {
-		t.Fatalf("既存の記録が変わりました: %s", records[0].Data)
+		t.Fatalf("existing record changed: %s", records[0].Data)
 	}
 	path := filepath.Join(root, "records", secondID+".json")
 	if err := os.WriteFile(path, []byte(`{"broken":`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := store.List(); err == nil || !strings.Contains(err.Error(), path) {
-		t.Fatalf("破損の対象が報告されませんでした: %v", err)
+		t.Fatalf("corrupt file was not reported: %v", err)
 	}
 	if data, err := os.ReadFile(path); err != nil || string(data) != `{"broken":` {
-		t.Fatalf("破損した記録が保存されていません: %s, %v", data, err)
+		t.Fatalf("corrupt record was not preserved: %s, %v", data, err)
 	}
 }
 
 func TestPublishAndInvalidInput(t *testing.T) {
 	root := t.TempDir()
 	store := New(root)
-	for _, body := range []string{"最初の本文", "再生成した本文"} {
+	for _, body := range []string{"initial body", "regenerated body"} {
 		if err := store.Publish("brief/instruction.md", []byte(body)); err != nil {
 			t.Fatal(err)
 		}
 		data, err := os.ReadFile(filepath.Join(root, "brief", "instruction.md"))
 		if err != nil || string(data) != body {
-			t.Fatalf("生成物: %s, %v", data, err)
+			t.Fatalf("artifact: %s, %v", data, err)
 		}
 	}
-	if err := store.Publish("view.html", []byte("<html>現在地</html>")); err != nil {
+	if err := store.Publish("view.html", []byte("<html>current state</html>")); err != nil {
 		t.Fatal(err)
 	}
-	if data, err := os.ReadFile(filepath.Join(root, "view.html")); err != nil || string(data) != "<html>現在地</html>" {
-		t.Fatalf("view の保存: %s, %v", data, err)
+	if data, err := os.ReadFile(filepath.Join(root, "view.html")); err != nil || string(data) != "<html>current state</html>" {
+		t.Fatalf("saved view: %s, %v", data, err)
 	}
 	for _, name := range []string{"../outside", filepath.Join(root, "absolute")} {
-		if err := store.Publish(name, []byte("本文")); err == nil {
-			t.Fatalf("ルート外のパスが受理されました: %s", name)
+		if err := store.Publish(name, []byte("body")); err == nil {
+			t.Fatalf("path outside root was accepted: %s", name)
 		}
 	}
 	if err := store.Append("../outside", json.RawMessage(`{}`)); err == nil {
-		t.Fatal("不正な記録 ID が受理されました")
+		t.Fatal("invalid record ID was accepted")
 	}
 	if err := store.Append(firstID, json.RawMessage(`{`)); err == nil {
-		t.Fatal("壊れた JSON が受理されました")
+		t.Fatal("invalid JSON was accepted")
 	}
 	if _, err := store.Get(firstID); !errors.Is(err, fs.ErrNotExist) {
-		t.Fatalf("壊れた記録が公開されました: %v", err)
+		t.Fatalf("invalid record was published: %v", err)
 	}
+}
+
+func TestAppendWithStaleTemporaryFiles(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "records"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"." + firstID + ".tmp", "." + firstID + "-stale.tmp"} {
+		if err := os.WriteFile(filepath.Join(root, "records", name), []byte(`{`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	store := New(root)
+	if err := store.Append(firstID, json.RawMessage(`{"kind":"pause"}`)); err != nil {
+		t.Fatal(err)
+	}
+	records, err := store.List()
+	if err != nil || len(records) != 1 || records[0].ID != firstID {
+		t.Fatalf("records after stale temporary files: %v, %v", records, err)
+	}
+}
+
+func TestConcurrentAppend(t *testing.T) {
+	store := New(t.TempDir())
+	const writers = 8
+	start := make(chan struct{})
+	results := make(chan error, writers)
+	for i := 0; i < writers; i++ {
+		go func() {
+			<-start
+			results <- store.Append(firstID, json.RawMessage(`{"kind":"pause"}`))
+		}()
+	}
+	close(start)
+	succeeded := 0
+	for i := 0; i < writers; i++ {
+		if err := <-results; err == nil {
+			succeeded++
+		} else if !errors.Is(err, fs.ErrExist) {
+			t.Fatal(err)
+		}
+	}
+	if succeeded != 1 {
+		t.Fatalf("successful appends: got %d, want 1", succeeded)
+	}
+}
+
+func TestWorkLockTimeout(t *testing.T) {
+	store := New(t.TempDir())
+	lock, err := store.Lock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	started := time.Now()
+	other, err := store.Lock()
+	if other != nil {
+		other.Close()
+	}
+	if !errors.Is(err, os.ErrDeadlineExceeded) || time.Since(started) < 10*time.Second {
+		t.Fatalf("lock timeout after %v: %v", time.Since(started), err)
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+	other, err = store.Lock()
+	if err != nil {
+		t.Fatalf("lock after release: %v", err)
+	}
+	other.Close()
 }
 
 func TestWorkLock(t *testing.T) {
@@ -102,7 +173,7 @@ func TestWorkLock(t *testing.T) {
 		blocked := errors.Is(err, syscall.EWOULDBLOCK)
 		wantBlocked := os.Getenv("DEVKIT_FSSTORE_LOCK_TEST_BLOCKED") == "true"
 		if blocked != wantBlocked || (err != nil && !blocked) {
-			t.Fatalf("別プロセスからのロック: %v、競合の期待値: %v", err, wantBlocked)
+			t.Fatalf("lock from another process: %v, expected contention: %v", err, wantBlocked)
 		}
 		return
 	}
@@ -118,11 +189,11 @@ func TestWorkLock(t *testing.T) {
 		cmd := exec.Command(os.Args[0], "-test.run=^TestWorkLock$")
 		cmd.Env = append(os.Environ(), "DEVKIT_FSSTORE_LOCK_TEST_ROOT="+root, "DEVKIT_FSSTORE_LOCK_TEST_BLOCKED="+blocked)
 		if output, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("子プロセス: %s, %v", output, err)
+			t.Fatalf("child process: %s, %v", output, err)
 		}
 	}
 	check("true")
-	// pause の書き込みは、作業ロックを保持したままでも独立して公開できる。
+	// A pause record can be published independently while the work lock is held.
 	if err := store.Append(firstID, json.RawMessage(`{"kind":"pause"}`)); err != nil {
 		t.Fatal(err)
 	}
@@ -131,6 +202,6 @@ func TestWorkLock(t *testing.T) {
 	}
 	check("false")
 	if _, err := os.Stat(filepath.Join(root, "run.lock")); err != nil {
-		t.Fatalf("ロックファイルが残っていません: %v", err)
+		t.Fatalf("lock file was not preserved: %v", err)
 	}
 }

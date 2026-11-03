@@ -1,11 +1,11 @@
-## 依頼
+## Request
 
-ボタンの文言を変更する手順について、各ステップが単独で検証できるか、人が一度で読める大きさかを確認する。
+Check whether each step in the button text change procedure can be verified independently and is small enough for a human to read in one pass.
 
-## 対象
+## Target
 
-# 保存ボタンの変更
+# Save button change
 
-1. 目的: 保存する操作だと分かるようにする。スコープ: 日報入力画面の送信ボタンの文言だけ。完了条件: 文言が「保存」で既存テストが通る。根拠: 利用者の依頼と保存動作を維持する要求。検証: 対象画面を描画して文言を照合し、既存テストを実行して終了コードと結果を残す。
+1. Purpose: Make clear that the operation saves. Scope: Only the submit button text on the daily report input screen. Completion conditions: The text is "Save" and existing tests pass. Grounds: The user request and requirement to preserve storage behavior. Verification: Render the target screen and compare the text, run existing tests, and retain exit codes and results.
 
-対象は文言1か所なので、ステップを追加しない。
+Do not add steps for a single text change.

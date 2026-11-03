@@ -1,13 +1,13 @@
-## 依頼
+## Request
 
-雛形は purpose → implement。C1 は保存ボタンの文言が「保存」、C2 は既存の保存動作を保つこと。変更は画面の文言だけで、データ・通信・構造は変えない。
+The template is purpose → implement. C1 requires the save button text to be "Save"; C2 requires preserving existing storage behavior. Only UI text changes; data, communication, and structure do not change.
 
-## 対象
+## Target
 
-# 計画
+# Plan
 
-- 採用: purpose → implement。遷移・ゲート・必須 check は雛形を保つ。
-- implement の check: behavior が C1 の対象画面の描画・操作を確認する。
-- C2 に対応する check: なし。
-- ゲート: 不要。理由は公開契約・外部操作・規約を変えない文言の修正。人への確認対象に該当しない。
-- 規模: purpose では依頼文の目的を確認し、implement で文言を変える。
+- Adopted: purpose → implement. Preserve the template's transitions, gates, and required checks.
+- Checks in implement: behavior verifies rendering and interaction on the C1 target screen.
+- Check corresponding to C2: None.
+- Gate: Not required. The reason is a text correction that changes no public contract, external operation, or convention. It does not require human confirmation.
+- Size: Confirm the request's purpose in purpose, then change the text in implement.

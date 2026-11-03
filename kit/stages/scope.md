@@ -1,29 +1,29 @@
-# 1 スコープ
+# 1 Scope
 
-## 入力
+## Inputs
 
-課題、計画の ID 付き完了条件、目的と完了条件の対応、既存の外部契約とデータの保持条件。
+The task, the plan's completion conditions with IDs, the relationship between purpose and completion conditions, and existing external contracts and data retention conditions.
 
-共通の入力は、固定した規範、計画の上限、変更対象の配置ガイド、rules.md と計画にある変更困難な決定、利用可能な check、前のステージの出力。修正ラウンドでは前回の指摘と指摘 ID、必須の command: の check の出力、pre-commit の出力を加える。前段は計画が採用したステージの出力を用い、ないステージを必須にしない。
+Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in rules.md and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required command: check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
-## 決めること
+## Decisions
 
-含めるものと含めないもの。外部から見えるもの。
+What is included, what is excluded, and what is externally visible.
 
-## 決めずに次のステージへ渡すこと
+## Deferred to later stages
 
-内部構造。
+Internal structure.
 
-## 元に戻せないもの
+## Irreversible items
 
-スキーマ、識別子、契約の型、外部への公開、データの保持のうち、該当すると判断したもの。
+Schemas, identifiers, contract types, external publication, and data retention identified as difficult to change.
 
-## 成果物
+## Artifacts
 
-スコープの明示と、元に戻せないものの一覧。保存先は規則と強制手段（`docs/architecture/data.md#規則と強制手段-rules`）と計画（`docs/architecture/data.md#計画-plan`）に従う。後続ステージの brief（`docs/architecture/modules.md#brief`）(入力から組み立てる依頼文)に渡す範囲は規則と強制手段（`docs/architecture/data.md#規則と強制手段-rules`）に従う。
+An explicit scope and list of irreversible items. Follow rules and enforcement (`docs/architecture/data.md#%E8%A6%8F%E5%89%87%E3%81%A8%E5%BC%B7%E5%88%B6%E6%89%8B%E6%AE%B5-rules`) and the plan (`docs/architecture/data.md#%E8%A8%88%E7%94%BB-plan`) for storage. Follow rules and enforcement (`docs/architecture/data.md#%E8%A6%8F%E5%89%87%E3%81%A8%E5%BC%B7%E5%88%B6%E6%89%8B%E6%AE%B5-rules`) for the scope passed to later-stage briefs (`docs/architecture/modules.md#brief`, requests assembled from inputs).
 
-## 終わる条件
+## Completion conditions
 
-含めるもの・含めないものと外部から見えるものが明示され、変更困難な決定の一覧と、その判断に必要な未確認事項・確定の時期を示している。選択を左右する未確認事項を残して、それに依存する実装・公開・保存を始めていない。
+Make inclusions, exclusions, and externally visible behavior explicit. Show the list of difficult-to-change decisions, unverified matters needed to decide them, and when to finalize them. Do not begin dependent implementation, publication, or storage while matters affecting the choice remain unverified.
 
-返却後の対象と規範に有効な必須 check がすべて `PASS` であり、判定者が担当する必須観点とその担当に対する検出試験に合格し、devkit が行う対象の照合と `git commit` が成功している。検証の選定と必須化は計画に従い、この定義から check を追加しない。確定の責務は `docs/architecture/guarantees.md#完了条件` に従う。
+All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully checked the target and run `git commit`. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6` for finalization responsibilities.

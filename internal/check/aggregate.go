@@ -13,8 +13,8 @@ type Summary struct {
 	CompletionConditionIDs []string      `json:"completion_condition_ids"`
 }
 
-// Aggregate は FAIL、NOT ASSESSED、PASS の優先順で集約する。
-// 対象と規範の有効性は呼び出し前に照合する。空の集合は違反なしとして扱う。
+// Aggregate combines judgments in FAIL, NOT ASSESSED, PASS priority order.
+// Validate targets and norms before calling. An empty set has no violations.
 func Aggregate(judgments []Judgment) Summary {
 	result := Summary{Judgment: Pass, Findings: []Finding{}, CompletionConditionIDs: []string{}}
 	for _, judgment := range judgments {
@@ -33,9 +33,9 @@ func Aggregate(judgments []Judgment) Summary {
 	return result
 }
 
-// ExemptionDecision は主張と根拠を照合した判断である。
-// CoversFinding は指摘が扱う要求がすべて適用除外になる場合だけ真にする。
-// 一部だけ外れる場合は指摘の blocking と判定を維持する。
+// ExemptionDecision records a decision based on the claim and evidence.
+// Set CoversFinding only when all requirements covered by the finding are exempt.
+// A partial exemption preserves the blocking flag and judgment.
 type ExemptionDecision struct {
 	FindingID            string
 	ExcludedRequirements []string
@@ -43,22 +43,22 @@ type ExemptionDecision struct {
 	Reason               string
 }
 
-// ApplyExemptions は要求の照合結果を適用し、元の指摘を参考情報として残す。
-// 意味上の適用可否を文章の一致から推測しない。
+// ApplyExemptions applies requirement assessments and retains findings as reference information.
+// It does not infer semantic applicability from matching text.
 func ApplyExemptions(judgment Judgment, decisions []ExemptionDecision) (Judgment, error) {
 	judgment.Findings = slices.Clone(judgment.Findings)
 	removedBlocking := false
 	for _, decision := range decisions {
 		index := slices.IndexFunc(judgment.Findings, func(f Finding) bool { return f.ID == decision.FindingID })
 		if index < 0 {
-			return Judgment{}, fmt.Errorf("適用除外の指摘がない: %q", decision.FindingID)
+			return Judgment{}, fmt.Errorf("exemption finding not found: %q", decision.FindingID)
 		}
 		finding := &judgment.Findings[index]
 		if len(decision.ExcludedRequirements) == 0 {
 			continue
 		}
 		if finding.Exemption == nil || finding.Exemption.Claim == "" || len(finding.Exemption.Evidence) == 0 || decision.Reason == "" {
-			return Judgment{}, fmt.Errorf("適用除外には主張・根拠・照合理由が必要です: %q", finding.ID)
+			return Judgment{}, fmt.Errorf("exemption requires a claim, evidence, and assessment reason: %q", finding.ID)
 		}
 		if decision.CoversFinding {
 			removedBlocking = removedBlocking || finding.Blocking
@@ -74,7 +74,7 @@ func ApplyExemptions(judgment Judgment, decisions []ExemptionDecision) (Judgment
 	return judgment, nil
 }
 
-// Requirement は必須 check と、呼び出し側が解決した判定対象である。
+// Requirement describes a required check and its caller-resolved target.
 type Requirement struct {
 	Aspect                 string
 	Runner                 string
@@ -90,7 +90,7 @@ type Coverage struct {
 	MissingConditionIDs []string
 }
 
-// CheckRequired は必須 check ごとに有効な結果と完了条件 ID の網羅を照合する。
+// CheckRequired checks valid results and completion condition ID coverage for each required check.
 func CheckRequired(required []Requirement, judgments []Judgment) []Coverage {
 	coverage := make([]Coverage, 0, len(required))
 	for _, requirement := range required {

@@ -1,12 +1,12 @@
-## 依頼
+## Request
 
-会話を読んでいない運用担当者が、保存済みの日報を削除する手順を読んで実行する。担当者が使える資料は以下の手順だけとする。
+An operator who has not read the conversation will read and execute the procedure for deleting stored daily reports. The following procedure is the only material available to the operator.
 
-## 対象
+## Target
 
-# 日報の削除手順
+# Daily report deletion procedure
 
-1. 日報一覧で、削除する日報のタイトルを選ぶ。
-2. 日報の詳細で「削除」を押す。
-3. 確認画面に表示されたタイトルが削除対象と一致したら「削除する」を押す。
-4. 日報一覧から対象のタイトルが消えたことを確認する。
+1. In the daily report list, select the title of the report to delete.
+2. In the daily report details, press "Delete".
+3. If the title on the confirmation screen matches the report to delete, press "Confirm deletion".
+4. Confirm that the target title no longer appears in the daily report list.

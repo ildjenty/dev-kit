@@ -1,12 +1,12 @@
-## 依頼
+## Request
 
-文書のリンク切れを防ぐための仕組みの追加案を確認する。比較した各案の保証と負担は以下の記録で確認済みとする。
+Check the proposal to add a mechanism preventing broken document links. Treat the guarantees and burdens of each compared proposal as verified in the records below.
 
-## 対象
+## Target
 
-# 必須の確認の選定
+# Selecting required verification
 
-- 防ぐ失敗: 文書変更時のリンク切れ。毎月1回程度再発し、参照できなくなる。
-- 案A: 文書変更時の既存コマンドで変更後の全リンクを commit 前に検証する。約1秒、追加保守は不要で誤検出もない。
-- 案B: 全変更で判定者が同じリンクを確認する。約30秒、担当定義の保守と誤検出対応が必要。保証は案Aと同じ。
-- 決定: 案Aを文書変更時だけ必須にする。必要な検出範囲と停止時点を保って負担を減らす。判定者による重複した確認は削除する。
+- Failure to prevent: Broken links on document changes recur about once a month, making references inaccessible.
+- Proposal A: Use an existing command on document changes to verify all links after the change before commit. About one second, no additional maintenance, and no false positives.
+- Proposal B: Have a judge check the same links on every change. About 30 seconds, with role definition maintenance and false-positive handling. The guarantee is the same as A.
+- Decision: Require A only on document changes, retaining necessary detection coverage and stopping point while reducing burden. Remove the judge's duplicate check.

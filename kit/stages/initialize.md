@@ -1,29 +1,29 @@
-# 初期化
+# Initialization
 
-## 入力
+## Inputs
 
-課題、計画の ID 付き完了条件、リポジトリの配置と既存の起動・テスト方法、利用するホストの設定。
+The task, the plan's completion conditions with IDs, repository layout and existing startup and test methods, and settings for the host in use.
 
-共通の入力は、固定した規範、計画の上限、変更対象の配置ガイド、rules.md と計画にある変更困難な決定、利用可能な check、前のステージの出力。修正ラウンドでは前回の指摘と指摘 ID、必須の command: の check の出力、pre-commit の出力を加える。前段は計画が採用したステージの出力を用い、ないステージを必須にしない。
+Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in rules.md and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required command: check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
-## 決めること
+## Decisions
 
-起動の方法、最初に通すテスト、進捗の見せ方、次の作業の選び方。kit の導入と確認は install の init・doctor（`docs/architecture/modules.md#install`）に従う。
+How to start the system, the first tests to pass, how to show progress, and how to choose the next work. Follow install's init and doctor contracts (`docs/architecture/modules.md#install`) for kit installation and verification.
 
-## 決めずに次のステージへ渡すこと
+## Deferred to later stages
 
-実装。
+Implementation.
 
-## 元に戻せないもの
+## Irreversible items
 
-なし。
+None.
 
-## 成果物
+## Artifacts
 
-動作する環境。
+A working environment.
 
-## 終わる条件
+## Completion conditions
 
-起動方法と最初に通すテスト、進捗の見せ方、次の作業の選び方を示し、環境が動作する。kit の導入と確認は install の init・doctor の契約に従っている。
+Show how to start the system, the first tests to pass, how to show progress, and how to choose the next work, with the environment working. Kit installation and verification follow install's init and doctor contracts.
 
-返却後の対象と規範に有効な必須 check がすべて `PASS` であり、判定者が担当する必須観点とその担当に対する検出試験に合格し、devkit が行う対象の照合と `git commit` が成功している。検証の選定と必須化は計画に従い、この定義から check を追加しない。確定の責務は `docs/architecture/guarantees.md#完了条件` に従う。
+All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully checked the target and run `git commit`. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6` for finalization responsibilities.

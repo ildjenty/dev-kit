@@ -1,13 +1,13 @@
-## 依頼
+## Request
 
-保存済みの日報を扱う設計案と、変更困難な決定の一覧を照合する。
+Compare the design proposal for stored daily reports with the list of difficult-to-change decisions.
 
-## 対象
+## Target
 
-# 日報の保持
+# Daily report retention
 
-- 要求: 送信済みの日報の削除を検討する。
-- 変更困難な決定: 保存済みの日報の完全削除。保持期間を延ばしても削除済みの日報は復旧できない。
-- 未確認: 保管が必要な期間。依頼者への確認を次の作業とする。
-- 確定期限: 削除処理の実装・公開前。
-- 現在の範囲: 保存件数を読み出す調査だけを行い、削除や保存形式の変更は行わない。
+- Requirement: Consider deleting submitted daily reports.
+- Difficult-to-change decision: Permanently deleting stored daily reports. Extending retention cannot recover already deleted reports.
+- Unverified: The required retention period. The next work is to ask the requester.
+- Finalization deadline: Before implementing or publishing deletion processing.
+- Current scope: Only investigate by reading the stored count; do not delete or change the storage format.

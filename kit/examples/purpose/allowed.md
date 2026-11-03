@@ -1,13 +1,13 @@
-## 依頼
+## Request
 
-変更を使う人、目的、計画の完了条件の対応を確認する。実装方式の決定は対象に含めない。
+Check how users of the change, its purpose, and the plan's completion conditions correspond. Choosing an implementation approach is out of scope.
 
-## 対象
+## Target
 
-# 保存ボタンの変更
+# Save button change
 
-- 利用者: 日報を登録する担当者。
-- 目的: ボタンを押すと日報を保存すると分かるようにする。
-- 完了条件 C1: 日報入力画面の送信ボタンに「保存」と表示される。
-- 対応: C1 の表示文言で保存する操作だと判断できる。対象画面の描画で文言を照合する。
-- 保留: 文言を持つファイルと描画の実装方式は後続のステージで決める。
+- Users: Staff submitting daily reports.
+- Purpose: Make clear that pressing the button saves the daily report.
+- Completion condition C1: The submit button on the daily report input screen displays "Save".
+- Relationship: The C1 display text identifies the operation as saving. Compare the text in the rendered target screen.
+- Deferred: Decide the file containing the text and rendering implementation in later stages.

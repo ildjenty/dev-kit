@@ -27,17 +27,17 @@ query = { executable = "./scripts/find-comment", args = [], timeout_seconds = 10
 		t.Fatal(err)
 	}
 	if c.KitVersion != "v1" || c.Commands["test"].Timeout() != 120*time.Second || c.Commands["test"].Args[0] != "--all" {
-		t.Fatalf("設定が一致しません: %+v", c)
+		t.Fatalf("configuration does not match: %+v", c)
 	}
 	if c.Judges["review"].Executable != "./scripts/judge" || c.Judges["review"].OutputSchema == "" {
-		t.Fatalf("判定コマンドが一致しません: %+v", c.Judges)
+		t.Fatalf("judge command does not match: %+v", c.Judges)
 	}
 	op := c.External["comment"]
 	if op.Query == nil || op.Query.Timeout() != 10*time.Second || op.OccurrenceField != "request_id" {
-		t.Fatalf("外部操作が一致しません: %+v", op)
+		t.Fatalf("external operation does not match: %+v", op)
 	}
 	if len(c.Deny.Rules) != 3 || c.Router.HumanConfirmation[0] != "billing_changed" {
-		t.Fatalf("規則が一致しません: %+v", c)
+		t.Fatalf("rules do not match: %+v", c)
 	}
 }
 
@@ -48,21 +48,24 @@ func TestParseInvalid(t *testing.T) {
 		want string
 	}{
 		{"kit_missing", "", "kit_version"},
-		{"syntax", "kit_version = [", "解析"},
-		{"unknown", "kit_version = 'v1'\nmodel = 'x'", "未定義"},
+		{"syntax", "kit_version = [", "parse"},
+		{"unknown", "kit_version = 'v1'\nmodel = 'x'", "unknown"},
 		{"executable", "kit_version = 'v1'\n[commands.test]\ntimeout_seconds = 1", "executable"},
 		{"timeout", "kit_version = 'v1'\n[commands.test]\nexecutable = 'test'\ntimeout_seconds = 0", "timeout_seconds"},
 		{"timeout_overflow", "kit_version = 'v1'\n[commands.test]\nexecutable = 'test'\ntimeout_seconds = 9223372036854775807", "timeout_seconds"},
 		{"schema", "kit_version = 'v1'\n[judges.review]\nexecutable = 'judge'\ntimeout_seconds = 1", "output_schema"},
 		{"query", "kit_version = 'v1'\n[external.post]\nexecutable = 'post'\ntimeout_seconds = 1\nquery = { executable = 'query' }", "query.timeout_seconds"},
 		{"deny", "kit_version = 'v1'\n[deny]\nrules = ['Bash(git push)']", "deny.rules"},
+		{"agent_extra_close", "kit_version = 'v1'\n[deny]\nrules = ['Agent(fork))']", "deny.rules"},
+		{"agent_extra_open", "kit_version = 'v1'\n[deny]\nrules = ['Agent((fork)']", "deny.rules"},
+		{"agent_nested", "kit_version = 'v1'\n[deny]\nrules = ['Agent((fork))']", "deny.rules"},
 		{"router", "kit_version = 'v1'\n[router]\nhuman_confirmation = ['']", "human_confirmation"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := Parse([]byte(tt.body))
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
-				t.Fatalf("エラー = %v、期待する項目 = %s", err, tt.want)
+				t.Fatalf("error = %v, expected field = %s", err, tt.want)
 			}
 		})
 	}

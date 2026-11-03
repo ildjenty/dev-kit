@@ -8,8 +8,8 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
-// CompletionInput は plan の規則と、現在の対象に対する受理済みの記録である。
-// Targets は check の target 指定を解決した値で、指定のない check は TargetVersion を使う。
+// CompletionInput holds plan rules and accepted records for the current target.
+// Targets resolves explicit check targets; checks without one use TargetVersion.
 type CompletionInput struct {
 	Rule            plan.CompletionRule
 	TargetVersion   form.TargetVersion
@@ -33,8 +33,8 @@ type Completion struct {
 	MissingDetection []check.DetectionRequirement
 }
 
-// CheckCompletion は判定前の条件と commit 後の完了確定を分けて照合する。
-// ReadyToCommit が真なら engine は完了処理を依頼でき、Complete が真なら確定できる。
+// CheckCompletion separately checks pre-judgment conditions and final completion after commit.
+// ReadyToCommit permits engine to request completion processing; Complete permits finalization.
 func CheckCompletion(input CompletionInput) Completion {
 	required := make([]check.Requirement, 0, len(input.Rule.Checks))
 	var detection []check.DetectionRequirement

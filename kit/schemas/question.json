@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "問い",
+  "title": "Question",
   "$ref": "#/$defs/question",
   "$defs": {
     "question": {
@@ -90,9 +90,9 @@
                 "type": "array",
                 "items": {
                   "enum": [
-                    "承認",
-                    "却下",
-                    "保留"
+                    "approve",
+                    "reject",
+                    "defer"
                   ]
                 },
                 "uniqueItems": true,
@@ -231,34 +231,8 @@
       "additionalProperties": false
     },
     "reference": {
-      "oneOf": [
-        {
-          "type": "object",
-          "properties": {
-            "record_id": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "record_id"
-          ],
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "properties": {
-            "external": {
-              "type": "string",
-              "minLength": 1
-            }
-          },
-          "required": [
-            "external"
-          ],
-          "additionalProperties": false
-        }
-      ]
+      "$ref": "urn:devkit:form:reference"
     }
-  }
+  },
+  "$id": "urn:devkit:form:question"
 }

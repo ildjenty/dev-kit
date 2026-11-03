@@ -1,29 +1,29 @@
-# 調査
+# Research
 
-## 入力
+## Inputs
 
-課題、計画の ID 付き完了条件、確認する事象と未確認の前提、関連するコード・文書・実行記録。
+The task, the plan's completion conditions with IDs, the phenomena and unverified premises to examine, and relevant code, documents, and execution records.
 
-共通の入力は、固定した規範、計画の上限、変更対象の配置ガイド、rules.md と計画にある変更困難な決定、利用可能な check、前のステージの出力。修正ラウンドでは前回の指摘と指摘 ID、必須の command: の check の出力、pre-commit の出力を加える。前段は計画が採用したステージの出力を用い、ないステージを必須にしない。
+Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in rules.md and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required command: check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
-## 決めること
+## Decisions
 
-起きている事象、動作の仕組み、既存の同種の処理の書き方。
+What is happening, how it works, and how existing similar processing is written.
 
-## 決めずに次のステージへ渡すこと
+## Deferred to later stages
 
-修正方法。
+How to fix it.
 
-## 元に戻せないもの
+## Irreversible items
 
-なし。
+None.
 
-## 成果物
+## Artifacts
 
-調査結果を、観測と推論に分けた報告。
+A report of research results that separates observations from inferences.
 
-## 終わる条件
+## Completion conditions
 
-調査する事象、動作の仕組み、既存の同種の処理について、観測と推論を分けた結果を示している。確認した範囲、未確認の範囲、根拠を区別できる。修正方法の確定は次のステージへ渡している。
+Present results about the phenomena, how the system works, and existing similar processing, separating observations from inferences. Distinguish verified scope, unverified scope, and grounds. Leave the choice of fix to the next stage.
 
-返却後の対象と規範に有効な必須 check がすべて `PASS` であり、判定者が担当する必須観点とその担当に対する検出試験に合格し、devkit が行う対象の照合と `git commit` が成功している。検証の選定と必須化は計画に従い、この定義から check を追加しない。確定の責務は `docs/architecture/guarantees.md#完了条件` に従う。
+All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully checked the target and run `git commit`. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `docs/architecture/guarantees.md#%E5%AE%8C%E4%BA%86%E6%9D%A1%E4%BB%B6` for finalization responsibilities.

@@ -1,12 +1,12 @@
-## 依頼
+## Request
 
-計画の完了条件 C1 は「日報入力画面の保存ボタンに『保存』と表示される」。終了ブロックと確認結果を照合する。必須 check の集約と commit の成功の確認は devkit に委ねる。
+Completion condition C1 in the plan is: The save button on the daily report input screen displays "Save". Compare the termination block with verification results. Leave aggregation of required checks and confirmation of commit success to devkit.
 
-## 対象
+## Target
 
-# 終了時の記録
+# Termination record
 
-- 終了ブロック: 完了として報告する。
-- 実際の状態: 対象画面のボタンには「保存」と表示される。
-- 確認結果: C1 に対応する描画記録で「保存」を確認した。必須の確認の未実施はない。
-- 残存物: 調査用の挙動変更は除去した。継続に必要な再現手順と描画記録は evidence/ に保存し、用途は C1 の照合、保持期間は引き継ぎ完了までとした。
+- Termination block: Report completion.
+- Actual state: The target screen's button displays "Save".
+- Verification results: Confirmed "Save" in the rendering record corresponding to C1. No required verification remains unperformed.
+- Remaining artifacts: Removed investigative behavior changes. Saved reproduction steps and rendering records needed for continuation in evidence/, with C1 comparison as their purpose and retention until handoff is complete.

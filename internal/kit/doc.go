@@ -1,5 +1,5 @@
-// kit は固定物のコピーからの供給、init 用の埋め込みからのコピー、doctor 用の一致の照合を担う。
-// 埋め込みの定義はルートパッケージに置き、状態機械の進行や入出力を伴わないドメインの判断は持たない。
-// 他の処理モジュールに依存せず、埋め込みの供給源をルートパッケージから読む。
-// 正本: docs/architecture/modules.md#kit
+// kit supplies assets from a repository copy, copies embedded assets for init, and verifies them for doctor.
+// Embedding belongs to the root package; state machine progression and domain decisions without I/O do not belong here.
+// This package reads embedded assets from the root package and does not depend on other processing modules.
+// Source of truth: docs/architecture/modules.md#kit
 package kit

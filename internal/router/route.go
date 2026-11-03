@@ -8,8 +8,8 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
-// Input の CompletedRounds は今回を含む完了済みのラウンド数である。
-// PreviousNoProgressRounds は前回までの連続回数であり、今回の進展は engine が計算する。
+// Input.CompletedRounds counts completed rounds including the current round.
+// PreviousNoProgressRounds counts preceding consecutive rounds; engine computes progress for this round.
 type Input struct {
 	Summary                  check.Summary
 	Stage                    plan.Stage
@@ -19,7 +19,7 @@ type Input struct {
 	TerminationKind          form.TerminationKind
 	PremiseBroken            bool
 	Confirmation             ConfirmationInput
-	// FindingCategories は人の判断を要する指摘 ID と分類名の対応である。
+	// FindingCategories maps IDs of findings requiring human decisions to category names.
 	FindingCategories map[string]string
 	Completion        Completion
 }
@@ -30,12 +30,12 @@ type Decision struct {
 	Confirmation Confirmation
 }
 
-// Decide は分類だけを行う。遷移・問い・暫定判断の記録は engine に委ねる。
-// Done は完了処理の依頼であり、完了確定には CheckCompletion の Complete が必要である。
+// Decide only classifies. Engine handles transitions and records questions and provisional decisions.
+// Done requests completion processing; final completion requires CheckCompletion.Complete.
 func (t Table) Decide(input Input) (Decision, error) {
 	confirmationInput := input.Confirmation
 	confirmationInput.HumanStage = confirmationInput.HumanStage || input.Stage.Assignee == plan.Human
-	// ゲートは修正を終えて完了処理へ進む時点で確認する。
+	// Check gates after corrections when proceeding to completion processing.
 	if input.Summary.Judgment == check.Pass && input.Completion.ReadyToCommit {
 		confirmationInput.Gate = input.Stage.Gate
 	}
@@ -53,25 +53,25 @@ func (t Table) Decide(input Input) (Decision, error) {
 	}
 	decision := Decision{Confirmation: confirmation}
 	if input.TerminationKind == form.TerminationQuestion || input.TerminationKind == form.TerminationStopped || confirmation.Required {
-		decision.Action, decision.Reason = plan.Ask, "人の確認が必要です"
+		decision.Action, decision.Reason = plan.Ask, "human confirmation is required"
 		decision.Confirmation.Provisional = false
 		return decision, nil
 	}
 	if input.PremiseBroken {
-		decision.Action, decision.Reason = plan.Back, "前提を決めたステージの見直しが必要です"
+		decision.Action, decision.Reason = plan.Back, "the stage that established the premise must be reconsidered"
 		decision.Confirmation.Provisional = false
 		return decision, nil
 	}
 	action, ok := t.CheckResults[input.Summary.Judgment]
 	if !ok {
-		return Decision{}, fmt.Errorf("判定結果の分類がない: %q", input.Summary.Judgment)
+		return Decision{}, fmt.Errorf("judgment classification not found: %q", input.Summary.Judgment)
 	}
 	if action != plan.Fix && action != plan.Ask && action != plan.Back && action != plan.Done {
-		return Decision{}, fmt.Errorf("不明な分類: %q", action)
+		return Decision{}, fmt.Errorf("unknown classification: %q", action)
 	}
 	if action == plan.Done && !input.Completion.ReadyToCommit {
 		action = plan.Ask
-		decision.Reason = "必須 check または検出試験の完了条件が満たされていません"
+		decision.Reason = "completion conditions for required checks or detection tests are not met"
 	}
 	noProgress := 0
 	if !input.ProgressMade {
@@ -79,10 +79,10 @@ func (t Table) Decide(input Input) (Decision, error) {
 	}
 	if action == plan.Fix && input.Stage.Limits.Reached(input.CompletedRounds, noProgress) {
 		action = plan.Ask
-		decision.Reason = "ラウンド数または進展のない回数が上限に達しました"
+		decision.Reason = "round or consecutive no-progress limit reached"
 	}
 	if confirmation.Provisional && action != plan.Fix && action != plan.Done {
-		// 未評価や上限による停止は、暫定判断だけで続行しない。
+		// Provisional decisions alone do not allow continuation after an unassessed result or a limit stop.
 		decision.Confirmation.Provisional = false
 	}
 	decision.Action = action

@@ -20,7 +20,7 @@
       ],
       "gate": {
         "required": false,
-        "reason": "公開契約を変えない文言の修正"
+        "reason": "Wording changes that preserve the public contract"
       },
       "limits": {
         "max_rounds": 3,
@@ -41,7 +41,7 @@
       "checks": [],
       "gate": {
         "required": false,
-        "reason": "調査結果を次のステージに渡す"
+        "reason": "Pass research findings to the next stage"
       },
       "limits": {
         "max_rounds": 1,

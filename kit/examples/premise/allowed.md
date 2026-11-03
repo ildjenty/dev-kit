@@ -1,11 +1,11 @@
-## 依頼
+## Request
 
-文書のリンク切れを防ぐための仕組みの追加案を確認する。比較した各案の保証と負担は以下の記録で確認済みとする。
+Check the proposal to add a mechanism preventing broken document links. Treat the guarantees and burdens of each compared proposal as verified in the records below.
 
-## 対象
+## Target
 
-# 必須の確認の選定
+# Selecting required verification
 
-- 外部契約: 発注条件 K1 が、納品するすべての文書を指定の判定者で検査することを義務付けている。実行記録の提出が受理条件である。
-- 決定: 指定の判定者を納品文書で必須にする。
-- 適用除外: principles/harness.md の原則5。手段と適用範囲が外部契約で固定され、比較しても変更できず、比較作業は納品を遅らせるだけになる。指定外の作業に必須化は広げない。
+- External contract: Order condition K1 requires every delivered document to be inspected by the designated judge. Submission of execution records is an acceptance condition.
+- Decision: Require the designated judge for delivered documents.
+- Exemption: Principle 5 of principles/harness.md. The external contract fixes the means and scope, comparison cannot change them, and comparison would only delay delivery. Do not extend the requirement to unspecified work.

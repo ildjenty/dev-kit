@@ -12,7 +12,7 @@ type Diff struct {
 	ChangedFields []string
 }
 
-// Replan は現在より大きい番号を残りの計画に付ける。すべての提案を含む最大の番号を渡す。
+// Replan assigns a higher version to the remaining plan. Pass the highest version across all proposals as current.
 func Replan(current Plan, remaining Plan) (Plan, Diff) {
 	next := clonePlan(remaining)
 	next.Version = current.Version + 1
@@ -81,7 +81,7 @@ const (
 	BackProposal    ProposalOrigin = "back"
 )
 
-// VersionEvaluation は記録から導いた判定・承認・撤回を受け取る。Plan の JSON には保存しない。
+// VersionEvaluation takes judgments, approvals, and withdrawals derived from records. It is not stored in Plan JSON.
 type VersionEvaluation struct {
 	Plan      Plan
 	Judgment  PlanJudgment
@@ -96,9 +96,9 @@ func (v VersionEvaluation) Executable(template PlanTemplate) bool {
 		(!(v.Origin == BackProposal || v.Plan.RequiresApproval(template)) || v.Approved)
 }
 
-// ExecutableVersion はステージ開始時だけ使う。実行中の束縛は呼び出し側が維持する。
-// replanAfterVersion は再計画待ちになった旧計画の番号とし、通常は0を渡す。
-// 旧計画への復帰を許さず、人が自発的に撤回した提案だけを読み飛ばす。
+// ExecutableVersion is used only at stage start. The caller maintains the binding during execution.
+// replanAfterVersion is the old plan version awaiting replanning; normally pass zero.
+// It prevents returning to old plans and skips only voluntarily withdrawn human proposals.
 func ExecutableVersion(template PlanTemplate, versions []VersionEvaluation, replanAfterVersion int) (Plan, bool) {
 	ordered := slices.Clone(versions)
 	slices.SortFunc(ordered, func(a, b VersionEvaluation) int {
@@ -112,7 +112,7 @@ func ExecutableVersion(template PlanTemplate, versions []VersionEvaluation, repl
 		}
 	})
 	for _, version := range ordered {
-		if version.Withdrawn && version.Origin == HumanProposal && replanAfterVersion == 0 {
+		if version.Withdrawn && version.Origin == HumanProposal {
 			continue
 		}
 		if version.Plan.Version <= replanAfterVersion {

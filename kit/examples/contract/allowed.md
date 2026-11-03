@@ -1,12 +1,12 @@
-## 依頼
+## Request
 
-承認状態の入力契約を確認する。要求は「承認済みなら承認者が必ず存在する」。外部の JSON は保存関数だけが受理し、そのまま保存される。
+Check the input contract for approval state. The requirement is that an approved state always has an approver. Only the save function accepts external JSON, which is stored as received.
 
-## 対象
+## Target
 
-# 承認の入力
+# Approval input
 
-- 入力: 外部の JSON の構造を境界で検証し、status が draft または approved、approved_by が省略可能な文字列であることを確かめてから保存する。
-- 保証: approved のときに approved_by が空または未指定なら DB の CHECK 制約が拒否する。すべての INSERT と UPDATE に同じ制約が適用され、迂回する保存経路はない。
-- 適用除外: principles/data.md の原則3に従い、この性質だけのために内部の型へ同じ規則を追加する要求を外す。DB 制約がすべての受理・保存経路で保証し、出力は制約を通過した行だけから作る。
-- 失敗: 入力エラーと保存先の障害を区別して返す。制約違反を成功にはしない。
+- Input: Validate the external JSON structure at the boundary, checking that status is draft or approved and approved_by is an optional string, then store it.
+- Guarantee: A DB CHECK constraint rejects approved rows whose approved_by is empty or absent. The same constraint applies to all INSERT and UPDATE operations, with no bypassing storage path.
+- Exemption: Under principle 3 of principles/data.md, waive the requirement to add the same rule to internal types solely for this property. The DB constraint guarantees it on every acceptance and storage path; outputs are built only from rows that passed the constraint.
+- Failures: Return input errors separately from storage failures. Do not treat constraint violations as success.

@@ -1,13 +1,13 @@
-## 依頼
+## Request
 
-計画の完了条件 C1 は「日報入力画面の保存ボタンに『保存』と表示される」。終了ブロックと確認結果を照合する。必須 check の集約と commit の成功の確認は devkit に委ねる。
+Completion condition C1 in the plan is: The save button on the daily report input screen displays "Save". Compare the termination block with verification results. Leave aggregation of required checks and confirmation of commit success to devkit.
 
-## 対象
+## Target
 
-# 終了時の記録
+# Termination record
 
-- 終了ブロック: 未完了として中断する。
-- 実際の状態: ボタンの文言は「保存」へ変更済みで、描画記録で確認した。必須の確認の未実施はない。外部への公開は未着手。
-- 中断の理由: 依頼者から再開の連絡があるまで止める指示を受けた。
-- 再開条件: 依頼者の再開指示。次の担当者は公開の対象と承認の範囲を確認し、外部への書き込みを勝手に行わない。
-- 残存物: 起動中のプロセスや調査用の挙動変更はない。再現手順と描画記録は evidence/ に置き、再開時の照合に使い、引き継ぎ完了まで保持する。
+- Termination block: Pause as incomplete.
+- Actual state: The button text has been changed to "Save", confirmed in the rendering record. No required verification remains unperformed. External publication has not started.
+- Reason for pause: The requester instructed us to stop until they request resume.
+- Resume conditions: The requester asks to resume. The next worker must check the publication target and approval scope, and must not write externally without authorization.
+- Remaining artifacts: No running processes or investigative behavior changes remain. Reproduction steps and rendering records are in evidence/, for comparison on resume and retention until handoff is complete.

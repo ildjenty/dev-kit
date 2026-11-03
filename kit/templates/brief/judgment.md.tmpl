@@ -1,0 +1,15 @@
+# Judgment request
+
+Instruction ID: {{.InstructionID}}
+
+{{.Content}}
+
+## Returning the result
+
+Return the result as a JSON-only final message in the specified output format.
+Set `instruction_id` to {{.InstructionIDJSON}}.
+{{if .OutputSchema}}
+### Result JSON Schema
+
+{{.OutputSchema}}
+{{end}}
