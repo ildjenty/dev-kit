@@ -16,7 +16,7 @@ form は固定フォーマットの型と、[スキーマ・テンプレート](
 
 #### 問い
 
-問い(人への確認事項)の文面に添える回答の案内は[問いの定義](../architecture/data.md#問い-question)に従う。選択肢による回答と文章による回答の受理、および訂正期限は[回答の受理](../architecture/guarantees.md#回答の受理)、停止する範囲と進められる範囲の表示は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
+問い(人への確認事項)の文面に添える回答の案内は[問いの定義](../architecture/data.md#問い-question)に従う。回答の受理と訂正は[回答の受理](../architecture/guarantees.md#回答の受理)、停止する範囲と進められる範囲の表示は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
 
 画面のデザインの承認時の表示要件は[問いの定義](../architecture/data.md#問い-question)に従う。
 

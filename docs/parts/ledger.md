@@ -20,11 +20,11 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 ### 決定
 
-`devkit note` の入力と決定の状態、[確認済みの記録の集合](../architecture/data.md#決定と証拠-decision--evidence)の導出は[決定と証拠](../architecture/data.md#決定と証拠-decision--evidence)(判断と調査結果)の定義に従う。
+`devkit note` の受理と決定の状態、回答済みの記録の集合の導出は[決定と証拠](../architecture/data.md#決定と証拠-decision--evidence)(判断と調査結果)の定義に従う。
 
 ### 問い・回答・承認
 
-[問い](../architecture/data.md#問い-question)(人への確認事項)と[回答・承認](../architecture/data.md#回答承認-answer--approval)(問いへの判断)の保存項目と同一性・訂正は各定義、受理の条件と期限は[回答の受理](../architecture/guarantees.md#回答の受理)に従う。
+[問い](../architecture/data.md#問い-question)(人への確認事項)と[回答・承認](../architecture/data.md#回答承認-answer--approval)(問いへの判断)の保存項目は各定義、受理と訂正は[回答の受理](../architecture/guarantees.md#回答の受理)に従う。
 
 ### ステージの実行
 

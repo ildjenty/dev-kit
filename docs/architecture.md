@@ -31,12 +31,12 @@ graph LR
 1. `devkit start --plan <name> <課題>` で[作業を開始](architecture/flow.md#作業の開始)し、計画者が雛形から計画を作る。[check](architecture/modules.md#check)(評価と判定)と人の承認は[計画の check と承認ゲート](architecture/flow.md#計画の-check-と承認ゲート)に従う。
 2. `devkit next` が[作業の指示](architecture/flow.md#作業の指示)としてステージ(作業を区切る単位)の brief を返す。判定に使う規範は[規範の固定](architecture/guarantees.md#規範の固定)に従って確定する。
 3. エージェントが作業し、終了ブロックを `devkit submit` で[提出する](architecture/flow.md#作業結果の提出)。
-4. `devkit` が判定者に先立って検証を実行する。実行順と失敗時の扱いは[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
+4. 提出後の進行は[作業結果の提出](architecture/flow.md#作業結果の提出)に従う。判定待ちでは `devkit` が判定者に先立って検証を実行する。実行順と失敗時の扱いは[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
 5. `devkit next` の指示で判定者サブエージェントを起動し、結果は[作業結果の判定](architecture/flow.md#作業結果の判定)に従って受理する。
-6. [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)が判断し、[判断後の処理](architecture/flow.md#router-の判断)へ進む。[人の回答](architecture/flow.md#人の回答と再開)や[完了の確定](architecture/guarantees.md#完了条件)は、その判断の後に行う。
+6. 判定後は [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)が判断し、[判断後の処理](architecture/flow.md#router-の判断)へ進む。問いへの回答は[人の回答](architecture/flow.md#人の回答と再開)、完了の確定は[完了条件](architecture/guarantees.md#完了条件)に従う。
 7. セッションをまたぐ再開は、[人の回答と再開](architecture/flow.md#人の回答と再開)に従う。
 
-[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)では、[Judgment](architecture/data.md#check-の結果-judgment)(`command:` の check を含む判定結果)を受理して次の行動を決める。
+[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)の判定待ちでは、[Judgment](architecture/data.md#check-の結果-judgment)(`command:` の check を含む判定結果)を受理して次の行動を決める。
 
 人の依頼でエージェントが呼ぶ、または人が直接実行する `devkit pause`・`devkit resume` の条件と、Stop の継続上限は[中断](architecture/guarantees.md#中断)に従う。
 
@@ -66,10 +66,6 @@ graph LR
 
 バイナリをどの方法で配布・配置するか。当面はインストーラによる配置を含めて未決定とする。
 
-### Bash の一律拒否と他の skill の共存
-
-[PreToolUse](architecture/hooks.md#pretooluse)のリダイレクト・置換・制御構文の拒否範囲を維持するか、狭めるか。当面は現行の範囲を維持し、`[deny]` に一致しなくても他の skill のリダイレクトや heredoc を止め、分けて実行しても続行できない場合がある制約を残す。
-
 ### 計画の提案番号
 
 [計画の指示](architecture/data.md#指示-instruction)の提案番号を計画のバージョンと同じ値にするか、採番時点・記録先・出し直し時の保持をどうするか。当面は[状態遷移と受理条件](architecture/data.md#状態遷移と受理条件)を維持し、これらは未確定とする。
@@ -84,7 +80,7 @@ graph LR
 
 ### 検証前の対象の不一致
 
-[コマンド実行前後](architecture/guarantees.md#判定対象の展開と完了時の永続化)や判定前の pre-commit 実行前に対象が不一致なら、取り直すか、その回数と上限をどうするか。当面は遷移を未確定とし、[commit 直前の取り直し回数](architecture/guarantees.md#commit-直前の対象の照合)を検証時にも適用するとは決めない。
+[コマンド実行前後](architecture/guarantees.md#判定対象の展開と完了時の永続化)に対象が不一致なら、取り直すか、その回数と上限をどうするか。当面は遷移を未確定とし、[commit 直前の取り直し回数](architecture/guarantees.md#commit-直前の対象の照合)を検証時にも適用するとは決めない。
 
 ### 外部操作の入力場所
 
@@ -98,13 +94,8 @@ graph LR
 
 ラウンドも判定指示もない期間に、`[deny]` などの規範をいつのスナップショットから読むか。当面は[規範の固定](architecture/guarantees.md#規範の固定)を維持し、計画者への指示だけがある期間も含め、該当しない期間の参照元とフォールバックは未確定とする。
 
-### サブエージェント定義の変更と完了
-
-必須 check の定義を編集したラウンドを旧定義で判定して完了させるか、指示を失効させて次へ移すか。当面は[SubagentStop](architecture/hooks.md#subagentstop)が採取した終了時点の定義を[照合](architecture/guarantees.md#判定結果の受理)し、不一致の結果を受理せず、変更を含むラウンドの完了手順は未確定とする。
-
 ## 未確認の前提
 
-- `git hook run pre-commit` が `core.hooksPath` や husky・pre-commit フレームワークでも commit 時と同じ hook を実行するか。同等性は未確認とする。
 - husky・pre-commit フレームワークと `core.hooksPath` が共存するか。共存は未確認とする。
 - Codex で escalation を要さない呼び出しにも rules の allow が適用されるか。適用の可否は未確認とする。
 - Codex の SubagentStop の `agent_type` を定義の名前と照合できるか。値の形式は未確認とする。
