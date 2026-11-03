@@ -43,7 +43,7 @@ dev-kit/
   embed.go               固定物の埋め込みと公開
 ```
 
-埋め込みの範囲は[ルートパッケージ](modules.md#ルートパッケージ)、コピーの供給とコピー先の配置は [kit](modules.md#kit)に従う。
+バイナリの配布と利用側への導入は [install](modules.md#install)に従う。埋め込みの範囲は[ルートパッケージ](modules.md#ルートパッケージ)、コピーの供給とコピー先の配置は [kit](modules.md#kit)に従う。
 
 各ディレクトリの配置ガイドは、`doc.go` の先頭コメントまたは README に置く。[`principles/structure.md`](../../principles/structure.md) の原則1に従う。
 
@@ -85,7 +85,7 @@ dev-kit/
       work/<作業ID>/
         records/<ULID>.json  追記のみの記録
         run.lock
-        inbox/               エージェントが終了ブロック・計画・note の入力 JSON を書く唯一の場所
+        inbox/               終了ブロック・計画・note の入力 JSON
         prompts/             人の入力の観測(UserPromptSubmit が書く)
         stops/<ULID>.json    作業単位の継続回数と上限到達時の問い(Stop が書く)
         brief/               next が書く brief と判定依頼
@@ -94,7 +94,7 @@ dev-kit/
         view.html
 ```
 
-記録 ID の形式は[記録の範囲](data.md#記録の範囲)、停止の観測の保持条件は[停止の観測](data.md#停止の観測-stopobservation)に従う。
+入力ファイルの場所と内容の保存は[状態遷移と受理条件](data.md#状態遷移と受理条件)、記録 ID の形式は[記録の範囲](data.md#記録の範囲)、停止の観測の保持条件は[停止の観測](data.md#停止の観測-stopobservation)に従う。
 
 配置ガイドは各ディレクトリの README に置き、[brief の入力](modules.md#brief)に使う。
 

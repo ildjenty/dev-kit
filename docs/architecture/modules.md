@@ -100,7 +100,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **責務**: [5つのイベント](hooks.md)を決定的に処理し、観測と結果を生成物にする。
 - **持つデータ**: 共通イベント、解決した作業 ID、組み立てた checkpoint、観測を扱う。
 - **公開する契約**: `devkit hook <event>` の処理結果を返す。出力の形式と上限は host/event を通してホストに合わせる。
-- **依存**: ledger、config、host/event、form、ledger/fsstore(生成物の公開)に依存する。ルートは cmd/devkit が workspace で解決し、作業 ID はセッションの観測の束縛から取得して渡す。cmd/devkit は workspace で解決した「スナップショットから `devkit.toml` を読む関数値」も hook に渡し、hook が[規範の固定](guarantees.md#規範の固定)に従って読み出す。
+- **依存**: ledger、config、host/event、form、ledger/fsstore(生成物の公開)に依存する。ルートは cmd/devkit が workspace で解決し、作業 ID はセッションの観測の束縛から取得して渡す。cmd/devkit は workspace で解決した「規範の参照元から `devkit.toml` を読む関数値」も hook に渡し、hook が[規範の固定](guarantees.md#規範の固定)に従って読み出す。
 - **置くもの・置かないもの**: イベント処理を置く。モデルによる判定は置かず、書き込みは[記録の書き込みと排他](data.md#記録の書き込みと排他)に従う。
 
 ### host/event
@@ -136,11 +136,13 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### install
 
+`devkit` のバイナリは `install.sh` で配布する。`install.sh` はリリースに置いた OS とアーキテクチャごとのビルド済みの `devkit` バイナリを取得し、PATH の通った場所に配置する。Go は dev-kit の開発言語であり、利用者の実行環境には不要である。
+
 - **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、kit のコピー、既定の雛形のコピー、観点ファイルと rules.md の初期内容、ignore、ホスト設定、既定のサブエージェント定義、skill とリンクを用意する。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。pre-commit の導入は[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
 - **持つデータ**: 導入する固定物と設定の断片、導入先との差分、doctor の照合結果を扱う。
 - **公開する契約**: `init` と `doctor` に対応する導入・照合の操作を公開する。doctor の項目は[doctor の確認項目](#doctor-の確認項目)に従う。
 - **依存**: config、kit、ledger、workspace に依存する。
-- **置くもの・置かないもの**: 導入先の構成と登録・照合を置く。配布の決定状況は[バイナリの配布方法](../architecture.md#バイナリの配布方法)に残す。
+- **置くもの・置かないもの**: 導入先の構成と登録・照合を置く。
 
 ### kit
 
@@ -174,7 +176,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### cmd/devkit
 
-- **責務**: サブコマンドを定義し、各実装を接続する。cwd をもとに workspace でルートとブランチ名を解決し、[セッションと作業](data.md#セッションとブランチ)を特定する。チェックアウトのルートと[固定配置](layout.md#利用側のリポジトリ)から記録ルートを解決し、ledger/fsstore に渡す。設定の読み出し元を解決して config に TOML を渡し、解析した設定と kit の値を各モジュールへ渡す。hook にはスナップショットから `devkit.toml` を読む関数値を渡し、[上限に応じた出力](guarantees.md#性能と出力の上限)を行う。
+- **責務**: サブコマンドを定義し、各実装を接続する。cwd をもとに workspace でルートとブランチ名を解決し、[セッションと作業](data.md#セッションとブランチ)を特定する。チェックアウトのルートと[固定配置](layout.md#利用側のリポジトリ)から記録ルートを解決し、ledger/fsstore に渡す。設定の読み出し元を解決して config に TOML を渡し、解析した設定と kit の値を各モジュールへ渡す。hook には[規範の参照元](guarantees.md#規範の固定)から `devkit.toml` を読む関数値を渡し、[上限に応じた出力](guarantees.md#性能と出力の上限)を行う。
 - **持つデータ**: 解決したルート・ブランチ・セッション・作業、設定、kit のコピー、各モジュールの実装を扱う。
 - **公開する契約**: エージェントが呼ぶのは `start`、`next`、`submit`、`plan`、`answer`、`external`、`note`、`status`、`view`、`pause`、`resume`、`abort`。人が呼ぶのは `init`、`doctor`、`version`、`pause`、`resume`。ホストが呼ぶのは `hook <event>`。`pause`・`resume` の呼び出しと作業の特定は[中断](guarantees.md#中断)と[セッションとブランチ](data.md#セッションとブランチ)に従う。`status` は記録の照会も担う。
 - **依存**: すべての実装パッケージに依存する。
@@ -242,7 +244,7 @@ graph TD
 
 `doctor` は次を照合する。
 
-- `devkit.toml` の妥当性、kit のコピーと埋め込みの一致、ホスト設定の断片、サブエージェントの定義の存在、skill のリンク、バイナリと記録形式の互換性。
+- `devkit.toml` の妥当性、手元のバイナリと `devkit.toml` の kit のバージョンの一致、kit のコピーと埋め込みの一致、ホスト設定の断片、サブエージェントの定義の存在、skill のリンク、バイナリと記録形式の互換性。
 - [完了条件](guarantees.md#完了条件)に従う pre-commit の存在確認。
 - Claude Code の workspace trust: `~/.claude.json` の `hasTrustDialogAccepted`。
 - Codex のプロジェクトの信頼: `~/.codex/config.toml` の `projects.<パス>.trust_level`。hook の信頼状態には照会手段がないため、`/hooks` で信頼を設定するよう案内する。

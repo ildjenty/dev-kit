@@ -4,9 +4,11 @@ dev-kit は、Claude Code や Codex CLI のセッション内で、リポジト�
 
 dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバイナリである。リポジトリの持ち主が[ループの雛形](docs/architecture/data.md#ループの雛形-plantemplate)(作業の段階と判定・承認の組み合わせ)を組む。kit は[7つの部品](docs/design.md#部品)、原則、[固定物](docs/architecture/modules.md#kit)(バージョン付きの資産)、`devkit` を提供する。現在は設計段階で、コードはまだない。
 
+バイナリの配布と導入は [install](docs/architecture/modules.md#install)、導入後の確認は [doctor](docs/architecture/modules.md#doctor-の確認項目)に従う。
+
 ## 参照順序
 
-1. [docs/architecture.md](docs/architecture.md): 構成と動作の概要。作業の流れ、保証の範囲、[未決事項](docs/architecture.md#未決事項)と[未確認の前提](docs/architecture.md#未確認の前提)。
+1. [docs/architecture.md](docs/architecture.md): 構成と動作の概要。作業の流れ、保証の範囲、[未確認の前提](docs/architecture.md#未確認の前提)。
 2. [docs/design.md](docs/design.md): 基本方針と、7つの部品の役割。
 3. [principles/README.md](principles/README.md): [check](docs/parts/check.md)(評価と判定の部品)が評価基準とする原則の一覧と、原則の書き方。
 
@@ -16,7 +18,7 @@ dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバ�
 
 ## ファイル構成
 
-- [docs/architecture.md](docs/architecture.md): 設計の概要、[未決事項](docs/architecture.md#未決事項)と[未確認の前提](docs/architecture.md#未確認の前提)。
+- [docs/architecture.md](docs/architecture.md): 設計の概要と[未確認の前提](docs/architecture.md#未確認の前提)。
 - [docs/architecture/](docs/architecture/): 設計の詳細。
   - [flow.md](docs/architecture/flow.md): 開始から完了までの流れ。
   - [data.md](docs/architecture/data.md): 記録と状態。

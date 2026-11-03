@@ -4,7 +4,7 @@
 
 ## 作業の開始
 
-人は通常どおりセッションを開き、kit の skill で課題を伝える。エージェントは `devkit start --plan <name> <課題>` で[ループの雛形](data.md#ループの雛形-plantemplate)(再利用するループの定義)を指定する。`start --plan <name>` の解決先は `.devkit/plans/` だけとし、`--plan` の省略時はリポジトリ側の `.devkit/plans/default.json` を使う。[engine](modules.md#engine)(進行を担うモジュール)は作業 ID とブランチ `devkit/<作業 ID>` を作ってチェックアウトを切り替え、基点コミットと kit のバージョンを記録して[セッションを束縛](data.md#セッションとブランチ)する。返すのは計画者への指示 ID と `brief/<指示 ID>.md` のパスである。
+人は通常どおりセッションを開き、kit の skill で課題を伝える。エージェントは `devkit start --plan <name> <課題>` で[ループの雛形](data.md#ループの雛形-plantemplate)(再利用するループの定義)を指定する。開始の条件は [hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)に従う。`start --plan <name>` の解決先は `.devkit/plans/` だけとし、`--plan` の省略時はリポジトリ側の `.devkit/plans/default.json` を使う。[engine](modules.md#engine)(進行を担うモジュール)は作業 ID とブランチ `devkit/<作業 ID>` を作ってチェックアウトを切り替え、基点コミットと kit のバージョンを記録して[セッションを束縛](data.md#セッションとブランチ)する。返すのは計画者への指示 ID と `brief/<指示 ID>.md` のパスである。
 
 エージェントは `devkit-planner` を、[定型の prompt](guarantees.md#判定結果の受理)で起動する。計画者は[計画](data.md#計画-plan)(雛形から作る課題ごとの実行内容)の項目を記入する。通常の取捨では、完了条件を書き、課題に関係のないステージ(作業を区切る単位)を外し、[check](modules.md#check)(評価と判定)の対象を指定し、必要なら調査・試作のステージを雛形の候補から足す。課題固有の元に戻せないものと外部操作(リポジトリ外への書き込み行為)の宣言も計画者が記入する。構成の変更が逸脱に当たる条件と承認は[計画の定義](data.md#計画-plan)に従う。計画者が最終メッセージで計画を返すと、[SubagentStop](hooks.md#subagentstop)が結果を保存する。次の `devkit next` で engine が結果を受理し、JSON Schema で検証して提案中の計画として記録する。
 
@@ -28,7 +28,7 @@ engine は `submit` で[状態遷移と受理条件](data.md#状態遷移と受�
 
 ## 作業結果の判定
 
-engine は `next` の中で、ステージに置いた `command:` の check(終了コードによる検証)をすべて判定者の check より先に実行する。雛形の列挙順は同じ種類の中だけ有効とする。コマンドの実行場所と実行前後の照合は[判定対象の展開と完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に従う。環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。終了コードと出力を [Judgment](data.md#check-の結果-judgment)(check の結果)に変換し、終了コードが0なら `PASS`、0以外なら `FAIL`、期限超過は `NOT ASSESSED` とする。必須の `command:` の check が `FAIL` なら、判定者を実行せず、engine が「修正する」として記録して出力を次の brief に含める。
+engine は `next` の中で、ステージに置いた `command:` の check(終了コードによる検証)をすべて判定者の check より先に実行する。雛形の列挙順は同じ種類の中だけ有効とする。コマンドの実行場所と実行前後の照合、不一致時の進行は[判定対象の展開と完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に従う。環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。照合を通った実行結果は、終了コードと出力を [Judgment](data.md#check-の結果-judgment)(check の結果)に変換し、終了コードが0なら `PASS`、0以外なら `FAIL`、期限超過は `NOT ASSESSED` とする。必須の `command:` の check が `FAIL` なら、判定者を実行せず、engine が「修正する」として記録して出力を次の brief に含める。
 
 `devkit next` は判定依頼を `brief/<指示 ID>.md` に書き、[対象を展開](guarantees.md#判定対象の展開と完了時の永続化)して、指示 ID と展開先のパスを返す。そのラウンドの終了ブロックを含む判定依頼の内容は [check の契約](modules.md#check)、観点「差分」の有効な承認・委任の一覧は[判定結果の受理](guarantees.md#判定結果の受理)に従う。
 

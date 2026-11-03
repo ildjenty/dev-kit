@@ -15,7 +15,7 @@
 - **実行の記録と生成物**: 保存する記録と再生成できる出力の区分は[所有と生存期間](architecture/data.md#所有と生存期間)、配置と git 管理は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。記録から組み立てる [checkpoint](architecture/data.md#checkpoint)(再開用の派生状態)は保存する記録と区別する。
 - **kit の固定物**: kit が供給するバージョン付きの資産であり、供給元と照合は [kit の供給](architecture/modules.md#kit)に従う。
 
-導入時に `init` が用意するものは [install](architecture/modules.md#install)、hook の登録先と設定の追記は[権限の境界](architecture/guarantees.md#権限の境界)に従う。バイナリの配置を含む配布方法は[バイナリの配布方法](architecture.md#バイナリの配布方法)に未決定として残す。
+バイナリの配布と、導入時に `init` が用意するものは [install](architecture/modules.md#install)、hook の登録先と設定の追記は[権限の境界](architecture/guarantees.md#権限の境界)に従う。
 
 導入後の照合は [doctor](architecture/modules.md#doctor-の確認項目)に従う。
 

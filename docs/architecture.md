@@ -60,32 +60,6 @@ graph LR
 - **配置**: [育てるもの](architecture/data.md#所有と生存期間)(リポジトリが所有して git で管理する資産)を含む利用側の配置は [layout.md](architecture/layout.md)で定める。
 - **hook**: SessionStart・Stop・PreToolUse・SubagentStop・UserPromptSubmit の5イベント。[hooks.md](architecture/hooks.md)
 
-## 未決事項
-
-### バイナリの配布方法
-
-バイナリをどの方法で配布・配置するか。当面はインストーラによる配置を含めて未決定とする。
-
-### 計画の提案番号
-
-[計画の指示](architecture/data.md#指示-instruction)の提案番号を計画のバージョンと同じ値にするか、採番時点・記録先・出し直し時の保持をどうするか。当面は[状態遷移と受理条件](architecture/data.md#状態遷移と受理条件)を維持し、これらは未確定とする。
-
-### 検証前の対象の不一致
-
-[コマンド実行前後](architecture/guarantees.md#判定対象の展開と完了時の永続化)に対象が不一致なら、取り直すか、その回数と上限をどうするか。当面は遷移を未確定とし、[commit 直前の取り直し回数](architecture/guarantees.md#commit-直前の対象の照合)を検証時にも適用するとは決めない。
-
-### 外部操作の入力場所
-
-`external` の入力ファイルも `inbox/` の下に限定するか、別の場所を認めるか。当面は[状態遷移と受理条件](architecture/data.md#状態遷移と受理条件)の場所の制約を拡張せず、受け取れる場所は未確定とする。
-
-### 観測のないセッションでの開始
-
-観測がないセッションの `start` を拒否するか、束縛先を何から識別し、[hook の稼働確認](architecture/guarantees.md#再開と-hook-の稼働確認)に加えるか。当面は[セッションとブランチ](architecture/data.md#セッションとブランチ)の識別元を維持し、識別できない場合の開始手順は未確定とする。
-
-### 指示のない期間の規範
-
-ラウンドも判定指示もない期間に、`[deny]` などの規範をいつのスナップショットから読むか。当面は[規範の固定](architecture/guarantees.md#規範の固定)を維持し、計画者への指示だけがある期間も含め、該当しない期間の参照元とフォールバックは未確定とする。
-
 ## 未確認の前提
 
 - husky・pre-commit フレームワークと `core.hooksPath` が共存するか。共存は未確認とする。
