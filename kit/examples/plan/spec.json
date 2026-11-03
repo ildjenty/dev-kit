@@ -1,0 +1,20 @@
+{
+  "aspect": "plan",
+  "cases": [
+    {
+      "kind": "violation",
+      "file": "violation.md",
+      "expected": "FAIL"
+    },
+    {
+      "kind": "conforming",
+      "file": "conforming.md",
+      "expected": "PASS"
+    },
+    {
+      "kind": "allowed",
+      "file": "allowed.md",
+      "expected": "PASS"
+    }
+  ]
+}

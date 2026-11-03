@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "devkit hook SessionStart" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "devkit hook Stop" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": ".*", "hooks": [{ "type": "command", "command": "devkit hook PreToolUse" }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "devkit hook SubagentStop" }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "devkit hook UserPromptSubmit" }] }
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "excludedCommands": ["devkit *"]
+  },
+  "permissions": {
+    "allow": ["Bash(devkit *)"],
+    "deny": [
+      "Edit(.devkit/run/**/records/**)",
+      "Edit(.devkit/run/**/results/**)"
+    ]
+  }
+}

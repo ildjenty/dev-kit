@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "終了ブロック",
+  "type": "object",
+  "properties": {
+    "instruction_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "termination_kind": {
+      "enum": [
+        "完了を主張",
+        "停止して確認",
+        "作業停止の申告"
+      ]
+    },
+    "work_performed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confirmed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unconfirmed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "obstacles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "resume_conditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "out_of_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "temporary_state": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/temporary_state"
+      }
+    },
+    "change_reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "instruction_id",
+    "termination_kind"
+  ],
+  "$defs": {
+    "temporary_state": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verification_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "invalid_when": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "content",
+        "verification_method",
+        "source",
+        "invalid_when"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

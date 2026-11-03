@@ -1,0 +1,78 @@
+{
+  "name": "docs",
+  "start_stage": "implement",
+  "meta_loop_stages": [],
+  "stages": [
+    {
+      "id": "implement",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "wording",
+          "runner": "review",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "公開契約を変えない文書の修正"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "implement",
+        "ask": "implement",
+        "back": "implement",
+        "done": null
+      }
+    }
+  ],
+  "optional_stages": [
+    {
+      "id": "research",
+      "assignee": "worker",
+      "checks": [],
+      "gate": {
+        "required": false,
+        "reason": "調査結果を次のステージに渡す"
+      },
+      "limits": {
+        "max_rounds": 1,
+        "max_no_progress": 1
+      },
+      "transitions": {
+        "fix": "research",
+        "ask": "research",
+        "back": "research",
+        "done": "implement"
+      }
+    },
+    {
+      "id": "prototype",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "contract",
+          "runner": "review",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "未確認の前提を試し、試作を本番から分離する"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "prototype",
+        "ask": "prototype",
+        "back": "prototype",
+        "done": "implement"
+      }
+    }
+  ]
+}

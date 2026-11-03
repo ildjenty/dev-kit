@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "証拠",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sources": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    },
+    "verification_method": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "id",
+    "content",
+    "sources",
+    "verification_method"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "reference": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "record_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "record_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "external": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "external"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

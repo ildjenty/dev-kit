@@ -1,0 +1,208 @@
+{
+  "name": "feature",
+  "start_stage": "purpose",
+  "meta_loop_stages": [],
+  "stages": [
+    {
+      "id": "purpose",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "purpose",
+          "runner": "review",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "課題に必要な作業の結果を確認する"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "purpose",
+        "ask": "purpose",
+        "back": "purpose",
+        "done": "scope"
+      }
+    },
+    {
+      "id": "scope",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "irreversible",
+          "runner": "review",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": true,
+        "reason": "変更困難な決定を含むスコープを確認する"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "scope",
+        "ask": "scope",
+        "back": "purpose",
+        "done": "structure"
+      }
+    },
+    {
+      "id": "structure",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "structure",
+          "runner": "review",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "課題に必要な作業の結果を確認する"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "structure",
+        "ask": "structure",
+        "back": "scope",
+        "done": "contract"
+      }
+    },
+    {
+      "id": "contract",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "contract",
+          "runner": "review",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "課題に必要な作業の結果を確認する"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "contract",
+        "ask": "contract",
+        "back": "structure",
+        "done": "steps"
+      }
+    },
+    {
+      "id": "steps",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "steps",
+          "runner": "review",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "課題に必要な作業の結果を確認する"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "steps",
+        "ask": "steps",
+        "back": "contract",
+        "done": "implement"
+      }
+    },
+    {
+      "id": "implement",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "command:test",
+          "runner": "command:test",
+          "required": true
+        },
+        {
+          "aspect": "diff",
+          "runner": "review",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "課題に必要な作業の結果を確認する"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "implement",
+        "ask": "implement",
+        "back": "steps",
+        "done": null
+      }
+    }
+  ],
+  "optional_stages": [
+    {
+      "id": "research",
+      "assignee": "worker",
+      "checks": [],
+      "gate": {
+        "required": false,
+        "reason": "調査結果を次のステージに渡す"
+      },
+      "limits": {
+        "max_rounds": 1,
+        "max_no_progress": 1
+      },
+      "transitions": {
+        "fix": "research",
+        "ask": "research",
+        "back": "research",
+        "done": "purpose"
+      }
+    },
+    {
+      "id": "prototype",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "contract",
+          "runner": "review",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "未確認の前提を試し、試作を本番から分離する"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "prototype",
+        "ask": "prototype",
+        "back": "prototype",
+        "done": "purpose"
+      }
+    }
+  ]
+}

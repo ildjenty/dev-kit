@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "決定",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1
+    },
+    "validity": {
+      "type": "string",
+      "minLength": 1
+    },
+    "supersedes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    },
+    "depends_on": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    },
+    "conditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "decider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provisional": {
+      "type": "boolean"
+    },
+    "rejected_alternatives": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/rejected_alternative"
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/reference"
+      }
+    }
+  },
+  "required": [
+    "id",
+    "content",
+    "validity",
+    "supersedes",
+    "depends_on",
+    "conditions",
+    "decider",
+    "provisional",
+    "rejected_alternatives",
+    "evidence"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "reference": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "record_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "record_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "external": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "external"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "rejected_alternative": {
+      "type": "object",
+      "properties": {
+        "proposal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "example": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "proposal",
+        "reason",
+        "example"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

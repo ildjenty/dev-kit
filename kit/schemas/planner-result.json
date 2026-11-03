@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "計画者の結果",
+  "type": "object",
+  "properties": {
+    "instruction_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "plan": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "instruction_id",
+    "plan"
+  ],
+  "additionalProperties": false
+}

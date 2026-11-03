@@ -1,0 +1,264 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "判定者の結果",
+  "type": "object",
+  "properties": {
+    "instruction_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "aspect": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_version": {
+      "$ref": "#/$defs/target_version"
+    },
+    "norms": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/norm_reference"
+      }
+    },
+    "completion_condition_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "judgment": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "NOT ASSESSED"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "checked_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unchecked_scope": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "method": {
+      "type": "string",
+      "minLength": 1
+    },
+    "environment": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "instruction_id",
+    "aspect",
+    "target_version",
+    "norms",
+    "completion_condition_ids",
+    "judgment",
+    "findings",
+    "checked_scope",
+    "unchecked_scope",
+    "method",
+    "environment"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "target_version": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "tree"
+            },
+            "tree": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "kind",
+            "tree"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "plan"
+            },
+            "plan": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "kind",
+            "plan"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "structure"
+            },
+            "structure": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "kind",
+            "structure"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "norm_reference": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tree_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "path",
+            "tree_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "blob_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "path",
+            "blob_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocking": {
+          "type": "boolean"
+        },
+        "kind": {
+          "enum": [
+            "auto-fixable",
+            "needs-decision"
+          ]
+        },
+        "scenario": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exemption": {
+          "$ref": "#/$defs/exemption"
+        },
+        "resolved_finding_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "id",
+        "blocking",
+        "kind",
+        "scenario"
+      ],
+      "additionalProperties": false
+    },
+    "exemption": {
+      "type": "object",
+      "properties": {
+        "claim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/reference"
+          }
+        }
+      },
+      "required": [
+        "claim",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "reference": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "record_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "record_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "external": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "external"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}
