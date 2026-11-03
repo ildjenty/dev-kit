@@ -26,7 +26,7 @@ brief の内容を返し、組み立て・書き出しの責務は [brief のモ
 
 同じ入力からは同じ内容を組み立てる。外部入出力の扱いは[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従い、規範の入力は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。
 
-[一時状態](../architecture/data.md#進捗-progress)(再開まで引き継ぐ状況)の無効条件の照合は [ledger のモジュール契約](../architecture/modules.md#ledger)に従い、brief は無効なものを除いた入力から組み立てる。
+決定の有効条件・適用条件と[一時状態](../architecture/data.md#進捗-progress)(再開まで引き継ぐ状況)の条件は、出典・参照とともにそのまま項目に添えて渡す。[ledger のモジュール契約](../architecture/modules.md#ledger)に従い、条件を評価して入力を除外することはせず、有効かどうかはエージェントと人が判断する。
 
 判定者・計画者の起動方法と、[指示 ID](../architecture/data.md#指示-instruction)(依頼を識別する値)から依頼本文のファイルを特定して読む手順は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 

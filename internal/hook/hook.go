@@ -33,7 +33,6 @@ type Handler struct {
 	ReadConfig        func(reference string) (config.Config, error)
 	ReadAgent         func(reference string, host event.Host, name string) (AgentDefinition, error)
 	InstructionRunner func(ledger.Instruction) (string, error)
-	TemporaryValid    ledger.TemporaryStateValid
 }
 
 // Process returns a result for host/event.Format. It never appends ledger records
@@ -91,7 +90,7 @@ func (h Handler) Process(e event.Event) (result event.Result, err error) {
 		if err != nil {
 			return event.Result{}, err
 		}
-		checkpoint, err := ledger.BuildCheckpoint(fsstore.New(h.workRoot()), stops, h.TemporaryValid, h.Validator)
+		checkpoint, err := ledger.BuildCheckpoint(fsstore.New(h.workRoot()), stops, h.Validator)
 		if err != nil {
 			return event.Result{}, err
 		}

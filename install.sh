@@ -32,7 +32,11 @@ if [ "$on_path" != true ]; then
 fi
 
 build_dir=$(mktemp -d "${TMPDIR:-/tmp}/devkit-install.XXXXXXXX")
+install_file=
 cleanup() {
+    if [ -n "$install_file" ] && [ -f "$install_file" ]; then
+        rm -- "$install_file"
+    fi
     if [ -f "$build_dir/devkit" ]; then
         rm -- "$build_dir/devkit"
     fi
@@ -41,8 +45,10 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 (cd -- "$source_dir" && go build -o "$build_dir/devkit" ./cmd/devkit)
-cp -- "$build_dir/devkit" "$bin_dir/devkit"
-chmod +x "$bin_dir/devkit"
+install_file=$(mktemp "$bin_dir/.devkit-install.XXXXXXXX")
+cp -- "$build_dir/devkit" "$install_file"
+chmod +x "$install_file"
+mv -f -- "$install_file" "$bin_dir/devkit"
 printf 'Installed %s\n' "$bin_dir/devkit"
 cd -- "$target_dir"
 "$bin_dir/devkit" init

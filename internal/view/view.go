@@ -234,19 +234,19 @@ func Generate(input Input) (string, error) {
 				return "", err
 			}
 			entry.Text = text
-			entry.Fields = []field{{"Approval state", string(resolved.Status)}, {"Validity", fmt.Sprint(resolved.Valid)}}
+			entry.Fields = []field{{"Approval state", string(resolved.Status)}, {"Active in records", fmt.Sprint(resolved.Active)}, {"Condition assessment", "For agents and people to assess"}}
 			entry.Links = references(value.DependsOn)
 			entry.Links = append(entry.Links, references(value.Evidence)...)
 			entry.Links = append(entry.Links, references(resolved.SupersededBy)...)
-			entry.Links = append(entry.Links, references(resolved.InvalidDependencies)...)
+			entry.Links = append(entry.Links, references(resolved.InactiveDependencies)...)
 			entry.Links = append(entry.Links, relatedChanges(input.Records, form.ApprovalTarget{Kind: form.ApprovalDecision, DecisionID: value.ID}, decisionRecords)...)
-			current = resolved.Valid
+			current = resolved.Active
 			if resolved.Status == ledger.DecisionApproved {
 				entry.Tags = append(entry.Tags, "Approved")
 			} else if resolved.Status == ledger.DecisionPending {
 				entry.Tags = append(entry.Tags, "Unreviewed")
 			}
-			if value.Provisional && resolved.Valid {
+			if value.Provisional && resolved.Active {
 				entry.Fields = append(entry.Fields, field{"Withdrawal requirements", "not recorded"})
 				entry.Links = append(entry.Links, dependentChecks(input, record.ID)...)
 				if resolved.Status != ledger.DecisionApproved {
@@ -263,8 +263,8 @@ func Generate(input Input) (string, error) {
 			entry.Links = references(value.Decisions)
 			current = currentArtifact(input, value)
 			for _, reference := range value.Decisions {
-				if decision, ok := decisions[reference.RecordID]; ok && !decision.Valid {
-					entry.Fields = append(entry.Fields, field{"Decision dependency", "Referenced decision is no longer valid: " + decision.Decision.ID + ". This does not undo the recorded change."})
+				if decision, ok := decisions[reference.RecordID]; ok && !decision.Active {
+					entry.Fields = append(entry.Fields, field{"Decision dependency", "Referenced decision is no longer active in the records: " + decision.Decision.ID + ". This does not undo the recorded change."})
 				}
 			}
 			if answer, ok := input.Ledger.ResolveApproval(approvalTarget(value.After)); ok {

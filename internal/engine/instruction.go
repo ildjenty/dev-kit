@@ -195,6 +195,12 @@ func (e *Engine) outputs(state *ledger.State) ([]brief.StageOutput, error) {
 	for _, record := range records {
 		var answer *ledger.Answer
 		switch p := record.Payload.(type) {
+		case *ledger.Decision:
+			data, err := json.MarshalIndent(p.Decision, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			outputs = append(outputs, brief.StageOutput{StageID: "Decision " + p.ID, Content: string(data)})
 		case *ledger.Answer:
 			answer = p
 		case *ledger.Approval:

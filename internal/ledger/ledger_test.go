@@ -167,16 +167,13 @@ func TestCheckpointPauseAndStopQuestions(t *testing.T) {
 	if current, open := state.OpenRound(); !open || current.ID != round.ID {
 		t.Fatalf("pause invalidated round: %+v, %v", current, open)
 	}
-	if _, err := state.Checkpoint(nil); err == nil {
-		t.Fatal("temporary state was used without checking validity")
-	}
 	before, _ := state.LatestProgress()
 	beforeJSON, err := json.Marshal(before)
 	if err != nil {
 		t.Fatal(err)
 	}
-	checkpoint, err := state.Checkpoint(func(item form.TemporaryState) (bool, error) { return item.Content == "Current cache", nil })
-	if err != nil || !checkpoint.Position.Paused || len(checkpoint.Questions) != 1 || len(checkpoint.Instructions) != 0 || len(checkpoint.Progress.TemporaryState) != 1 || checkpoint.Progress.TemporaryState[0].Content != "Current cache" {
+	checkpoint, err := state.Checkpoint()
+	if err != nil || !checkpoint.Position.Paused || len(checkpoint.Questions) != 1 || len(checkpoint.Instructions) != 0 || !reflect.DeepEqual(checkpoint.Progress.TemporaryState, before.TemporaryState) {
 		t.Fatalf("checkpoint: %+v, %v", checkpoint, err)
 	}
 	progress, _ := state.LatestProgress()
@@ -295,23 +292,49 @@ func TestDecisionGraphAndAnswerStatus(t *testing.T) {
 	appendRecord(t, store, &Decision{Decision: form.Decision{ID: "dependent", DependsOn: []form.Reference{{RecordID: old.ID}}}})
 	next := appendRecord(t, store, &Decision{Decision: form.Decision{ID: "next", Supersedes: []form.Reference{{RecordID: old.ID}}}})
 	appendRecord(t, store, &Decision{Decision: form.Decision{ID: "latest", Supersedes: []form.Reference{{RecordID: next.ID}}}})
-	resolved, err := loadState(t, store).ResolveDecisions(DecisionContext{Valid: func(form.Decision) (bool, error) { return true, nil }})
-	if err != nil || len(resolved) != 4 || resolved[0].Valid || resolved[1].Valid || resolved[2].Valid || !resolved[3].Valid || len(resolved[1].InvalidDependencies) != 1 {
+	resolved, err := loadState(t, store).ResolveDecisions(DecisionContext{})
+	if err != nil || len(resolved) != 4 || resolved[0].Active || resolved[1].Active || resolved[2].Active || !resolved[3].Active || len(resolved[1].InactiveDependencies) != 1 {
 		t.Fatalf("replacement chain and dependency: %+v, %v", resolved, err)
 	}
 	target := form.ApprovalTarget{Kind: form.ApprovalDecision, DecisionID: "latest"}
 	appendRecord(t, store, &Question{Question: form.Question{ID: "decision-review", ApprovalTarget: target}})
 	approved := appendRecord(t, store, &Approval{Answer: Answer{QuestionID: "decision-review", Target: target, Interpretation: AnswerApproved}})
 	appendRecord(t, store, &StateChange{DecisionID: "latest", DecisionStatus: DecisionApproved, AnswerID: approved.ID})
-	resolved, err = loadState(t, store).ResolveDecisions(DecisionContext{Valid: func(form.Decision) (bool, error) { return true, nil }})
+	resolved, err = loadState(t, store).ResolveDecisions(DecisionContext{})
 	if err != nil || resolved[3].Status != DecisionApproved {
 		t.Fatalf("decision approval: %+v, %v", resolved, err)
 	}
 	corrected := appendRecord(t, store, &Answer{QuestionID: "decision-review", Target: target, Interpretation: AnswerDeferred, Supersedes: approved.ID})
 	appendRecord(t, store, &StateChange{DecisionID: "latest", DecisionStatus: DecisionDeferred, AnswerID: corrected.ID})
-	resolved, err = loadState(t, store).ResolveDecisions(DecisionContext{Valid: func(form.Decision) (bool, error) { return true, nil }})
-	if err != nil || resolved[3].Status != DecisionDeferred || resolved[3].Valid {
+	resolved, err = loadState(t, store).ResolveDecisions(DecisionContext{})
+	if err != nil || resolved[3].Status != DecisionDeferred || resolved[3].Active {
 		t.Fatalf("decision correction: %+v, %v", resolved, err)
+	}
+}
+
+func TestDecisionConditionsArePassedThrough(t *testing.T) {
+	store, _ := workStore(t)
+	decision := &Decision{Decision: form.Decision{
+		ID: "conditional", Content: "Use the current service", Validity: "While the service remains available",
+		Conditions: []string{"The owner still accepts the operational cost"}, Decider: "human",
+		DependsOn: []form.Reference{{External: "https://example.invalid/service"}}, Supersedes: []form.Reference{},
+		RejectedAlternatives: []form.RejectedAlternative{}, Evidence: []form.Reference{},
+	}}
+	record, err := NewRecord(store, decision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Append(store, record, testValidator(t)); err != nil {
+		t.Fatal(err)
+	}
+	state := loadState(t, store)
+	resolved, err := state.ResolveDecisions(DecisionContext{})
+	if err != nil || len(resolved) != 1 || !resolved[0].Active || !reflect.DeepEqual(resolved[0].Decision, decision.Decision) {
+		t.Fatalf("conditions or external dependency were assessed: %+v, %v", resolved, err)
+	}
+	checkpoint, err := state.Checkpoint()
+	if err != nil || !reflect.DeepEqual(checkpoint.Decisions, resolved) {
+		t.Fatalf("checkpoint lost decision conditions: %+v, %v", checkpoint, err)
 	}
 }
 

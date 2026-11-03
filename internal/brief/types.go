@@ -40,7 +40,7 @@ type CommandOutput struct {
 }
 
 // WorkInput contains known information to include in a work request.
-// Read Norms and documents from the fixed reference source and exclude invalid temporary state.
+// Read Norms and documents from the fixed reference source and preserve conditions with their items.
 type WorkInput struct {
 	// RequestTemplate is the request text resolved by the caller from the fixed kit copy.
 	RequestTemplate  string

@@ -37,6 +37,23 @@ func gitCommand(t *testing.T, root string, args ...string) {
 
 func checkout(t *testing.T) string {
 	t.Helper()
+	for _, entry := range os.Environ() {
+		name, _, _ := strings.Cut(entry, "=")
+		if strings.HasPrefix(name, "GIT_") {
+			t.Setenv(name, "")
+			if err := os.Unsetenv(name); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	gitEnvironment := t.TempDir()
+	t.Setenv("GIT_CONFIG_GLOBAL", filepath.Join(gitEnvironment, "config"))
+	t.Setenv("GIT_CONFIG_SYSTEM", filepath.Join(gitEnvironment, "config"))
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_TEMPLATE_DIR", gitEnvironment)
+	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_KEY_0", "core.hooksPath")
+	t.Setenv("GIT_CONFIG_VALUE_0", gitEnvironment)
 	root := t.TempDir()
 	gitCommand(t, root, "init", "--quiet")
 	gitCommand(t, root, "config", "user.name", "Devkit test")
@@ -64,7 +81,7 @@ func TestCommandsAndHookBindings(t *testing.T) {
 			} else {
 				t.Setenv("CODEX_THREAD_ID", "test-session")
 			}
-			if got := command(t, "", "init"); !strings.Contains(got, "Initialized") {
+			if got := command(t, "", "init", "--yes"); !strings.Contains(got, "Initialized") {
 				t.Fatalf("missing init summary: %s", got)
 			}
 			gitCommand(t, root, "add", ".")
@@ -105,6 +122,10 @@ func TestCommandsAndHookBindings(t *testing.T) {
 			if got := command(t, string(denied), "hook", "PreToolUse"); !strings.Contains(got, `"permissionDecision":"deny"`) {
 				t.Fatalf("judge write was not denied: %s", got)
 			}
+			allowed, _ := json.Marshal(map[string]any{"hook_event_name": "PreToolUse", "session_id": "test-session", "cwd": nested, "agent_id": "judge", "agent_type": "devkit-judge", "tool_name": "Read", "tool_input": map[string]string{"file_path": filepath.Join(root, "devkit.toml")}})
+			if got := command(t, string(allowed), "hook", "PreToolUse"); strings.TrimSpace(got) != "{}" {
+				t.Fatalf("judge read was not allowed: %s", got)
+			}
 			command(t, "", "pause")
 			var paused engine.Result
 			if err := json.Unmarshal([]byte(command(t, "", "next")), &paused); err != nil {
@@ -129,6 +150,64 @@ func TestCommandsAndHookBindings(t *testing.T) {
 			observation, err := hook.ReadSession(filepath.Join(root, ".devkit/run"), "test-session")
 			if err != nil || observation.Host != host {
 				t.Fatalf("wrong host observation: %+v, %v", observation, err)
+			}
+		})
+	}
+}
+
+func TestInitConfirmation(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		input    string
+		yes      bool
+		accepted bool
+	}{
+		{name: "accept", input: "y\n", accepted: true},
+		{name: "accept full answer", input: "YES\n", accepted: true},
+		{name: "skip confirmation", yes: true, accepted: true},
+		{name: "decline", input: "n\n"},
+		{name: "empty answer", input: "\n"},
+		{name: "end of input"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := checkout(t)
+			settings := filepath.Join(root, ".claude/settings.json")
+			if err := os.MkdirAll(filepath.Dir(settings), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			const before = "{\"permissions\":{\"allow\":[\"Read\"]}}\n"
+			if err := os.WriteFile(settings, []byte(before), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			args := []string{"init"}
+			if test.yes {
+				args = append(args, "--yes")
+			}
+			var output bytes.Buffer
+			err := run(context.Background(), args, strings.NewReader(test.input), &output)
+			if test.accepted && err != nil || !test.accepted && (err == nil || err.Error() != "initialization canceled") {
+				t.Fatalf("unexpected confirmation result: %v", err)
+			}
+			got := output.String()
+			if !strings.Contains(got, "--- .claude/settings.json (before)\n+++ .claude/settings.json (after)\n-"+before) || !strings.Contains(got, `+      "Bash(devkit *)"`) {
+				t.Fatalf("missing host settings diff: %s", got)
+			}
+			if strings.Contains(got, "Apply initialization changes? [y/N]") == test.yes {
+				t.Fatalf("unexpected confirmation prompt: %s", got)
+			}
+			after, err := os.ReadFile(settings)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !test.accepted {
+				if string(after) != before {
+					t.Fatal("declined initialization changed host settings")
+				}
+				if _, err := os.Stat(filepath.Join(root, ".codex/hooks.json")); !os.IsNotExist(err) {
+					t.Fatalf("declined initialization wrote hooks: %v", err)
+				}
+			} else if got := command(t, "", "init"); strings.Contains(got, "Apply initialization changes?") {
+				t.Fatalf("unchanged initialization requested confirmation: %s", got)
 			}
 		})
 	}

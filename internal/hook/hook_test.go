@@ -143,6 +143,45 @@ func TestSubagentSessionAndStopAreIgnored(t *testing.T) {
 	}
 }
 
+func TestSessionStartPreservesConditions(t *testing.T) {
+	h := newHandler(t)
+	decision := form.Decision{
+		ID: "conditional", Content: "Keep the existing service", Validity: "While the owner accepts the cost",
+		Conditions: []string{"The current requirements still apply"}, Decider: "human",
+		Supersedes: []form.Reference{}, DependsOn: []form.Reference{{External: "https://example.invalid/service"}},
+		RejectedAlternatives: []form.RejectedAlternative{}, Evidence: []form.Reference{},
+	}
+	appendPayload(t, h, &ledger.Decision{Decision: decision})
+	store := fsstore.New(h.workRoot())
+	run, err := store.NextID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AppendRecord(run, string(ledger.KindStageRun), &ledger.StageRun{ID: run, StageID: "implement", PlanVersion: 1, State: ledger.StageWorking}); err != nil {
+		t.Fatal(err)
+	}
+	round, err := store.NextID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AppendRecord(round, string(ledger.KindRound), &ledger.Round{ID: round, StageRunID: run, SessionID: "session", StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: "before"}, Norms: []form.NormReference{}}); err != nil {
+		t.Fatal(err)
+	}
+	temporary := form.TemporaryState{Content: "Existing cache", VerificationMethod: "Inspect the cache", Source: "Cache directory", InvalidWhen: "The cache is replaced"}
+	appendPayload(t, h, &ledger.Progress{RoundID: round, Progress: form.Progress{
+		InstructionID: "work", TerminationKind: form.TerminationCompleted, TemporaryState: []form.TemporaryState{temporary},
+	}})
+	result := process(t, h, event.Event{Host: event.ClaudeCode, Name: event.SessionStart, SessionID: "session"})
+	for _, want := range []string{decision.Validity, decision.Conditions[0], decision.DependsOn[0].External, temporary.Content, temporary.VerificationMethod, temporary.Source, temporary.InvalidWhen} {
+		if !strings.Contains(result.AdditionalContext, want) {
+			t.Errorf("checkpoint did not preserve %q: %s", want, result.AdditionalContext)
+		}
+	}
+	if strings.Contains(result.AdditionalContext, "Warning:") {
+		t.Fatalf("condition-bearing checkpoint failed: %s", result.AdditionalContext)
+	}
+}
+
 func TestDenyRules(t *testing.T) {
 	h := newHandler(t)
 	for _, test := range []struct {

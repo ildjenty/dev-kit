@@ -47,7 +47,7 @@ func loadInput(t *testing.T, stops []ledger.StopObservation, payloads ...ledger.
 	if err != nil {
 		t.Fatal(err)
 	}
-	decisions, err := state.ResolveDecisions(ledger.DecisionContext{Valid: func(form.Decision) (bool, error) { return true, nil }})
+	decisions, err := state.ResolveDecisions(ledger.DecisionContext{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,6 +130,30 @@ func TestGenerateReadOnly(t *testing.T) {
 	render(t, input)
 	if len(input.Ledger.UnansweredQuestions()) != 1 || input.Ledger.LastRecordID() != recordID(5) {
 		t.Error("rendering changed ledger state")
+	}
+}
+
+func TestGeneratePreservesConditions(t *testing.T) {
+	decision := form.Decision{
+		ID: "conditional", Content: "Keep the current service", Validity: "While the owner accepts the cost",
+		Conditions: []string{"The requirements still apply"}, Decider: "human", Provisional: true,
+		Supersedes: []form.Reference{}, DependsOn: []form.Reference{{External: "https://example.invalid/service"}},
+		RejectedAlternatives: []form.RejectedAlternative{}, Evidence: []form.Reference{},
+	}
+	temporary := form.TemporaryState{Content: "Existing cache", VerificationMethod: "Inspect the cache", Source: "Cache directory", InvalidWhen: "The cache is replaced"}
+	input := loadInput(t, nil, &ledger.Decision{Decision: decision},
+		&ledger.StageRun{ID: recordID(3), StageID: "implement", PlanVersion: 1, State: ledger.StageWorking},
+		&ledger.Round{ID: recordID(4), StageRunID: recordID(3), SessionID: "session", StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: "before"}, Norms: []form.NormReference{}},
+		&ledger.Progress{RoundID: recordID(4), Progress: form.Progress{InstructionID: "work", TerminationKind: form.TerminationCompleted, TemporaryState: []form.TemporaryState{temporary}}})
+	html := render(t, input)
+	for _, want := range []string{decision.Validity, decision.Conditions[0], decision.DependsOn[0].External, temporary.Content, temporary.VerificationMethod, temporary.Source, temporary.InvalidWhen, "For agents and people to assess"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("view did not preserve %q", want)
+		}
+	}
+	body := articleContaining(t, sectionHTML(t, html, "current"), "Decision conditional")
+	if strings.Contains(body, "<dt>Validity</dt><dd>true</dd>") {
+		t.Fatal("graph state was presented as condition validity")
 	}
 }
 

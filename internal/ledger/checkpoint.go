@@ -1,8 +1,6 @@
 package ledger
 
 import (
-	"fmt"
-
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 	"github.com/ildjenty/dev-kit/internal/plan"
@@ -132,45 +130,35 @@ func (s *State) UnacceptedInstructions() []Instruction {
 
 // Checkpoint is derived for each injection and is never appended as a record.
 type Checkpoint struct {
-	Position     Position        `json:"position"`
-	Progress     *Progress       `json:"progress,omitempty"`
-	Questions    []form.Question `json:"questions"`
-	Instructions []Instruction   `json:"instructions"`
+	Position     Position           `json:"position"`
+	Progress     *Progress          `json:"progress,omitempty"`
+	Decisions    []ResolvedDecision `json:"decisions"`
+	Questions    []form.Question    `json:"questions"`
+	Instructions []Instruction      `json:"instructions"`
 }
 
-// TemporaryStateValid checks the supplied validity conditions against current reality.
-// Ledger does not interpret free-form conditions or execute verification commands.
-type TemporaryStateValid func(form.TemporaryState) (bool, error)
-
-func (s *State) Checkpoint(valid TemporaryStateValid) (Checkpoint, error) {
+// Checkpoint preserves temporary state and its conditions without evaluating them.
+func (s *State) Checkpoint() (Checkpoint, error) {
+	decisions, err := s.ResolveDecisions(DecisionContext{})
+	if err != nil {
+		return Checkpoint{}, err
+	}
 	checkpoint := Checkpoint{
-		Position: s.CurrentPosition(), Questions: s.UnansweredQuestions(), Instructions: s.UnacceptedInstructions(),
+		Position: s.CurrentPosition(), Decisions: decisions, Questions: s.UnansweredQuestions(), Instructions: s.UnacceptedInstructions(),
 	}
 	if progress, ok := s.LatestProgress(); ok {
 		copy := *progress
-		copy.TemporaryState = []form.TemporaryState{}
-		for _, temporary := range progress.TemporaryState {
-			if valid == nil {
-				return Checkpoint{}, fmt.Errorf("temporary state validity check is required")
-			}
-			keep, err := valid(temporary)
-			if err != nil {
-				return Checkpoint{}, fmt.Errorf("temporary state %q: %w", temporary.Content, err)
-			}
-			if keep {
-				copy.TemporaryState = append(copy.TemporaryState, temporary)
-			}
-		}
+		copy.TemporaryState = append([]form.TemporaryState{}, progress.TemporaryState...)
 		checkpoint.Progress = &copy
 	}
 	return checkpoint, nil
 }
 
 // BuildCheckpoint loads a fresh snapshot before assembling its checkpoint.
-func BuildCheckpoint(store *fsstore.Store, stops []StopObservation, valid TemporaryStateValid, validator *Validator) (Checkpoint, error) {
+func BuildCheckpoint(store *fsstore.Store, stops []StopObservation, validator *Validator) (Checkpoint, error) {
 	state, err := Load(store, stops, validator)
 	if err != nil {
 		return Checkpoint{}, err
 	}
-	return state.Checkpoint(valid)
+	return state.Checkpoint()
 }

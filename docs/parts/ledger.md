@@ -22,6 +22,8 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 `devkit note` の受理と決定の状態は[決定と証拠](../architecture/data.md#決定と証拠-decision--evidence)(判断と調査結果)の定義に従う。
 
+自然文の有効条件・適用条件と外部依存の充足を判定する評価関数は受け取らず、条件と参照を決定に添えて返す。承認・却下・保留、置換と記録内の依存関係の解決結果は、条件の充足とは区別する。
+
 ### 問い・回答・承認
 
 [問い](../architecture/data.md#問い-question)(人への確認事項)と[回答・承認](../architecture/data.md#回答承認-answer--approval)(問いへの判断)の保存項目は各定義、受理と訂正は[回答の受理](../architecture/guarantees.md#回答の受理)に従う。
@@ -56,7 +58,7 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 ### checkpoint
 
-終了ブロックの[一時状態](../architecture/data.md#進捗-progress)(無効になる条件を持つ情報)の照合を含む現在地の組み立ては [checkpoint](../architecture/data.md#checkpoint)(再開用の現在地)、注入との接続は [SessionStart](../architecture/hooks.md#sessionstart)(起動・再開などのイベント)に従う。
+終了ブロックの[一時状態](../architecture/data.md#進捗-progress)(無効になる条件を持つ情報)を含む現在地の組み立ては [checkpoint](../architecture/data.md#checkpoint)(再開用の現在地)、注入との接続は [SessionStart](../architecture/hooks.md#sessionstart)(起動・再開などのイベント)に従う。一時状態の条件を判定する評価関数は受け取らず、条件による除外も行わない。確認方法・出典・無効になる条件をそのまま添えて渡す。
 
 ### 状態の問い合わせ
 

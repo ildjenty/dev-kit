@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -36,7 +37,7 @@ const usage = `Usage: devkit <command> [arguments]
   abort
   status [--records | --record <id>]
   view
-  init
+  init [--yes]
   doctor
   version
   hook <event> [--host claude-code|codex]
@@ -99,11 +100,17 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		return err
 	}
 	if name == "init" || name == "doctor" {
+		yes := false
+		if name == "init" {
+			f.BoolVar(&yes, "yes", false, "Apply changes without confirmation")
+		}
 		if err := parse(f, args, 0, 0); err != nil {
 			return err
 		}
 		if name == "init" {
-			result, err := install.Init(ctx, cwd, nil)
+			result, err := install.Init(ctx, cwd, func(changes []install.Change) error {
+				return confirmInit(changes, input, output, yes)
+			})
 			if err != nil {
 				return err
 			}
@@ -224,6 +231,44 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		return err
 	}
 	return writeOutput(output, filepath.Join(e.Root(), ".devkit/run/work", result.WorkID), "response.json", result)
+}
+
+func confirmInit(changes []install.Change, input io.Reader, output io.Writer, yes bool) error {
+	for _, change := range changes {
+		if !strings.HasPrefix(change.Path, ".claude/") && !strings.HasPrefix(change.Path, ".codex/") {
+			continue
+		}
+		if _, err := fmt.Fprintf(output, "--- %s (before)\n+++ %s (after)\n", change.Path, change.Path); err != nil {
+			return err
+		}
+		if len(change.Before) != 0 {
+			if _, err := fmt.Fprintln(output, "-"+strings.ReplaceAll(strings.TrimSuffix(string(change.Before), "\n"), "\n", "\n-")); err != nil {
+				return err
+			}
+		}
+		if len(change.After) != 0 {
+			if _, err := fmt.Fprintln(output, "+"+strings.ReplaceAll(strings.TrimSuffix(string(change.After), "\n"), "\n", "\n+")); err != nil {
+				return err
+			}
+		}
+	}
+	if yes {
+		return nil
+	}
+	if _, err := fmt.Fprint(output, "Apply initialization changes? [y/N] "); err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(input)
+	if scanner.Scan() {
+		answer := strings.TrimSpace(scanner.Text())
+		if strings.EqualFold(answer, "y") || strings.EqualFold(answer, "yes") {
+			return nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	return errors.New("initialization canceled")
 }
 
 func writeOutput(output io.Writer, root string, name string, value any) error {

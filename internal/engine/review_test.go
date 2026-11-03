@@ -733,6 +733,42 @@ func TestHistoryReadErrorsArePropagated(t *testing.T) {
 	}
 }
 
+func TestBriefOutputsPreserveDecisionConditions(t *testing.T) {
+	e, ctx := fixture(t)
+	working(t, e, ctx)
+	decision := form.Decision{
+		ID: "conditional", Content: "Keep the current service", Validity: "While the owner accepts the cost",
+		Conditions: []string{"The requirements still apply"}, Decider: "human",
+		Supersedes: []form.Reference{}, DependsOn: []form.Reference{{External: "https://example.invalid/service"}},
+		RejectedAlternatives: []form.RejectedAlternative{}, Evidence: []form.Reference{},
+	}
+	if _, err := e.Note(ctx, ledger.KindDecision, marshal(t, decision)); err != nil {
+		t.Fatal(err)
+	}
+	state, err := e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs, err := e.outputs(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range outputs {
+		if output.StageID != "Decision "+decision.ID {
+			continue
+		}
+		var got form.Decision
+		if err := json.Unmarshal([]byte(output.Content), &got); err != nil {
+			t.Fatal(err)
+		}
+		if string(marshal(t, got)) != string(marshal(t, decision)) {
+			t.Fatalf("brief output changed decision conditions: %+v", got)
+		}
+		return
+	}
+	t.Fatal("brief outputs omitted the conditional decision")
+}
+
 func TestCommitRecoveryCompletesPartialRecords(t *testing.T) {
 	for _, stop := range []string{"commit_artifact", "closed_round", "completed_stage"} {
 		t.Run(stop, func(t *testing.T) {

@@ -6,25 +6,23 @@ import (
 	"github.com/ildjenty/dev-kit/internal/form"
 )
 
-// DecisionContext supplies assessments of free-form validity and application conditions.
-// ExternalValid assesses explicitly external dependencies, which are outside the work graph.
-type DecisionContext struct {
-	Valid         func(form.Decision) (bool, error)
-	ExternalValid func(form.Reference) (bool, error)
-}
+// DecisionContext is empty because conditions and external references are passed through.
+type DecisionContext struct{}
 
+// ResolvedDecision preserves conditions alongside recorded status and graph relationships.
+// Active describes those records, not whether natural-language conditions are satisfied.
 type ResolvedDecision struct {
-	RecordID            string           `json:"record_id"`
-	Decision            form.Decision    `json:"decision"`
-	Status              DecisionStatus   `json:"status"`
-	Valid               bool             `json:"valid"`
-	SupersededBy        []form.Reference `json:"superseded_by"`
-	InvalidDependencies []form.Reference `json:"invalid_dependencies"`
+	RecordID             string           `json:"record_id"`
+	Decision             form.Decision    `json:"decision"`
+	Status               DecisionStatus   `json:"status"`
+	Active               bool             `json:"active"`
+	SupersededBy         []form.Reference `json:"superseded_by"`
+	InactiveDependencies []form.Reference `json:"inactive_dependencies"`
 }
 
 // ResolveDecisions resolves status changes, active replacements, and dependencies.
-// It does not infer the meaning of free-form validity or conditions.
-func (s *State) ResolveDecisions(context DecisionContext) ([]ResolvedDecision, error) {
+// Conditions and external dependencies are preserved for agents and people to assess.
+func (s *State) ResolveDecisions(_ DecisionContext) ([]ResolvedDecision, error) {
 	decisions := []ResolvedDecision{}
 	byRecord := make(map[string]int)
 	byID := make(map[string]int)
@@ -36,7 +34,7 @@ func (s *State) ResolveDecisions(context DecisionContext) ([]ResolvedDecision, e
 			byRecord[record.ID], byID[decision.ID] = len(decisions), len(decisions)
 			decisions = append(decisions, ResolvedDecision{
 				RecordID: record.ID, Decision: decision.Decision, Status: DecisionPending,
-				SupersededBy: []form.Reference{}, InvalidDependencies: []form.Reference{},
+				SupersededBy: []form.Reference{}, InactiveDependencies: []form.Reference{},
 			})
 		}
 	}
@@ -75,7 +73,7 @@ func (s *State) ResolveDecisions(context DecisionContext) ([]ResolvedDecision, e
 	var resolve func(int) (bool, error)
 	resolve = func(index int) (bool, error) {
 		if visited[index] {
-			return decisions[index].Valid, nil
+			return decisions[index].Active, nil
 		}
 		decision := &decisions[index]
 		if visiting[index] {
@@ -83,15 +81,6 @@ func (s *State) ResolveDecisions(context DecisionContext) ([]ResolvedDecision, e
 		}
 		visiting[index] = true
 		valid := decision.Status != DecisionRejected && decision.Status != DecisionDeferred
-		if context.Valid != nil {
-			assessed, err := context.Valid(decision.Decision)
-			if err != nil {
-				return false, fmt.Errorf("decision %s: %w", decision.RecordID, err)
-			}
-			valid = valid && assessed
-		} else if decision.Decision.Validity != "" || len(decision.Decision.Conditions) != 0 {
-			return false, fmt.Errorf("decision %s: validity assessment is required", decision.RecordID)
-		}
 		for _, ref := range decision.Decision.DependsOn {
 			var active bool
 			if ref.RecordID != "" {
@@ -105,17 +94,10 @@ func (s *State) ResolveDecisions(context DecisionContext) ([]ResolvedDecision, e
 					return false, err
 				}
 			} else {
-				if context.ExternalValid == nil {
-					return false, fmt.Errorf("decision %s: external dependency assessment is required", decision.RecordID)
-				}
-				var err error
-				active, err = context.ExternalValid(ref)
-				if err != nil {
-					return false, fmt.Errorf("decision %s: %w", decision.RecordID, err)
-				}
+				continue
 			}
 			if !active {
-				decision.InvalidDependencies = append(decision.InvalidDependencies, ref)
+				decision.InactiveDependencies = append(decision.InactiveDependencies, ref)
 				valid = false
 			}
 		}
@@ -129,7 +111,7 @@ func (s *State) ResolveDecisions(context DecisionContext) ([]ResolvedDecision, e
 				valid = false
 			}
 		}
-		decision.Valid = valid
+		decision.Active = valid
 		visiting[index], visited[index] = false, true
 		return valid, nil
 	}
