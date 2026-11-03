@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Detection result",
+  "type": "object",
+  "properties": {
+    "instruction_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file": {
+            "type": "string"
+          },
+          "judgment": {
+            "$ref": "urn:devkit:form:judgment"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "matches_blocking": {
+            "type": "boolean"
+          },
+          "respects_difference": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "file",
+          "judgment",
+          "reason",
+          "matches_blocking",
+          "respects_difference"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "instruction_id",
+    "observations"
+  ],
+  "additionalProperties": false
+}
