@@ -14,7 +14,7 @@ brief は、[作業者](../architecture/data.md#計画-plan)(作業を行うロ�
 
 修正[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)では、指摘と検証の失敗情報を受け取る。入力の構成は[指摘の参照](../architecture/data.md#指摘-finding)、[brief のモジュール契約](../architecture/modules.md#brief)と[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
 
-計画依頼の組み立てでは、[作業の開始](../architecture/flow.md#作業の開始)に従って[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)と課題を受け取り、再提案・再計画では[計画の check と承認ゲート](../architecture/flow.md#計画の-check-と承認ゲート)と[計画のバージョン](../architecture/data.md#計画のバージョン)に従って指摘や残りの実行内容を受け取る。
+計画依頼の組み立てでは、[作業の開始](../architecture/flow.md#作業の開始)に従って[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)と課題を受け取り、再提案・再計画では[計画の check と承認ゲート](../architecture/flow.md#計画の-check-と承認ゲート)と[計画のバージョン](../architecture/data.md#計画のバージョン)に従って人の修正指示、check の指摘や残りの実行内容を受け取る。
 
 判定依頼の組み立てでは、[check](check.md#入力と出力)(判定依頼の内容を決める部品)が決めた内容を入力として受け取る。
 
