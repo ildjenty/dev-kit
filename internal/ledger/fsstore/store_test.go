@@ -25,12 +25,12 @@ func TestRecords(t *testing.T) {
 		t.Fatalf("empty records: %v, %v", records, err)
 	}
 	for _, id := range []string{secondID, firstID} {
-		data := json.RawMessage(`{"id":"` + id + `","kind":"work"}`)
+		data := json.RawMessage(`{"id":"` + id + `","kind":"work","payload":{}}`)
 		if err := store.Append(id, data); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := store.Append(firstID, json.RawMessage(`{"changed":true}`)); !errors.Is(err, fs.ErrExist) {
+	if err := store.Append(firstID, json.RawMessage(`{"id":"`+firstID+`","kind":"work","payload":{"changed":true}}`)); !errors.Is(err, fs.ErrExist) {
 		t.Fatalf("overwrite was not rejected: %v", err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "records", ".unfinished.tmp"), []byte(`{`), 0o600); err != nil {
@@ -43,8 +43,8 @@ func TestRecords(t *testing.T) {
 	if len(records) != 2 || records[0].ID != firstID || records[1].ID != secondID {
 		t.Fatalf("record order and count: %v", records)
 	}
-	if !strings.Contains(string(records[0].Data), `"kind":"work"`) {
-		t.Fatalf("existing record changed: %s", records[0].Data)
+	if records[0].Kind != "work" {
+		t.Fatalf("existing record changed: %s", records[0].Kind)
 	}
 	path := filepath.Join(root, "records", secondID+".json")
 	if err := os.WriteFile(path, []byte(`{"broken":`), 0o600); err != nil {
@@ -103,7 +103,7 @@ func TestAppendWithStaleTemporaryFiles(t *testing.T) {
 		}
 	}
 	store := New(root)
-	if err := store.Append(firstID, json.RawMessage(`{"kind":"pause"}`)); err != nil {
+	if err := store.Append(firstID, json.RawMessage(`{"id":"`+firstID+`","kind":"pause","payload":{}}`)); err != nil {
 		t.Fatal(err)
 	}
 	records, err := store.List()
@@ -120,7 +120,7 @@ func TestConcurrentAppend(t *testing.T) {
 	for i := 0; i < writers; i++ {
 		go func() {
 			<-start
-			results <- store.Append(firstID, json.RawMessage(`{"kind":"pause"}`))
+			results <- store.Append(firstID, json.RawMessage(`{"id":"`+firstID+`","kind":"pause","payload":{}}`))
 		}()
 	}
 	close(start)
@@ -194,7 +194,7 @@ func TestWorkLock(t *testing.T) {
 	}
 	check("true")
 	// A pause record can be published independently while the work lock is held.
-	if err := store.Append(firstID, json.RawMessage(`{"kind":"pause"}`)); err != nil {
+	if err := store.Append(firstID, json.RawMessage(`{"id":"`+firstID+`","kind":"pause","payload":{}}`)); err != nil {
 		t.Fatal(err)
 	}
 	if err := lock.Close(); err != nil {
@@ -203,5 +203,34 @@ func TestWorkLock(t *testing.T) {
 	check("false")
 	if _, err := os.Stat(filepath.Join(root, "run.lock")); err != nil {
 		t.Fatalf("lock file was not preserved: %v", err)
+	}
+}
+
+func TestRecordEnvelopeValidation(t *testing.T) {
+	for _, tc := range []struct{ body, reason string }{
+		{`{"id":"` + secondID + `","kind":"work","payload":{}}`, "does not match filename"},
+		{`{"id":"` + firstID + `","kind":"work","payload":null}`, "payload must be an object"},
+		{`{"id":"` + firstID + `","kind":"work","payload":{}`, "invalid record JSON"},
+		{`{"id":"` + firstID + `","kind":"work","payload":{},"unknown":true}`, "unknown field"},
+	} {
+		root := t.TempDir()
+		store := New(root)
+		if err := store.Append(firstID, json.RawMessage(tc.body)); err == nil || !strings.Contains(err.Error(), tc.reason) {
+			t.Fatalf("envelope write diagnostic: %v", err)
+		}
+		dir := filepath.Join(root, "records")
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, firstID+".json")
+		if err := os.WriteFile(path, []byte(tc.body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := store.Get(firstID); err == nil || !strings.Contains(err.Error(), path) || !strings.Contains(err.Error(), tc.reason) {
+			t.Fatalf("envelope read diagnostic: %v", err)
+		}
+		if data, err := os.ReadFile(path); err != nil || string(data) != tc.body {
+			t.Fatalf("corrupt envelope changed: %s, %v", data, err)
+		}
 	}
 }

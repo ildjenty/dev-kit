@@ -1,6 +1,7 @@
 package fsstore
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,10 +21,11 @@ type Store struct {
 	root string
 }
 
-// Record holds the ID from its filename and the JSON body interpreted by ledger.
+// Record is the storage envelope. Ledger interprets Kind and Payload.
 type Record struct {
-	ID   string
-	Data json.RawMessage
+	ID      string          `json:"id"`
+	Kind    string          `json:"kind"`
+	Payload json.RawMessage `json:"payload"`
 }
 
 // New sets the storage root without resolving it or creating files.
@@ -38,7 +40,7 @@ func (s *Store) Append(id string, data json.RawMessage) error {
 	if err != nil {
 		return err
 	}
-	if err := validateJSON(path, data); err != nil {
+	if err := validateRecord(path, id, data); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -89,7 +91,11 @@ func (s *Store) List() ([]Record, error) {
 		if err != nil {
 			return nil, err
 		}
-		records = append(records, Record{ID: id, Data: data})
+		record, err := DecodeRecord(id, data)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, record)
 	}
 	return records, nil
 }
@@ -105,7 +111,7 @@ func (s *Store) Get(id string) (json.RawMessage, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := validateJSON(path, data); err != nil {
+	if err := validateRecord(path, id, data); err != nil {
 		return nil, err
 	}
 	return json.RawMessage(data), nil
@@ -186,12 +192,89 @@ func (s *Store) recordPath(id string) (string, error) {
 	return path, nil
 }
 
-func validateJSON(path string, data []byte) error {
-	var raw json.RawMessage
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("record %s: cannot read JSON: %w", path, err)
+// DecodePayload decodes a stored payload without accepting unknown fields.
+func DecodePayload(data []byte, dst any) error {
+	if !json.Valid(data) {
+		return fmt.Errorf("invalid record JSON")
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(dst)
+}
+
+// DecodeRecord decodes the envelope and checks its ID against the filename.
+func DecodeRecord(id string, data []byte) (Record, error) {
+	var record Record
+	if err := DecodePayload(data, &record); err != nil {
+		return Record{}, err
+	}
+	if record.ID != id {
+		return Record{}, fmt.Errorf("body ID %q does not match filename %q", record.ID, id)
+	}
+	if record.Kind == "" {
+		return Record{}, fmt.Errorf("record kind is required")
+	}
+	payload := bytes.TrimSpace(record.Payload)
+	if len(payload) == 0 || payload[0] != '{' {
+		return Record{}, fmt.Errorf("record payload must be an object")
+	}
+	return record, nil
+}
+
+func validateRecord(path, id string, data []byte) error {
+	if _, err := DecodeRecord(id, data); err != nil {
+		return fmt.Errorf("record %s: %w", path, err)
 	}
 	return nil
+}
+
+// AppendRecord serializes and publishes a storage envelope.
+func (s *Store) AppendRecord(id, kind string, payload any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("record %s.json: %w", id, err)
+	}
+	body, err := json.Marshal(Record{ID: id, Kind: kind, Payload: data})
+	if err != nil {
+		return fmt.Errorf("record %s.json: %w", id, err)
+	}
+	return s.Append(id, body)
+}
+
+// GetRecord reads and decodes a storage envelope.
+func (s *Store) GetRecord(id string) (Record, error) {
+	data, err := s.Get(id)
+	if err != nil {
+		return Record{}, err
+	}
+	return DecodeRecord(id, data)
+}
+
+// NextID returns a ULID greater than the last published record ID.
+// The caller holds the work lock through publication, except for pause.
+func (s *Store) NextID() (string, error) {
+	records, err := s.List()
+	if err != nil {
+		return "", err
+	}
+	next := ulid.Make()
+	if len(records) != 0 {
+		last, err := ulid.ParseStrict(records[len(records)-1].ID)
+		if err != nil {
+			return "", err
+		}
+		if next.Compare(last) <= 0 {
+			next = last
+			for i := len(next) - 1; i >= 0; i-- {
+				next[i]++
+				if next[i] != 0 {
+					return next.String(), nil
+				}
+			}
+			return "", fmt.Errorf("record ID space exhausted")
+		}
+	}
+	return next.String(), nil
 }
 
 func writeAndClose(f *os.File, data []byte) error {
