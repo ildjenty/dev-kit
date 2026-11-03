@@ -76,6 +76,12 @@ func TestFixedFormats(t *testing.T) {
 	decisionQuestion.ApprovalTarget = ApprovalTarget{Kind: ApprovalDecision, DecisionID: "decision"}
 	decisionQuestion.Options = []string{"approve", "reject", "defer"}
 	decisionQuestion.Recommendation = "approve"
+	external := ExternalOperationTarget{
+		OperationID: "operation", Kind: "publish", Target: "pull request",
+		InputHash: "input", DefinitionHash: "definition", ExecutableHash: "executable",
+	}
+	externalQuestion := question
+	externalQuestion.ApprovalTarget = ApprovalTarget{Kind: ApprovalExternal, External: &external}
 	cases := []struct {
 		name  string
 		value any
@@ -94,7 +100,9 @@ func TestFixedFormats(t *testing.T) {
 		{"planner-result", PlannerResult{InstructionID: "instruction", Plan: json.RawMessage(`{"task":"The plan package validates the plan content"}`)}},
 		{"question", question},
 		{"question", decisionQuestion},
+		{"question", externalQuestion},
 		{"instruction", Instruction{ID: "instruction", Kind: InstructionQuestion, TargetKey: "question", Question: &question}},
+		{"instruction", Instruction{ID: "instruction", Kind: InstructionExternal, TargetKey: "operation", External: &external}},
 		{"decision", Decision{
 			ID: "decision", Content: "Use the existing save operation", Validity: "While the save destination remains unchanged", Supersedes: []Reference{}, DependsOn: refs,
 			Conditions: []string{"Keep the existing save destination"}, Decider: "Human", Provisional: true,
@@ -138,6 +146,7 @@ func TestInvalidFormats(t *testing.T) {
 		{"finding", `{"id":"finding","blocking":true,"kind":"unknown","scenario":"Failure"}`},
 		{"instruction", `{"id":"instruction","kind":"judgment","target_key":"round/aspect","reissue":0,"brief":"Request"}`},
 		{"instruction", `{"id":"instruction","kind":"question","target_key":"question","reissue":0}`},
+		{"instruction", `{"id":"instruction","kind":"external","target_key":"operation","reissue":0,"external":{"operation_id":"operation","kind":"publish","target":"pull request","input_hash":"input","definition_hash":"definition"}}`},
 		{"evidence", `{"id":"evidence","content":"Result","verification_method":"Check"}`},
 		{"evidence", `{"id":"evidence","content":"Result","verification_method":"Check","sources":[{"record_id":"record","external":"source"}]}`},
 	}

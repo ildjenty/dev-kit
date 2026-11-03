@@ -133,7 +133,13 @@ func validateStages(start string, stages, optional []Stage, meta []string, condi
 				return fmt.Errorf("%s: %s references an unselected optional stage: %q", stage.ID, action, *target)
 			}
 		}
-		for _, check := range stage.Checks {
+		for i, check := range stage.Checks {
+			if slices.ContainsFunc(stage.Checks[:i], func(previous Check) bool {
+				return previous.Aspect == check.Aspect && previous.Runner == check.Runner &&
+					(previous.Target != check.Target || !slices.Equal(previous.CompletionConditionIDs, check.CompletionConditionIDs))
+			}) {
+				return fmt.Errorf("%s: conflicting check mappings for aspect %q and runner %q", stage.ID, check.Aspect, check.Runner)
+			}
 			if check.Runner == "command:" {
 				return fmt.Errorf("%s: command name is missing", stage.ID)
 			}

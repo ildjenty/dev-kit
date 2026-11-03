@@ -40,7 +40,7 @@ func (s *Store) Append(id string, data json.RawMessage) error {
 	if err != nil {
 		return err
 	}
-	if err := validateRecord(path, id, data); err != nil {
+	if _, err := validateRecord(path, id, data); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -87,11 +87,7 @@ func (s *Store) List() ([]Record, error) {
 			continue
 		}
 		id := strings.TrimSuffix(entry.Name(), ".json")
-		data, err := s.Get(id)
-		if err != nil {
-			return nil, err
-		}
-		record, err := DecodeRecord(id, data)
+		record, err := s.GetRecord(id)
 		if err != nil {
 			return nil, err
 		}
@@ -103,18 +99,24 @@ func (s *Store) List() ([]Record, error) {
 // Get reads a record and reports JSON corruption with the filename and reason.
 // The caller interpreting the body checks schema and kit compatibility.
 func (s *Store) Get(id string) (json.RawMessage, error) {
+	data, _, err := s.readRecord(id)
+	return data, err
+}
+
+func (s *Store) readRecord(id string) (json.RawMessage, Record, error) {
 	path, err := s.recordPath(id)
 	if err != nil {
-		return nil, err
+		return nil, Record{}, err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, Record{}, err
 	}
-	if err := validateRecord(path, id, data); err != nil {
-		return nil, err
+	record, err := validateRecord(path, id, data)
+	if err != nil {
+		return nil, Record{}, err
 	}
-	return json.RawMessage(data), nil
+	return json.RawMessage(data), record, nil
 }
 
 // Publish renames a temporary file to publish an artifact at a root-relative path.
@@ -221,11 +223,12 @@ func DecodeRecord(id string, data []byte) (Record, error) {
 	return record, nil
 }
 
-func validateRecord(path, id string, data []byte) error {
-	if _, err := DecodeRecord(id, data); err != nil {
-		return fmt.Errorf("record %s: %w", path, err)
+func validateRecord(path, id string, data []byte) (Record, error) {
+	record, err := DecodeRecord(id, data)
+	if err != nil {
+		return Record{}, fmt.Errorf("record %s: %w", path, err)
 	}
-	return nil
+	return record, nil
 }
 
 // AppendRecord serializes and publishes a storage envelope.
@@ -243,11 +246,8 @@ func (s *Store) AppendRecord(id, kind string, payload any) error {
 
 // GetRecord reads and decodes a storage envelope.
 func (s *Store) GetRecord(id string) (Record, error) {
-	data, err := s.Get(id)
-	if err != nil {
-		return Record{}, err
-	}
-	return DecodeRecord(id, data)
+	_, record, err := s.readRecord(id)
+	return record, err
 }
 
 // NextID returns a ULID greater than the last published record ID.

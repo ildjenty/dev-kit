@@ -121,6 +121,9 @@ func AcceptResult(request Request, data []byte, schema *form.Schema, provenance 
 			}
 		}
 	}
+	if result.Judgment == Fail && !slices.ContainsFunc(result.Findings, func(f Finding) bool { return f.Blocking }) {
+		return Judgment{}, false, fmt.Errorf("FAIL judgment contains no blocking findings")
+	}
 	return judgment, true, nil
 }
 

@@ -20,6 +20,29 @@ type ResolvedDecision struct {
 	InactiveDependencies []form.Reference `json:"inactive_dependencies"`
 }
 
+func validateDecisionAnswer(record, referenced Record) error {
+	change, ok := record.Payload.(*StateChange)
+	if !ok || change.AnswerID != referenced.ID {
+		return nil
+	}
+	var answer Answer
+	switch p := referenced.Payload.(type) {
+	case *Answer:
+		answer = *p
+	case *Approval:
+		answer = p.Answer
+	default:
+		return fmt.Errorf("decision state change requires an answer or approval")
+	}
+	if answer.Target.Kind != form.ApprovalDecision || answer.Target.DecisionID != change.DecisionID {
+		return fmt.Errorf("decision state change does not match answer target")
+	}
+	if answer.Interpretation == AnswerText || DecisionStatus(answer.Interpretation) != change.DecisionStatus {
+		return fmt.Errorf("decision status %q does not match answer interpretation %q", change.DecisionStatus, answer.Interpretation)
+	}
+	return nil
+}
+
 // ResolveDecisions resolves status changes, active replacements, and dependencies.
 // Conditions and external dependencies are preserved for agents and people to assess.
 func (s *State) ResolveDecisions(_ DecisionContext) ([]ResolvedDecision, error) {

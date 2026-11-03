@@ -45,6 +45,9 @@ func (h Handler) Process(e event.Event) (result event.Result, err error) {
 		if err != nil && e.Name == event.SessionStart {
 			result = event.Result{AdditionalContext: "Warning: " + err.Error()}
 			err = nil
+		} else if err != nil && e.Name == event.PreToolUse {
+			result = denied("Cannot evaluate tool use: " + err.Error())
+			err = nil
 		}
 	}()
 	now := time.Now().UTC()

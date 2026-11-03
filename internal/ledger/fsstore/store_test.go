@@ -1,6 +1,7 @@
 package fsstore
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -30,8 +31,15 @@ func TestRecords(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	original, err := store.Get(firstID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := store.Append(firstID, json.RawMessage(`{"id":"`+firstID+`","kind":"work","payload":{"changed":true}}`)); !errors.Is(err, fs.ErrExist) {
 		t.Fatalf("overwrite was not rejected: %v", err)
+	}
+	if data, err := store.Get(firstID); err != nil || !bytes.Equal(data, original) {
+		t.Fatalf("existing record changed: %s, %v", data, err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "records", ".unfinished.tmp"), []byte(`{`), 0o600); err != nil {
 		t.Fatal(err)
@@ -42,9 +50,6 @@ func TestRecords(t *testing.T) {
 	}
 	if len(records) != 2 || records[0].ID != firstID || records[1].ID != secondID {
 		t.Fatalf("record order and count: %v", records)
-	}
-	if records[0].Kind != "work" {
-		t.Fatalf("existing record changed: %s", records[0].Kind)
 	}
 	path := filepath.Join(root, "records", secondID+".json")
 	if err := os.WriteFile(path, []byte(`{"broken":`), 0o600); err != nil {
@@ -134,6 +139,36 @@ func TestConcurrentAppend(t *testing.T) {
 	}
 	if succeeded != 1 {
 		t.Fatalf("successful appends: got %d, want 1", succeeded)
+	}
+}
+
+func TestAppendPublicationLock(t *testing.T) {
+	root := t.TempDir()
+	dirPath := filepath.Join(root, "records")
+	if err := os.MkdirAll(dirPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dir, err := os.Open(dirPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dir.Close()
+	if err := syscall.Flock(int(dir.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Fatal(err)
+	}
+	store := New(root)
+	body := json.RawMessage(`{"id":"` + firstID + `","kind":"pause","payload":{}}`)
+	if err := store.Append(firstID, body); !errors.Is(err, os.ErrDeadlineExceeded) {
+		t.Fatalf("append while publication lock is held: %v", err)
+	}
+	if _, err := store.Get(firstID); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("record published while publication lock is held: %v", err)
+	}
+	if err := dir.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Append(firstID, body); err != nil {
+		t.Fatalf("append after publication lock release: %v", err)
 	}
 }
 

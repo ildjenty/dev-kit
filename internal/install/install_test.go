@@ -331,7 +331,9 @@ func TestInitRepairsNegatedIgnore(t *testing.T) {
 func TestWriteConfigPublishesAndCleansUp(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "settings.json")
-	writeFile(t, root, "settings.json", "Original settings.\n")
+	if err := writeConfig(path, []byte("Original settings.\n")); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.Chmod(path, 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -351,11 +353,15 @@ func TestWriteConfigPublishesAndCleansUp(t *testing.T) {
 	if string(readFile(t, root, "previous.json")) != "Original settings.\n" {
 		t.Fatal("existing configuration was rewritten in place")
 	}
-	if err := writeConfig(root, []byte("Cannot replace a directory.\n")); err == nil {
+	directory := filepath.Join(root, "directory")
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeConfig(directory, []byte("Cannot replace a directory.\n")); err == nil {
 		t.Fatal("configuration publication unexpectedly replaced a directory")
 	}
 	entries, err := os.ReadDir(root)
-	if err != nil || len(entries) != 2 || entries[0].Name() != "previous.json" || entries[1].Name() != "settings.json" {
+	if err != nil || len(entries) != 3 || entries[0].Name() != "directory" || entries[1].Name() != "previous.json" || entries[2].Name() != "settings.json" {
 		t.Fatalf("temporary files remain: %+v, %v", entries, err)
 	}
 }
@@ -409,16 +415,33 @@ func TestDoctorUsesLatestSessionStart(t *testing.T) {
 	root := t.TempDir()
 	const sessionID = "current-session"
 	const prefix = ".devkit/run/sessions/" + sessionID + "/"
-	const observation = `{"session_id":"current-session"}`
+	const observation = `{"host":"codex","session_id":"current-session","observed_at":"2026-11-04T00:00:00Z"}`
 	writeFile(t, root, prefix+"20261104T000000.000000000Z-SessionStart.json", observation)
 	latest := prefix + "20261104T000001.000000000Z-SessionStart.json"
-	for _, body := range []string{`{`, `{"session_id":"other-session"}`, observation} {
-		writeFile(t, root, latest, body)
-		report := Report{Root: root}
-		report.checkSession(sessionID)
-		if check := checkNamed(t, report, "hook_session"); check.OK != (body == observation) {
-			t.Fatalf("latest observation was not validated: %s: %+v", body, check)
-		}
+	for _, tc := range []struct {
+		name string
+		body string
+		ok   bool
+	}{
+		{"malformed", `{`, false},
+		{"different-session", `{"host":"codex","session_id":"other-session","observed_at":"2026-11-04T00:00:00Z"}`, false},
+		{"missing-host", `{"session_id":"current-session","observed_at":"2026-11-04T00:00:00Z"}`, false},
+		{"invalid-host", `{"host":123,"session_id":"current-session","observed_at":"2026-11-04T00:00:00Z"}`, false},
+		{"missing-time", `{"host":"codex","session_id":"current-session"}`, false},
+		{"invalid-time", `{"host":"codex","session_id":"current-session","observed_at":"invalid"}`, false},
+		{"null-time", `{"host":"codex","session_id":"current-session","observed_at":null}`, false},
+		{"invalid-work-id", `{"host":"codex","session_id":"current-session","observed_at":"2026-11-04T00:00:00Z","work_id":123}`, false},
+		{"unbound", observation, true},
+		{"bound", `{"host":"codex","session_id":"current-session","observed_at":"2026-11-04T00:00:00Z","work_id":"01ARZ3NDEKTSV4RRFFQ69G5FAV"}`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			writeFile(t, root, latest, tc.body)
+			report := Report{Root: root}
+			report.checkSession(sessionID)
+			if check := checkNamed(t, report, "hook_session"); check.OK != tc.ok {
+				t.Fatalf("latest observation was not validated: %s: %+v", tc.body, check)
+			}
+		})
 	}
 }
 

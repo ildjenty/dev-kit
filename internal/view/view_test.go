@@ -180,14 +180,17 @@ func coverageInput(t *testing.T) Input {
 		RejectedAlternatives: []form.RejectedAlternative{}, Evidence: []form.Reference{}}
 	judgment := check.Judgment{JudgmentResult: form.JudgmentResult{InstructionID: "check-1", Aspect: "contract", TargetVersion: target, Norms: norms,
 		CompletionConditionIDs: []string{"C1"}, Judgment: form.Pass, Findings: []form.Finding{}, CheckedScope: []string{"Public output"},
-		UncheckedScope: []string{"Guide examples"}, Method: "Compare the output", Environment: "Local checkout"}, Runner: "review"}
+		UncheckedScope: []string{"Guide examples"}, Method: "Compare the output", Environment: "Local checkout"}, Runner: "review",
+		Provenance: check.Provenance{Source: check.JudgeCommand, InstructionID: "check-1", Runner: "review"}}
 	newer := judgment
 	newer.InstructionID = "check-2"
+	newer.Provenance.InstructionID = newer.InstructionID
 	newer.Norms = []form.NormReference{{Path: "AGENTS.md", BlobID: "norm-old"}}
 	newer.JudgmentResult.Judgment = form.Fail
 	newer.Findings = []form.Finding{{ID: "F1", Blocking: true, Kind: form.NeedsDecision, Scenario: "The output contract needs a decision"}}
 	current := judgment
 	current.InstructionID, current.Runner = "check-current", "current-review"
+	current.Provenance.InstructionID, current.Provenance.Runner = current.InstructionID, current.Runner
 	p.Stages[0].Checks = append(p.Stages[0].Checks, plan.Check{Aspect: "contract", Runner: "current-review", Required: true, CompletionConditionIDs: []string{"C1"}, Target: "returned tree"})
 	input := loadInput(t, nil, &ledger.PlanVersion{Plan: p, Origin: plan.InitialProposal},
 		&ledger.StageRun{ID: recordID(3), StageID: "implement", PlanVersion: 1, State: ledger.StageJudgmentWait, StopReason: "Checks are pending", NextActor: "judge"},
@@ -205,9 +208,23 @@ func coverageInput(t *testing.T) Input {
 func TestGenerateCoverage(t *testing.T) {
 	html := render(t, coverageInput(t))
 	coverage := sectionHTML(t, html, "coverage")
-	for _, want := range []string{"Public output", "Guide examples", "Compare the output", "C2: The guide is updated", "No current check recorded for this condition."} {
-		if !strings.Contains(coverage, want) {
-			t.Errorf("missing %q in coverage", want)
+	rows := regexp.MustCompile(`(?s)<tr><td>.*?</tr>`).FindAllString(coverage, -1)
+	want := [][]string{
+		{"C1: Existing output is preserved", "Tree current", "Compare the output<p><a href=\"#" + anchor("record", recordID(9)) + "\">contract</a></p>", "Public output", "Guide examples", "PASS<br>Valid", "Unreviewed"},
+		{"C2: The guide is updated", "", "", "", "No current check recorded for this condition.", "NOT ASSESSED<br>", "Unreviewed"},
+	}
+	if len(rows) != len(want) {
+		t.Fatalf("got %d coverage rows, want %d", len(rows), len(want))
+	}
+	for i, row := range rows {
+		cells := regexp.MustCompile(`(?s)<td>(.*?)</td>`).FindAllStringSubmatch(row, -1)
+		if len(cells) != len(want[i]) {
+			t.Fatalf("coverage row %d has %d cells, want %d", i, len(cells), len(want[i]))
+		}
+		for j, cell := range cells {
+			if cell[1] != want[i][j] {
+				t.Errorf("coverage row %d cell %d = %q, want %q", i, j, cell[1], want[i][j])
+			}
 		}
 	}
 	if strings.Contains(coverage, "Invalid for current comparison") {
@@ -247,10 +264,52 @@ func TestGenerateBlockingFinding(t *testing.T) {
 func TestGenerateDecisionDependencies(t *testing.T) {
 	html := render(t, coverageInput(t))
 	body := articleContaining(t, sectionHTML(t, html, "current"), "<h3>Decision D1</h3>")
-	for _, want := range []string{"Affected change: Preserve public output", "Check to reassess on withdrawal", "<dt>Withdrawal requirements</dt><dd>not recorded</dd>"} {
+	for _, want := range []string{"Affected change: Preserve public output", "Check to reassess on withdrawal", "While the contract applies"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)
 		}
+	}
+	if strings.Contains(body, "Withdrawal requirements") || strings.Contains(body, "not recorded") {
+		t.Error("unrecorded withdrawal requirements were displayed")
+	}
+}
+
+func TestGenerateQuestionDecisionConditions(t *testing.T) {
+	decision := form.Decision{ID: "D1", Content: "Keep the current format", Validity: "While the contract applies", Provisional: true,
+		Supersedes: []form.Reference{}, DependsOn: []form.Reference{}, Conditions: []string{"The owner accepts the cost", "The service remains available"}, Decider: "worker",
+		RejectedAlternatives: []form.RejectedAlternative{}, Evidence: []form.Reference{}}
+	unrelated := decision
+	unrelated.ID, unrelated.Content, unrelated.Validity = "D2", "Keep the unrelated service", "While the unrelated contract applies"
+	unrelated.Conditions = []string{"The unrelated owner accepts the cost"}
+	for _, target := range []form.ApprovalTarget{
+		{Kind: form.ApprovalTree, Tree: "current"},
+		{Kind: form.ApprovalDecision, DecisionID: "D1"},
+	} {
+		t.Run(string(target.Kind), func(t *testing.T) {
+			q := question("review", "Approve the current result?")
+			q.ApprovalTarget = target
+			input := loadInput(t, nil, &ledger.Decision{Decision: decision}, &ledger.Decision{Decision: unrelated},
+				&ledger.Artifact{Before: form.TargetVersion{Kind: form.TargetTree, Tree: "before"}, After: form.TargetVersion{Kind: form.TargetTree, Tree: "current"},
+					ChangeKind: "Preserve public output", CompletionConditionIDs: []string{}, Decisions: []form.Reference{{RecordID: recordID(2)}}},
+				&ledger.Question{Question: q})
+			html := render(t, input)
+			body := articleContaining(t, sectionHTML(t, html, "attention"), q.Text)
+			for _, want := range []string{
+				"<dt>Decision D1 validity</dt><dd>" + decision.Validity + "</dd>",
+				"<dt>Decision D1 conditions</dt><dd>" + strings.Join(decision.Conditions, "\n") + "</dd>",
+				`href="#` + anchor("record", recordID(2)) + `"`,
+			} {
+				if !strings.Contains(body, want) {
+					t.Errorf("question is missing %q", want)
+				}
+			}
+			if strings.Contains(body, unrelated.Validity) || strings.Contains(body, unrelated.Conditions[0]) {
+				t.Error("question includes conditions from an unrelated decision")
+			}
+			if strings.Count(html, decision.Content) != 1 {
+				t.Error("related decision does not have one body")
+			}
+		})
 	}
 }
 
@@ -318,8 +377,23 @@ func TestStructureMermaidDependencyDirection(t *testing.T) {
 
 func TestStructureMermaidEscaping(t *testing.T) {
 	structure := Structure{Modules: []Module{{ID: "unsafe", Name: `UI"] --> injected["`}}}
-	if mermaid := StructureMermaid(structure); strings.Contains(mermaid, `injected[`) || !strings.HasPrefix(mermaid, "flowchart LR") {
+	mermaid := StructureMermaid(structure)
+	if strings.Contains(mermaid, `injected[`) || !strings.HasPrefix(mermaid, "flowchart LR") {
 		t.Fatalf("unsafe module name was not encoded: %s", mermaid)
+	}
+	node := regexp.MustCompile(`(?m)^  m0\["([^"]+)"\]$`).FindStringSubmatch(mermaid)
+	if len(node) != 2 {
+		t.Fatalf("diagram is missing the encoded module: %s", mermaid)
+	}
+	label := regexp.MustCompile(`#([0-9]+);`).ReplaceAllStringFunc(node[1], func(entity string) string {
+		value, err := strconv.Atoi(entity[1 : len(entity)-1])
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(rune(value))
+	})
+	if label != structure.Modules[0].Name {
+		t.Fatalf("module label = %q, want %q", label, structure.Modules[0].Name)
 	}
 }
 

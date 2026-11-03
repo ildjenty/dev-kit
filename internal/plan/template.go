@@ -164,10 +164,6 @@ func Deviations(template PlanTemplate, p Plan) []Deviation {
 			ids = append(ids, stage.ID)
 		}
 	}
-	expected := Plan{}
-	if len(ids) > 0 {
-		expected, _ = p.SelectStages(template, ids)
-	}
 	result := make([]Deviation, 0)
 	// Changing a retained start stage is a deviation, except when omitting leading stages or inserting optional stages.
 	start := template.StartStage
@@ -186,7 +182,7 @@ func Deviations(template PlanTemplate, p Plan) []Deviation {
 		result = append(result, Deviation{Kind: ChangedStartStage, StageID: p.StartStage})
 	}
 	for _, stage := range p.Stages {
-		original, ok := expected.Stage(stage.ID)
+		original, ok := known[stage.ID]
 		if !ok {
 			result = append(result, Deviation{Kind: AddedStage, StageID: stage.ID})
 			continue

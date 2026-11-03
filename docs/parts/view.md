@@ -28,7 +28,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 ##### 現在の到達点と有効な変更
 
-有効な変更と、撤回する場合に満たす必要がある条件を含む暫定判断の表示は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
+有効な変更と、決定に付いた有効条件・適用条件をそのまま添えた暫定判断の表示は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
 
 ##### 経緯
 

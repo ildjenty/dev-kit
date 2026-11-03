@@ -131,10 +131,17 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 	answers := state.AnsweredQuestions()
 	previous, answered := answers[question.ID]
 	if answered {
-		if request.Supersedes == "" {
-			if previous.Answer.Original == original && previous.Answer.Interpretation == request.Interpretation && previous.Answer.Text == request.Text && reflect.DeepEqual(previous.Answer.Target, question.ApprovalTarget) {
-				return response(state), nil
+		if request.Supersedes == previous.Answer.Supersedes && previous.Answer.Original == original && previous.Answer.Interpretation == request.Interpretation && previous.Answer.Text == request.Text && reflect.DeepEqual(previous.Answer.Target, question.ApprovalTarget) {
+			if err := e.recordDecisionAnswer(previous.Answer, previous.RecordID); err != nil {
+				return Result{}, err
 			}
+			state, err = e.load()
+			if err != nil {
+				return Result{}, err
+			}
+			return response(state), nil
+		}
+		if request.Supersedes == "" {
 			return Result{}, fmt.Errorf("answer correction must reference %s", previous.RecordID)
 		}
 		if request.Supersedes != previous.RecordID {
@@ -161,17 +168,8 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 	if err != nil {
 		return Result{}, err
 	}
-	if question.ApprovalTarget.Kind == form.ApprovalDecision && request.Interpretation != ledger.AnswerText {
-		status := ledger.DecisionDeferred
-		switch request.Interpretation {
-		case ledger.AnswerApproved:
-			status = ledger.DecisionApproved
-		case ledger.AnswerRejected:
-			status = ledger.DecisionRejected
-		}
-		if _, err = e.append(&ledger.StateChange{DecisionID: question.ApprovalTarget.DecisionID, DecisionStatus: status, AnswerID: id}); err != nil {
-			return Result{}, err
-		}
+	if err = e.recordDecisionAnswer(answer, id); err != nil {
+		return Result{}, err
 	}
 	if state.WorkStatus() != ledger.WorkActive {
 		state, err = e.load()
@@ -263,4 +261,28 @@ func (e *Engine) prompt(name string) (string, time.Time, error) {
 	}
 	data, err := os.ReadFile(filepath.Join(e.workRoot(), "prompts", selected))
 	return string(data), at, err
+}
+
+func (e *Engine) recordDecisionAnswer(answer ledger.Answer, id string) error {
+	if answer.Target.Kind != form.ApprovalDecision || answer.Interpretation == ledger.AnswerText {
+		return nil
+	}
+	records, err := e.records()
+	if err != nil {
+		return err
+	}
+	for _, record := range records {
+		if change, ok := record.Payload.(*ledger.StateChange); ok && change.AnswerID == id {
+			return nil
+		}
+	}
+	status := ledger.DecisionDeferred
+	switch answer.Interpretation {
+	case ledger.AnswerApproved:
+		status = ledger.DecisionApproved
+	case ledger.AnswerRejected:
+		status = ledger.DecisionRejected
+	}
+	_, err = e.append(&ledger.StateChange{DecisionID: answer.Target.DecisionID, DecisionStatus: status, AnswerID: id})
+	return err
 }

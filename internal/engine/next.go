@@ -95,14 +95,7 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		} else if recovered {
 			continue
 		}
-		if run, ok := state.LatestStageRun(); ok && run.State != ledger.StageInvalidated {
-			if recovered, r, err := e.recoverCommit(ctx, state, run); err != nil || recovered {
-				if err != nil || r.Instruction != nil || r.Paused {
-					return r, err
-				}
-				continue
-			}
-		}
+
 		if questions := e.currentQuestions(state); len(questions) > 0 {
 			q := questions[0]
 			if q.ApprovalTarget.Kind == form.ApprovalTree {
@@ -133,6 +126,14 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		}
 		if changed {
 			continue
+		}
+		if run, ok := state.LatestStageRun(); ok && run.State != ledger.StageInvalidated {
+			if recovered, r, err := e.recoverCommit(ctx, state, run); err != nil || recovered {
+				if err != nil || r.Instruction != nil || r.Paused {
+					return r, err
+				}
+				continue
+			}
 		}
 		head, err := e.workspace.Head(ctx)
 		if err != nil {
@@ -177,7 +178,7 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 					return e.publishInstruction(i, false, data, "")
 				}
 			}
-			return result, errors.New("initial planning instruction is missing")
+			return result, errors.New("initial planning instruction is missing; retry devkit start with the original task and template")
 		}
 		latest := proposals[len(proposals)-1]
 		for latest.Withdrawn && latest.Origin == plan.HumanProposal && len(proposals) > 1 {
@@ -328,19 +329,27 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 			}
 			if stage.Assignee == plan.Human {
 				target := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: round.StartTarget.Tree}
-				if answer, ok := state.ResolveAnswer(target); ok {
-					progress := form.Progress{InstructionID: "human-" + round.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{answer.Answer.Text}}
+				if answer, ok := humanStageAnswer(state, run, round); ok {
+					progress := form.Progress{InstructionID: "human-" + round.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{answer.Text}}
 					if err = e.recordSubmission(ctx, state, run, round, progress); err != nil {
 						return result, err
 					}
 					continue
 				}
 				q := e.question(target, "human_stage", "Provide the output for human stage "+stage.ID+".", stage.ID)
+				q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
 				q, err = e.saveQuestion(state, q, "")
 				if err != nil {
 					return result, err
 				}
 				return e.issueQuestion(state, q)
+			}
+			if run.State == ledger.StageExternalWait {
+				update := *run
+				update.State, update.NextActor, update.StopReason = ledger.StageWorking, "worker", ""
+				if _, err = e.append(&update); err != nil {
+					return result, err
+				}
 			}
 			return e.workInstruction(ctx, state, p, stage, round)
 		}
@@ -558,7 +567,7 @@ func (e *Engine) recordSubmission(ctx context.Context, state *ledger.State, run 
 			return err
 		}
 	}
-	if run.State != ledger.StageWorking {
+	if run.State != ledger.StageWorking && !(run.State == ledger.StageAnswerWait && strings.HasPrefix(progress.InstructionID, "human-")) {
 		return nil
 	}
 	update := *run
@@ -598,7 +607,7 @@ func (e *Engine) recordSubmission(ctx context.Context, state *ledger.State, run 
 
 func (e *Engine) recoverSubmission(ctx context.Context, state *ledger.State) (bool, error) {
 	run, ok := state.LatestStageRun()
-	if !ok || run.State != ledger.StageWorking {
+	if !ok || run.State != ledger.StageWorking && run.State != ledger.StageAnswerWait {
 		return false, nil
 	}
 	rounds := state.Rounds(run.ID)
@@ -615,6 +624,9 @@ func (e *Engine) recoverSubmission(ctx context.Context, state *ledger.State) (bo
 	}
 	for _, record := range records {
 		if progress, ok := record.Payload.(*ledger.Progress); ok && progress.RoundID == round.ID {
+			if run.State == ledger.StageAnswerWait && !strings.HasPrefix(progress.InstructionID, "human-") {
+				continue
+			}
 			return true, e.recordSubmission(ctx, state, run, round, progress.Progress)
 		}
 	}
@@ -775,6 +787,10 @@ func (e *Engine) recoverCommit(ctx context.Context, state *ledger.State, run *le
 		return true, Result{}, nil
 	}
 	stage, _ := p.Stage(run.StageID)
+	if round.Decision == nil {
+		r, err := e.judgeRound(ctx, state, p, stage, run, round)
+		return true, r, err
+	}
 	r, err := e.finishCommit(ctx, state, p, stage, run, round)
 	return true, r, err
 }
@@ -842,7 +858,11 @@ func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.P
 	if err = e.active(); err != nil {
 		return Result{}, err
 	}
-	summary := check.Aggregate(state.LatestJudgments(*round.ReturnedTarget, round.Norms))
+	judgments, err := e.roundJudgments(round)
+	if err != nil {
+		return Result{}, err
+	}
+	summary := check.Aggregate(judgments)
 	records, err := e.records()
 	if err != nil {
 		return Result{}, err

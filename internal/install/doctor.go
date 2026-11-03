@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/kit"
@@ -211,9 +212,15 @@ func (r *Report) checkSession(sessionID string) {
 		data, err := os.ReadFile(filepath.Join(root, entry.Name()))
 		if err == nil {
 			var observation struct {
-				SessionID string `json:"session_id"`
+				Host       string    `json:"host"`
+				SessionID  string    `json:"session_id"`
+				ObservedAt time.Time `json:"observed_at"`
+				WorkID     string    `json:"work_id,omitempty"`
 			}
 			err = json.Unmarshal(data, &observation)
+			if err == nil && (observation.Host == "" || observation.ObservedAt.IsZero()) {
+				err = fmt.Errorf("session observation %s requires host and observed_at", entry.Name())
+			}
 			if err == nil && observation.SessionID != sessionID {
 				err = fmt.Errorf("session observation %s does not identify session %q", entry.Name(), sessionID)
 			}

@@ -158,6 +158,16 @@ func Generate(input Input) (string, error) {
 		entry.Links = append(entry.Links, relatedChanges(input.Records, question.ApprovalTarget, decisionRecords)...)
 		entry.Fields = append(entry.Fields, field{"Target version", approvalLabel(question.ApprovalTarget)})
 		entry.Links = append(entry.Links, questionChecks(input, question.ApprovalTarget)...)
+		for _, decision := range input.Decisions {
+			if slices.ContainsFunc(entry.Links, func(ref link) bool {
+				return ref.Href == "#"+anchor("record", decision.RecordID)
+			}) {
+				entry.Fields = append(entry.Fields, field{"Decision " + decision.Decision.ID + " validity", decision.Decision.Validity})
+				if len(decision.Decision.Conditions) != 0 {
+					entry.Fields = append(entry.Fields, field{"Decision " + decision.Decision.ID + " conditions", strings.Join(decision.Decision.Conditions, "\n")})
+				}
+			}
+		}
 		if answer, ok := answers[question.ID]; ok {
 			entry.Fields = append(entry.Fields, field{"Approval state", string(answer.Answer.Interpretation)})
 			if answer.Answer.Interpretation == ledger.AnswerApproved {
@@ -247,7 +257,6 @@ func Generate(input Input) (string, error) {
 				entry.Tags = append(entry.Tags, "Unreviewed")
 			}
 			if value.Provisional && resolved.Active {
-				entry.Fields = append(entry.Fields, field{"Withdrawal requirements", "not recorded"})
 				entry.Links = append(entry.Links, dependentChecks(input, record.ID)...)
 				if resolved.Status != ledger.DecisionApproved {
 					provisional = append(provisional, item{Title: "Review provisional decision at the next gate or PR review", Links: []link{recordLink(record.ID, value.ID)}})
@@ -598,7 +607,7 @@ func structureDiagrams(input Input) ([]diagram, []diagram) {
 	seen := make(map[string]string)
 	if input.Structure != nil {
 		current := diagram{ID: anchor("structure", input.Structure.Version), Title: "Current dependency structure", Version: input.Structure.Version,
-			Modules: input.Structure.Modules, Mermaid: StructureMermaid(*input.Structure)}
+			Modules: input.Structure.Modules, Mermaid: structureMermaid(*input.Structure)}
 		seen[input.Structure.Version] = current.ID
 		for _, revision := range input.StructureHistory {
 			if revision.Structure == nil || revision.Structure.Version != input.Structure.Version {
@@ -620,7 +629,7 @@ func structureDiagrams(input Input) ([]diagram, []diagram) {
 				entry.ID = anchor("structure", entry.Version)
 				seen[entry.Version] = entry.ID
 				entry.Modules = revision.Structure.Modules
-				entry.Mermaid = StructureMermaid(*revision.Structure)
+				entry.Mermaid = structureMermaid(*revision.Structure)
 			}
 		}
 		history = append(history, entry)

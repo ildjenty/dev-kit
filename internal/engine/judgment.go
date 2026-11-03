@@ -341,9 +341,10 @@ func (e *Engine) acceptPending(ctx context.Context, state *ledger.State) (bool, 
 	return false, nil
 }
 func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round) (Result, error) {
-	if run.State == ledger.StageAnswerWait || run.State == ledger.StageApprovalWait {
+	if run.State == ledger.StageAnswerWait || run.State == ledger.StageApprovalWait || run.State == ledger.StageExternalWait {
 		update := *run
 		update.State = ledger.StageJudgmentWait
+		update.NextActor = "judge"
 		if _, err := e.append(&update); err != nil {
 			return Result{}, err
 		}
@@ -368,7 +369,10 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 		if err != nil {
 			return Result{}, err
 		}
-		judgments := state.LatestJudgments(target, round.Norms)
+		judgments, err := e.roundJudgments(round)
+		if err != nil {
+			return Result{}, err
+		}
 		var existing *check.Judgment
 		for _, j := range judgments {
 			if j.Aspect == item.Aspect && j.Runner == string(item.Runner) {
@@ -377,6 +381,9 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 			}
 		}
 		if existing != nil {
+			if commandTargetChanged(*existing) {
+				return e.fixRound(ctx, state, p, stage, run, round, "A command changed its target.")
+			}
 			if item.Required && item.Runner.IsCommand() && existing.Judgment == check.Fail {
 				return e.fixRound(ctx, state, p, stage, run, round, "A required command check failed.")
 			}
@@ -407,6 +414,9 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 			if _, err = e.append(&ledger.Judgment{Judgment: judgment, RoundID: round.ID}); err != nil {
 				return Result{}, err
 			}
+			if commandTargetChanged(judgment) {
+				return e.fixRound(ctx, state, p, stage, run, round, "A command check changed its target.")
+			}
 			if judgment.Judgment == check.Fail && item.Required {
 				return e.fixRound(ctx, state, p, stage, run, round, "A required command check failed.")
 			}
@@ -420,7 +430,7 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 			if _, err = e.append(&ledger.Judgment{Judgment: judgment, RoundID: round.ID}); err != nil {
 				return Result{}, err
 			}
-			if judgment.Command != nil && judgment.Judgment == check.Fail {
+			if commandTargetChanged(judgment) {
 				return e.fixRound(ctx, state, p, stage, run, round, "A judgment command changed its target.")
 			}
 			continue
@@ -434,7 +444,10 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 	if err != nil {
 		return Result{}, err
 	}
-	judgments := state.LatestJudgments(target, round.Norms)
+	judgments, err := e.roundJudgments(round)
+	if err != nil {
+		return Result{}, err
+	}
 	targets := map[string]form.TargetVersion{}
 	for _, item := range stage.Checks {
 		targets[item.Target] = target
@@ -461,19 +474,10 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 		}
 	}
 	approvalTarget := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}
-	_, approved := state.ResolveApproval(approvalTarget)
-	if approved {
+	if gateApproved(state, run, round, approvalTarget) {
 		categories = nil
 	}
-	humanAnswered := false
-	for _, q := range state.Questions() {
-		if q.StopCategory == "human_stage" && q.StoppedStage == stage.ID {
-			_, humanAnswered = state.AnsweredQuestions()[q.ID]
-			if humanAnswered {
-				break
-			}
-		}
-	}
+	_, humanAnswered := humanStageAnswer(state, run, round)
 	termination := form.TerminationCompleted
 	records, err := e.records()
 	if err != nil {
@@ -546,7 +550,10 @@ func (e *Engine) progress(state *ledger.State, runID string, current *ledger.Rou
 			break
 		}
 		if round.ReturnedTarget != nil {
-			js := state.LatestJudgments(*round.ReturnedTarget, round.Norms)
+			js, err := e.roundJudgments(round)
+			if err != nil {
+				return false, 0, err
+			}
 			before := check.Aggregate(previous)
 			after := check.Aggregate(js)
 			if summaryProgress(before, after) {
@@ -610,8 +617,8 @@ func (e *Engine) matches(ctx context.Context, tree string) (bool, error) {
 	actual, err := e.workspace.SnapshotTree(ctx)
 	return actual == tree, err
 }
-func changedCommand(request check.Request, output string) check.Judgment {
-	return check.Judgment{JudgmentResult: form.JudgmentResult{InstructionID: request.InstructionID, Aspect: request.Aspect.ID, TargetVersion: request.TargetVersion, Norms: normRefs(request.Norms), CompletionConditionIDs: []string{}, Judgment: check.Fail, Findings: []form.Finding{{ID: request.InstructionID + ":target-changed", Blocking: true, Kind: form.AutoFixable, Scenario: "The command changed its target, or the working tree did not match before execution.\n" + output}}, CheckedScope: []string{}, UncheckedScope: []string{request.TargetPath}, Method: "Working tree comparison before and after command execution", Environment: "work checkout"}, Runner: request.Runner, Provenance: check.Provenance{Source: check.JudgeCommand, InstructionID: request.InstructionID, Runner: request.Runner}, Command: &check.CommandResult{ExitCode: 1, Output: output}}
+func changedCommand(request check.Request, output string, result *check.CommandResult) check.Judgment {
+	return check.Judgment{JudgmentResult: form.JudgmentResult{InstructionID: request.InstructionID, Aspect: request.Aspect.ID, TargetVersion: request.TargetVersion, Norms: normRefs(request.Norms), CompletionConditionIDs: []string{}, Judgment: check.Fail, Findings: []form.Finding{{ID: request.InstructionID + ":target-changed", Blocking: true, Kind: form.AutoFixable, Scenario: "The command changed its target, or the working tree did not match before execution.\n" + output}}, CheckedScope: []string{}, UncheckedScope: []string{request.TargetPath}, Method: "Working tree comparison before and after command execution", Environment: "work checkout"}, Runner: request.Runner, Provenance: check.Provenance{Source: check.JudgeCommand, InstructionID: request.InstructionID, Runner: request.Runner}, Command: result}
 }
 func (e *Engine) runCheck(ctx context.Context, request check.Request, command config.Command, stage, tree string) (check.Judgment, error) {
 	match, err := e.matches(ctx, tree)
@@ -619,7 +626,7 @@ func (e *Engine) runCheck(ctx context.Context, request check.Request, command co
 		return check.Judgment{}, err
 	}
 	if !match {
-		return changedCommand(request, "The target differed before command execution."), nil
+		return changedCommand(request, "The target differed before command execution.", nil), nil
 	}
 	result, _, err := e.runCommand(ctx, command, stage, nil)
 	if err != nil {
@@ -630,7 +637,7 @@ func (e *Engine) runCheck(ctx context.Context, request check.Request, command co
 		return check.Judgment{}, err
 	}
 	if !match {
-		return changedCommand(request, result.Output), nil
+		return changedCommand(request, result.Output, &result), nil
 	}
 	return check.FromCommand(request, result)
 }
@@ -641,7 +648,7 @@ func (e *Engine) runJudge(ctx context.Context, data instructionData, command con
 		return check.Judgment{}, err
 	}
 	if !match {
-		return changedCommand(request, "The target differed before command execution."), nil
+		return changedCommand(request, "The target differed before command execution.", nil), nil
 	}
 	input, err := json.Marshal(request)
 	if err != nil {
@@ -656,7 +663,7 @@ func (e *Engine) runJudge(ctx context.Context, data instructionData, command con
 		return check.Judgment{}, err
 	}
 	if !match {
-		return changedCommand(request, result.Output), nil
+		return changedCommand(request, result.Output, &result), nil
 	}
 	if result.ExitCode != 0 || result.TimedOut {
 		return unassessed(request, result.Output), nil
@@ -723,7 +730,11 @@ func (e *Engine) fixRound(ctx context.Context, state *ledger.State, p plan.Plan,
 	if err != nil {
 		return Result{}, err
 	}
-	summary := check.Aggregate(state.LatestJudgments(*round.ReturnedTarget, round.Norms))
+	judgments, err := e.roundJudgments(round)
+	if err != nil {
+		return Result{}, err
+	}
+	summary := check.Aggregate(judgments)
 	made, noProgress, err := e.progress(state, run.ID, round, summary)
 	if err != nil {
 		return Result{}, err
@@ -777,4 +788,44 @@ func gateApproved(state *ledger.State, run *ledger.StageRun, round *ledger.Round
 	}
 	answer, ok := state.AnsweredQuestions()[gate.ID]
 	return ok && answer.Answer.Interpretation == ledger.AnswerApproved && answer.Answer.Target == target
+}
+
+func commandTargetChanged(judgment check.Judgment) bool {
+	return slices.ContainsFunc(judgment.Findings, func(f form.Finding) bool { return f.ID == judgment.InstructionID+":target-changed" })
+}
+
+func (e *Engine) roundJudgments(round *ledger.Round) ([]check.Judgment, error) {
+	records, err := e.records()
+	if err != nil {
+		return nil, err
+	}
+	judgments := []check.Judgment{}
+	for _, record := range records {
+		j, ok := record.Payload.(*ledger.Judgment)
+		if !ok || j.RoundID != round.ID || j.TargetVersion != *round.ReturnedTarget {
+			continue
+		}
+		index := slices.IndexFunc(judgments, func(old check.Judgment) bool { return old.Aspect == j.Aspect && old.Runner == j.Runner })
+		if index < 0 {
+			judgments = append(judgments, j.Judgment)
+		} else {
+			judgments[index] = j.Judgment
+		}
+	}
+	return slices.DeleteFunc(judgments, func(j check.Judgment) bool { return !j.ValidFor(*round.ReturnedTarget, round.Norms) }), nil
+}
+
+func humanStageAnswer(state *ledger.State, run *ledger.StageRun, round *ledger.Round) (ledger.Answer, bool) {
+	var question *form.Question
+	for _, q := range state.Questions() {
+		if q.StopCategory == "human_stage" && q.StoppedStage == run.StageID && slices.Contains(q.Evidence, form.Reference{RecordID: run.ID}) && slices.Contains(q.Evidence, form.Reference{RecordID: round.ID}) {
+			copy := q
+			question = &copy
+		}
+	}
+	if question == nil {
+		return ledger.Answer{}, false
+	}
+	answer, ok := state.AnsweredQuestions()[question.ID]
+	return answer.Answer, ok && answer.Answer.Target == question.ApprovalTarget && answer.Answer.Interpretation != ledger.AnswerDeferred
 }

@@ -154,7 +154,9 @@ func inspect(ctx context.Context, e *engine.Engine, name string, f *flag.FlagSet
 		return err
 	}
 	if status.Warning != "" {
-		fmt.Fprintln(output, "Warning:", status.Warning)
+		if _, err := fmt.Fprintln(output, "Warning:", status.Warning); err != nil {
+			return err
+		}
 	}
 	_, err = fmt.Fprintln(output, filepath.Join(root, "view.html"))
 	return err

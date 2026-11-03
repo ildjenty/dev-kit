@@ -123,6 +123,8 @@ func TestAcceptResult(t *testing.T) {
 		{"PASS with blocking correction", Pass, []Finding{{ID: "F1", Blocking: true, Kind: AutoFixable, Scenario: "required correction"}}, true},
 		{"PASS with blocking decision", Pass, []Finding{{ID: "F1", Blocking: true, Kind: NeedsDecision, Scenario: "required decision"}}, true},
 		{"duplicate finding IDs", Pass, []Finding{result.Findings[0], result.Findings[0]}, true},
+		{"FAIL without findings", Fail, []Finding{}, true},
+		{"FAIL with reference information only", Fail, result.Findings, true},
 		{"FAIL with blocking correction", Fail, []Finding{{ID: "F1", Blocking: true, Kind: AutoFixable, Scenario: "required correction"}}, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -147,7 +149,7 @@ func TestAcceptResult(t *testing.T) {
 	}
 }
 
-func TestAggregateExemptionAndCommand(t *testing.T) {
+func TestFromCommand(t *testing.T) {
 	request := judgmentRequest(t)
 	request.Runner, request.Aspect.ID = "command:test", "command:test"
 	var judgments []Judgment
@@ -161,11 +163,27 @@ func TestAggregateExemptionAndCommand(t *testing.T) {
 	if judgments[0].Judgment != Pass || judgments[1].Judgment != Fail || judgments[2].Judgment != NotAssessed {
 		t.Fatalf("command judgments: %+v", judgments)
 	}
+}
+
+func TestAggregate(t *testing.T) {
+	judgments := []Judgment{
+		{JudgmentResult: form.JudgmentResult{Judgment: Pass}},
+		{JudgmentResult: form.JudgmentResult{Judgment: Fail}},
+		{JudgmentResult: form.JudgmentResult{Judgment: NotAssessed}},
+	}
 	if Aggregate(judgments).Judgment != Fail || Aggregate([]Judgment{judgments[0], judgments[2]}).Judgment != NotAssessed || Aggregate(nil).Judgment != Pass {
 		t.Fatal("unexpected aggregation priority")
 	}
-	judgment := judgments[1]
-	judgment.Findings[0].Exemption = &form.Exemption{Claim: "outside the agreed scope", Evidence: []form.Reference{{RecordID: "agreement"}}}
+}
+
+func TestApplyExemptions(t *testing.T) {
+	judgment := Judgment{JudgmentResult: form.JudgmentResult{
+		Judgment: Fail,
+		Findings: []Finding{{
+			ID: "F1", Blocking: true, Kind: AutoFixable, Scenario: "required correction",
+			Exemption: &form.Exemption{Claim: "outside the agreed scope", Evidence: []form.Reference{{RecordID: "agreement"}}},
+		}},
+	}}
 	decision := ExemptionDecision{FindingID: judgment.Findings[0].ID, ExcludedRequirements: []string{"out-of-scope requirement"}, Reason: "comparison against the agreed scope"}
 	partial, err := ApplyExemptions(judgment, []ExemptionDecision{decision})
 	if err != nil || partial.Judgment != Fail {
@@ -176,8 +194,16 @@ func TestAggregateExemptionAndCommand(t *testing.T) {
 	if err != nil || exempted.Judgment != Pass || exempted.Findings[0].Blocking || !judgment.Findings[0].Blocking {
 		t.Fatalf("invalid exemption result or original value: %+v, %v", exempted, err)
 	}
+}
+
+func TestCheckRequired(t *testing.T) {
+	request := judgmentRequest(t)
+	judgment := Judgment{JudgmentResult: form.JudgmentResult{
+		Aspect: request.Aspect.ID, TargetVersion: request.TargetVersion, Norms: request.normReferences(),
+		CompletionConditionIDs: []string{"C1"}, Judgment: Pass,
+	}, Runner: request.Runner}
 	required := []Requirement{{Aspect: request.Aspect.ID, Runner: request.Runner, TargetVersion: request.TargetVersion, Norms: request.normReferences(), CompletionConditionIDs: []string{"C1", "C2"}}}
-	if CheckRequired(required, []Judgment{judgments[0]})[0].Judgment != NotAssessed {
+	if CheckRequired(required, []Judgment{judgment})[0].Judgment != NotAssessed {
 		t.Fatal("marked an unchecked completion condition PASS")
 	}
 	if CheckRequired(required, nil)[0].Judgment != NotAssessed {

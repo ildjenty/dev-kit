@@ -128,42 +128,7 @@
       "$ref": "urn:devkit:form:question"
     },
     "external_operation_target": {
-      "type": "object",
-      "properties": {
-        "operation_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "kind": {
-          "type": "string",
-          "minLength": 1
-        },
-        "target": {
-          "type": "string",
-          "minLength": 1
-        },
-        "input_hash": {
-          "type": "string",
-          "minLength": 1
-        },
-        "definition_hash": {
-          "type": "string",
-          "minLength": 1
-        },
-        "executable_hash": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "required": [
-        "operation_id",
-        "kind",
-        "target",
-        "input_hash",
-        "definition_hash",
-        "executable_hash"
-      ],
-      "additionalProperties": false
+      "$ref": "urn:devkit:form:question#/$defs/external_operation_target"
     }
   }
 }

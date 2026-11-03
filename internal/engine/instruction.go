@@ -614,6 +614,22 @@ func (e *Engine) saveQuestion(state *ledger.State, q form.Question, supersedes s
 	return q, err
 }
 func (e *Engine) issueQuestion(state *ledger.State, q form.Question) (Result, error) {
+	if run, ok := state.LatestStageRun(); ok && run.StageID == q.StoppedStage && run.State != ledger.StageCompleted && run.State != ledger.StageInvalidated && state.WorkStatus() == ledger.WorkActive {
+		waiting := ledger.StageState("")
+		switch q.StopCategory {
+		case "human_stage":
+			waiting = ledger.StageAnswerWait
+		case "external_operation", "external_unknown":
+			waiting = ledger.StageExternalWait
+		}
+		if waiting != "" && (waiting != run.State || run.NextActor != "human" || run.StopReason != q.StopReason) {
+			update := *run
+			update.State, update.NextActor, update.StopReason = waiting, "human", q.StopReason
+			if _, err := e.append(&update); err != nil {
+				return Result{}, err
+			}
+		}
+	}
 	meta, fresh, err := e.issuance(form.InstructionQuestion, q.ID, nil, 0, q.ID)
 	if err != nil {
 		return Result{}, err

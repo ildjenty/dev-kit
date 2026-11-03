@@ -13,9 +13,9 @@ bin_dir=${1:-"$HOME/.local/bin"}
 mkdir -p -- "$bin_dir"
 bin_dir=$(CDPATH= cd -- "$bin_dir" && pwd -P)
 on_path=false
-saved_ifs=$IFS
-IFS=:
-for entry in $PATH; do
+remaining_path=$PATH
+while :; do
+    entry=${remaining_path%%:*}
     [ -n "$entry" ] || entry=.
     if [ -d "$entry" ]; then
         entry=$(CDPATH= cd -- "$entry" && pwd -P)
@@ -24,8 +24,11 @@ for entry in $PATH; do
             break
         fi
     fi
+    case $remaining_path in
+        *:*) remaining_path=${remaining_path#*:} ;;
+        *) break ;;
+    esac
 done
-IFS=$saved_ifs
 if [ "$on_path" != true ]; then
     printf 'Add %s to PATH, then run this script again.\n' "$bin_dir" >&2
     exit 1

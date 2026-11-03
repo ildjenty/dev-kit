@@ -24,7 +24,7 @@ func git(t *testing.T, root string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("git", args...)
 	cmd.Dir = root
-	cmd.Env = append(os.Environ(), "GIT_CONFIG_NOSYSTEM=1")
+	cmd.Env = os.Environ()
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v: %s", args, err, out)
@@ -43,6 +43,18 @@ func write(t *testing.T, root, name, content string) {
 }
 func fixture(t *testing.T) (*Engine, context.Context) {
 	t.Helper()
+	for _, variable := range os.Environ() {
+		name, _, _ := strings.Cut(variable, "=")
+		if strings.HasPrefix(name, "GIT_") {
+			t.Setenv(name, "")
+			if err := os.Unsetenv(name); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_TEMPLATE_DIR", t.TempDir())
 	ctx := context.Background()
 	root := t.TempDir()
 	t.Cleanup(func() {
@@ -294,6 +306,9 @@ func TestCommandTargetMutation(t *testing.T) {
 	content, err := os.ReadFile(filepath.Join(e.Root(), "README.md"))
 	if err != nil || string(content) != "Changed by command\n" {
 		t.Fatalf("command did not change the target: %q, %v", content, err)
+	}
+	if judgment.Command == nil || judgment.Command.ExitCode != 0 || judgment.Command.TimedOut {
+		t.Fatalf("actual command result was not preserved: %+v", judgment.Command)
 	}
 	if judgment.Judgment != check.Fail || !strings.Contains(judgment.Findings[0].Scenario, "changed its target") {
 		t.Fatalf("mutation was accepted: %+v", judgment)

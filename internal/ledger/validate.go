@@ -24,6 +24,24 @@ func NewValidator(sources map[string][]byte) (*Validator, error) {
 		resources["urn:devkit:form:"+name] = source
 	}
 	v := &Validator{forms: make(map[string]*form.Schema)}
+	provenance, err := form.CompileSchema([]byte(`{
+		"type":"object",
+		"properties":{
+			"source":{"enum":["subagent","judge_command","command"]},
+			"instruction_id":{"type":"string","minLength":1},
+			"runner":{"type":"string","minLength":1},
+			"agent_id":{"type":"string"},
+			"effort":{"type":"string"},
+			"model":{"type":"string"},
+			"result_path":{"type":"string"}
+		},
+		"required":["source","instruction_id","runner"],
+		"additionalProperties":false
+	}`))
+	if err != nil {
+		return nil, fmt.Errorf("record schema provenance: %w", err)
+	}
+	v.forms["provenance"] = provenance
 	for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "reference", "instruction"} {
 		source, ok := sources[name]
 		if !ok {
@@ -136,6 +154,9 @@ func (v *Validator) validateRaw(payload Payload, data []byte) error {
 		delete(fields, "supersedes")
 	case *Judgment:
 		schema = "judgment"
+		if err := v.forms["provenance"].Validate(fields["provenance"]); err != nil {
+			return fmt.Errorf("judgment provenance: %w", err)
+		}
 		for _, name := range []string{"round_id", "runner", "provenance", "content", "command"} {
 			delete(fields, name)
 		}
@@ -184,6 +205,12 @@ func (v *Validator) answer(a Answer) error {
 func (v *Validator) judgment(j Judgment) error {
 	if err := required(j.Runner); err != nil {
 		return err
+	}
+	if err := v.check("provenance", j.Provenance); err != nil {
+		return fmt.Errorf("judgment provenance: %w", err)
+	}
+	if j.Provenance.InstructionID != j.InstructionID || j.Provenance.Runner != j.Runner {
+		return fmt.Errorf("judgment provenance does not match instruction and runner")
 	}
 	return v.check("judgment", j.JudgmentResult)
 }

@@ -302,11 +302,14 @@ func (w *Workspace) workingIndex(ctx context.Context) ([]string, func() error, e
 		var paths []byte
 		paths, err = w.run(ctx, env, "ls-files", "-z")
 		if err == nil {
-			cmd := w.command(ctx, env, "update-index", "--no-assume-unchanged", "-z", "--stdin")
-			cmd.Stdin = bytes.NewReader(paths)
-			output, updateErr := cmd.CombinedOutput()
-			if updateErr != nil {
-				err = fmt.Errorf("git update-index: %w: %s", updateErr, output)
+			for _, flag := range []string{"--no-assume-unchanged", "--no-skip-worktree"} {
+				cmd := w.command(ctx, env, "update-index", flag, "-z", "--stdin")
+				cmd.Stdin = bytes.NewReader(paths)
+				output, updateErr := cmd.CombinedOutput()
+				if updateErr != nil {
+					err = fmt.Errorf("git update-index: %w: %s", updateErr, output)
+					break
+				}
 			}
 		}
 	}

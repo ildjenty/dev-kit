@@ -39,6 +39,10 @@ func StructureMermaid(structure Structure) string {
 	if err := validateStructure(structure); err != nil {
 		return ""
 	}
+	return structureMermaid(structure)
+}
+
+func structureMermaid(structure Structure) string {
 	var b strings.Builder
 	b.WriteString("flowchart LR\n")
 	ids := make(map[string]string, len(structure.Modules))

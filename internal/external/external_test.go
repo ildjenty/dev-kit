@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -202,37 +204,56 @@ func TestUnknownRecoveryAndPause(t *testing.T) {
 	}
 }
 
-type pauseOnErrContext struct {
-	context.Context
-	pause func()
-}
-
-func (c pauseOnErrContext) Err() error {
-	c.pause()
-	return c.Context.Err()
-}
-
-func TestExecuteRechecksPauseBeforeInvocation(t *testing.T) {
+func TestExecuteRejectsPausedWork(t *testing.T) {
 	e, request := fixture(t)
 	approvalID := approve(t, e, request)
-	ctx := pauseOnErrContext{Context: context.Background(), pause: func() {
-		appendRecord(t, e, &ledger.Pause{Position: form.Reference{RecordID: approvalID}})
-	}}
+	appendRecord(t, e, &ledger.Pause{Position: form.Reference{RecordID: approvalID}})
 	calls := 0
 	e.run = func(context.Context, config.Command, json.RawMessage, string) commandResult {
 		calls++
 		return commandResult{Status: ledger.ExternalSucceeded}
 	}
-	result, err := e.Execute(ctx, request)
+	_, err := e.Execute(context.Background(), request)
 	if err == nil || err.Error() != "work is paused; use devkit resume before starting an external operation" {
 		t.Fatalf("expected pause rejection before invocation: %v", err)
 	}
 	if calls != 0 {
 		t.Fatalf("operation started after pause publication: calls=%d", calls)
 	}
-	recorded, err := e.recorded(result.Operation.OperationID)
-	if err != nil || recorded.RecordID != result.RecordID || recorded.Operation.Status != ledger.ExternalRunning {
-		t.Fatalf("before record was not retained: %+v, %v", recorded, err)
+}
+
+func TestRecoveryRequiresOriginalDefinition(t *testing.T) {
+	for _, status := range []ledger.ExternalStatus{ledger.ExternalRunning, ledger.ExternalUnknown} {
+		t.Run(string(status), func(t *testing.T) {
+			e, request := fixture(t)
+			r := e.registrations[request.Kind]
+			r.Query = &config.Command{Executable: "write", Args: []string{"query"}, TimeoutSeconds: 1}
+			e.registrations[request.Kind] = r
+			approvalID := approve(t, e, request)
+			target, err := e.Describe(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := appendRecord(t, e, &ledger.ExternalOp{
+				ExternalOperationTarget: target, ApprovalID: approvalID, Input: request.Input, Status: ledger.ExternalRunning,
+			})
+			if status == ledger.ExternalUnknown {
+				appendRecord(t, e, &ledger.ExternalOp{
+					ExternalOperationTarget: target, ApprovalID: approvalID, BeforeID: before.ID,
+					Input: request.Input, Status: status,
+				})
+			}
+			r.Query.Args = []string{"different-query"}
+			e.registrations[request.Kind] = r
+			e.run = func(context.Context, config.Command, json.RawMessage, string) commandResult {
+				t.Fatal("changed query was invoked")
+				return commandResult{}
+			}
+			result, err := e.Recover(context.Background(), target.OperationID)
+			if err != nil || result.Operation.Status != ledger.ExternalUnknown || !result.ConfirmationRequired || result.Operation.BeforeID != before.ID {
+				t.Fatalf("changed definition resolved the operation: %+v, %v", result, err)
+			}
+		})
 	}
 }
 
@@ -304,6 +325,55 @@ func TestCommandBoundary(t *testing.T) {
 	}
 }
 
+func TestExecutableSymlinks(t *testing.T) {
+	for _, location := range []string{"inside", "outside"} {
+		t.Run(location, func(t *testing.T) {
+			e, request := fixture(t)
+			outside := location == "outside"
+			directory := e.root
+			if outside {
+				directory = t.TempDir()
+			}
+			target := filepath.Join(directory, "command")
+			if err := os.WriteFile(target, []byte("#!/bin/sh\nprintf '%s' '{\"status\":\"succeeded\"}'\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink(target, filepath.Join(e.root, "linked-command")); err != nil {
+				t.Fatal(err)
+			}
+			r := e.registrations[request.Kind]
+			r.Executable = "linked-command"
+			e.registrations[request.Kind] = r
+			if _, err := e.Describe(request); (err != nil) != outside {
+				t.Fatalf("unexpected approval path result: %v", err)
+			}
+			result := e.invoke(context.Background(), r.Command, request.Input, "operation")
+			if outside {
+				if result.Status != ledger.ExternalFailed || !result.notStarted {
+					t.Fatalf("outside executable was not rejected: %+v", result)
+				}
+			} else if result.Status != ledger.ExternalSucceeded {
+				t.Fatalf("inside executable failed: %+v", result)
+			}
+		})
+	}
+}
+
+func TestInvokeDeadlineOverridesReportedSuccess(t *testing.T) {
+	e, request := fixture(t)
+	e.run = func(ctx context.Context, _ config.Command, _ json.RawMessage, _ string) commandResult {
+		<-ctx.Done()
+		if !errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			t.Fatalf("expected deadline expiration, got %v", ctx.Err())
+		}
+		return commandResult{Status: ledger.ExternalSucceeded}
+	}
+	result := e.invoke(context.Background(), e.registrations[request.Kind].Command, request.Input, "operation")
+	if result.Status != ledger.ExternalUnknown || !strings.Contains(result.Result, context.DeadlineExceeded.Error()) {
+		t.Fatalf("deadline expiration did not override success: %+v", result)
+	}
+}
+
 func TestCommandOutcomes(t *testing.T) {
 	for _, test := range []struct {
 		name   string
@@ -313,21 +383,32 @@ func TestCommandOutcomes(t *testing.T) {
 		{"failed", "printf '%s' '{\"status\":\"failed\",\"result\":\"Rejected\"}'", ledger.ExternalFailed},
 		{"invalid", "printf '%s' 'not JSON'", ledger.ExternalUnknown},
 		{"nonzero", "exit 1", ledger.ExternalUnknown},
-		{"timeout", "sleep 5", ledger.ExternalUnknown},
+		{"timeout", ": > started\nexec sleep 5", ledger.ExternalUnknown},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			e, request := fixture(t)
+			if test.name == "timeout" {
+				sleep, err := exec.LookPath("sleep")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Setenv("PATH", filepath.Dir(sleep))
+			}
 			if err := os.WriteFile(filepath.Join(e.root, "write"), []byte("#!/bin/sh\n"+test.script+"\n"), 0o755); err != nil {
 				t.Fatal(err)
 			}
 			approve(t, e, request)
-			started := time.Now()
 			result, err := e.Execute(context.Background(), request)
 			if err != nil || result.Operation.Status != test.status {
 				t.Fatalf("unexpected outcome: %+v, %v", result, err)
 			}
-			if test.name == "timeout" && time.Since(started) > 1800*time.Millisecond {
-				t.Fatal("inherited pipes exceeded the command deadline")
+			if test.name == "timeout" {
+				if _, err := os.Stat(filepath.Join(e.root, "started")); err != nil {
+					t.Fatalf("command did not start: %v", err)
+				}
+				if !strings.Contains(result.Operation.Result, context.DeadlineExceeded.Error()) {
+					t.Fatalf("expected deadline expiration, got %q", result.Operation.Result)
+				}
 			}
 			again, err := e.Execute(context.Background(), request)
 			if err != nil || again.RecordID != result.RecordID {

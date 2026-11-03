@@ -190,6 +190,20 @@ func TestCompletion(t *testing.T) {
 	if !CheckCompletion(input).Complete {
 		t.Fatal("could not finalize despite satisfied completion conditions")
 	}
+	t.Run("commit failed", func(t *testing.T) {
+		failed := input
+		failed.CommitSucceeded = false
+		if CheckCompletion(failed).Complete {
+			t.Fatal("completed despite a failed commit")
+		}
+	})
+	t.Run("target mismatch", func(t *testing.T) {
+		mismatched := input
+		mismatched.TargetMatches = false
+		if CheckCompletion(mismatched).Complete {
+			t.Fatal("completed despite a target mismatch")
+		}
+	})
 	input.Detection = nil
 	if CheckCompletion(input).ReadyToCommit {
 		t.Fatal("passed without checking content identity")

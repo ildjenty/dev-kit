@@ -9,11 +9,129 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ildjenty/dev-kit/internal/check"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 	"github.com/ildjenty/dev-kit/internal/plan"
 	"github.com/oklog/ulid/v2"
 )
+
+func TestDecisionStatusMatchesAnswer(t *testing.T) {
+	for _, status := range []DecisionStatus{DecisionApproved, DecisionRejected, DecisionDeferred} {
+		for _, interpretation := range []Interpretation{AnswerApproved, AnswerRejected, AnswerDeferred, AnswerText} {
+			t.Run(string(status)+"/"+string(interpretation), func(t *testing.T) {
+				store, _ := workStore(t)
+				v := testValidator(t)
+				appendRecord(t, store, &Decision{Decision: form.Decision{ID: "choice"}})
+				target := form.ApprovalTarget{Kind: form.ApprovalDecision, DecisionID: "choice"}
+				answer := appendRecord(t, store, &Answer{QuestionID: "review", Target: target, Interpretation: interpretation, Text: "Use the measured option"})
+				record, err := NewRecord(store, &StateChange{DecisionID: "choice", DecisionStatus: status, AnswerID: answer.ID})
+				if err != nil {
+					t.Fatal(err)
+				}
+				valid := string(status) == string(interpretation)
+				if err := Append(store, record, v); (err == nil) != valid || !valid && !strings.Contains(err.Error(), "does not match answer interpretation") {
+					t.Fatalf("decision state write: %v", err)
+				}
+				if !valid {
+					if err := store.AppendRecord(record.ID, string(record.Kind()), record.Payload); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if _, err := Get(store, record.ID, v); (err == nil) != valid || !valid && !strings.Contains(err.Error(), "does not match answer interpretation") {
+					t.Fatalf("decision state read: %v", err)
+				}
+				if _, err := List(store, v); (err == nil) != valid || !valid && !strings.Contains(err.Error(), "does not match answer interpretation") {
+					t.Fatalf("decision state scan: %v", err)
+				}
+				if valid {
+					resolved, err := loadState(t, store).ResolveDecisions(DecisionContext{})
+					if err != nil || len(resolved) != 1 || resolved[0].Status != status {
+						t.Fatalf("decision status: %+v, %v", resolved, err)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestJudgmentProvenanceValidation(t *testing.T) {
+	v := testValidator(t)
+	for _, tc := range []struct {
+		name       string
+		provenance check.Provenance
+		valid      bool
+	}{
+		{"empty", check.Provenance{}, false},
+		{"unknown source", check.Provenance{Source: "unknown", InstructionID: "judge", Runner: "judge"}, false},
+		{"missing instruction", check.Provenance{Source: check.SubagentResult, Runner: "judge"}, false},
+		{"missing runner", check.Provenance{Source: check.SubagentResult, InstructionID: "judge"}, false},
+		{"different instruction", check.Provenance{Source: check.SubagentResult, InstructionID: "other", Runner: "judge"}, false},
+		{"different runner", check.Provenance{Source: check.SubagentResult, InstructionID: "judge", Runner: "other"}, false},
+		{"subagent", check.Provenance{Source: check.SubagentResult, InstructionID: "judge", Runner: "judge"}, true},
+		{"judge command", check.Provenance{Source: check.JudgeCommand, InstructionID: "judge", Runner: "judge"}, true},
+		{"command check", check.Provenance{Source: check.CommandCheck, InstructionID: "judge", Runner: "judge"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			store := fsstore.New(t.TempDir())
+			judgment := &Judgment{Judgment: check.Judgment{JudgmentResult: form.JudgmentResult{Judgment: form.Pass}}}
+			completeFixture(judgment)
+			judgment.Provenance = tc.provenance
+			record, err := NewRecord(store, judgment)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := Append(store, record, v); (err == nil) != tc.valid || !tc.valid && !strings.Contains(err.Error(), "provenance") {
+				t.Fatalf("judgment write: %v", err)
+			}
+			if !tc.valid {
+				if err := store.AppendRecord(record.ID, string(record.Kind()), record.Payload); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := Get(store, record.ID, v); (err == nil) != tc.valid || !tc.valid && !strings.Contains(err.Error(), "provenance") {
+				t.Fatalf("judgment read: %v", err)
+			}
+			if _, err := List(store, v); (err == nil) != tc.valid || !tc.valid && !strings.Contains(err.Error(), "provenance") {
+				t.Fatalf("judgment scan: %v", err)
+			}
+		})
+	}
+}
+
+func TestGetRejectsMissingReferences(t *testing.T) {
+	root := t.TempDir()
+	store := fsstore.New(root)
+	v := testValidator(t)
+	missing := ulid.Make().String()
+	evidence := &Evidence{Evidence: form.Evidence{ID: "source", Content: "Measured latency", VerificationMethod: "Benchmark", Sources: []form.Reference{{RecordID: missing}}}}
+	completeFixture(evidence)
+	record, err := NewRecord(store, evidence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AppendRecord(record.ID, string(record.Kind()), evidence); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Get(store, record.ID, v); err == nil || !strings.Contains(err.Error(), record.ID+".json") || !strings.Contains(err.Error(), missing) {
+		t.Fatalf("missing reference diagnostic: %v", err)
+	}
+	if _, err := List(store, v); err == nil {
+		t.Fatal("missing reference accepted by List")
+	}
+	decision := &Decision{Decision: form.Decision{ID: "choice", Evidence: []form.Reference{{RecordID: record.ID}}}}
+	completeFixture(decision)
+	dependent, err := NewRecord(store, decision)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Append(store, dependent, v); err == nil || !strings.Contains(err.Error(), missing) {
+		t.Fatalf("reference to corrupt record accepted: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "records", record.ID+".json")); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestPayloadValidationAtStorageBoundaries(t *testing.T) {
 	v := testValidator(t)

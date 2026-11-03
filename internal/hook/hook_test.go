@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -293,15 +294,89 @@ func TestPauseBypassesObservationAndConfigurationFailures(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(h.Root, ".devkit"), []byte("not a directory"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	result := process(t, h, event.Event{Name: event.PreToolUse, SessionID: "session", ToolName: "Bash", Command: "devkit pause"})
-	if result.Decision != event.Allow || result.SystemMessage == "" {
-		t.Fatalf("pause was obstructed: %+v", result)
+	for _, command := range []string{"devkit pause", `devkit pause "Stop for review"`} {
+		result := process(t, h, event.Event{Name: event.PreToolUse, SessionID: "session", ToolName: "Bash", Command: command})
+		if result.Decision != event.Allow || result.SystemMessage == "" {
+			t.Fatalf("%q was obstructed: %+v", command, result)
+		}
 	}
 	h = newHandler(t)
 	h.ReadConfig = func(string) (config.Config, error) { return config.Config{}, errors.New("configuration unavailable") }
-	result = process(t, h, event.Event{Name: event.PreToolUse, SessionID: "session", Command: "devkit pause"})
-	if result.Decision != event.Allow {
-		t.Fatalf("pause depended on configuration: %+v", result)
+	for _, command := range []string{"devkit pause", "devkit pause Stop for review"} {
+		result := process(t, h, event.Event{Name: event.PreToolUse, SessionID: "session", Command: command})
+		if result.Decision != event.Allow {
+			t.Fatalf("%q depended on configuration: %+v", command, result)
+		}
+	}
+}
+
+func TestPauseCommandWithReason(t *testing.T) {
+	h := newHandler(t)
+	h.ReadConfig = func(string) (config.Config, error) {
+		return config.Config{Deny: config.Deny{Rules: []string{"Bash(devkit *)"}}}, nil
+	}
+	for _, test := range []struct {
+		command string
+		allow   bool
+	}{
+		{"devkit pause", true},
+		{"devkit pause Stop for review", true},
+		{`devkit pause "Wait; review & confirm"`, true},
+		{"devkit pause\n", true},
+		{"devkit pause; git push", false},
+		{"devkit pause Stop && git push", false},
+		{"devkit pause Stop || git push", false},
+		{"devkit pause Stop | git push", false},
+		{"devkit pause Stop & git push", false},
+		{"devkit pause Stop\ngit push", false},
+	} {
+		result := process(t, h, event.Event{Name: event.PreToolUse, SessionID: "session", ToolName: "Bash", Command: test.command})
+		want := event.Deny
+		if test.allow {
+			want = event.Allow
+		}
+		if result.Decision != want {
+			t.Errorf("%q: %+v", test.command, result)
+		}
+	}
+}
+
+func TestPreToolUseReadFailuresDeny(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		setup func(*Handler)
+		cause string
+	}{
+		{"missing configuration reader", func(h *Handler) { h.ReadConfig = nil }, "configuration reader is required"},
+		{"configuration", func(h *Handler) {
+			h.ReadConfig = func(string) (config.Config, error) { return config.Config{}, errors.New("configuration unavailable") }
+		}, "configuration unavailable"},
+		{"missing agent reader", func(h *Handler) { h.ReadAgent = nil }, "agent definition reader is required"},
+		{"agent definition", func(h *Handler) {
+			h.ReadAgent = func(string, event.Host, string) (AgentDefinition, error) {
+				return AgentDefinition{}, errors.New("agent definition unavailable")
+			}
+		}, "agent definition unavailable"},
+		{"missing validator", func(h *Handler) { h.Validator = nil }, "ledger validator is required"},
+		{"ledger", func(h *Handler) {
+			if err := os.WriteFile(filepath.Join(h.workRoot(), "records", lastRecord(t, *h)+".json"), []byte("{"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}, "record"},
+		{"observation", func(h *Handler) {
+			if err := os.WriteFile(filepath.Join(h.runRoot(), "sessions"), []byte("not a directory"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}, "sessions"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			h := newHandler(t)
+			test.setup(&h)
+			result := process(t, h, event.Event{Host: event.ClaudeCode, Name: event.PreToolUse, SessionID: "session", ToolName: "Agent", Agent: &event.AgentInvocation{Type: "devkit-judge", Prompt: "devkit-instruction issued"}})
+			if result.Decision != event.Deny || !strings.Contains(result.Reason, test.cause) {
+				t.Fatalf("read failure did not deny with its cause: %+v", result)
+			}
+		})
 	}
 }
 
@@ -400,7 +475,7 @@ func TestSubagentResultCollection(t *testing.T) {
 	}
 }
 
-func TestConcurrentSubagentResultCollection(t *testing.T) {
+func TestSubagentResultPublicationLock(t *testing.T) {
 	h := newHandler(t)
 	appendPayload(t, h, &ledger.Instruction{ID: "issued", Kind: form.InstructionJudgment, TargetKey: "target", SessionID: "session"})
 	state, err := ledger.Load(fsstore.New(h.workRoot()), nil, h.Validator)
@@ -408,36 +483,48 @@ func TestConcurrentSubagentResultCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 	e := event.Event{Host: event.Codex, Name: event.SubagentStop, AgentID: "child", AgentType: "devkit-judge", LastAssistantMessage: `{"instruction_id":"issued"}`}
-	type outcome struct {
-		data []byte
-		err  error
+	dir := filepath.Join(h.workRoot(), "results")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	const collectors = 8
-	start := make(chan struct{})
-	outcomes := make(chan outcome, collectors)
-	for i := range collectors {
-		go func() {
-			<-start
-			var result outcome
-			result.err = h.subagentStop(e, state, time.Unix(int64(i), 0))
-			if result.err == nil {
-				result.data, result.err = os.ReadFile(filepath.Join(h.workRoot(), "results", "issued-child.json"))
-			}
-			outcomes <- result
-		}()
+	publication, err := os.Open(dir)
+	if err != nil {
+		t.Fatal(err)
 	}
-	close(start)
-	var first []byte
-	for range collectors {
-		result := <-outcomes
-		if result.err != nil {
-			t.Fatal(result.err)
+	defer publication.Close()
+	if err := syscall.Flock(int(publication.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Fatal(err)
+	}
+	outcome := make(chan error, 1)
+	go func() { outcome <- h.subagentStop(e, state, time.Unix(1, 0)) }()
+	select {
+	case err := <-outcome:
+		if !errors.Is(err, os.ErrDeadlineExceeded) {
+			t.Fatalf("contended publication did not time out: %v", err)
 		}
-		if first == nil {
-			first = result.data
-		} else if string(result.data) != string(first) {
-			t.Fatalf("concurrent collection replaced the first result: %s", result.data)
-		}
+	case <-time.After(15 * time.Second):
+		t.Fatal("contended publication waited without a deadline")
+	}
+	name := filepath.Join(dir, "issued-child.json")
+	if _, err := os.Stat(name); !os.IsNotExist(err) {
+		t.Fatalf("contended publication created a result: %v", err)
+	}
+	if err := syscall.Flock(int(publication.Fd()), syscall.LOCK_UN); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.subagentStop(e, state, time.Unix(2, 0)); err != nil {
+		t.Fatal(err)
+	}
+	first, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.subagentStop(e, state, time.Unix(3, 0)); err != nil {
+		t.Fatal(err)
+	}
+	repeated, err := os.ReadFile(name)
+	if err != nil || string(repeated) != string(first) {
+		t.Fatalf("first result was replaced after lock release: %s, %v", repeated, err)
 	}
 }
 

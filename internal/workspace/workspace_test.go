@@ -23,7 +23,7 @@ func newWorkspace(t *testing.T) *Workspace {
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
 	root := t.TempDir()
-	git(t, root, "init", "-b", "main")
+	git(t, root, "init", "--template=", "-b", "main")
 	git(t, root, "config", "user.name", "devkit test")
 	git(t, root, "config", "user.email", "devkit@example.invalid")
 	git(t, root, "config", "commit.gpgsign", "false")
@@ -72,9 +72,22 @@ func read(t *testing.T, path string) []byte {
 func hook(t *testing.T, w *Workspace, body string) {
 	t.Helper()
 	path := filepath.Join(w.Root(), ".git/hooks/pre-commit")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.WriteFile(path, []byte("#!/bin/sh\nset -eu\n"+body+"\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestWorkspaceIgnoresTemplates(t *testing.T) {
+	template := t.TempDir()
+	write(t, template, "hooks/pre-commit", "#!/bin/sh\nexit 1\n")
+	if err := os.Chmod(filepath.Join(template, "hooks/pre-commit"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GIT_TEMPLATE_DIR", template)
+	newWorkspace(t)
 }
 
 func TestResolveAndBranches(t *testing.T) {
@@ -168,6 +181,32 @@ func TestSnapshotAndExpand(t *testing.T) {
 	}
 	if got := git(t, w.Root(), "for-each-ref", "--format=%(refname)", "refs/devkit/work/"); got != "" {
 		t.Fatalf("ref remains: %s", got)
+	}
+}
+
+func TestSnapshotSkipWorktree(t *testing.T) {
+	w := newWorkspace(t)
+	ctx := context.Background()
+	head := git(t, w.Root(), "rev-parse", "HEAD")
+	git(t, w.Root(), "update-index", "--skip-worktree", "tracked")
+	indexPath := filepath.Join(w.Root(), ".git/index")
+	index := read(t, indexPath)
+	write(t, w.Root(), "tracked", "judged\n")
+	snap, err := w.Snapshot(ctx, "work")
+	if err != nil {
+		t.Fatal(err)
+	}
+	content, err := w.ReadFile(ctx, snap.Tree, "tracked")
+	if err != nil || string(content) != "judged\n" {
+		t.Fatalf("skip-worktree target: %q, %v", content, err)
+	}
+	write(t, w.Root(), "tracked", "later\n")
+	result, err := w.Commit(ctx, snap.Tree, "work", "implement", "complete")
+	if !errors.Is(err, ErrTargetChanged) || result.Commit != "" {
+		t.Fatalf("target change was not rejected: %+v, %v", result, err)
+	}
+	if !bytes.Equal(index, read(t, indexPath)) || head != git(t, w.Root(), "rev-parse", "HEAD") {
+		t.Fatal("snapshot or rejected commit changed the normal index or HEAD")
 	}
 }
 

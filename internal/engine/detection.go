@@ -158,6 +158,23 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 			}
 		}
 		if !pending {
+			recorded, err := e.records()
+			if err != nil {
+				return Result{}, false, err
+			}
+			var test *check.DetectionTest
+			for _, record := range recorded {
+				if result, ok := record.Payload.(*ledger.DetectionTest); ok && result.InstructionID == meta.ID {
+					copy := result.DetectionTest
+					test = &copy
+				}
+			}
+			if test == nil {
+				return Result{}, false, errors.New("accepted detection result is missing")
+			}
+			if test.Passed {
+				return Result{}, true, e.publishDetection(ctx, *test)
+			}
 			q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: data.Request.TargetVersion.Tree}, "detection_failed", "The detection test failed. Revise the aspect or propose a plan without this required check.", "")
 			q, err = e.saveQuestion(state, q, "")
 			if err != nil {
@@ -289,6 +306,10 @@ func (e *Engine) acceptDetection(ctx context.Context, state *ledger.State, meta 
 		_, err = e.saveQuestion(state, q, "")
 		return err
 	}
+	return e.publishDetection(ctx, test)
+}
+
+func (e *Engine) publishDetection(ctx context.Context, test check.DetectionTest) error {
 	ref, err := e.workspace.SnapshotTree(ctx)
 	if err != nil {
 		return err

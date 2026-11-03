@@ -173,9 +173,6 @@ func walkEmbedded(visit func(source, name string, entry fs.DirEntry) error) erro
 		if source == "." || source == "kit" {
 			return nil
 		}
-		if strings.HasPrefix(source, "kit/") && entry.Name() == "README.md" && !entry.IsDir() {
-			return nil
-		}
 		return visit(source, strings.TrimPrefix(source, "kit/"), entry)
 	})
 }

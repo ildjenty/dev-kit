@@ -2,6 +2,7 @@ package hook
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -47,8 +48,20 @@ func publishSubagentResult(workRoot string, result SubagentResult) error {
 	}
 	defer publication.Close()
 	// Keep the existence check and rename atomic across result collectors.
-	if err := syscall.Flock(int(publication.Fd()), syscall.LOCK_EX); err != nil {
-		return fmt.Errorf("result publication lock %s: %w", dir, err)
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		err := syscall.Flock(int(publication.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+		if !errors.Is(err, syscall.EWOULDBLOCK) {
+			if err != nil {
+				return fmt.Errorf("result publication lock %s: %w", dir, err)
+			}
+			break
+		}
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return fmt.Errorf("result publication lock %s: %w", dir, os.ErrDeadlineExceeded)
+		}
+		time.Sleep(min(100*time.Millisecond, remaining))
 	}
 	name := filepath.Join("results", result.InstructionID+"-"+result.AgentID+".json")
 	if _, err := os.Lstat(filepath.Join(workRoot, name)); err == nil {

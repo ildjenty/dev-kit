@@ -338,7 +338,7 @@ func TestDecisionConditionsArePassedThrough(t *testing.T) {
 	}
 }
 
-func TestFindingsCompletionAndExternalResults(t *testing.T) {
+func TestBlockingFindingResolution(t *testing.T) {
 	store, _ := workStore(t)
 	run := &StageRun{StageID: "implement", PlanVersion: 1, State: StageWorking}
 	appendRecord(t, store, run)
@@ -361,31 +361,56 @@ func TestFindingsCompletionAndExternalResults(t *testing.T) {
 	if findings := state.UnresolvedBlocking(run.ID); len(findings) != 0 {
 		t.Fatalf("resolved findings retained: %+v", findings)
 	}
+}
+
+func TestLatestJudgmentsAndNormMismatch(t *testing.T) {
+	store, _ := workStore(t)
+	target := form.TargetVersion{Kind: form.TargetTree, Tree: "result"}
+	norms := []form.NormReference{{Path: "rules", BlobID: "rules-a"}}
+	appendRecord(t, store, &Judgment{Judgment: check.Judgment{JudgmentResult: form.JudgmentResult{
+		Aspect: "test", TargetVersion: target, Norms: norms, Judgment: form.Fail,
+	}, Runner: "judge"}})
+	appendRecord(t, store, &Judgment{Judgment: check.Judgment{JudgmentResult: form.JudgmentResult{
+		Aspect: "test", TargetVersion: target, Norms: norms, Judgment: form.Pass,
+	}, Runner: "judge"}})
+	state := loadState(t, store)
 	if judgments := state.LatestJudgments(target, norms); len(judgments) != 1 || judgments[0].Judgment != form.Pass {
 		t.Fatalf("latest judgment: %+v", judgments)
 	}
 	changed := []form.NormReference{{Path: "rules", BlobID: "rules-b"}}
-	appendRecord(t, store, &Judgment{RoundID: round.ID, Judgment: check.Judgment{JudgmentResult: form.JudgmentResult{
+	appendRecord(t, store, &Judgment{Judgment: check.Judgment{JudgmentResult: form.JudgmentResult{
 		Aspect: "test", TargetVersion: target, Norms: changed, Judgment: form.Fail,
 	}, Runner: "judge"}})
 	if judgments := loadState(t, store).LatestJudgments(target, norms); len(judgments) != 0 {
 		t.Fatal("older judgment hid newer norm mismatch")
 	}
+}
+
+func TestExternalUnknownResult(t *testing.T) {
+	store, _ := workStore(t)
 	externalTarget := form.ExternalOperationTarget{OperationID: "publish", Kind: "comment", Target: "issue:42", InputHash: strings.Repeat("b", 64), DefinitionHash: strings.Repeat("c", 64), ExecutableHash: strings.Repeat("d", 64)}
 	approvalTarget := form.ApprovalTarget{Kind: form.ApprovalExternal, External: &externalTarget}
 	appendRecord(t, store, &Question{Question: form.Question{ID: "publish-question", ApprovalTarget: approvalTarget}})
 	approval := appendRecord(t, store, &Approval{Answer: Answer{QuestionID: "publish-question", Target: approvalTarget, Interpretation: AnswerApproved}})
 	before := appendRecord(t, store, &ExternalOp{ExternalOperationTarget: externalTarget, ApprovalID: approval.ID, Input: json.RawMessage(`{"body":"Result"}`), Status: ExternalRunning})
 	appendRecord(t, store, &ExternalOp{ExternalOperationTarget: externalTarget, ApprovalID: approval.ID, BeforeID: before.ID, Input: json.RawMessage(`{"body":"Result"}`), Status: ExternalUnknown})
-	state = loadState(t, store)
+	state := loadState(t, store)
 	if operations := state.CurrentPosition().ExternalOps; len(operations) != 1 || operations[0].Status != ExternalUnknown || operations[0].BeforeID != before.ID {
 		t.Fatalf("external execution state: %+v", operations)
 	}
+}
+
+func TestWorkCompletion(t *testing.T) {
+	store, _ := workStore(t)
+	run := &StageRun{StageID: "implement", PlanVersion: 1, State: StageWorking}
+	appendRecord(t, store, run)
+	round := &Round{StageRunID: run.ID, SessionID: "session"}
+	appendRecord(t, store, round)
 	completed := *run
 	completed.State, completed.Commit = StageCompleted, "commit"
 	appendRecord(t, store, &completed)
 	appendRecord(t, store, &StateChange{WorkStatus: WorkCompleted})
-	state = loadState(t, store)
+	state := loadState(t, store)
 	if _, open := state.OpenRound(); open || len(state.IncompleteStageRuns()) != 0 || state.WorkStatus() != WorkCompleted {
 		t.Fatal("completed work remained active")
 	}

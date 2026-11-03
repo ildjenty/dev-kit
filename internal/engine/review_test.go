@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/ildjenty/dev-kit/internal/check"
+	"github.com/ildjenty/dev-kit/internal/config"
+	"github.com/ildjenty/dev-kit/internal/external"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
@@ -824,5 +826,460 @@ func TestCommitRecoveryCompletesPartialRecords(t *testing.T) {
 				t.Fatal("partial completion made a duplicate commit")
 			}
 		})
+	}
+}
+
+func TestCommitRefreshWaitsForJudgeAndApproval(t *testing.T) {
+	e, ctx := fixture(t)
+	configureStage(t, e, func(stage *plan.Stage) {
+		stage.Gate.Required = true
+		stage.Checks = []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
+	})
+	work := working(t, e, ctx)
+	write(t, e.Root(), "README.md", "# Submitted target\n")
+	write(t, e.Root(), ".git/hooks/pre-commit", "#!/bin/sh\nprintf '# Formatted target\\n' > README.md\ngit add README.md\n")
+	if err := os.Chmod(filepath.Join(e.Root(), ".git/hooks/pre-commit"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
+		t.Fatal(err)
+	}
+	for _, phase := range []string{"submitted", "refreshed"} {
+		review, err := e.Next(ctx)
+		if err != nil || review.Status != ledger.WorkActive || review.Instruction == nil || review.Instruction.Kind != form.InstructionJudgment {
+			t.Fatalf("%s target did not await judgment: %+v, %v", phase, review, err)
+		}
+		pending, err := e.Next(ctx)
+		if err != nil || pending.Instruction == nil || pending.Instruction.ID != review.Instruction.ID || pending.Status != ledger.WorkActive {
+			t.Fatalf("%s target bypassed pending judgment: %+v, %v", phase, pending, err)
+		}
+		data, err := e.readInstruction(review.Instruction.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		collect(t, e, review.Instruction, pass(*data.Request))
+		asked, err := e.Next(ctx)
+		if err != nil || asked.Status != ledger.WorkActive || asked.Instruction == nil || asked.Instruction.Question == nil {
+			t.Fatalf("%s target did not await approval: %+v, %v", phase, asked, err)
+		}
+		if pending, err := e.Next(ctx); err != nil || pending.Status != ledger.WorkActive || pending.Instruction == nil || pending.Instruction.ID != asked.Instruction.ID {
+			t.Fatalf("%s target bypassed pending approval: %+v, %v", phase, pending, err)
+		}
+		observeAnswer(t, e, "Approve this target.")
+		if _, err := e.Answer(ctx, AnswerRequest{QuestionID: asked.Instruction.Question.ID, Interpretation: ledger.AnswerApproved}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if done, err := e.Next(ctx); err != nil || done.Status != ledger.WorkCompleted {
+		t.Fatalf("approved target did not complete: %+v, %v", done, err)
+	}
+}
+
+func TestVerificationRunsAgainInNewRound(t *testing.T) {
+	e, ctx := fixture(t)
+	settings, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, e.Root(), "devkit.toml", string(settings)+"\n[commands.verify]\nexecutable = '/bin/sh'\nargs = ['-c', \"printf 'attempt\\\\n' >> .devkit/run/attempts; test -f .devkit/run/retry\"]\ntimeout_seconds = 5\n")
+	configureStage(t, e, func(stage *plan.Stage) {
+		stage.Checks = []plan.Check{{Aspect: "command:verify", Runner: "command:verify", Required: true}}
+	})
+	work := working(t, e, ctx)
+	for attempt := 0; attempt < 2; attempt++ {
+		if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
+			t.Fatal(err)
+		}
+		result, err := e.Next(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if attempt == 0 {
+			if result.Instruction == nil || result.Instruction.Kind != form.InstructionWork {
+				t.Fatalf("failed command did not request correction: %+v", result)
+			}
+			write(t, e.Root(), ".devkit/run/retry", "Ready\n")
+			work = result
+		} else if result.Status != ledger.WorkCompleted {
+			t.Fatalf("previous failure was reused: %+v", result)
+		}
+	}
+	attempts, err := os.ReadFile(filepath.Join(e.Root(), ".devkit/run/attempts"))
+	if err != nil || strings.Count(string(attempts), "attempt\n") != 2 {
+		t.Fatalf("expected one command per round: %q, %v", attempts, err)
+	}
+}
+
+func TestOptionalCommandMutationStopsBeforeJudge(t *testing.T) {
+	e, ctx := fixture(t)
+	settings, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, e.Root(), "devkit.toml", string(settings)+"\n[commands.verify]\nexecutable = '/bin/sh'\nargs = ['-c', \"printf 'Changed target\\\\n' > README.md\"]\ntimeout_seconds = 5\n")
+	configureStage(t, e, func(stage *plan.Stage) {
+		stage.Checks = []plan.Check{{Aspect: "command:verify", Runner: "command:verify"}, {Aspect: "plan", Runner: "devkit-judge"}}
+	})
+	work := working(t, e, ctx)
+	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
+		t.Fatal(err)
+	}
+	result, err := e.Next(ctx)
+	if err != nil || result.Instruction == nil || result.Instruction.Kind != form.InstructionWork {
+		t.Fatalf("optional mutation proceeded to judgment: %+v, %v", result, err)
+	}
+	records, err := e.records()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range records {
+		if judgment, ok := record.Payload.(*ledger.Judgment); ok && judgment.RoundID != "" {
+			if !commandTargetChanged(judgment.Judgment) || judgment.Command == nil || judgment.Command.ExitCode != 0 || judgment.Command.TimedOut {
+				t.Fatalf("actual command result was not preserved: %+v", judgment)
+			}
+			return
+		}
+	}
+	t.Fatal("target mutation was not recorded")
+}
+
+func TestUnrelatedApprovalDoesNotClearChangeConfirmation(t *testing.T) {
+	e, ctx := fixture(t)
+	work := working(t, e, ctx)
+	write(t, e.Root(), "package.json", "{\"name\":\"fixture\"}\n")
+	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
+		t.Fatal(err)
+	}
+	state, err := e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	round, _ := state.OpenRound()
+	q, err := e.saveQuestion(state, e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: round.ReturnedTarget.Tree}, "scope", "Approve the documentation scope?", "implement"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	observeAnswer(t, e, "Approve the documentation scope.")
+	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: q.ID, Interpretation: ledger.AnswerApproved}); err != nil {
+		t.Fatal(err)
+	}
+	asked, err := e.Next(ctx)
+	if err != nil || asked.Status != ledger.WorkActive || asked.Instruction == nil || asked.Instruction.Question == nil || asked.Instruction.Question.StopCategory != "stage_confirmation" {
+		t.Fatalf("unrelated approval cleared dependency confirmation: %+v, %v", asked, err)
+	}
+	observeAnswer(t, e, "Approve the dependency change.")
+	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: asked.Instruction.Question.ID, Interpretation: ledger.AnswerApproved}); err != nil {
+		t.Fatal(err)
+	}
+	if done, err := e.Next(ctx); err != nil || done.Status != ledger.WorkCompleted {
+		t.Fatalf("change confirmation did not permit completion: %+v, %v", done, err)
+	}
+}
+
+func TestHumanStageUsesItsOwnAnswer(t *testing.T) {
+	e, ctx := fixture(t)
+	configureStage(t, e, func(stage *plan.Stage) { stage.Assignee = plan.Human })
+	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	planResult(t, e, start)
+	detection, err := e.Next(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	acceptDetectionResult(t, e, detection.Instruction)
+	review, err := e.Next(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := e.readInstruction(review.Instruction.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	collect(t, e, review.Instruction, pass(*data.Request))
+	asked, err := e.Next(ctx)
+	if err != nil || asked.Instruction == nil || asked.Instruction.Question == nil {
+		t.Fatalf("human stage did not ask for output: %+v, %v", asked, err)
+	}
+	state, err := e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, _ := state.LatestStageRun()
+	round, _ := state.OpenRound()
+	if run.State != ledger.StageAnswerWait || run.NextActor != "human" || run.StopReason != asked.Instruction.Question.StopReason {
+		t.Fatalf("human wait was not recorded: %+v", run)
+	}
+	other, err := e.saveQuestion(state, e.question(asked.Instruction.Question.ApprovalTarget, "scope", "Approve a separate scope?", run.StageID), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	observeAnswer(t, e, "Approve the separate scope.")
+	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: other.ID, Interpretation: ledger.AnswerApproved, Text: "Unrelated output"}); err != nil {
+		t.Fatal(err)
+	}
+	state, err = e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := humanStageAnswer(state, run, round); ok {
+		t.Fatal("unrelated answer became human stage output")
+	}
+	observeAnswer(t, e, "The reviewed documentation is ready.")
+	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: asked.Instruction.Question.ID, Interpretation: ledger.AnswerText, Text: "Human stage output"}); err != nil {
+		t.Fatal(err)
+	}
+	state, err = e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherRound := *round
+	otherRound.ID = "later-round"
+	otherRun := *run
+	otherRun.ID = "later-run"
+	if _, ok := humanStageAnswer(state, &otherRun, round); ok {
+		t.Fatal("answer escaped its stage run")
+	}
+	if _, ok := humanStageAnswer(state, run, &otherRound); ok {
+		t.Fatal("answer escaped its round")
+	}
+	if done, err := e.Next(ctx); err != nil || done.Status != ledger.WorkCompleted {
+		t.Fatalf("human output did not complete: %+v, %v", done, err)
+	}
+	state, err = e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	progress, _ := state.LatestProgress()
+	if progress == nil || len(progress.WorkPerformed) != 1 || progress.WorkPerformed[0] != "Human stage output" {
+		t.Fatalf("incorrect human output: %+v", progress)
+	}
+}
+
+func TestDecisionAnswerRetryRestoresStateChange(t *testing.T) {
+	for _, interpretation := range []ledger.Interpretation{ledger.AnswerApproved, ledger.AnswerRejected, ledger.AnswerDeferred} {
+		for _, correction := range []bool{false, true} {
+			name := string(interpretation)
+			if correction {
+				name += "_correction"
+			}
+			t.Run(name, func(t *testing.T) {
+				e, ctx := fixture(t)
+				working(t, e, ctx)
+				decision := form.Decision{ID: "choice", Content: "Retain the service", Validity: "While the requirements apply", Conditions: []string{}, Decider: "human", Supersedes: []form.Reference{}, DependsOn: []form.Reference{}, RejectedAlternatives: []form.RejectedAlternative{}, Evidence: []form.Reference{}}
+				if _, err := e.Note(ctx, ledger.KindDecision, marshal(t, decision)); err != nil {
+					t.Fatal(err)
+				}
+				state, err := e.load()
+				if err != nil {
+					t.Fatal(err)
+				}
+				q, err := e.saveQuestion(state, e.question(form.ApprovalTarget{Kind: form.ApprovalDecision, DecisionID: decision.ID}, "decision", "Confirm the service decision", "implement"), "")
+				if err != nil {
+					t.Fatal(err)
+				}
+				observeAnswer(t, e, "Record this decision.")
+				request := AnswerRequest{QuestionID: q.ID, Interpretation: interpretation, Text: "Service decision"}
+				if correction {
+					if _, err := e.Answer(ctx, AnswerRequest{QuestionID: q.ID, Interpretation: ledger.AnswerText, Text: "Pending interpretation"}); err != nil {
+						t.Fatal(err)
+					}
+					state, err = e.load()
+					if err != nil {
+						t.Fatal(err)
+					}
+					request.Supersedes = state.AnsweredQuestions()[q.ID].RecordID
+					observeAnswer(t, e, "Correct the earlier decision.")
+				}
+				if _, err := e.Answer(ctx, request); err != nil {
+					t.Fatal(err)
+				}
+				state, err = e.load()
+				if err != nil {
+					t.Fatal(err)
+				}
+				answer := state.AnsweredQuestions()[q.ID]
+				records, err := e.records()
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, record := range records {
+					if record.ID > answer.RecordID {
+						if err := os.Remove(filepath.Join(e.workRoot(), "records", record.ID+".json")); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+				for retry := 0; retry < 2; retry++ {
+					if _, err := e.Answer(ctx, request); err != nil {
+						t.Fatal(err)
+					}
+				}
+				records, err = e.records()
+				if err != nil {
+					t.Fatal(err)
+				}
+				changes := 0
+				for _, record := range records {
+					if change, ok := record.Payload.(*ledger.StateChange); ok && change.AnswerID == answer.RecordID {
+						changes++
+						if change.DecisionStatus != ledger.DecisionStatus(interpretation) {
+							t.Fatalf("incorrect recovered decision status: %+v", change)
+						}
+					}
+				}
+				if changes != 1 {
+					t.Fatalf("expected one restored state change, got %d", changes)
+				}
+			})
+		}
+	}
+}
+
+func TestDetectionPassRestoresMissingIndex(t *testing.T) {
+	e, ctx := fixture(t)
+	working(t, e, ctx)
+	if err := os.Remove(filepath.Join(e.Root(), ".devkit/detect.json")); err != nil {
+		t.Fatal(err)
+	}
+	state, err := e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tree, err := e.workspace.SnapshotTree(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	checks := []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
+	result, pending, err := e.ensureDetection(ctx, state, checks, tree)
+	if err != nil || !pending || result.Instruction != nil {
+		t.Fatalf("accepted detection pass was not restored: %+v, %v", result, err)
+	}
+	tree, err = e.workspace.SnapshotTree(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requirements, tests, err := e.detectionContext(ctx, checks, tree)
+	if err != nil || len(check.MissingDetection(requirements, tests)) != 0 {
+		t.Fatalf("restored index lacks the accepted pass: %v", err)
+	}
+}
+
+func TestStartResumesBeforeInitialInstruction(t *testing.T) {
+	for _, bound := range []bool{false, true} {
+		t.Run(map[bool]string{false: "before_binding", true: "after_binding"}[bound], func(t *testing.T) {
+			e, ctx := fixture(t)
+			request := StartRequest{Template: "test", Task: "Update documentation"}
+			initial, err := e.Start(ctx, request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			records, err := e.records()
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, record := range records {
+				if _, ok := record.Payload.(*ledger.Instruction); ok {
+					if err := os.Remove(filepath.Join(e.workRoot(), "records", record.ID+".json")); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			if !bound {
+				entries, err := os.ReadDir(filepath.Join(e.runRoot(), "sessions", e.sessionID))
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, entry := range entries {
+					if strings.HasSuffix(entry.Name(), "-bind.json") {
+						if err := os.Remove(filepath.Join(e.runRoot(), "sessions", e.sessionID, entry.Name())); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+			}
+			reopened, err := New(ctx, e.Root(), e.sessionID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			resumed, err := reopened.Start(ctx, request)
+			if err != nil || resumed.WorkID != initial.WorkID || resumed.Instruction == nil || resumed.Instruction.Kind != form.InstructionPlan {
+				t.Fatalf("interrupted start did not resume: %+v, %v", resumed, err)
+			}
+		})
+	}
+}
+
+func TestTargetMismatchDoesNotInventCommandResult(t *testing.T) {
+	e, ctx := fixture(t)
+	working(t, e, ctx)
+	state, err := e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	round, _ := state.OpenRound()
+	write(t, e.Root(), "README.md", "# Mismatching target\n")
+	request := check.Request{RequestInput: check.RequestInput{InstructionID: "mismatch", Runner: "command:test", Aspect: check.Aspect{ID: "command:test"}, TargetVersion: round.StartTarget, TargetPath: e.Root()}}
+	command := config.Command{Executable: "/bin/sh", Args: []string{"-c", "touch .devkit/run/unexpected-execution"}, TimeoutSeconds: 5}
+	verification, err := e.runCheck(ctx, request, command, "implement", round.StartTarget.Tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	judgment, err := e.runJudge(ctx, instructionData{Request: &request}, config.Judge{Command: command}, "implement", round.StartTarget.Tree)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, result := range []check.Judgment{verification, judgment} {
+		if !commandTargetChanged(result) || result.Command != nil {
+			t.Fatalf("unexecuted command received a result: %+v", result)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(e.Root(), ".devkit/run/unexpected-execution")); !os.IsNotExist(err) {
+		t.Fatalf("command ran against a mismatching target: %v", err)
+	}
+}
+
+func TestExternalQuestionRecordsWaitingStage(t *testing.T) {
+	e, ctx := fixture(t)
+	settings, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, e.Root(), "publish", "#!/bin/sh\nexit 0\n")
+	if err := os.Chmod(filepath.Join(e.Root(), "publish"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	write(t, e.Root(), "devkit.toml", string(settings)+"\n[external.publish]\nexecutable = './publish'\nargs = []\ntimeout_seconds = 5\n")
+	git(t, e.Root(), "add", ".")
+	git(t, e.Root(), "commit", "-qm", "Register publication")
+	work := working(t, e, ctx)
+	asked, err := e.External(ctx, external.Request{Kind: "publish", Target: "fixture/item", Input: json.RawMessage(`{"message":"Hello"}`)})
+	if err != nil || asked.Instruction == nil || asked.Instruction.Question == nil {
+		t.Fatalf("external approval was not requested: %+v, %v", asked, err)
+	}
+	state, err := e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, _ := state.LatestStageRun()
+	if run.State != ledger.StageExternalWait || run.NextActor != "human" || run.StopReason != asked.Instruction.Question.StopReason {
+		t.Fatalf("external wait was not recorded: %+v", run)
+	}
+	observeAnswer(t, e, "Approve this publication.")
+	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: asked.Instruction.Question.ID, Interpretation: ledger.AnswerApproved}); err != nil {
+		t.Fatal(err)
+	}
+	resumed, err := e.Next(ctx)
+	if err != nil || resumed.Instruction == nil || resumed.Instruction.ID != work.Instruction.ID {
+		t.Fatalf("external wait did not return to work: %+v, %v", resumed, err)
+	}
+	state, err = e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, _ = state.LatestStageRun()
+	if run.State != ledger.StageWorking || run.NextActor != "worker" {
+		t.Fatalf("external wait remained after resumption: %+v", run)
 	}
 }

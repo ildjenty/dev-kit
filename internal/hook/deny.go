@@ -77,7 +77,7 @@ func pauseCommand(e event.Event) bool {
 		return false
 	}
 	fields := strings.Fields(e.Command)
-	return len(fields) == 2 && fields[0] == "devkit" && fields[1] == "pause"
+	return len(fields) >= 2 && fields[0] == "devkit" && fields[1] == "pause" && len(commandParts(strings.TrimSpace(e.Command))) == 1
 }
 
 func matchesRule(rule string, e event.Event) bool {
@@ -119,7 +119,7 @@ func commandParts(command string) []string {
 			quote = c
 			continue
 		}
-		if c == ';' || c == '|' || c == '&' && i+1 < len(command) && command[i+1] == '&' {
+		if c == ';' || c == '|' || c == '&' || c == '\n' {
 			parts = append(parts, command[start:i])
 			if (c == '|' || c == '&') && i+1 < len(command) && command[i+1] == c {
 				i++

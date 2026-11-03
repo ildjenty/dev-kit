@@ -348,22 +348,74 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	if err != nil {
 		return Result{}, err
 	}
-	if obs.WorkID != "" {
-		e.workID = obs.WorkID
-		s, err := e.load()
-		if err != nil {
-			return Result{}, err
-		}
-		if s.WorkStatus() == ledger.WorkActive {
-			return Result{}, errors.New("the session is already bound to active work")
-		}
-	}
 	name := request.Template
 	if name == "" {
 		name = "default"
 	}
 	if !localName(name) || strings.TrimSpace(request.Task) == "" {
 		return Result{}, errors.New("a template name and task are required")
+	}
+	id := obs.WorkID
+	if id == "" {
+		branch, err := e.workspace.Branch(ctx)
+		if err != nil {
+			return Result{}, err
+		}
+		if strings.HasPrefix(branch, "devkit/") {
+			id = strings.TrimPrefix(branch, "devkit/")
+		}
+	}
+	if id != "" {
+		e.workID = id
+		state, err := e.load()
+		if err != nil {
+			return Result{}, err
+		}
+		if state.WorkStatus() == ledger.WorkActive {
+			lock, err := e.store().Lock()
+			if err != nil {
+				return Result{}, err
+			}
+			defer lock.Close()
+			if err := e.active(); err != nil {
+				return Result{}, err
+			}
+			records, err := e.records()
+			if err != nil {
+				return Result{}, err
+			}
+			for _, record := range records {
+				switch record.Payload.(type) {
+				case *ledger.Instruction, *ledger.PlanVersion:
+					return Result{}, errors.New("the session is already bound to active work")
+				}
+			}
+			work, _ := state.Work()
+			branch, err := e.workspace.Branch(ctx)
+			if err != nil {
+				return Result{}, err
+			}
+			if branch != work.Branch {
+				return Result{}, errors.New("work branch does not match")
+			}
+			task, err := os.ReadFile(filepath.Join(e.workRoot(), work.TaskRef))
+			if err != nil {
+				return Result{}, err
+			}
+			if string(task) != request.Task {
+				return Result{}, errors.New("task does not match the interrupted start")
+			}
+			template, source, err := e.template(ctx, work.BaseCommit, name)
+			if err != nil {
+				return Result{}, err
+			}
+			bound := *obs
+			bound.WorkID, bound.ObservedAt = e.workID, time.Now().UTC()
+			if err = hook.PublishSession(e.runRoot(), bound, "bind"); err != nil {
+				return Result{}, err
+			}
+			return e.planner(ctx, template, source, 1, plan.InitialProposal)
+		}
 	}
 	head, err := e.workspace.Head(ctx)
 	if err != nil {
@@ -675,11 +727,15 @@ func (e *Engine) External(ctx context.Context, request external.Request) (Result
 			request.Plan = &selected
 		}
 	}
+	stageID := ""
+	if run, ok := state.LatestStageRun(); ok {
+		stageID = run.StageID
+	}
 	executor := external.New(e.Root(), e.store(), e.validator, settings.External)
 	outcome, err := executor.Execute(ctx, request)
 	var approval *external.ApprovalRequired
 	if errors.As(err, &approval) {
-		q := e.question(form.ApprovalTarget{Kind: form.ApprovalExternal, External: &approval.Target}, "external_operation", "Approve this external write?", "")
+		q := e.question(form.ApprovalTarget{Kind: form.ApprovalExternal, External: &approval.Target}, "external_operation", "Approve this external write?", stageID)
 		if q, err = e.saveQuestion(state, q, ""); err != nil {
 			return Result{}, err
 		}
@@ -693,10 +749,13 @@ func (e *Engine) External(ctx context.Context, request external.Request) (Result
 		return Result{}, err
 	}
 	if outcome.ConfirmationRequired {
-		q := e.question(form.ApprovalTarget{Kind: form.ApprovalExternal, External: &outcome.Operation.ExternalOperationTarget}, "external_unknown", "The external outcome is unknown. Confirm its outcome before continuing.", "")
+		q := e.question(form.ApprovalTarget{Kind: form.ApprovalExternal, External: &outcome.Operation.ExternalOperationTarget}, "external_unknown", "The external outcome is unknown. Confirm its outcome before continuing.", stageID)
 		if q, err = e.saveQuestion(state, q, ""); err != nil {
 			return Result{}, err
 		}
+		r, err := e.issueQuestion(state, q)
+		r.External = &outcome
+		return r, err
 	}
 	state, err = e.load()
 	if err != nil {

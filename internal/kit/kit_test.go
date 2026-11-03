@@ -29,6 +29,7 @@ func TestCopyLayoutAndRead(t *testing.T) {
 		{"docs/parts/runtime.md", "docs/parts/runtime.md"},
 		{"principles/harness.md", "principles/harness.md"},
 		{"kit/plans/default.json", "plans/default.json"},
+		{"kit/plans/README.md", "plans/README.md"},
 	} {
 		want, err := fs.ReadFile(devkit.FS(), pair[0])
 		if err != nil {
@@ -42,7 +43,7 @@ func TestCopyLayoutAndRead(t *testing.T) {
 			t.Errorf("copy contents differ: %s", pair[1])
 		}
 	}
-	for _, name := range []string{"kit", "plans/README.md"} {
+	for _, name := range []string{"kit"} {
 		if _, err := fs.Stat(k, name); !errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("unexpected copied path: %s: %v", name, err)
 		}

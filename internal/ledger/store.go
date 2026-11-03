@@ -27,7 +27,11 @@ func Append(store *fsstore.Store, record Record, validator *Validator) error {
 	}
 	for _, ref := range references(record) {
 		if ref.RecordID != "" {
-			if _, err := Get(store, ref.RecordID, validator); err != nil {
+			referenced, err := Get(store, ref.RecordID, validator)
+			if err == nil {
+				err = validateDecisionAnswer(record, referenced)
+			}
+			if err != nil {
 				return fmt.Errorf("record %s.json: reference %s: %w", record.ID, ref.RecordID, err)
 			}
 		} else if ref.External == "" {
@@ -46,7 +50,27 @@ func Get(store *fsstore.Store, id string, validator *Validator) (Record, error) 
 	if err != nil {
 		return Record{}, err
 	}
-	return readRecord(raw, validator)
+	record, err := readRecord(raw, validator)
+	if err != nil {
+		return Record{}, err
+	}
+	for _, ref := range references(record) {
+		if ref.RecordID == "" {
+			continue
+		}
+		raw, err := store.GetRecord(ref.RecordID)
+		if err == nil {
+			var referenced Record
+			referenced, err = readRecord(raw, validator)
+			if err == nil {
+				err = validateDecisionAnswer(record, referenced)
+			}
+		}
+		if err != nil {
+			return Record{}, fmt.Errorf("record %s.json: reference %s: %w", record.ID, ref.RecordID, err)
+		}
+	}
+	return record, nil
 }
 
 // List returns typed records in fsstore's ID order, stopping at unreadable records.
@@ -56,18 +80,24 @@ func List(store *fsstore.Store, validator *Validator) ([]Record, error) {
 		return nil, err
 	}
 	records := make([]Record, 0, len(stored))
-	ids := make(map[string]bool, len(stored))
+	byID := make(map[string]Record, len(stored))
 	for _, raw := range stored {
 		record, err := readRecord(raw, validator)
 		if err != nil {
 			return nil, err
 		}
 		records = append(records, record)
-		ids[record.ID] = true
+		byID[record.ID] = record
 	}
 	for _, record := range records {
 		for _, ref := range references(record) {
-			if ref.RecordID != "" && ids[ref.RecordID] && ref.External == "" || ref.RecordID == "" && ref.External != "" {
+			if referenced, exists := byID[ref.RecordID]; ref.RecordID != "" && exists && ref.External == "" {
+				if err := validateDecisionAnswer(record, referenced); err != nil {
+					return nil, fmt.Errorf("record %s.json: reference %s: %w", record.ID, ref.RecordID, err)
+				}
+				continue
+			}
+			if ref.RecordID == "" && ref.External != "" {
 				continue
 			}
 			return nil, fmt.Errorf("record %s.json: invalid or missing reference: %+v", record.ID, ref)

@@ -166,6 +166,13 @@ func (e *External) Recover(ctx context.Context, operationID string) (Result, err
 	if !ok || registration.Query == nil {
 		return e.unresolved(result, "No registered query can resolve this operation; human confirmation is required")
 	}
+	definition, err := json.Marshal(registration)
+	if err != nil {
+		return result, err
+	}
+	if contentHash(definition) != op.DefinitionHash {
+		return e.unresolved(result, "The registered definition has changed; human confirmation is required")
+	}
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}
@@ -253,7 +260,15 @@ func (e *External) executablePath(name string) (string, error) {
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(e.root, path)
 	}
-	rel, err := filepath.Rel(e.root, path)
+	root, err := filepath.EvalSymlinks(e.root)
+	if err != nil {
+		return "", fmt.Errorf("resolve checkout root: %w", err)
+	}
+	path, err = filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", fmt.Errorf("resolve external executable: %w", err)
+	}
+	rel, err := filepath.Rel(root, path)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("external executable %q must be inside the checkout", name)
 	}

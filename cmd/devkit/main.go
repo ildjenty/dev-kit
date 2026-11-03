@@ -20,6 +20,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
+	"github.com/ildjenty/dev-kit/internal/workspace"
 )
 
 const usage = `Usage: devkit <command> [arguments]
@@ -108,8 +109,12 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 			return err
 		}
 		if name == "init" {
+			w, err := workspace.Open(ctx, cwd)
+			if err != nil {
+				return err
+			}
 			result, err := install.Init(ctx, cwd, func(changes []install.Change) error {
-				return confirmInit(changes, input, output, yes)
+				return confirmInit(changes, filepath.Join(w.Root(), ".devkit/run"), input, output, yes)
 			})
 			if err != nil {
 				return err
@@ -233,24 +238,31 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	return writeOutput(output, filepath.Join(e.Root(), ".devkit/run/work", result.WorkID), "response.json", result)
 }
 
-func confirmInit(changes []install.Change, input io.Reader, output io.Writer, yes bool) error {
+func confirmInit(changes []install.Change, root string, input io.Reader, output io.Writer, yes bool) error {
+	var diff strings.Builder
+	count := 0
 	for _, change := range changes {
 		if !strings.HasPrefix(change.Path, ".claude/") && !strings.HasPrefix(change.Path, ".codex/") {
 			continue
 		}
-		if _, err := fmt.Fprintf(output, "--- %s (before)\n+++ %s (after)\n", change.Path, change.Path); err != nil {
-			return err
-		}
+		count++
+		fmt.Fprintf(&diff, "--- %s (before)\n+++ %s (after)\n", change.Path, change.Path)
 		if len(change.Before) != 0 {
-			if _, err := fmt.Fprintln(output, "-"+strings.ReplaceAll(strings.TrimSuffix(string(change.Before), "\n"), "\n", "\n-")); err != nil {
-				return err
-			}
+			fmt.Fprintln(&diff, "-"+strings.ReplaceAll(strings.TrimSuffix(string(change.Before), "\n"), "\n", "\n-"))
 		}
 		if len(change.After) != 0 {
-			if _, err := fmt.Fprintln(output, "+"+strings.ReplaceAll(strings.TrimSuffix(string(change.After), "\n"), "\n", "\n+")); err != nil {
-				return err
-			}
+			fmt.Fprintln(&diff, "+"+strings.ReplaceAll(strings.TrimSuffix(string(change.After), "\n"), "\n", "\n+"))
 		}
+	}
+	if diff.Len() > 3000 {
+		if err := fsstore.New(root).Publish("init.diff", []byte(diff.String())); err != nil {
+			return err
+		}
+		if _, err := fmt.Fprintf(output, "Initialization changes %d host files. Full diff: %s\n", count, filepath.Join(root, "init.diff")); err != nil {
+			return err
+		}
+	} else if _, err := io.WriteString(output, diff.String()); err != nil {
+		return err
 	}
 	if yes {
 		return nil
@@ -282,16 +294,23 @@ func writeOutput(output io.Writer, root string, name string, value any) error {
 		}
 		switch value := value.(type) {
 		case engine.Result:
-			fmt.Fprintf(output, "Work %s: %s; paused=%t.\n", value.WorkID, value.Status, value.Paused)
+			_, err = fmt.Fprintf(output, "Work %s: %s; paused=%t.\n", value.WorkID, value.Status, value.Paused)
 		case engine.Status:
-			fmt.Fprintf(output, "Work %s: %s; paused=%t.\n", value.WorkID, value.Position.Status, value.Position.Paused)
+			_, err = fmt.Fprintf(output, "Work %s: %s; paused=%t.\n", value.WorkID, value.Position.Status, value.Position.Paused)
 		case install.Result:
-			fmt.Fprintf(output, "Initialized %s (%d changes).\n", value.Root, len(value.Changes))
+			if _, err := fmt.Fprintf(output, "Initialized %s (%d changes).\n", value.Root, len(value.Changes)); err != nil {
+				return err
+			}
 			for _, guidance := range value.Guidance {
-				fmt.Fprintln(output, guidance)
+				if _, err := fmt.Fprintln(output, guidance); err != nil {
+					return err
+				}
 			}
 		case install.Report:
-			fmt.Fprintf(output, "Doctor: healthy=%t.\n", value.Healthy())
+			_, err = fmt.Fprintf(output, "Doctor: healthy=%t.\n", value.Healthy())
+		}
+		if err != nil {
+			return err
 		}
 		_, err = fmt.Fprintln(output, "Full output:", filepath.Join(root, name))
 		return err

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/fs"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -123,8 +124,14 @@ func TestSelectionAndDeviations(t *testing.T) {
 	if err := v.ValidatePlan(selected); err != nil {
 		t.Fatal(err)
 	}
-	if got := Deviations(template, selected); len(got) != 0 {
-		t.Fatalf("normal stage selection was classified as a deviation: %+v", got)
+	wantSelection := []Deviation{
+		{Kind: ChangedTransition, StageID: "research", Transition: Done},
+		{Kind: ChangedTransition, StageID: "contract", Transition: Back},
+		{Kind: ChangedTransition, StageID: "contract", Transition: Done},
+		{Kind: ChangedTransition, StageID: "implement", Transition: Back},
+	}
+	if got := Deviations(template, selected); !reflect.DeepEqual(got, wantSelection) {
+		t.Fatalf("stage selection deviations: got %+v, want %+v", got, wantSelection)
 	}
 	if selected.StartStage != "research" || *selected.Stages[0].Transitions.Done != "contract" {
 		t.Fatal("optional stage insertion and start stage change were not applied")
@@ -133,11 +140,16 @@ func TestSelectionAndDeviations(t *testing.T) {
 		t.Fatal("modified the original template or plan")
 	}
 	leading, err := p.SelectStages(template, []string{"contract", "steps", "implement"})
-	if err != nil || len(Deviations(template, leading)) != 0 {
-		t.Fatal("start stage change from omitting leading stages was classified as a deviation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantLeading := []Deviation{{Kind: ChangedTransition, StageID: "contract", Transition: Back}}
+	if got := Deviations(template, leading); !reflect.DeepEqual(got, wantLeading) {
+		t.Fatalf("omitting leading stages should only change transitions: %+v", got)
 	}
 	leading.StartStage = "implement"
-	if got := Deviations(template, leading); len(got) != 1 || got[0].Kind != ChangedStartStage {
+	wantLeading = append([]Deviation{{Kind: ChangedStartStage, StageID: "implement"}}, wantLeading...)
+	if got := Deviations(template, leading); !reflect.DeepEqual(got, wantLeading) {
 		t.Fatalf("missed a change to a retained start stage: %+v", got)
 	}
 	p.Stages[1].Gate.Required = false
@@ -222,8 +234,113 @@ func TestOptionalStageTransitionRedirection(t *testing.T) {
 	if stage.Transitions.Fix != "research" || stage.Transitions.Ask != "research" || stage.Transitions.Back != "contract" {
 		t.Fatalf("optional stage transitions were not redirected: %+v", stage.Transitions)
 	}
-	if got := Deviations(template, selected); len(got) != 0 {
-		t.Fatalf("redirected optional stage transitions were classified as deviations: %+v", got)
+	got := Deviations(template, selected)
+	if len(got) != 7 {
+		t.Fatalf("redirected stage transition deviations: %+v", got)
+	}
+	for _, action := range []Transition{Fix, Ask, Back, Done} {
+		if !slices.Contains(got, Deviation{Kind: ChangedTransition, StageID: "research", Transition: action}) {
+			t.Fatalf("missed a redirected optional stage transition: %s", action)
+		}
+	}
+}
+
+func TestStageSelectionRequiresTransitionApproval(t *testing.T) {
+	v := validator(t)
+	template, hash := loadTemplate(t, v, "feature")
+	p := NewPlan(template, hash, "Fix behavior", []CompletionCondition{{"C1", "Works as expected"}})
+	selected, err := p.SelectStages(template, []string{"purpose", "implement"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bindChecks(&selected)
+	if err := v.ValidatePlan(selected); err != nil {
+		t.Fatal(err)
+	}
+	want := []Deviation{
+		{Kind: ChangedTransition, StageID: "purpose", Transition: Done},
+		{Kind: ChangedTransition, StageID: "implement", Transition: Back},
+	}
+	if got := Deviations(template, selected); !reflect.DeepEqual(got, want) {
+		t.Fatalf("stage selection deviations: got %+v, want %+v", got, want)
+	}
+	evaluation := VersionEvaluation{Plan: selected, Judgment: PlanPass, Origin: InitialProposal}
+	if evaluation.Executable(template) {
+		t.Fatal("made redirected transitions executable without approval")
+	}
+	evaluation.Approved = true
+	if !evaluation.Executable(template) {
+		t.Fatal("could not execute approved redirected transitions")
+	}
+}
+
+func TestDeviationsWithUnselectedOptionalTransition(t *testing.T) {
+	v := validator(t)
+	template, hash := loadTemplate(t, v, "feature")
+	template.OptionalStages[0].Transitions.Back = "prototype"
+	template.OptionalStages[0].Gate.Required = true
+	template.OptionalStages[0].Checks = []Check{{Aspect: "research", Runner: "review", Required: true}}
+	if err := v.ValidateTemplate(template); err != nil {
+		t.Fatal(err)
+	}
+	p := NewPlan(template, hash, "Fix behavior", []CompletionCondition{{"C1", "Works as expected"}})
+	research := cloneStage(template.OptionalStages[0])
+	research.Transitions.Back = "research"
+	research.Gate.Required = false
+	research.Checks = []Check{}
+	p.Stages = append(p.Stages, research)
+	bindChecks(&p)
+	if err := v.ValidatePlan(p); err != nil {
+		t.Fatal(err)
+	}
+	want := []Deviation{
+		{Kind: RemovedGate, StageID: "research"},
+		{Kind: ChangedTransition, StageID: "research", Transition: Back},
+		{Kind: RemovedRequiredCheck, StageID: "research", Aspect: "research", Runner: "review"},
+	}
+	if got := Deviations(template, p); !reflect.DeepEqual(got, want) {
+		t.Fatalf("optional stage deviations: got %+v, want %+v", got, want)
+	}
+}
+
+func TestCheckMappingsWithSharedAspectAndRunner(t *testing.T) {
+	v := validator(t)
+	template, hash := loadTemplate(t, v, "default")
+	p := NewPlan(template, hash, "Fix behavior", []CompletionCondition{
+		{"C1", "First target is correct"},
+		{"C2", "Second target is correct"},
+	})
+	bindChecks(&p)
+	for _, tc := range []struct {
+		name   string
+		change func(*Check)
+		valid  bool
+	}{
+		{"different target", func(c *Check) { c.Target = "another target" }, false},
+		{"different conditions", func(c *Check) { c.CompletionConditionIDs = []string{"C2"} }, false},
+		{"identical mapping", func(c *Check) {}, true},
+		{"different aspect", func(c *Check) {
+			c.Aspect = "behavior"
+			c.Target = "another target"
+		}, true},
+		{"different runner", func(c *Check) {
+			c.Runner = "other-review"
+			c.Target = "another target"
+		}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := clonePlan(p)
+			duplicate := cloneCheck(candidate.Stages[0].Checks[1])
+			tc.change(&duplicate)
+			candidate.Stages[0].Checks = append(candidate.Stages[0].Checks, duplicate)
+			err := v.ValidatePlan(candidate)
+			if tc.valid && err != nil {
+				t.Fatal(err)
+			}
+			if !tc.valid && (err == nil || !strings.Contains(err.Error(), "conflicting check mappings")) {
+				t.Fatalf("expected conflicting check mappings, got %v", err)
+			}
+		})
 	}
 }
 

@@ -149,10 +149,8 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 		}
 		if change.Symlink {
 			err = os.Symlink(string(change.After), target)
-		} else if change.Before != nil {
-			err = writeConfig(target, change.After)
 		} else {
-			err = os.WriteFile(target, change.After, 0o644)
+			err = writeConfig(target, change.After)
 		}
 		if err != nil {
 			return result, err
@@ -162,12 +160,16 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 }
 
 func writeConfig(path string, data []byte) error {
-	target, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return err
-	}
-	info, err := os.Stat(target)
-	if err != nil {
+	target := path
+	mode := fs.FileMode(0o644)
+	info, err := os.Stat(path)
+	if err == nil {
+		target, err = filepath.EvalSymlinks(path)
+		if err != nil {
+			return err
+		}
+		mode = info.Mode().Perm()
+	} else if !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 	file, err := os.CreateTemp(filepath.Dir(target), ".devkit-*.tmp")
@@ -175,7 +177,7 @@ func writeConfig(path string, data []byte) error {
 		return err
 	}
 	defer os.Remove(file.Name())
-	if err := file.Chmod(info.Mode().Perm()); err != nil {
+	if err := file.Chmod(mode); err != nil {
 		return errors.Join(err, file.Close())
 	}
 	_, writeErr := file.Write(data)
