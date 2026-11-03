@@ -222,10 +222,29 @@ func TestHookMatcherDoesNotHideRequiredRegistration(t *testing.T) {
 		t.Fatalf("required matcher was not installed: %s, %v", after, err)
 	}
 	var settings struct {
-		Hooks map[string][]json.RawMessage `json:"hooks"`
+		Hooks map[string][]struct {
+			Matcher string `json:"matcher"`
+			Hooks   []struct {
+				Type    string `json:"type"`
+				Command string `json:"command"`
+			} `json:"hooks"`
+		} `json:"hooks"`
 	}
 	if err := json.Unmarshal(after, &settings); err != nil || len(settings.Hooks["PreToolUse"]) != 2 {
 		t.Fatalf("existing matcher was not preserved: %s, %v", after, err)
+	}
+	for _, matcher := range []string{"Read", ".*"} {
+		found := false
+		for _, registration := range settings.Hooks["PreToolUse"] {
+			for _, hook := range registration.Hooks {
+				if registration.Matcher == matcher && hook.Type == "command" && hook.Command == "devkit hook PreToolUse" {
+					found = true
+				}
+			}
+		}
+		if !found {
+			t.Errorf("missing registration for matcher %q: %s", matcher, after)
+		}
 	}
 }
 
@@ -242,11 +261,11 @@ func TestDoctorVersionsAndSessionScope(t *testing.T) {
 	}
 	const workID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 	store := fsstore.New(filepath.Join(root, ".devkit/run/work", workID))
-	if err := store.AppendRecord(workID, string(ledger.KindWork), ledger.Work{ID: workID, KitVersion: "v0"}); err != nil {
+	if err := store.AppendRecord(workID, string(ledger.KindWork), ledger.Work{ID: workID, TaskRef: "task.md", Branch: "main", BaseCommit: "base", KitVersion: "v0"}); err != nil {
 		t.Fatal(err)
 	}
 	report, err = Doctor(ctx, root, "current-session")
-	if err != nil || checkNamed(t, report, "work_version/"+workID).OK {
+	if err != nil || checkNamed(t, report, "work_version/"+workID).OK || !strings.Contains(checkNamed(t, report, "work_version/"+workID).Message, "unreadable kit version") {
 		t.Fatalf("incompatible Work was accepted: %+v, %v", report, err)
 	}
 	writeFile(t, root, "devkit.toml", "kit_version = 'v0'\n")
@@ -256,5 +275,139 @@ func TestDoctorVersionsAndSessionScope(t *testing.T) {
 	}
 	if _, err := Init(ctx, root, nil); err == nil {
 		t.Fatal("init accepted a different kit version")
+	}
+}
+
+func TestInitRepairsNegatedIgnore(t *testing.T) {
+	root := repository(t)
+	ctx := context.Background()
+	if _, err := Init(ctx, root, nil); err != nil {
+		t.Fatal(err)
+	}
+	const before = ".devkit/run/\n!.devkit/run/\n"
+	writeFile(t, root, ".gitignore", before)
+	report, err := Doctor(ctx, root, "")
+	if err != nil || checkNamed(t, report, "gitignore").OK {
+		t.Fatalf("negated ignore was accepted: %+v, %v", report, err)
+	}
+	confirmed := false
+	if _, err := Init(ctx, root, func(changes []Change) error {
+		for _, change := range changes {
+			if change.Path == ".gitignore" && string(change.Before) == before && string(change.After) == before+".devkit/run/\n" {
+				confirmed = true
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !confirmed {
+		t.Fatal("ignore repair was not proposed")
+	}
+	cmd := exec.Command("git", "-C", root, "check-ignore", "--quiet", "--", ".devkit/run/work/record.json")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("runtime records are not ignored: %v: %s", err, output)
+	}
+	report, err = Doctor(ctx, root, "")
+	if err != nil || !checkNamed(t, report, "gitignore").OK {
+		t.Fatalf("repaired ignore was rejected: %+v, %v", report, err)
+	}
+	result, err := Init(ctx, root, nil)
+	if err != nil || len(result.Changes) != 0 {
+		t.Fatalf("ignore repair is not idempotent: %+v, %v", result.Changes, err)
+	}
+}
+
+func TestWriteConfigPublishesAndCleansUp(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, "settings.json")
+	writeFile(t, root, "settings.json", "Original settings.\n")
+	if err := os.Chmod(path, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Link(path, filepath.Join(root, "previous.json")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeConfig(path, []byte("Updated settings.\n")); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(readFile(t, root, "settings.json")) != "Updated settings.\n" || info.Mode().Perm() != 0o600 {
+		t.Fatal("configuration contents or permissions were not preserved")
+	}
+	if string(readFile(t, root, "previous.json")) != "Original settings.\n" {
+		t.Fatal("existing configuration was rewritten in place")
+	}
+	if err := writeConfig(root, []byte("Cannot replace a directory.\n")); err == nil {
+		t.Fatal("configuration publication unexpectedly replaced a directory")
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil || len(entries) != 2 || entries[0].Name() != "previous.json" || entries[1].Name() != "settings.json" {
+		t.Fatalf("temporary files remain: %+v, %v", entries, err)
+	}
+}
+
+func TestDoctorValidatesLedgerRecords(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		kind   string
+		body   string
+		reason string
+	}{
+		{"valid", "", "", ""},
+		{"incomplete-work", "work", `{"kit_version":"v1"}`, `record field "id" is required`},
+		{"unknown-kind", "unknown", `{}`, "unknown record kind"},
+		{"invalid-lesson", "lesson", `{"content":"","evidence":[]}`, "required record field is empty"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := repository(t)
+			ctx := context.Background()
+			if _, err := Init(ctx, root, nil); err != nil {
+				t.Fatal(err)
+			}
+			const workID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
+			const recordID = "01ARZ3NDEKTSV4RRFFQ69G5FAW"
+			store := fsstore.New(filepath.Join(root, ".devkit/run/work", workID))
+			if err := store.AppendRecord(workID, "work", ledger.Work{ID: workID, TaskRef: "task.md", Branch: "main", BaseCommit: "base", KitVersion: kit.Version}); err != nil {
+				t.Fatal(err)
+			}
+			if tc.kind != "" {
+				if err := store.AppendRecord(recordID, tc.kind, json.RawMessage(tc.body)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			report, err := Doctor(ctx, root, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			check := checkNamed(t, report, "work_version/"+workID)
+			if tc.reason == "" {
+				if !check.OK {
+					t.Fatalf("valid records were rejected: %+v", check)
+				}
+			} else if check.OK || !strings.Contains(check.Message, recordID+".json") || !strings.Contains(check.Message, tc.reason) {
+				t.Fatalf("unreadable record was not identified: %+v", check)
+			}
+		})
+	}
+}
+
+func TestDoctorUsesLatestSessionStart(t *testing.T) {
+	root := t.TempDir()
+	const sessionID = "current-session"
+	const prefix = ".devkit/run/sessions/" + sessionID + "/"
+	const observation = `{"session_id":"current-session"}`
+	writeFile(t, root, prefix+"20261104T000000.000000000Z-SessionStart.json", observation)
+	latest := prefix + "20261104T000001.000000000Z-SessionStart.json"
+	for _, body := range []string{`{`, `{"session_id":"other-session"}`, observation} {
+		writeFile(t, root, latest, body)
+		report := Report{Root: root}
+		report.checkSession(sessionID)
+		if check := checkNamed(t, report, "hook_session"); check.OK != (body == observation) {
+			t.Fatalf("latest observation was not validated: %s: %+v", body, check)
+		}
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -109,7 +110,19 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 	if err != nil {
 		return result, err
 	}
-	result.addChange(".gitignore", before, appendLines(before, []byte(".devkit/run/\n")))
+	ignored, err := runtimeIgnored(ctx, result.Root)
+	if err != nil {
+		return result, err
+	}
+	after := appendLines(before, []byte(".devkit/run/\n"))
+	if !ignored && bytes.Equal(before, after) {
+		after = bytes.Clone(before)
+		if len(after) != 0 && after[len(after)-1] != '\n' {
+			after = append(after, '\n')
+		}
+		after = append(after, ".devkit/run/\n"...)
+	}
+	result.addChange(".gitignore", before, after)
 	if len(result.Changes) != 0 && confirm != nil {
 		if err := confirm(result.Changes); err != nil {
 			return result, err
@@ -127,6 +140,8 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 		}
 		if change.Symlink {
 			err = os.Symlink(string(change.After), target)
+		} else if change.Before != nil {
+			err = writeConfig(target, change.After)
 		} else {
 			err = os.WriteFile(target, change.After, 0o644)
 		}
@@ -135,6 +150,43 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 		}
 	}
 	return result, nil
+}
+
+func writeConfig(path string, data []byte) error {
+	target, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return err
+	}
+	info, err := os.Stat(target)
+	if err != nil {
+		return err
+	}
+	file, err := os.CreateTemp(filepath.Dir(target), ".devkit-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(file.Name())
+	if err := file.Chmod(info.Mode().Perm()); err != nil {
+		return errors.Join(err, file.Close())
+	}
+	_, writeErr := file.Write(data)
+	if err := errors.Join(writeErr, file.Close()); err != nil {
+		return err
+	}
+	return os.Rename(file.Name(), target)
+}
+
+func runtimeIgnored(ctx context.Context, root string) (bool, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", root, "check-ignore", "--quiet", "--", ".devkit/run/")
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return true, nil
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) && exitErr.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, fmt.Errorf("git check-ignore: %w: %s", err, output)
 }
 
 func (r *Result) addChange(name string, before, after []byte) {

@@ -34,7 +34,11 @@ type StructureRevision struct {
 }
 
 // StructureMermaid returns dependency diagram text without executing Mermaid.
+// It returns an empty string for duplicate module IDs or missing dependency ends.
 func StructureMermaid(structure Structure) string {
+	if err := validateStructure(structure); err != nil {
+		return ""
+	}
 	var b strings.Builder
 	b.WriteString("flowchart LR\n")
 	ids := make(map[string]string, len(structure.Modules))
@@ -51,6 +55,22 @@ func StructureMermaid(structure Structure) string {
 		fmt.Fprintf(&b, "  %s -->|depends on| %s\n", ids[dependency.From], ids[dependency.To])
 	}
 	return b.String()
+}
+
+func validateStructure(structure Structure) error {
+	ids := make(map[string]bool, len(structure.Modules))
+	for _, module := range structure.Modules {
+		if ids[module.ID] {
+			return fmt.Errorf("duplicate module ID: %q", module.ID)
+		}
+		ids[module.ID] = true
+	}
+	for _, dependency := range structure.Dependencies {
+		if !ids[dependency.From] || !ids[dependency.To] {
+			return fmt.Errorf("dependency %q -> %q requires both module IDs", dependency.From, dependency.To)
+		}
+	}
+	return nil
 }
 
 func mermaidLabel(value string) string {

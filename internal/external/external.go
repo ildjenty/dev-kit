@@ -139,6 +139,13 @@ func (e *External) Execute(ctx context.Context, request Request) (Result, error)
 	if err != nil {
 		return Result{}, err
 	}
+	state, err = ledger.Load(e.store, nil, e.validator)
+	if err != nil {
+		return result, err
+	}
+	if _, _, paused := state.Paused(); paused {
+		return result, errors.New("work is paused; use devkit resume before starting an external operation")
+	}
 	outcome := e.invoke(ctx, registration.Command, before.Input, id)
 	return e.finish(result, outcome)
 }

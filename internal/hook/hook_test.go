@@ -34,7 +34,10 @@ func newHandler(t *testing.T) Handler {
 	h := Handler{
 		Root: t.TempDir(), WorkID: ulid.Make().String(), Validator: validator,
 		ReadConfig: func(string) (config.Config, error) {
-			return config.Config{Deny: config.Deny{Rules: []string{"Bash(git push *)", "Agent(fork)", "apply_patch", "mcp_write"}}}, nil
+			return config.Config{Deny: config.Deny{
+				Rules: []string{"Bash(git push *)", "Agent(fork)", "mcp_all_write"},
+				Judge: []string{"apply_patch", "mcp_write"},
+			}}, nil
 		},
 		ReadAgent: func(_ string, _ event.Host, name string) (AgentDefinition, error) {
 			return AgentDefinition{Name: name, Model: "inherit", Effort: "high"}, nil
@@ -158,10 +161,25 @@ func TestDenyRules(t *testing.T) {
 			t.Errorf("%q: %+v", test.command, result)
 		}
 	}
-	for _, tool := range []string{"apply_patch", "mcp_write"} {
-		result := process(t, h, event.Event{Host: event.Codex, Name: event.PreToolUse, SessionID: "session", AgentID: "child", AgentType: "devkit-judge", ToolName: tool})
-		if result.Decision != event.Deny {
-			t.Fatalf("judge write tool: %+v", result)
+	for _, host := range []event.Host{event.ClaudeCode, event.Codex} {
+		for _, caller := range []struct {
+			id, role string
+			deny     bool
+		}{
+			{"", "", false},
+			{"", "devkit-judge", false},
+			{"child", "custom", false},
+			{"child", "devkit-judge", true},
+			{"child", "devkit-planner", true},
+		} {
+			for _, tool := range []string{"apply_patch", "mcp_write", "mcp_all_write", "Read"} {
+				e := event.Event{Host: host, Name: event.PreToolUse, SessionID: "session", AgentID: caller.id, AgentType: caller.role, ToolName: tool}
+				result := process(t, h, e)
+				wantDeny := tool == "mcp_all_write" || caller.deny && tool != "Read"
+				if (result.Decision == event.Deny) != wantDeny {
+					t.Errorf("%s caller %+v tool %s: %+v", host, caller, tool, result)
+				}
+			}
 		}
 	}
 	result := process(t, h, event.Event{Host: event.ClaudeCode, Name: event.PreToolUse, SessionID: "session", ToolName: "Agent", Agent: &event.AgentInvocation{Type: "fork"}})
@@ -171,6 +189,32 @@ func TestDenyRules(t *testing.T) {
 	h.WorkID = ""
 	if result := process(t, h, event.Event{Name: event.PreToolUse, Command: "git push"}); result.Decision != "" {
 		t.Fatalf("deny affected an unbound session: %+v", result)
+	}
+	if result := process(t, h, event.Event{Name: event.PreToolUse, AgentID: "child", AgentType: "devkit-judge", ToolName: "apply_patch"}); result.Decision != "" {
+		t.Fatalf("judge deny affected an unbound session: %+v", result)
+	}
+}
+
+func TestKitDenyDefaults(t *testing.T) {
+	h := newHandler(t)
+	data, err := os.ReadFile(filepath.Join("..", "..", "kit", "hosts", "deny.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, err := config.Parse(append([]byte("kit_version = \"v1\"\n"), data...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.ReadConfig = func(string) (config.Config, error) { return settings, nil }
+	e := event.Event{Host: event.Codex, Name: event.PreToolUse, SessionID: "session", ToolName: "apply_patch"}
+	if result := process(t, h, e); result.Decision == event.Deny {
+		t.Fatalf("default denied a parent write: %+v", result)
+	}
+	for _, role := range []string{"devkit-judge", "devkit-planner"} {
+		e.AgentID, e.AgentType = "child", role
+		if result := process(t, h, e); result.Decision != event.Deny {
+			t.Fatalf("default allowed a %s write: %+v", role, result)
+		}
 	}
 }
 
@@ -224,12 +268,16 @@ func TestPauseBypassesObservationAndConfigurationFailures(t *testing.T) {
 
 func TestNormativeReference(t *testing.T) {
 	h := newHandler(t)
-	var reference string
+	var reference, agentReference string
 	h.ReadConfig = func(ref string) (config.Config, error) { reference = ref; return config.Config{}, nil }
-	e := event.Event{Name: event.PreToolUse, SessionID: "session", ToolName: "Read"}
+	h.ReadAgent = func(ref string, _ event.Host, name string) (AgentDefinition, error) {
+		agentReference = ref
+		return AgentDefinition{Name: name}, nil
+	}
+	e := event.Event{Host: event.ClaudeCode, Name: event.PreToolUse, SessionID: "session", ToolName: "Agent", Agent: &event.AgentInvocation{Type: "devkit-judge", Prompt: "devkit-instruction issued"}}
 	process(t, h, e)
-	if reference != "HEAD" {
-		t.Fatalf("outside-round reference: %q", reference)
+	if reference != "devkit/"+h.WorkID || agentReference != reference {
+		t.Fatalf("outside-round references: config %q, agent %q", reference, agentReference)
 	}
 	store := fsstore.New(h.workRoot())
 	runID, err := store.NextID()
@@ -247,8 +295,8 @@ func TestNormativeReference(t *testing.T) {
 		t.Fatal(err)
 	}
 	process(t, h, e)
-	if reference != "frozen-tree" {
-		t.Fatalf("round reference: %q", reference)
+	if reference != "frozen-tree" || agentReference != reference {
+		t.Fatalf("round references: config %q, agent %q", reference, agentReference)
 	}
 }
 
@@ -291,6 +339,14 @@ func TestSubagentResultCollection(t *testing.T) {
 			if got.InstructionID != "issued" || got.Runner != runner || got.Effort != "high" || got.Model != "" || got.ObservedAt.IsZero() || string(got.Content) != e.LastAssistantMessage {
 				t.Fatalf("result provenance: %+v", got)
 			}
+			for _, message := range []string{e.LastAssistantMessage, `{"instruction_id":"issued","result":"changed"}`} {
+				e.LastAssistantMessage = message
+				process(t, h, e)
+				repeated, err := os.ReadFile(filepath.Join(h.workRoot(), "results", "issued-child.json"))
+				if err != nil || string(repeated) != string(data) {
+					t.Fatalf("first result was replaced: %s, %v", repeated, err)
+				}
+			}
 			e.Host, e.AgentID, e.Model = event.Codex, "codex-child", "observed-model"
 			process(t, h, e)
 			data, err = os.ReadFile(filepath.Join(h.workRoot(), "results", "issued-codex-child.json"))
@@ -302,6 +358,47 @@ func TestSubagentResultCollection(t *testing.T) {
 				t.Fatalf("Codex provenance: %+v, %v", codex, err)
 			}
 		})
+	}
+}
+
+func TestConcurrentSubagentResultCollection(t *testing.T) {
+	h := newHandler(t)
+	appendPayload(t, h, &ledger.Instruction{ID: "issued", Kind: form.InstructionJudgment, TargetKey: "target", SessionID: "session"})
+	state, err := ledger.Load(fsstore.New(h.workRoot()), nil, h.Validator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := event.Event{Host: event.Codex, Name: event.SubagentStop, AgentID: "child", AgentType: "devkit-judge", LastAssistantMessage: `{"instruction_id":"issued"}`}
+	type outcome struct {
+		data []byte
+		err  error
+	}
+	const collectors = 8
+	start := make(chan struct{})
+	outcomes := make(chan outcome, collectors)
+	for i := range collectors {
+		go func() {
+			<-start
+			var result outcome
+			result.err = h.subagentStop(e, state, time.Unix(int64(i), 0))
+			if result.err == nil {
+				result.data, result.err = os.ReadFile(filepath.Join(h.workRoot(), "results", "issued-child.json"))
+			}
+			outcomes <- result
+		}()
+	}
+	close(start)
+	var first []byte
+	for range collectors {
+		result := <-outcomes
+		if result.err != nil {
+			t.Fatal(result.err)
+		}
+		if first == nil {
+			first = result.data
+		} else if string(result.data) != string(first) {
+			t.Fatalf("concurrent collection replaced the first result: %s", result.data)
+		}
 	}
 }
 

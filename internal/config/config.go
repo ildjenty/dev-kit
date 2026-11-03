@@ -47,9 +47,10 @@ type ExternalOperation struct {
 	OccurrenceField string   `toml:"occurrence_field"`
 }
 
-// Deny holds prohibition rules applied to bound sessions.
+// Deny holds rules for all bound sessions and for devkit judge and planner subagents.
 type Deny struct {
 	Rules []string `toml:"rules"`
+	Judge []string `toml:"judge"`
 }
 
 // Router holds additions to the default classification table.
@@ -107,6 +108,11 @@ func (c Config) Validate() error {
 	for _, rule := range c.Deny.Rules {
 		if !validDenyRule(rule) {
 			return fmt.Errorf("invalid deny.rules format: %q", rule)
+		}
+	}
+	for _, tool := range c.Deny.Judge {
+		if tool == "" || strings.ContainsAny(tool, "()") || strings.IndexFunc(tool, unicode.IsSpace) >= 0 {
+			return fmt.Errorf("invalid deny.judge tool name: %q", tool)
 		}
 	}
 	for _, item := range c.Router.HumanConfirmation {

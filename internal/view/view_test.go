@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -74,7 +75,8 @@ func render(t *testing.T, input Input) string {
 	return html
 }
 
-func TestGenerateAnswerBoundaryAndPause(t *testing.T) {
+func answeredInput(t *testing.T) Input {
+	t.Helper()
 	old := question("review-1", "Approve the previous result?")
 	stopQuestion := question("continue", "May the work continue?")
 	stopQuestion.ApprovalTarget = form.ApprovalTarget{Kind: form.ApprovalWork, WorkID: "work"}
@@ -84,28 +86,63 @@ func TestGenerateAnswerBoundaryAndPause(t *testing.T) {
 			Original: "Approved", SessionID: "session", ObservedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}},
 		&ledger.Lesson{Content: "Keep the existing contract", Evidence: []form.Reference{}},
 		&ledger.Pause{Position: form.Reference{RecordID: recordID(1)}, Reason: "Requested by the person"})
-	html := render(t, input)
-	for _, want := range []string{"Run devkit resume", "May the work continue?", "Answer in your own words.", "Limited to artifacts recorded by submit.", "review-1: approved"} {
-		if !strings.Contains(html, want) {
-			t.Fatalf("missing %q", want)
-		}
-	}
-	recent := strings.Split(strings.Split(html, `<section id="recent">`)[1], `</section>`)[0]
+	return input
+}
+
+func TestGenerateNewRecords(t *testing.T) {
+	html := render(t, answeredInput(t))
+	recent := sectionHTML(t, html, "recent")
 	if strings.Contains(recent, recordID(3)) || !strings.Contains(recent, recordID(4)) || !strings.Contains(recent, recordID(5)) {
 		t.Fatalf("unexpected new-record boundary: %s", recent)
 	}
-	if strings.Count(html, old.Text) != 1 || strings.Count(html, stopQuestion.Text) != 1 {
-		t.Fatal("question bodies were duplicated")
-	}
-	if len(input.Ledger.UnansweredQuestions()) != 1 || input.Ledger.LastRecordID() != recordID(5) {
-		t.Fatal("rendering changed ledger state")
-	}
-	if second := render(t, input); second != html {
-		t.Fatal("identical input did not produce identical HTML")
+}
+
+func TestGeneratePausedGuidance(t *testing.T) {
+	html := render(t, answeredInput(t))
+	if !strings.Contains(html, "Run devkit resume") {
+		t.Fatal("missing explicit resume guidance")
 	}
 }
 
-func TestGenerateCoverageAndDependencies(t *testing.T) {
+func TestGenerateQuestions(t *testing.T) {
+	html := render(t, answeredInput(t))
+	for _, want := range []string{"May the work continue?", "Answer in your own words.", "review-1: approved"} {
+		if !strings.Contains(html, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+	for _, text := range []string{"Approve the previous result?", "May the work continue?"} {
+		if strings.Count(html, text) != 1 {
+			t.Errorf("question %q does not have one body", text)
+		}
+	}
+}
+
+func TestGenerateRecordCoverage(t *testing.T) {
+	html := render(t, answeredInput(t))
+	if !strings.Contains(html, "Limited to artifacts recorded by submit.") {
+		t.Error("missing record coverage")
+	}
+}
+
+func TestGenerateReadOnly(t *testing.T) {
+	input := answeredInput(t)
+	render(t, input)
+	if len(input.Ledger.UnansweredQuestions()) != 1 || input.Ledger.LastRecordID() != recordID(5) {
+		t.Error("rendering changed ledger state")
+	}
+}
+
+func TestGenerateDeterministic(t *testing.T) {
+	input := answeredInput(t)
+	html := render(t, input)
+	if second := render(t, input); second != html {
+		t.Error("identical input did not produce identical HTML")
+	}
+}
+
+func coverageInput(t *testing.T) Input {
+	t.Helper()
 	target := form.TargetVersion{Kind: form.TargetTree, Tree: "current"}
 	norms := []form.NormReference{{Path: "AGENTS.md", BlobID: "norm-current"}}
 	p := plan.Plan{Version: 1, Template: plan.TemplateRef{Name: "docs", ContentHash: strings.Repeat("a", 64)}, Task: "Preserve the contract",
@@ -125,6 +162,9 @@ func TestGenerateCoverageAndDependencies(t *testing.T) {
 	newer.Norms = []form.NormReference{{Path: "AGENTS.md", BlobID: "norm-old"}}
 	newer.JudgmentResult.Judgment = form.Fail
 	newer.Findings = []form.Finding{{ID: "F1", Blocking: true, Kind: form.NeedsDecision, Scenario: "The output contract needs a decision"}}
+	current := judgment
+	current.InstructionID, current.Runner = "check-current", "current-review"
+	p.Stages[0].Checks = append(p.Stages[0].Checks, plan.Check{Aspect: "contract", Runner: "current-review", Required: true, CompletionConditionIDs: []string{"C1"}, Target: "returned tree"})
 	input := loadInput(t, nil, &ledger.PlanVersion{Plan: p, Origin: plan.InitialProposal},
 		&ledger.StageRun{ID: recordID(3), StageID: "implement", PlanVersion: 1, State: ledger.StageJudgmentWait, StopReason: "Checks are pending", NextActor: "judge"},
 		&ledger.Round{ID: recordID(4), StageRunID: recordID(3), SessionID: "session", StartTarget: target, ReturnedTarget: &target, Norms: norms},
@@ -132,49 +172,155 @@ func TestGenerateCoverageAndDependencies(t *testing.T) {
 		&ledger.Artifact{Before: form.TargetVersion{Kind: form.TargetTree, Tree: "before"}, After: target,
 			CompletionConditionIDs: []string{"C1"}, ChangeKind: "Preserve public output", Decisions: []form.Reference{{RecordID: recordID(5)}}},
 		&ledger.Judgment{Judgment: judgment, RoundID: recordID(4)}, &ledger.Judgment{Judgment: newer, RoundID: recordID(4)},
+		&ledger.Judgment{Judgment: current, RoundID: recordID(4)},
 		&ledger.Question{Question: question("review", "Approve the current result?")})
 	input.Targets, input.Norms = []form.TargetVersion{target}, norms
-	html := render(t, input)
-	for _, want := range []string{"Verification coverage map", "Public output", "Guide examples", "Compare the output", "C2: The guide is updated",
-		"No check recorded for this condition.", "Norm mismatch", "A newer result exists", "Unresolved blocking finding F1", "Check to reassess on withdrawal", "Withdrawal requirements"} {
-		if !strings.Contains(html, want) {
-			t.Fatalf("missing %q", want)
+	return input
+}
+
+func TestGenerateCoverage(t *testing.T) {
+	html := render(t, coverageInput(t))
+	coverage := sectionHTML(t, html, "coverage")
+	for _, want := range []string{"Public output", "Guide examples", "Compare the output", "C2: The guide is updated", "No current check recorded for this condition."} {
+		if !strings.Contains(coverage, want) {
+			t.Errorf("missing %q in coverage", want)
 		}
 	}
-	if strings.Index(html, "Unresolved blocking finding F1") > strings.Index(html, "Review provisional decision") {
-		t.Fatal("a provisional decision appeared before a blocking item")
-	}
-	if strings.Count(html, "The output contract needs a decision") != 1 {
-		t.Fatal("finding body was duplicated")
-	}
-	fields := judgmentFields(input, recordID(8), &ledger.Judgment{Judgment: newer, RoundID: recordID(4)})
-	if fields[1].Value == "Valid" {
-		t.Fatal("a judgment with obsolete norms was marked valid")
+	if strings.Contains(coverage, "Invalid for current comparison") {
+		t.Error("historical checks appeared in current coverage")
 	}
 }
 
-func TestGenerateEscapingAndStructureHistory(t *testing.T) {
-	input := loadInput(t, nil, &ledger.Question{Question: question("unsafe", `<script>alert("test")</script>`)})
+func TestGenerateJudgmentValidity(t *testing.T) {
+	html := render(t, coverageInput(t))
+	for _, test := range []struct{ instruction, validity, reason, section string }{
+		{"check-1", "Invalid for current comparison", "A newer result exists", "history"},
+		{"check-2", "Invalid for current comparison", "Norm mismatch", "history"},
+		{"check-current", "Valid", "", "current"},
+	} {
+		t.Run(test.instruction, func(t *testing.T) {
+			body := articleContaining(t, sectionHTML(t, html, test.section), "Instruction ID: "+test.instruction+"\n")
+			if !strings.Contains(body, "<dt>Validity</dt><dd>"+test.validity+"</dd>") {
+				t.Errorf("unexpected judgment validity: %s", body)
+			}
+			if !strings.Contains(body, test.reason) {
+				t.Errorf("missing reason %q", test.reason)
+			}
+		})
+	}
+}
+
+func TestGenerateBlockingFinding(t *testing.T) {
+	html := render(t, coverageInput(t))
+	if strings.Index(html, "Unresolved blocking finding F1") > strings.Index(html, "Review provisional decision") || !strings.Contains(html, "Unresolved blocking finding F1") {
+		t.Error("a blocking item did not appear before provisional decisions")
+	}
+	if strings.Count(html, "The output contract needs a decision") != 1 {
+		t.Error("finding does not have one body")
+	}
+}
+
+func TestGenerateDecisionDependencies(t *testing.T) {
+	html := render(t, coverageInput(t))
+	body := articleContaining(t, sectionHTML(t, html, "current"), "<h3>Decision D1</h3>")
+	for _, want := range []string{"Affected change: Preserve public output", "Check to reassess on withdrawal", "<dt>Withdrawal requirements</dt><dd>not recorded</dd>"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("missing %q", want)
+		}
+	}
+}
+
+func structureInput(t *testing.T) Input {
+	t.Helper()
+	input := loadInput(t, nil)
 	before := Structure{Version: "old", Modules: []Module{{ID: "core", Name: "Core", Responsibility: "Compute", Path: "internal/core"}}}
-	input.Structure = &Structure{Version: "new", Modules: []Module{before.Modules[0], {ID: "ui", Name: `UI"] --> injected["`, Path: "internal/ui"}},
+	input.Structure = &Structure{Version: "new", Modules: []Module{before.Modules[0], {ID: "ui", Name: "UI", Path: "internal/ui"}},
 		Dependencies: []Dependency{{From: "ui", To: "core"}}}
 	input.StructureHistory = []StructureRevision{{Commit: "current", Structure: input.Structure}, {Commit: "previous", Structure: &before}, {Commit: "deleted"}}
+	return input
+}
+
+func TestGenerateEscaping(t *testing.T) {
+	input := loadInput(t, nil, &ledger.Question{Question: question("unsafe", `<script>alert("test")</script>`)})
 	html := render(t, input)
 	if strings.Contains(html, "<script>") || !strings.Contains(html, "&lt;script&gt;") {
 		t.Fatal("record text was not escaped")
 	}
-	for _, want := range []string{"Added module: ui", "Structure at commit previous", "Structure deleted", "internal/core"} {
-		if !strings.Contains(html, want) {
-			t.Fatalf("missing %q", want)
+}
+
+func TestGenerateStructureHistory(t *testing.T) {
+	html := render(t, structureInput(t))
+	current := sectionHTML(t, html, "structure")
+	history := sectionHTML(t, html, "history")
+	if !strings.Contains(current, "Added module: ui") || strings.Contains(current, "Structure at commit") || strings.Contains(current, "Structure deleted") {
+		t.Error("current structure contains historical bodies or omits the current change")
+	}
+	for _, want := range []string{"Structure at commit previous", "Structure deleted", "internal/core"} {
+		if !strings.Contains(history, want) {
+			t.Errorf("missing %q in structure history", want)
 		}
 	}
-	mermaid := StructureMermaid(*input.Structure)
-	if !strings.Contains(mermaid, "m1 -->|depends on| m0") || strings.Contains(mermaid, `injected[`) {
-		t.Fatalf("unexpected dependency diagram: %s", mermaid)
+	bodies := regexp.MustCompile(`(?s)<details id="([^"]+)">(.*?)</details>`).FindAllStringSubmatch(html, -1)
+	for _, version := range []string{"new", "old"} {
+		count := 0
+		for _, body := range bodies {
+			if strings.Contains(body[2], " — "+version+"</summary>") {
+				count++
+			}
+		}
+		if count != 1 {
+			t.Errorf("structure version %q has %d bodies", version, count)
+		}
 	}
-	if strings.Count(html, "Responsibility</th>") != 2 {
-		t.Fatal("a repeated structure version duplicated the diagram body")
+}
+
+func TestStructureMermaidDependencyDirection(t *testing.T) {
+	mermaid := StructureMermaid(*structureInput(t).Structure)
+	nodes := make(map[string]string)
+	for _, node := range regexp.MustCompile(`(?m)^\s*(\w+)\["([^"]+)"\]`).FindAllStringSubmatch(mermaid, -1) {
+		label := regexp.MustCompile(`#([0-9]+);`).ReplaceAllStringFunc(node[2], func(entity string) string {
+			value, err := strconv.Atoi(entity[1 : len(entity)-1])
+			if err != nil {
+				t.Fatal(err)
+			}
+			return string(rune(value))
+		})
+		nodes[label] = node[1]
 	}
+	if nodes["Core"] == "" || nodes["UI"] == "" || !strings.Contains(mermaid, nodes["UI"]+" -->|depends on| "+nodes["Core"]) {
+		t.Fatalf("diagram does not show UI depending on Core: %s", mermaid)
+	}
+}
+
+func TestStructureMermaidEscaping(t *testing.T) {
+	structure := Structure{Modules: []Module{{ID: "unsafe", Name: `UI"] --> injected["`}}}
+	if mermaid := StructureMermaid(structure); strings.Contains(mermaid, `injected[`) || !strings.HasPrefix(mermaid, "flowchart LR") {
+		t.Fatalf("unsafe module name was not encoded: %s", mermaid)
+	}
+}
+
+func sectionHTML(t *testing.T, html, id string) string {
+	t.Helper()
+	_, section, ok := strings.Cut(html, `<section id="`+id+`">`)
+	if !ok {
+		t.Fatalf("missing section %q", id)
+	}
+	section, _, _ = strings.Cut(section, "</section>")
+	return section
+}
+
+func articleContaining(t *testing.T, html, text string) string {
+	t.Helper()
+	var found []string
+	for _, body := range regexp.MustCompile(`(?s)<article\b[^>]*>.*?</article>`).FindAllString(html, -1) {
+		if strings.Contains(body, text) {
+			found = append(found, body)
+		}
+	}
+	if len(found) != 1 {
+		t.Fatalf("found %d articles containing %q", len(found), text)
+	}
+	return found[0]
 }
 
 func TestGenerateRequiresWork(t *testing.T) {
@@ -183,5 +329,116 @@ func TestGenerateRequiresWork(t *testing.T) {
 	}
 	if _, err := Generate(Input{Ledger: &ledger.State{}}); err == nil {
 		t.Fatal("accepted an empty ledger")
+	}
+}
+
+func TestGenerateQuestionAnswersSurviveReplacement(t *testing.T) {
+	old := question("old-review", "Approve the old result?")
+	replacement := question("new-review", "Approve the replacement result?")
+	input := loadInput(t, nil,
+		&ledger.Question{Question: old},
+		&ledger.Approval{Answer: ledger.Answer{QuestionID: old.ID, Target: old.ApprovalTarget, Interpretation: ledger.AnswerApproved,
+			Original: "Approved", SessionID: "session", ObservedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		&ledger.Question{Question: replacement, Supersedes: old.ID})
+	html := render(t, input)
+	historical := articleContaining(t, sectionHTML(t, html, "history"), old.Text)
+	if !strings.Contains(historical, "<dt>Approval state</dt><dd>approved</dd>") || !strings.Contains(historical, "<dt>Effective approval for target</dt><dd>No</dd>") {
+		t.Errorf("the original answer was lost or treated as effective: %s", historical)
+	}
+	pending := articleContaining(t, sectionHTML(t, html, "attention"), replacement.Text)
+	if !strings.Contains(pending, "<dt>Approval state</dt><dd>Unreviewed</dd>") {
+		t.Errorf("the replacement inherited an old answer: %s", pending)
+	}
+	if !strings.Contains(sectionHTML(t, html, "answered"), "old-review: approved") {
+		t.Error("the answered list lost the original answer")
+	}
+}
+
+func TestGenerateEffectiveQuestionApproval(t *testing.T) {
+	body := articleContaining(t, render(t, answeredInput(t)), "Approve the previous result?")
+	if !strings.Contains(body, "<dt>Effective approval for target</dt><dd>Yes</dd>") {
+		t.Error("an effective approval was not identified")
+	}
+}
+
+func TestGenerateCurrentChanges(t *testing.T) {
+	before := form.TargetVersion{Kind: form.TargetTree, Tree: "before"}
+	after := form.TargetVersion{Kind: form.TargetTree, Tree: "after"}
+	input := loadInput(t, nil,
+		&ledger.Artifact{Before: before, After: after, ChangeKind: "Add feature", CompletionConditionIDs: []string{}, Decisions: []form.Reference{}},
+		&ledger.Artifact{Before: after, After: before, ChangeKind: "Remove feature", CompletionConditionIDs: []string{}, Decisions: []form.Reference{}})
+	input.Targets = []form.TargetVersion{before}
+	html := render(t, input)
+	current, history := sectionHTML(t, html, "current"), sectionHTML(t, html, "history")
+	if strings.Contains(current, "Change Add feature") || !strings.Contains(current, "Change Remove feature") {
+		t.Error("current changes include an undone change or omit its replacement")
+	}
+	if !strings.Contains(history, "Change Add feature") || strings.Contains(history, "Change Remove feature") {
+		t.Error("change history does not preserve the undone change separately")
+	}
+	header := regexp.MustCompile(`(?s)<header>.*?</header>`).FindString(html)
+	if strings.Contains(header, "Add feature") || !strings.Contains(header, "Remove feature") {
+		t.Error("current achievement includes an undone change or omits the current change")
+	}
+}
+
+func TestGenerateReintroducedChanges(t *testing.T) {
+	before := form.TargetVersion{Kind: form.TargetTree, Tree: "before"}
+	after := form.TargetVersion{Kind: form.TargetTree, Tree: "after"}
+	input := loadInput(t, nil,
+		&ledger.Artifact{Before: before, After: after, ChangeKind: "Add feature", CompletionConditionIDs: []string{}, Decisions: []form.Reference{}},
+		&ledger.Artifact{Before: after, After: before, ChangeKind: "Remove feature", CompletionConditionIDs: []string{}, Decisions: []form.Reference{}},
+		&ledger.Artifact{Before: before, After: after, ChangeKind: "Restore feature", CompletionConditionIDs: []string{}, Decisions: []form.Reference{}})
+	input.Targets = []form.TargetVersion{after}
+	html := render(t, input)
+	current, history := sectionHTML(t, html, "current"), sectionHTML(t, html, "history")
+	if strings.Contains(current, "Change Add feature") || strings.Contains(current, "Change Remove feature") || !strings.Contains(current, "Change Restore feature") {
+		t.Error("an earlier occurrence of the current target was treated as a current change")
+	}
+	if !strings.Contains(history, "Change Add feature") || !strings.Contains(history, "Change Remove feature") {
+		t.Error("replaced changes were not retained in history")
+	}
+}
+
+func TestGenerateJudgmentTargetMismatch(t *testing.T) {
+	input := coverageInput(t)
+	input.Targets = []form.TargetVersion{{Kind: form.TargetTree, Tree: "different"}}
+	html := render(t, input)
+	body := articleContaining(t, sectionHTML(t, html, "history"), "Instruction ID: check-current\n")
+	if !strings.Contains(body, "<dt>Validity</dt><dd>Invalid for current comparison</dd>") || !strings.Contains(body, "Target mismatch") {
+		t.Error("a check for a different target was not identified as invalid")
+	}
+	if strings.Contains(sectionHTML(t, html, "coverage"), "Public output") {
+		t.Error("coverage includes a check for a different target")
+	}
+}
+
+func TestGenerateRejectsInvalidStructure(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		structure Structure
+	}{
+		{"duplicate module ID", Structure{Modules: []Module{{ID: "core"}, {ID: "core"}}}},
+		{"missing dependent", Structure{Modules: []Module{{ID: "core"}}, Dependencies: []Dependency{{From: "missing", To: "core"}}}},
+		{"missing dependency", Structure{Modules: []Module{{ID: "core"}}, Dependencies: []Dependency{{From: "core", To: "missing"}}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			for _, historical := range []bool{false, true} {
+				t.Run(fmt.Sprintf("historical=%t", historical), func(t *testing.T) {
+					input := loadInput(t, nil)
+					if historical {
+						input.StructureHistory = []StructureRevision{{Commit: "invalid", Structure: &test.structure}}
+					} else {
+						input.Structure = &test.structure
+					}
+					if html, err := Generate(input); err == nil || html != "" {
+						t.Error("invalid structure produced a successful view")
+					}
+				})
+			}
+			if text := StructureMermaid(test.structure); text != "" {
+				t.Errorf("invalid structure produced a diagram: %s", text)
+			}
+		})
 	}
 }

@@ -72,15 +72,16 @@ type diagram struct {
 }
 
 type page struct {
-	WorkID    string
-	Summary   []field
-	Attention []item
-	Current   []item
-	History   []item
-	Answered  []link
-	Recent    []link
-	Coverage  []coverage
-	Structure []diagram
+	WorkID           string
+	Summary          []field
+	Attention        []item
+	Current          []item
+	History          []item
+	Answered         []link
+	Recent           []link
+	Coverage         []coverage
+	Structure        []diagram
+	StructureHistory []diagram
 }
 
 //go:embed view.html
@@ -97,6 +98,18 @@ func Generate(input Input) (string, error) {
 	position := input.Ledger.CurrentPosition()
 	if position.Work == nil {
 		return "", fmt.Errorf("view requires a work record")
+	}
+	if input.Structure != nil {
+		if err := validateStructure(*input.Structure); err != nil {
+			return "", fmt.Errorf("current structure: %w", err)
+		}
+	}
+	for _, revision := range input.StructureHistory {
+		if revision.Structure != nil {
+			if err := validateStructure(*revision.Structure); err != nil {
+				return "", fmt.Errorf("structure at commit %s: %w", revision.Commit, err)
+			}
+		}
 	}
 	p := page{WorkID: position.Work.ID}
 	lastAnswer := ""
@@ -145,11 +158,16 @@ func Generate(input Input) (string, error) {
 		entry.Links = append(entry.Links, relatedChanges(input.Records, question.ApprovalTarget, decisionRecords)...)
 		entry.Fields = append(entry.Fields, field{"Target version", approvalLabel(question.ApprovalTarget)})
 		entry.Links = append(entry.Links, questionChecks(input, question.ApprovalTarget)...)
-		if answer, ok := input.Ledger.ResolveAnswer(question.ApprovalTarget); ok {
+		if answer, ok := answers[question.ID]; ok {
 			entry.Fields = append(entry.Fields, field{"Approval state", string(answer.Answer.Interpretation)})
 			if answer.Answer.Interpretation == ledger.AnswerApproved {
 				entry.Tags = append(entry.Tags, "Approved")
 			}
+			effective := "No"
+			if approval, ok := input.Ledger.ResolveApproval(question.ApprovalTarget); ok && approval.RecordID == answer.RecordID {
+				effective = "Yes"
+			}
+			entry.Fields = append(entry.Fields, field{"Effective approval for target", effective})
 		} else {
 			entry.Fields = append(entry.Fields, field{"Approval state", "Unreviewed"})
 		}
@@ -177,7 +195,7 @@ func Generate(input Input) (string, error) {
 				if slices.ContainsFunc(judgment.Findings, func(f form.Finding) bool { return f.ID == finding.ID }) {
 					entry.Links = []link{recordLink(record.ID, "Finding and evidence")}
 					entry.Fields = append(entry.Fields, field{"Target version", targetLabel(judgment.TargetVersion)})
-					entry.Fields = append(entry.Fields, judgmentFields(input, record.ID, judgment)...)
+					entry.Fields = append(entry.Fields, judgmentFields(input, judgment)...)
 					entry.Links = append(entry.Links, relatedChanges(input.Records, approvalTarget(judgment.TargetVersion), decisionRecords)...)
 					if answer, ok := input.Ledger.ResolveAnswer(approvalTarget(judgment.TargetVersion)); ok {
 						entry.Fields = append(entry.Fields, field{"Approval state", string(answer.Answer.Interpretation)})
@@ -229,7 +247,7 @@ func Generate(input Input) (string, error) {
 				entry.Tags = append(entry.Tags, "Unreviewed")
 			}
 			if value.Provisional && resolved.Valid {
-				entry.Fields = append(entry.Fields, field{"Withdrawal requirements", "Not recorded as a separate field; review dependent changes, decisions, and checks."})
+				entry.Fields = append(entry.Fields, field{"Withdrawal requirements", "not recorded"})
 				entry.Links = append(entry.Links, dependentChecks(input, record.ID)...)
 				if resolved.Status != ledger.DecisionApproved {
 					provisional = append(provisional, item{Title: "Review provisional decision at the next gate or PR review", Links: []link{recordLink(record.ID, value.ID)}})
@@ -243,7 +261,7 @@ func Generate(input Input) (string, error) {
 			entry.Fields = []field{{"Before", targetLabel(value.Before)}, {"After", targetLabel(value.After)},
 				{"Completion conditions", conditionLabels(input, value.CompletionConditionIDs)}, {"Commit", value.Commit}}
 			entry.Links = references(value.Decisions)
-			current = true
+			current = currentArtifact(input, value)
 			for _, reference := range value.Decisions {
 				if decision, ok := decisions[reference.RecordID]; ok && !decision.Valid {
 					entry.Fields = append(entry.Fields, field{"Decision dependency", "Referenced decision is no longer valid: " + decision.Decision.ID + ". This does not undo the recorded change."})
@@ -257,7 +275,8 @@ func Generate(input Input) (string, error) {
 			}
 		case *ledger.Judgment:
 			entry.Title = "Check " + value.Aspect
-			entry.Fields = judgmentFields(input, record.ID, value)
+			entry.Fields = judgmentFields(input, value)
+			current = currentJudgment(input, value)
 			// The result format contains checked scopes and the full findings.
 			text, err := form.RenderMarkdown(value.JudgmentResult)
 			if err != nil {
@@ -289,8 +308,7 @@ func Generate(input Input) (string, error) {
 		for _, condition := range position.Plan.Plan.CompletionConditions {
 			found := false
 			for _, record := range input.Records {
-				if judgment, ok := record.Payload.(*ledger.Judgment); ok && slices.Contains(judgment.CompletionConditionIDs, condition.ID) {
-					fields := judgmentFields(input, record.ID, judgment)
+				if judgment, ok := record.Payload.(*ledger.Judgment); ok && currentJudgment(input, judgment) && slices.Contains(judgment.CompletionConditionIDs, condition.ID) {
 					approval := "Unreviewed"
 					if answer, ok := input.Ledger.ResolveAnswer(approvalTarget(judgment.TargetVersion)); ok {
 						approval = string(answer.Answer.Interpretation)
@@ -298,18 +316,18 @@ func Generate(input Input) (string, error) {
 					p.Coverage = append(p.Coverage, coverage{Condition: condition.ID + ": " + condition.Description,
 						Target: targetLabel(judgment.TargetVersion), Method: judgment.Method,
 						Checked: strings.Join(judgment.CheckedScope, "\n"), Unchecked: strings.Join(judgment.UncheckedScope, "\n"),
-						Judgment: string(judgment.JudgmentResult.Judgment), Validity: fields[1].Value, Approval: approval,
+						Judgment: string(judgment.JudgmentResult.Judgment), Validity: "Valid", Approval: approval,
 						Check: recordLink(record.ID, judgment.Aspect)})
 					found = true
 				}
 			}
 			if !found {
 				p.Coverage = append(p.Coverage, coverage{Condition: condition.ID + ": " + condition.Description,
-					Judgment: string(form.NotAssessed), Unchecked: "No check recorded for this condition.", Approval: "Unreviewed"})
+					Judgment: string(form.NotAssessed), Unchecked: "No current check recorded for this condition.", Approval: "Unreviewed"})
 			}
 		}
 	}
-	p.Structure = structureDiagrams(input)
+	p.Structure, p.StructureHistory = structureDiagrams(input)
 	var output bytes.Buffer
 	if err := pageTemplate.Execute(&output, p); err != nil {
 		return "", fmt.Errorf("render view: %w", err)
@@ -325,7 +343,7 @@ func summary(input Input, position ledger.Position, pending []form.Question, pro
 	completed := []string{}
 	outcomes := []string{}
 	for _, record := range input.Records {
-		if artifact, ok := record.Payload.(*ledger.Artifact); ok {
+		if artifact, ok := record.Payload.(*ledger.Artifact); ok && currentArtifact(input, artifact) {
 			outcomes = append(outcomes, artifact.ChangeKind)
 		}
 	}
@@ -390,18 +408,37 @@ func roundInRun(state *ledger.State, roundID, runID string) bool {
 	return slices.ContainsFunc(state.Rounds(runID), func(round *ledger.Round) bool { return round.ID == roundID })
 }
 
-func judgmentFields(input Input, id string, judgment *ledger.Judgment) []field {
+func currentArtifact(input Input, artifact *ledger.Artifact) bool {
+	if artifact.Before == artifact.After || !slices.Contains(input.Targets, artifact.After) {
+		return false
+	}
+	for i := len(input.Records) - 1; i >= 0; i-- {
+		if latest, ok := input.Records[i].Payload.(*ledger.Artifact); ok && latest.After.Kind == artifact.After.Kind && latest.Before != latest.After {
+			return latest == artifact
+		}
+	}
+	return false
+}
+
+func currentJudgment(input Input, judgment *ledger.Judgment) bool {
+	if !slices.Contains(input.Targets, judgment.TargetVersion) {
+		return false
+	}
+	for _, latest := range input.Ledger.LatestJudgments(judgment.TargetVersion, input.Norms) {
+		if latest.InstructionID == judgment.InstructionID && latest.Aspect == judgment.Aspect && latest.Runner == judgment.Runner {
+			return true
+		}
+	}
+	return false
+}
+
+func judgmentFields(input Input, judgment *ledger.Judgment) []field {
 	fields := []field{{"Judgment", string(judgment.JudgmentResult.Judgment)}}
 	targetMatch := slices.Contains(input.Targets, judgment.TargetVersion)
 	normMatch := judgment.ValidFor(judgment.TargetVersion, input.Norms)
-	latest := true
-	for _, record := range input.Records {
-		if newer, ok := record.Payload.(*ledger.Judgment); ok && record.ID > id && newer.Aspect == judgment.Aspect && newer.Runner == judgment.Runner && newer.TargetVersion == judgment.TargetVersion {
-			latest = false
-		}
-	}
+	current := currentJudgment(input, judgment)
 	validity := "Valid"
-	if !targetMatch || !normMatch || !latest {
+	if !current {
 		validity = "Invalid for current comparison"
 	}
 	fields = append(fields, field{"Validity", validity})
@@ -411,7 +448,7 @@ func judgmentFields(input Input, id string, judgment *ledger.Judgment) []field {
 	if !normMatch {
 		fields = append(fields, field{"Norm mismatch", "The recorded norms differ from the supplied current norms."})
 	}
-	if !latest {
+	if targetMatch && normMatch && !current {
 		fields = append(fields, field{"History", "A newer result exists for this aspect, runner, and target."})
 	}
 	for _, run := range input.Ledger.StageRuns() {
@@ -450,7 +487,7 @@ func questionChecks(input Input, target form.ApprovalTarget) []link {
 	}
 	for _, record := range input.Records {
 		if judgment, ok := record.Payload.(*ledger.Judgment); ok && (approvalTarget(judgment.TargetVersion) == target || slices.Contains(targets, judgment.TargetVersion)) {
-			fields := judgmentFields(input, record.ID, judgment)
+			fields := judgmentFields(input, judgment)
 			links = append(links, recordLink(record.ID, judgment.Aspect+": "+string(judgment.JudgmentResult.Judgment)+"; "+fields[1].Value))
 		}
 	}
@@ -555,8 +592,9 @@ func approvalLabel(target form.ApprovalTarget) string {
 	return "Not recorded"
 }
 
-func structureDiagrams(input Input) []diagram {
+func structureDiagrams(input Input) ([]diagram, []diagram) {
 	var diagrams []diagram
+	var history []diagram
 	seen := make(map[string]string)
 	if input.Structure != nil {
 		current := diagram{ID: anchor("structure", input.Structure.Version), Title: "Current dependency structure", Version: input.Structure.Version,
@@ -585,9 +623,9 @@ func structureDiagrams(input Input) []diagram {
 				entry.Mermaid = StructureMermaid(*revision.Structure)
 			}
 		}
-		diagrams = append(diagrams, entry)
+		history = append(history, entry)
 	}
-	return diagrams
+	return diagrams, history
 }
 
 func structureChanges(before, after *Structure) []string {

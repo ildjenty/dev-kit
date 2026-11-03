@@ -14,6 +14,7 @@ test = { executable = "./scripts/test", args = ["--all"], timeout_seconds = 120 
 review = { executable = "./scripts/judge", args = [], timeout_seconds = 60, output_schema = ".devkit/kit/v1/schemas/judgment.json" }
 [deny]
 rules = ["Bash(git push *)", "Agent(fork)", "mcp__service__write"]
+judge = ["apply_patch", "mcp__service__write"]
 [router]
 human_confirmation = ["billing_changed"]
 [external.comment]
@@ -36,7 +37,7 @@ query = { executable = "./scripts/find-comment", args = [], timeout_seconds = 10
 	if op.Query == nil || op.Query.Timeout() != 10*time.Second || op.OccurrenceField != "request_id" {
 		t.Fatalf("external operation does not match: %+v", op)
 	}
-	if len(c.Deny.Rules) != 3 || c.Router.HumanConfirmation[0] != "billing_changed" {
+	if len(c.Deny.Rules) != 3 || len(c.Deny.Judge) != 2 || c.Deny.Judge[0] != "apply_patch" || c.Router.HumanConfirmation[0] != "billing_changed" {
 		t.Fatalf("rules do not match: %+v", c)
 	}
 }
@@ -59,6 +60,9 @@ func TestParseInvalid(t *testing.T) {
 		{"agent_extra_close", "kit_version = 'v1'\n[deny]\nrules = ['Agent(fork))']", "deny.rules"},
 		{"agent_extra_open", "kit_version = 'v1'\n[deny]\nrules = ['Agent((fork)']", "deny.rules"},
 		{"agent_nested", "kit_version = 'v1'\n[deny]\nrules = ['Agent((fork))']", "deny.rules"},
+		{"judge_empty", "kit_version = 'v1'\n[deny]\njudge = ['']", "deny.judge"},
+		{"judge_command", "kit_version = 'v1'\n[deny]\njudge = ['Bash(git push *)']", "deny.judge"},
+		{"judge_whitespace", "kit_version = 'v1'\n[deny]\njudge = ['apply patch']", "deny.judge"},
 		{"router", "kit_version = 'v1'\n[router]\nhuman_confirmation = ['']", "human_confirmation"},
 	}
 	for _, tt := range tests {

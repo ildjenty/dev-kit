@@ -1,0 +1,3 @@
+[deny]
+rules = ["Bash(git push *)", "Agent(fork)"]
+judge = ["apply_patch", "Edit", "Write", "NotebookEdit"]

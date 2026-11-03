@@ -69,12 +69,12 @@ func approve(t *testing.T, e *External, request Request) string {
 	}
 	approvalTarget := form.ApprovalTarget{Kind: form.ApprovalExternal, External: &target}
 	appendRecord(t, e, &ledger.Question{Question: form.Question{
-		ID: "approval-" + target.DefinitionHash + target.ExecutableHash, Text: "Approve publication?",
+		ID: "approval-" + target.OperationID + target.DefinitionHash + target.ExecutableHash, Text: "Approve publication?",
 		ApprovalTarget: approvalTarget, Options: []string{"approve", "reject", "defer"},
 		StopCategory: "approval", StopReason: "Publication requires approval", Evidence: []form.Reference{},
 	}})
 	r := appendRecord(t, e, &ledger.Approval{Answer: ledger.Answer{
-		QuestionID: "approval-" + target.DefinitionHash + target.ExecutableHash,
+		QuestionID: "approval-" + target.OperationID + target.DefinitionHash + target.ExecutableHash,
 		Target:     approvalTarget, Interpretation: ledger.AnswerApproved, Original: "Approved",
 		SessionID: "session", ObservedAt: time.Now(),
 	}})
@@ -189,8 +189,50 @@ func TestUnknownRecoveryAndPause(t *testing.T) {
 		t.Fatal("recovery cleared the pause")
 	}
 	request.Input = json.RawMessage(`{"message":"Another operation"}`)
-	if _, err := e.Execute(context.Background(), request); err == nil {
-		t.Fatal("new operation started during pause")
+	approve(t, e, request)
+	e.run = func(context.Context, config.Command, json.RawMessage, string) commandResult {
+		calls++
+		return commandResult{Status: ledger.ExternalSucceeded}
+	}
+	if _, err := e.Execute(context.Background(), request); err == nil || err.Error() != "work is paused; use devkit resume before starting an external operation" {
+		t.Fatalf("expected pause rejection: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("new operation started during pause: calls=%d", calls)
+	}
+}
+
+type pauseOnErrContext struct {
+	context.Context
+	pause func()
+}
+
+func (c pauseOnErrContext) Err() error {
+	c.pause()
+	return c.Context.Err()
+}
+
+func TestExecuteRechecksPauseBeforeInvocation(t *testing.T) {
+	e, request := fixture(t)
+	approvalID := approve(t, e, request)
+	ctx := pauseOnErrContext{Context: context.Background(), pause: func() {
+		appendRecord(t, e, &ledger.Pause{Position: form.Reference{RecordID: approvalID}})
+	}}
+	calls := 0
+	e.run = func(context.Context, config.Command, json.RawMessage, string) commandResult {
+		calls++
+		return commandResult{Status: ledger.ExternalSucceeded}
+	}
+	result, err := e.Execute(ctx, request)
+	if err == nil || err.Error() != "work is paused; use devkit resume before starting an external operation" {
+		t.Fatalf("expected pause rejection before invocation: %v", err)
+	}
+	if calls != 0 {
+		t.Fatalf("operation started after pause publication: calls=%d", calls)
+	}
+	recorded, err := e.recorded(result.Operation.OperationID)
+	if err != nil || recorded.RecordID != result.RecordID || recorded.Operation.Status != ledger.ExternalRunning {
+		t.Fatalf("before record was not retained: %+v, %v", recorded, err)
 	}
 }
 

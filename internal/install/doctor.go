@@ -91,12 +91,12 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 		err = fmt.Errorf("skill link must point to ../../.agents/skills/devkit; existing link was preserved")
 	}
 	r.add("skill_link", "Claude Code links to the canonical devkit skill.", err)
-	ignored, err := os.ReadFile(filepath.Join(r.Root, ".gitignore"))
-	if err == nil && !bytes.Equal(ignored, appendLines(ignored, []byte(".devkit/run/\n"))) {
-		err = fmt.Errorf("add .devkit/run/ to .gitignore")
+	ignored, err := runtimeIgnored(ctx, r.Root)
+	if err == nil && !ignored {
+		err = fmt.Errorf(".devkit/run/ is not ignored; run devkit init and review its additions")
 	}
-	r.add("gitignore", "The runtime directory has a .gitignore entry.", err)
-	r.checkWorkVersions(c.KitVersion)
+	r.add("gitignore", "Git ignores the runtime directory.", err)
+	r.checkWorkVersions(c.KitVersion, k)
 	r.checkSession(sessionID)
 	return r, nil
 }
@@ -134,29 +134,47 @@ func requireFile(path string) error {
 	return err
 }
 
-func (r *Report) checkWorkVersions(configVersion string) {
+func (r *Report) checkWorkVersions(configVersion string, k *kit.Kit) {
 	root := filepath.Join(r.Root, ".devkit/run/work")
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		r.add("work_versions", "", err)
 		return
 	}
+	var validator *ledger.Validator
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-		records, err := fsstore.New(filepath.Join(root, entry.Name())).List()
+		if validator == nil {
+			if k == nil {
+				r.add("work_versions", "", fmt.Errorf("kit copy is unavailable; cannot validate work records"))
+				return
+			}
+			sources := make(map[string][]byte)
+			for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
+				source, err := k.ReadFile("schemas/" + name + ".json")
+				if err != nil {
+					r.add("work_versions", "", err)
+					return
+				}
+				sources[name] = source
+			}
+			validator, err = ledger.NewValidator(sources)
+			if err != nil {
+				r.add("work_versions", "", err)
+				return
+			}
+		}
+		records, err := ledger.List(fsstore.New(filepath.Join(root, entry.Name())), validator)
 		found := false
 		if err == nil {
 			for _, record := range records {
-				if record.Kind != string(ledger.KindWork) {
+				work, ok := record.Payload.(*ledger.Work)
+				if !ok {
 					continue
 				}
 				found = true
-				var work ledger.Work
-				if err = fsstore.DecodePayload(record.Payload, &work); err != nil {
-					break
-				}
 				if work.KitVersion != kit.Version || configVersion != "" && work.KitVersion != configVersion {
 					err = fmt.Errorf("Work kit version %q does not match binary %q and configuration %q", work.KitVersion, kit.Version, configVersion)
 					break
@@ -185,7 +203,8 @@ func (r *Report) checkSession(sessionID string) {
 		r.add("hook_session", "", err)
 		return
 	}
-	for _, entry := range entries {
+	for i := len(entries) - 1; i >= 0; i-- {
+		entry := entries[i]
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), "-SessionStart.json") {
 			continue
 		}

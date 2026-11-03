@@ -152,7 +152,7 @@ func (h Handler) subagentStop(e event.Event, state *ledger.State, now time.Time)
 		} else if e.Host == event.Codex {
 			result.Model = e.Model
 		}
-		return publishJSON(fsstore.New(h.workRoot()), filepath.Join("results", instruction.ID+"-"+e.AgentID+".json"), result)
+		return publishSubagentResult(h.workRoot(), result)
 	}
 	return nil
 }

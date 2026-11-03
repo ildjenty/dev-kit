@@ -13,7 +13,11 @@ func (h Handler) preToolUse(e event.Event, state *ledger.State) (event.Result, e
 	if h.ReadConfig == nil {
 		return event.Result{}, fmt.Errorf("normative configuration reader is required")
 	}
-	reference := "HEAD"
+	work, ok := state.Work()
+	if !ok {
+		return event.Result{}, fmt.Errorf("work record is required")
+	}
+	reference := work.Branch
 	if round, ok := state.OpenRound(); ok {
 		reference = round.StartTarget.Tree
 	}
@@ -24,6 +28,13 @@ func (h Handler) preToolUse(e event.Event, state *ledger.State) (event.Result, e
 	for _, rule := range settings.Deny.Rules {
 		if matchesRule(rule, e) {
 			return denied("Operation matches deny rule: " + rule), nil
+		}
+	}
+	if e.AgentID != "" && strings.HasPrefix(e.AgentType, "devkit-") {
+		for _, tool := range settings.Deny.Judge {
+			if e.ToolName == tool {
+				return denied("Operation matches judge deny tool: " + tool), nil
+			}
 		}
 	}
 	if e.Agent == nil || !strings.HasPrefix(e.Agent.Type, "devkit-") {

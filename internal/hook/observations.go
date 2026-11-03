@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ildjenty/dev-kit/internal/host/event"
@@ -33,6 +34,29 @@ type SubagentResult struct {
 	Effort        string          `json:"effort,omitempty"`
 	Model         string          `json:"model,omitempty"`
 	Content       json.RawMessage `json:"content"`
+}
+
+func publishSubagentResult(workRoot string, result SubagentResult) error {
+	dir := filepath.Join(workRoot, "results")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	publication, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	defer publication.Close()
+	// Keep the existence check and rename atomic across result collectors.
+	if err := syscall.Flock(int(publication.Fd()), syscall.LOCK_EX); err != nil {
+		return fmt.Errorf("result publication lock %s: %w", dir, err)
+	}
+	name := filepath.Join("results", result.InstructionID+"-"+result.AgentID+".json")
+	if _, err := os.Lstat(filepath.Join(workRoot, name)); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	return publishJSON(fsstore.New(workRoot), name, result)
 }
 
 // PublishSession publishes a hook observation or a CLI binding operation under runRoot.
