@@ -124,7 +124,7 @@ func TestSubmissionRecovery(t *testing.T) {
 				}
 				// Recovery must use the saved submission even when the checkout changes.
 				write(t, e.Root(), "README.md", "# Later checkout\n")
-				reopened, err := New(ctx, e.Root(), e.sessionID)
+				reopened, err := newTestEngine(ctx, e.Root(), e.sessionID)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -214,7 +214,7 @@ func TestCommitRecoveryAfterPauseInHook(t *testing.T) {
 		t.Fatalf("commit did not pause before completion records: %+v, %v", paused, err)
 	}
 	head := git(t, e.Root(), "rev-parse", "HEAD")
-	reopened, err := New(ctx, e.Root(), e.sessionID)
+	reopened, err := newTestEngine(ctx, e.Root(), e.sessionID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestPauseAndStatusWithoutForwardAssets(t *testing.T) {
 			e, ctx := fixture(t)
 			working(t, e, ctx)
 			write(t, e.Root(), broken, "Invalid configuration or schema")
-			reopened, err := New(ctx, e.Root(), e.sessionID)
+			reopened, err := newTestEngine(ctx, e.Root(), e.sessionID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -317,7 +317,7 @@ func TestMissingBriefIsRegenerated(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := os.Remove(issued.Instruction.Brief); err != nil {
+			if err := os.RemoveAll(filepath.Join(e.workRoot(), "brief")); err != nil {
 				t.Fatal(err)
 			}
 			write(t, e.Root(), "README.md", "# Later checkout\n")
@@ -597,7 +597,7 @@ func TestPlannerOmitsCorrectedHumanInstructions(t *testing.T) {
 func TestPreCommitPathFollowsGitConfiguration(t *testing.T) {
 	e, ctx := fixture(t)
 	git(t, e.Root(), "config", "core.hooksPath", ".custom-hooks")
-	path, err := e.preCommitPath(ctx)
+	path, err := e.workspace.PreCommitPath(ctx)
 	if err != nil || path != ".custom-hooks/pre-commit" {
 		t.Fatalf("effective hook path was not resolved: %q, %v", path, err)
 	}
@@ -815,7 +815,7 @@ func TestCommitRecoveryCompletesPartialRecords(t *testing.T) {
 					}
 				}
 			}
-			reopened, err := New(ctx, e.Root(), e.sessionID)
+			reopened, err := newTestEngine(ctx, e.Root(), e.sessionID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1199,7 +1199,7 @@ func TestStartResumesBeforeInitialInstruction(t *testing.T) {
 					}
 				}
 			}
-			reopened, err := New(ctx, e.Root(), e.sessionID)
+			reopened, err := newTestEngine(ctx, e.Root(), e.sessionID)
 			if err != nil {
 				t.Fatal(err)
 			}

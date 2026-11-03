@@ -16,25 +16,42 @@ import (
 	"github.com/ildjenty/dev-kit/internal/external"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/hook"
-	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 	"github.com/ildjenty/dev-kit/internal/plan"
 	"github.com/ildjenty/dev-kit/internal/workspace"
-	"github.com/oklog/ulid/v2"
 )
 
 // Engine advances one checkout. SessionID is the current host session, not a work ID.
 // Each operation reloads records; subagents are always launched by the caller.
 type Engine struct {
-	workspace *workspace.Workspace
-	sessionID string
-	version   string
-	schemas   map[string][]byte
-	forms     map[string]*form.Schema
-	plans     *plan.Validator
-	validator *ledger.Validator
-	workID    string
+	workspace      *workspace.Workspace
+	sessionID      string
+	version        string
+	schemas        map[string][]byte
+	forms          map[string]*form.Schema
+	plans          *plan.Validator
+	validator      *ledger.Validator
+	workID         string
+	runDir         string
+	workDir        string
+	newWork        func() (string, string)
+	schemasForWork func() (map[string][]byte, error)
+	readConfig     func(context.Context, string) (config.Config, error)
+}
+
+// Options supplies checkout, work, storage, configuration, and kit values resolved by the caller.
+// LoadSchemas is deferred until a forward operation needs the working kit copy.
+type Options struct {
+	Workspace   *workspace.Workspace
+	SessionID   string
+	WorkID      string
+	RunRoot     string
+	WorkRoot    string
+	KitVersion  string
+	NewWork     func() (id, root string)
+	LoadSchemas func() (map[string][]byte, error)
+	ReadConfig  func(context.Context, string) (config.Config, error)
 }
 
 // StartRequest identifies the repository template and the task supplied by the human.
@@ -65,47 +82,24 @@ type Status struct {
 	Warning      string               `json:"warning,omitempty"`
 }
 
-// New opens a checkout. Forward operations load schemas from its kit copy. An empty session ID
-// uses CLAUDE_CODE_SESSION_ID, then CODEX_THREAD_ID. Pause also works without a session.
-func New(ctx context.Context, cwd, sessionID string) (*Engine, error) {
-	w, err := workspace.Open(ctx, cwd)
-	if err != nil {
-		return nil, err
+// New assembles an engine from resolved values without loading forward assets.
+func New(options Options) (*Engine, error) {
+	if options.SessionID != "" && !localName(options.SessionID) {
+		return nil, fmt.Errorf("invalid session ID: %q", options.SessionID)
 	}
-	if sessionID == "" {
-		sessionID = os.Getenv("CLAUDE_CODE_SESSION_ID")
-		if sessionID == "" {
-			sessionID = os.Getenv("CODEX_THREAD_ID")
-		}
-	}
-	if sessionID != "" && !localName(sessionID) {
-		return nil, fmt.Errorf("invalid session ID: %q", sessionID)
-	}
-	return &Engine{workspace: w, sessionID: sessionID, version: kit.Version}, nil
+	return &Engine{workspace: options.Workspace, sessionID: options.SessionID, version: options.KitVersion,
+		workID: options.WorkID, runDir: options.RunRoot, workDir: options.WorkRoot,
+		newWork: options.NewWork, schemasForWork: options.LoadSchemas, readConfig: options.ReadConfig}, nil
 }
 
 func (e *Engine) initialize() error {
 	if e.plans != nil {
 		return nil
 	}
-	data, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
+	var err error
+	e.schemas, err = e.schemasForWork()
 	if err != nil {
 		return err
-	}
-	settings, err := config.Parse(data)
-	if err != nil {
-		return err
-	}
-	k, err := kit.Open(e.Root(), settings.KitVersion)
-	if err != nil {
-		return err
-	}
-	e.schemas = map[string][]byte{}
-	for _, name := range schemaNames {
-		e.schemas[name], err = k.ReadFile("schemas/" + name + ".json")
-		if err != nil {
-			return err
-		}
 	}
 	validator, err := ledger.NewValidator(e.schemas)
 	if err != nil {
@@ -130,7 +124,10 @@ func (e *Engine) initialize() error {
 	return nil
 }
 
-var schemaNames = []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan", "planner-result", "detection-result"}
+// SchemaNames returns the kit schema names required by forward operations.
+func SchemaNames() []string {
+	return []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan", "planner-result", "detection-result"}
+}
 
 // Historical record validation remains available while forward assets are edited.
 // Forward operations replace this validator with the working kit schemas.
@@ -154,7 +151,7 @@ func (e *Engine) recordValidator() error {
 			return errors.New("work and kit versions do not match")
 		}
 		sources := map[string][]byte{}
-		for _, name := range schemaNames {
+		for _, name := range SchemaNames() {
 			if name == "planner-result" || name == "detection-result" {
 				continue
 			}
@@ -175,8 +172,8 @@ func localName(name string) bool {
 
 // Root returns the resolved checkout root.
 func (e *Engine) Root() string          { return e.workspace.Root() }
-func (e *Engine) runRoot() string       { return filepath.Join(e.Root(), ".devkit/run") }
-func (e *Engine) workRoot() string      { return filepath.Join(e.runRoot(), "work", e.workID) }
+func (e *Engine) runRoot() string       { return e.runDir }
+func (e *Engine) workRoot() string      { return e.workDir }
 func (e *Engine) store() *fsstore.Store { return fsstore.New(e.workRoot()) }
 func hash(data []byte) string           { return fmt.Sprintf("%x", sha256.Sum256(data)) }
 func (e *Engine) append(payload ledger.Payload) (string, error) {
@@ -215,24 +212,16 @@ func (e *Engine) resolve(ctx context.Context, bind bool) (*ledger.State, string,
 			return nil, "", err
 		}
 	}
-	id := ""
-	if obs != nil {
-		id = obs.WorkID
-	}
 	branch, branchErr := e.workspace.Branch(ctx)
-	if id == "" && strings.HasPrefix(branch, "devkit/") {
-		id = strings.TrimPrefix(branch, "devkit/")
-	}
-	if id == "" || !localName(id) {
+	if e.workID == "" || !localName(e.workID) {
 		return nil, "", errors.New("no work is bound to this session or branch")
 	}
-	e.workID = id
 	state, err := e.load()
 	if err != nil {
 		return nil, "", err
 	}
 	work, ok := state.Work()
-	if !ok || work.ID != id {
+	if !ok || work.ID != e.workID {
 		return nil, "", errors.New("work record does not match the work directory")
 	}
 	if work.KitVersion != e.version {
@@ -251,7 +240,7 @@ func (e *Engine) resolve(ctx context.Context, bind bool) (*ledger.State, string,
 			return nil, "", err
 		}
 		bound := *obs
-		bound.WorkID = id
+		bound.WorkID = e.workID
 		bound.ObservedAt = time.Now().UTC()
 		if err := hook.PublishSession(e.runRoot(), bound, "bind"); err != nil {
 			return nil, "", err
@@ -355,18 +344,7 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	if !localName(name) || strings.TrimSpace(request.Task) == "" {
 		return Result{}, errors.New("a template name and task are required")
 	}
-	id := obs.WorkID
-	if id == "" {
-		branch, err := e.workspace.Branch(ctx)
-		if err != nil {
-			return Result{}, err
-		}
-		if strings.HasPrefix(branch, "devkit/") {
-			id = strings.TrimPrefix(branch, "devkit/")
-		}
-	}
-	if id != "" {
-		e.workID = id
+	if e.workID != "" {
 		state, err := e.load()
 		if err != nil {
 			return Result{}, err
@@ -432,7 +410,7 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	if template.Name != name {
 		return Result{}, errors.New("template name does not match its file name")
 	}
-	e.workID = ulid.Make().String()
+	e.workID, e.workDir = e.newWork()
 	lock, err := e.store().Lock()
 	if err != nil {
 		return Result{}, err
@@ -784,14 +762,15 @@ func (e *Engine) reference(ctx context.Context, state *ledger.State) (string, er
 	return e.workspace.Head(ctx)
 }
 func (e *Engine) settings(ctx context.Context, ref string) (config.Config, error) {
-	data, err := e.workspace.ReadFile(ctx, ref, "devkit.toml")
-	if err != nil {
-		return config.Config{}, err
-	}
-	return config.Parse(data)
+	return e.readConfig(ctx, ref)
 }
 func (e *Engine) norms(ctx context.Context, ref string) ([]form.NormReference, error) {
-	ids, err := e.workspace.NormativeIDs(ctx, ref)
+	return NormativeReferences(ctx, e.workspace, ref)
+}
+
+// NormativeReferences returns sorted norm identities, distinguishing trees from blobs.
+func NormativeReferences(ctx context.Context, w *workspace.Workspace, ref string) ([]form.NormReference, error) {
+	ids, err := w.NormativeIDs(ctx, ref)
 	if err != nil {
 		return nil, err
 	}

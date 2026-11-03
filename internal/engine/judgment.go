@@ -56,20 +56,27 @@ func normRefs(norms []check.Norm) []form.NormReference {
 	}
 	return refs
 }
-func (e *Engine) outputSchema(ctx context.Context, ref, runner string) ([]byte, *form.Schema, error) {
+func (e *Engine) judgmentSchema(ctx context.Context, ref, runner string) ([]byte, error) {
 	settings, err := e.settings(ctx, ref)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	source, err := e.asset(ctx, ref, "schemas/judgment.json")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if command, ok := settings.Judges[runner]; ok {
 		source, err = e.workspace.ReadFile(ctx, ref, command.OutputSchema)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
+	}
+	return source, nil
+}
+func (e *Engine) outputSchema(ctx context.Context, ref, runner string) ([]byte, *form.Schema, error) {
+	source, err := e.judgmentSchema(ctx, ref, runner)
+	if err != nil {
+		return nil, nil, err
 	}
 	resources := map[string][]byte{}
 	for name := range e.schemas {
@@ -125,48 +132,11 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 	var progress *form.Progress
 	findings := []form.Finding{}
 	if round != nil {
-		bound, ok, err := e.boundPlan(version)
-		if err != nil {
+		if err := e.roundNorms(ctx, state, round.ID, version, norms); err != nil {
 			return meta, instructionData{}, false, err
-		}
-		if !ok {
-			return meta, instructionData{}, false, errors.New("bound plan is missing")
-		}
-		agreed, err := json.MarshalIndent(bound, "", "  ")
-		if err != nil {
-			return meta, instructionData{}, false, err
-		}
-		additional := "\n\n## Agreed plan\n\n" + string(agreed)
-		for _, issued := range state.UnacceptedInstructions() {
-			if issued.Kind == form.InstructionWork && issued.RoundID == round.ID {
-				body, err := e.instructionBrief(issued.ID)
-				if err != nil {
-					return meta, instructionData{}, false, err
-				}
-				additional += "\n\n## Work brief\n\n" + string(body)
-			}
-		}
-		// Submitted work instructions are no longer pending; locate the accepted issuance too.
-		records, err := e.records()
-		if err != nil {
-			return meta, instructionData{}, false, err
-		}
-		for _, record := range records {
-			if progress, ok := record.Payload.(*ledger.Progress); ok && progress.RoundID == round.ID && !strings.HasPrefix(progress.InstructionID, "human-") {
-				body, err := e.instructionBrief(progress.InstructionID)
-				if err != nil {
-					return meta, instructionData{}, false, err
-				}
-				additional += "\n\n## Accepted work brief\n\n" + string(body)
-			}
-		}
-		for index := range norms {
-			if norms[index].Reference.Path == ".devkit" {
-				norms[index].Content += additional
-			}
 		}
 		requestKind = check.RoundRequest
-		records, err = e.records()
+		records, err := e.records()
 		if err != nil {
 			return meta, instructionData{}, false, err
 		}
@@ -176,7 +146,7 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 				progress = &copy
 			}
 		}
-		findings = state.UnresolvedBlocking(round.StageRunID)
+		findings = check.FindingsForAspect(item.Aspect, state.UnresolvedBlocking(round.StageRunID))
 	}
 	input := check.RequestInput{Kind: requestKind, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: aspect, TargetVersion: target, TargetPath: path, Norms: norms, OutputSchema: schema, CompletionConditionIDs: append([]string{}, item.CompletionConditionIDs...), Progress: progress, PreviousFindings: findings, Authorizations: []check.Authorization{}}
 	answers := state.AnsweredQuestions()
@@ -201,21 +171,107 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 	data := instructionData{Reference: ref, Request: &request, Instruction: form.Instruction{ID: meta.ID, Kind: kind, TargetPath: path, Runner: string(item.Runner), Text: "Launch the assigned judge with: devkit-instruction " + meta.ID}}
 	return meta, data, fresh, nil
 }
+func (e *Engine) roundNorms(ctx context.Context, state *ledger.State, roundID string, version int, norms []check.Norm) error {
+	bound, ok, err := e.boundPlan(version)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("bound plan is missing")
+	}
+	agreed, err := json.MarshalIndent(bound, "", "  ")
+	if err != nil {
+		return err
+	}
+	additional := "\n\n## Agreed plan\n\n" + string(agreed)
+	for _, issued := range state.UnacceptedInstructions() {
+		if issued.Kind == form.InstructionWork && issued.RoundID == roundID {
+			body, err := e.instructionBrief(issued.ID)
+			if err != nil {
+				return err
+			}
+			additional += "\n\n## Work brief\n\n" + string(body)
+		}
+	}
+	// Submitted work instructions are no longer pending; locate the accepted issuance too.
+	records, err := e.records()
+	if err != nil {
+		return err
+	}
+	for _, record := range records {
+		if progress, ok := record.Payload.(*ledger.Progress); ok && progress.RoundID == roundID && !strings.HasPrefix(progress.InstructionID, "human-") {
+			body, err := e.instructionBrief(progress.InstructionID)
+			if err != nil {
+				return err
+			}
+			additional += "\n\n## Accepted work brief\n\n" + string(body)
+		}
+	}
+	for index := range norms {
+		if norms[index].Reference.Path == ".devkit" {
+			norms[index].Content += additional
+		}
+	}
+	return nil
+}
+
+func (e *Engine) hydrateRequest(ctx context.Context, data instructionData) error {
+	if data.Request == nil || len(data.Request.Norms) == 0 || data.Request.Norms[0].Content != "" {
+		return nil
+	}
+	norms, _, err := e.normDocuments(ctx, data.Reference)
+	if err != nil {
+		return err
+	}
+	if data.Request.Kind == check.RoundRequest {
+		records, err := e.records()
+		if err != nil {
+			return err
+		}
+		for _, record := range records {
+			if meta, ok := record.Payload.(*ledger.Instruction); ok && meta.ID == data.Instruction.ID {
+				state, err := e.load()
+				if err != nil {
+					return err
+				}
+				if err := e.roundNorms(ctx, state, meta.RoundID, meta.PlanVersion, norms); err != nil {
+					return err
+				}
+				break
+			}
+		}
+	}
+	data.Request.Norms = norms
+	return nil
+}
+
 func (e *Engine) publishJudgment(ctx context.Context, meta ledger.Instruction, data instructionData, fresh bool) (Result, error) {
-	template, err := e.asset(ctx, data.Reference, "templates/brief/judgment.md.tmpl")
-	if err != nil {
-		return Result{}, err
-	}
-	content, err := json.MarshalIndent(data.Request, "", "  ")
-	if err != nil {
-		return Result{}, err
-	}
-	b, err := brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: meta.ID, Content: "```json\n" + string(content) + "\n```", OutputSchema: string(data.Request.OutputSchema)})
+	b, err := e.judgmentBrief(ctx, data)
 	if err != nil {
 		return Result{}, err
 	}
 	return e.publishInstruction(meta, fresh, data, b.Text)
 }
+
+func (e *Engine) judgmentBrief(ctx context.Context, data instructionData) (brief.Brief, error) {
+	if err := e.hydrateRequest(ctx, data); err != nil {
+		return brief.Brief{}, err
+	}
+	template, err := e.asset(ctx, data.Reference, "templates/brief/judgment.md.tmpl")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	content, err := json.MarshalIndent(data.Request, "", "  ")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	schema, err := e.judgmentSchema(ctx, data.Reference, data.Instruction.Runner)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: "```json\n" + string(content) + "\n```", OutputSchema: string(schema)})
+}
+
 func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan) (Result, error) {
 	head, err := e.workspace.Head(ctx)
 	if err != nil {
@@ -465,7 +521,7 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 	meta := slices.Contains(p.MetaLoopStages, stage.ID)
 	categories := differenceCategories(paths, meta)
 	if !meta {
-		hookPath, err := e.preCommitPath(ctx)
+		hookPath, err := e.workspace.PreCommitPath(ctx)
 		if err != nil {
 			return Result{}, err
 		}
@@ -618,7 +674,7 @@ func (e *Engine) matches(ctx context.Context, tree string) (bool, error) {
 	return actual == tree, err
 }
 func changedCommand(request check.Request, output string, result *check.CommandResult) check.Judgment {
-	return check.Judgment{JudgmentResult: form.JudgmentResult{InstructionID: request.InstructionID, Aspect: request.Aspect.ID, TargetVersion: request.TargetVersion, Norms: normRefs(request.Norms), CompletionConditionIDs: []string{}, Judgment: check.Fail, Findings: []form.Finding{{ID: request.InstructionID + ":target-changed", Blocking: true, Kind: form.AutoFixable, Scenario: "The command changed its target, or the working tree did not match before execution.\n" + output}}, CheckedScope: []string{}, UncheckedScope: []string{request.TargetPath}, Method: "Working tree comparison before and after command execution", Environment: "work checkout"}, Runner: request.Runner, Provenance: check.Provenance{Source: check.JudgeCommand, InstructionID: request.InstructionID, Runner: request.Runner}, Command: result}
+	return check.Judgment{JudgmentResult: form.JudgmentResult{InstructionID: request.InstructionID, Aspect: request.Aspect.ID, TargetVersion: request.TargetVersion, Norms: normRefs(request.Norms), CompletionConditionIDs: []string{}, Judgment: check.Fail, Findings: []form.Finding{{ID: check.FindingID(request.Aspect.ID, request.InstructionID+":target-changed"), Blocking: true, Kind: form.AutoFixable, Scenario: "The command changed its target, or the working tree did not match before execution.\n" + output}}, CheckedScope: []string{}, UncheckedScope: []string{request.TargetPath}, Method: "Working tree comparison before and after command execution", Environment: "work checkout"}, Runner: request.Runner, Provenance: check.Provenance{Source: check.JudgeCommand, InstructionID: request.InstructionID, Runner: request.Runner}, Command: result}
 }
 func (e *Engine) runCheck(ctx context.Context, request check.Request, command config.Command, stage, tree string) (check.Judgment, error) {
 	match, err := e.matches(ctx, tree)
@@ -791,7 +847,9 @@ func gateApproved(state *ledger.State, run *ledger.StageRun, round *ledger.Round
 }
 
 func commandTargetChanged(judgment check.Judgment) bool {
-	return slices.ContainsFunc(judgment.Findings, func(f form.Finding) bool { return f.ID == judgment.InstructionID+":target-changed" })
+	return slices.ContainsFunc(judgment.Findings, func(f form.Finding) bool {
+		return f.ID == check.FindingID(judgment.Aspect, judgment.InstructionID+":target-changed")
+	})
 }
 
 func (e *Engine) roundJudgments(round *ledger.Round) ([]check.Judgment, error) {

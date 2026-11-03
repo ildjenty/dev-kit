@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -38,7 +37,7 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		r.Warning = warning
 		pending := state.UnacceptedInstructions()
 		if len(pending) > 0 {
-			data, err := e.readInstruction(pending[len(pending)-1].ID)
+			data, err := e.readInstructionFacts(pending[len(pending)-1].ID)
 			if err != nil {
 				return r, err
 			}
@@ -996,18 +995,4 @@ func (e *Engine) replaceQuestionTarget(ctx context.Context, round *ledger.Round,
 	copy.ReturnedTarget = &target
 	_, err = e.append(&copy)
 	return err
-}
-
-func (e *Engine) preCommitPath(ctx context.Context) (string, error) {
-	cmd := exec.CommandContext(ctx, "git", "rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-commit")
-	cmd.Dir = e.Root()
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	path, err := filepath.Rel(e.Root(), strings.TrimSpace(string(output)))
-	if err != nil {
-		return "", err
-	}
-	return filepath.ToSlash(path), nil
 }

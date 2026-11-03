@@ -83,7 +83,7 @@ func fixture(t *testing.T) (*Engine, context.Context) {
 	if err := hook.PublishSession(filepath.Join(root, ".devkit/run"), hook.SessionObservation{Host: event.ClaudeCode, SessionID: "session-one", ObservedAt: time.Now().UTC()}, "SessionStart"); err != nil {
 		t.Fatal(err)
 	}
-	e, err := New(ctx, root, "session-one")
+	e, err := newTestEngine(ctx, root, "session-one")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -370,7 +370,7 @@ func TestNewSessionReissuesPlannerAndWork(t *testing.T) {
 	if err = hook.PublishSession(e.runRoot(), hook.SessionObservation{Host: event.ClaudeCode, SessionID: "session-two", ObservedAt: time.Now().UTC()}, "SessionStart"); err != nil {
 		t.Fatal(err)
 	}
-	second, err := New(ctx, e.Root(), "session-two")
+	second, err := newTestEngine(ctx, e.Root(), "session-two")
 	if err != nil {
 		t.Fatal(err)
 	}

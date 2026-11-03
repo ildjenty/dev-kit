@@ -7,11 +7,11 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/ildjenty/dev-kit/internal/config"
-	"github.com/ildjenty/dev-kit/internal/engine"
 	"github.com/ildjenty/dev-kit/internal/hook"
 	"github.com/ildjenty/dev-kit/internal/host/event"
 	"github.com/ildjenty/dev-kit/internal/ledger"
@@ -122,7 +122,7 @@ func processHook(ctx context.Context, e event.Event) (event.Result, error) {
 		return readAgent(ctx, w, ref, host, name)
 	}
 	h.InstructionRunner = func(instruction ledger.Instruction) (string, error) {
-		runtime, err := engine.New(ctx, w.Root(), e.SessionID)
+		runtime, err := newEngine(ctx, w.Root(), e.SessionID)
 		if err != nil {
 			return "", err
 		}
@@ -176,8 +176,15 @@ func readAgent(ctx context.Context, w *workspace.Workspace, ref string, host eve
 		if !ok {
 			continue
 		}
-		value = strings.Trim(strings.TrimSpace(value), "\"'")
-		switch strings.TrimSpace(key) {
+		key = strings.TrimSpace(key)
+		if key != "name" && key != "model" && key != "effort" {
+			continue
+		}
+		value, err = frontmatterValue(value)
+		if err != nil {
+			return hook.AgentDefinition{}, err
+		}
+		switch key {
 		case "name":
 			definition.Name = value
 		case "model":
@@ -187,4 +194,46 @@ func readAgent(ctx context.Context, w *workspace.Workspace, ref string, host eve
 		}
 	}
 	return definition, nil
+}
+
+func frontmatterValue(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	if value[0] == '\'' {
+		var result strings.Builder
+		for i := 1; i < len(value); i++ {
+			if value[i] != '\'' {
+				result.WriteByte(value[i])
+				continue
+			}
+			if i+1 < len(value) && value[i+1] == '\'' {
+				result.WriteByte('\'')
+				i++
+				continue
+			}
+			return result.String(), nil
+		}
+		return "", errors.New("agent front matter contains an unterminated quoted value")
+	}
+	if value[0] == '"' {
+		for i := 1; i < len(value); i++ {
+			if value[i] == '\\' {
+				i++
+				continue
+			}
+			if value[i] == '"' {
+				return strconv.Unquote(value[:i+1])
+			}
+		}
+		return "", errors.New("agent front matter contains an unterminated quoted value")
+	}
+	for i := range value {
+		if value[i] == '#' && (i == 0 || value[i-1] == ' ' || value[i-1] == '\t') {
+			value = value[:i]
+			break
+		}
+	}
+	return strings.TrimSpace(value), nil
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/form"
@@ -12,6 +13,31 @@ import (
 type JudgmentValue = form.JudgmentValue
 type Finding = form.Finding
 type FindingKind = form.FindingKind
+
+// FindingID identifies a finding by its aspect and its aspect-local ID.
+func FindingID(aspect, id string) string {
+	return strconv.Itoa(len(aspect)) + ":" + aspect + id
+}
+
+// FindingsForAspect returns aspect-local IDs for a correction request.
+// Accepted findings retain their namespace in records and aggregate results.
+func FindingsForAspect(aspect string, findings []Finding) []Finding {
+	prefix := FindingID(aspect, "")
+	result := []Finding{}
+	for _, finding := range findings {
+		id, ok := strings.CutPrefix(finding.ID, prefix)
+		if !ok {
+			continue
+		}
+		finding.ID = id
+		finding.ResolvedFindingIDs = slices.Clone(finding.ResolvedFindingIDs)
+		for i, resolved := range finding.ResolvedFindingIDs {
+			finding.ResolvedFindingIDs[i] = strings.TrimPrefix(resolved, prefix)
+		}
+		result = append(result, finding)
+	}
+	return result
+}
 
 const (
 	Pass          = form.Pass
@@ -124,6 +150,13 @@ func AcceptResult(request Request, data []byte, schema *form.Schema, provenance 
 	if result.Judgment == Fail && !slices.ContainsFunc(result.Findings, func(f Finding) bool { return f.Blocking }) {
 		return Judgment{}, false, fmt.Errorf("FAIL judgment contains no blocking findings")
 	}
+	for i := range judgment.Findings {
+		finding := &judgment.Findings[i]
+		finding.ID = FindingID(result.Aspect, finding.ID)
+		for j, id := range finding.ResolvedFindingIDs {
+			finding.ResolvedFindingIDs[j] = FindingID(result.Aspect, id)
+		}
+	}
 	return judgment, true, nil
 }
 
@@ -153,7 +186,7 @@ func FromCommand(request Request, result CommandResult) (Judgment, error) {
 	} else if result.ExitCode != 0 {
 		value = Fail
 		findings = append(findings, Finding{
-			ID: request.InstructionID + ":command", Blocking: true, Kind: AutoFixable,
+			ID: FindingID(request.Aspect.ID, request.InstructionID+":command"), Blocking: true, Kind: AutoFixable,
 			Scenario: fmt.Sprintf("%s failed with exit code %d.\n%s", request.Runner, result.ExitCode, result.Output),
 		})
 	}

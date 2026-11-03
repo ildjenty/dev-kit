@@ -216,17 +216,49 @@ type Round struct {
 	Decision       *router.Decision     `json:"decision,omitempty"`
 }
 
-// Instruction stores issuance metadata only; engine regenerates its text and brief.
+// Instruction stores issuance facts; engine regenerates its text and brief.
 type Instruction struct {
-	ID          string               `json:"id"`
-	Kind        form.InstructionKind `json:"kind"`
-	TargetKey   string               `json:"target_key"`
-	Reissue     int                  `json:"reissue"`
-	SessionID   string               `json:"session_id"`
-	RoundID     string               `json:"round_id,omitempty"`
-	StageRunID  string               `json:"stage_run_id,omitempty"`
-	PlanVersion int                  `json:"plan_version,omitempty"`
-	QuestionID  string               `json:"question_id,omitempty"`
+	ID           string                `json:"id"`
+	Kind         form.InstructionKind  `json:"kind"`
+	TargetKey    string                `json:"target_key"`
+	Reissue      int                   `json:"reissue"`
+	SessionID    string                `json:"session_id"`
+	RoundID      string                `json:"round_id,omitempty"`
+	StageRunID   string                `json:"stage_run_id,omitempty"`
+	PlanVersion  int                   `json:"plan_version,omitempty"`
+	QuestionID   string                `json:"question_id,omitempty"`
+	Reference    string                `json:"reference,omitempty"`
+	Runner       string                `json:"runner,omitempty"`
+	TargetPath   string                `json:"target_path,omitempty"`
+	TemplateName string                `json:"template_name,omitempty"`
+	Origin       plan.ProposalOrigin   `json:"origin,omitempty"`
+	Request      *check.Request        `json:"request,omitempty"`
+	Detection    *InstructionDetection `json:"detection,omitempty"`
+	Context      *InstructionContext   `json:"context,omitempty"`
+}
+
+// InstructionDetection preserves the inputs used to accept a detection result.
+type InstructionDetection struct {
+	Spec     check.DetectionSpec     `json:"spec"`
+	Identity check.DetectionIdentity `json:"identity"`
+	Examples map[string]string       `json:"examples"`
+}
+
+// InstructionOutput preserves a prior output supplied when an instruction was issued.
+type InstructionOutput struct {
+	StageID string `json:"stage_id"`
+	Content string `json:"content"`
+}
+
+// InstructionContext keeps issuance-time facts, without storing rendered briefs.
+type InstructionContext struct {
+	Outputs           []InstructionOutput `json:"outputs"`
+	Findings          []check.Finding     `json:"findings"`
+	CurrentPlan       *plan.Plan          `json:"current_plan,omitempty"`
+	RemainingPlan     *plan.Plan          `json:"remaining_plan,omitempty"`
+	HumanInstructions string              `json:"human_instructions,omitempty"`
+	Commands          []check.Judgment    `json:"commands,omitempty"`
+	PreCommitOutput   string              `json:"pre_commit_output,omitempty"`
 }
 
 type Artifact struct {

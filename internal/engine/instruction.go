@@ -270,7 +270,11 @@ func (e *Engine) publishInstruction(meta ledger.Instruction, fresh bool, data in
 		if _, err := os.Stat(i.Brief); errors.Is(err, os.ErrNotExist) {
 			text = data.BriefText
 			if text == "" {
-				return Result{}, errors.New("instruction brief must be regenerated from its reference")
+				body, err := e.regenerateBrief(context.Background(), meta, data)
+				if err != nil {
+					return Result{}, err
+				}
+				text = body.Text
 			}
 		} else if err != nil {
 			return Result{}, err
@@ -292,6 +296,17 @@ func (e *Engine) publishInstruction(meta ledger.Instruction, fresh bool, data in
 		return Result{}, err
 	}
 	if fresh {
+		meta.Reference, meta.Runner, meta.TargetPath = data.Reference, i.Runner, i.TargetPath
+		meta.TemplateName, meta.Origin = data.TemplateName, data.Origin
+		meta.Request, meta.Detection = data.Request, data.Detection
+		if data.Request != nil {
+			request := *data.Request
+			request.Norms = slices.Clone(request.Norms)
+			for i := range request.Norms {
+				request.Norms[i].Content = ""
+			}
+			meta.Request = &request
+		}
 		if meta.RoundID != "" {
 			state, err := e.load()
 			if err != nil {
@@ -324,13 +339,44 @@ func (e *Engine) publishInstruction(meta ledger.Instruction, fresh bool, data in
 	return r, nil
 }
 func (e *Engine) readInstruction(id string) (instructionData, error) {
-	var data instructionData
-	source, err := os.ReadFile(filepath.Join(e.workRoot(), "brief", id+".json"))
+	data, err := e.readInstructionFacts(id)
 	if err != nil {
 		return data, err
 	}
-	err = json.Unmarshal(source, &data)
-	return data, err
+	return data, e.hydrateRequest(context.Background(), data)
+}
+
+func (e *Engine) readInstructionFacts(id string) (instructionData, error) {
+	records, err := e.records()
+	if err != nil {
+		return instructionData{}, err
+	}
+	for _, record := range records {
+		meta, ok := record.Payload.(*ledger.Instruction)
+		if !ok || meta.ID != id {
+			continue
+		}
+		i := form.Instruction{ID: meta.ID, Kind: meta.Kind, TargetKey: meta.TargetKey, Reissue: meta.Reissue, Runner: meta.Runner, TargetPath: meta.TargetPath, Brief: filepath.Join(e.workRoot(), "brief", id+".md")}
+		switch meta.Kind {
+		case form.InstructionPlan:
+			i.Text = "Launch the planner with: devkit-instruction " + id
+		case form.InstructionWork:
+			i.Text = "Perform the work described in the brief, then run devkit submit."
+		case form.InstructionJudgment, form.InstructionPlanCheck:
+			i.Text = "Launch the assigned judge with: devkit-instruction " + id
+		case form.InstructionDetectionTest:
+			i.Text = "Run the detection test with the assigned judge: devkit-instruction " + id
+		case form.InstructionQuestion:
+			for _, r := range records {
+				if question, ok := r.Payload.(*ledger.Question); ok && question.ID == meta.QuestionID {
+					q := question.Question
+					i.Question, i.Text = &q, q.Text
+				}
+			}
+		}
+		return instructionData{Instruction: i, Reference: meta.Reference, Origin: meta.Origin, TemplateName: meta.TemplateName, Request: meta.Request, Detection: meta.Detection}, nil
+	}
+	return instructionData{}, fmt.Errorf("instruction not found: %s", id)
 }
 
 func (e *Engine) instructionBrief(id string) ([]byte, error) {
@@ -343,17 +389,74 @@ func (e *Engine) instructionBrief(id string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if data.BriefText == "" {
-		return nil, errors.New("instruction brief must be regenerated from its reference")
+	records, err := e.records()
+	if err != nil {
+		return nil, err
 	}
-	body = []byte(data.BriefText)
-	return body, e.store().Publish(name, body)
+	for _, record := range records {
+		if meta, ok := record.Payload.(*ledger.Instruction); ok && meta.ID == id {
+			b, err := e.regenerateBrief(context.Background(), *meta, data)
+			if err != nil {
+				return nil, err
+			}
+			body = []byte(b.Text)
+			return body, e.store().Publish(name, body)
+		}
+	}
+	return nil, fmt.Errorf("instruction not found: %s", id)
+}
+
+func (e *Engine) regenerateBrief(ctx context.Context, meta ledger.Instruction, data instructionData) (brief.Brief, error) {
+	state, err := e.load()
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	switch meta.Kind {
+	case form.InstructionPlan:
+		template, source, err := e.template(ctx, data.Reference, data.TemplateName)
+		if err != nil {
+			return brief.Brief{}, err
+		}
+		return e.plannerBrief(ctx, state, template, source, meta.PlanVersion, data.Origin, data.Reference, &meta)
+	case form.InstructionWork:
+		p, ok, err := e.boundPlan(meta.PlanVersion)
+		if err != nil {
+			return brief.Brief{}, err
+		}
+		if !ok {
+			return brief.Brief{}, errors.New("bound plan is missing")
+		}
+		for _, round := range state.Rounds(meta.StageRunID) {
+			if round.ID != meta.RoundID {
+				continue
+			}
+			for _, run := range state.StageRuns() {
+				if run.ID == meta.StageRunID {
+					stage, ok := p.Stage(run.StageID)
+					if !ok {
+						return brief.Brief{}, errors.New("bound stage is missing")
+					}
+					return e.workBrief(ctx, state, p, stage, round, &meta)
+				}
+			}
+		}
+		return brief.Brief{}, errors.New("instruction round is missing")
+	case form.InstructionJudgment, form.InstructionPlanCheck:
+		return e.judgmentBrief(ctx, data)
+	case form.InstructionDetectionTest:
+		return e.detectionBrief(ctx, data)
+	case form.InstructionQuestion:
+		text, err := form.RenderMarkdown(*data.Instruction.Question)
+		return brief.Brief{Text: text}, err
+	default:
+		return brief.Brief{}, fmt.Errorf("unsupported instruction kind: %s", meta.Kind)
+	}
 }
 
 // InstructionRunner resolves the runner from an issued request for hook collection.
-// The engine must first resolve its work through Status, Next, or another operation.
+// The caller supplies the resolved work and loads its record validator before collection.
 func (e *Engine) InstructionRunner(instruction ledger.Instruction) (string, error) {
-	data, err := e.readInstruction(instruction.ID)
+	data, err := e.readInstructionFacts(instruction.ID)
 	if err != nil {
 		return "", err
 	}
@@ -375,42 +478,36 @@ func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte
 	}
 	if !fresh {
 		old, err := e.readInstruction(meta.ID)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err != nil {
 			return Result{}, err
 		}
-		if err == nil {
-			if old.BriefText != "" {
-				return e.publishInstruction(meta, false, old, "")
-			}
-			if _, err := os.Stat(old.Instruction.Brief); err == nil {
-				return e.publishInstruction(meta, false, old, "")
-			} else if !errors.Is(err, os.ErrNotExist) {
-				return Result{}, err
-			}
-			ref = old.Reference
-			t, source, err = e.template(ctx, ref, old.TemplateName)
-			if err != nil {
-				return Result{}, err
-			}
-		}
+		return e.publishInstruction(meta, false, old, "")
 	}
-	template, err := e.asset(ctx, ref, "templates/brief/planner.md.tmpl")
+	b, err := e.plannerBrief(ctx, state, t, source, version, origin, ref, &meta)
 	if err != nil {
 		return Result{}, err
+	}
+	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Runner: "devkit-planner", Text: "Launch the planner with: devkit-instruction " + meta.ID}, Reference: ref, Origin: origin, TemplateName: t.Name}, b.Text)
+}
+
+func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.PlanTemplate, source []byte, version int, origin plan.ProposalOrigin, ref string, meta *ledger.Instruction) (brief.Brief, error) {
+	template, err := e.asset(ctx, ref, "templates/brief/planner.md.tmpl")
+	if err != nil {
+		return brief.Brief{}, err
 	}
 	_, docs, err := e.normDocuments(ctx, ref)
 	if err != nil {
-		return Result{}, err
+		return brief.Brief{}, err
 	}
 	facts, err := e.repository(ctx, ref)
 	if err != nil {
-		return Result{}, err
+		return brief.Brief{}, err
 	}
 	definitions := []brief.Document{}
 	for _, stage := range append(slices.Clone(t.Stages), t.OptionalStages...) {
 		data, err := e.asset(ctx, ref, "stages/"+stage.ID+".md")
 		if err != nil {
-			return Result{}, err
+			return brief.Brief{}, err
 		}
 		definitions = append(definitions, brief.Document{Path: e.kitPath("stages/" + stage.ID + ".md"), Content: string(data)})
 		facts.AvailableChecks = append(facts.AvailableChecks, stage.Checks...)
@@ -418,13 +515,17 @@ func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte
 	work, _ := state.Work()
 	task, err := os.ReadFile(filepath.Join(e.workRoot(), work.TaskRef))
 	if err != nil {
-		return Result{}, err
+		return brief.Brief{}, err
 	}
 	outputs, err := e.outputs(state)
 	if err != nil {
-		return Result{}, err
+		return brief.Brief{}, err
 	}
-	input := brief.PlannerInput{RequestTemplate: string(template), InstructionID: meta.ID, Version: version, Template: t, TemplateHash: plan.ContentHash(source), Task: string(task), StageDefinitions: definitions, Repository: facts, Norms: docs, PreviousOutputs: outputs, OutputSchema: string(e.schemas["planner-result"])}
+	outputSchema, err := e.asset(ctx, ref, "schemas/planner-result.json")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	input := brief.PlannerInput{RequestTemplate: string(template), InstructionID: meta.ID, Version: version, Template: t, TemplateHash: plan.ContentHash(source), Task: string(task), StageDefinitions: definitions, Repository: facts, Norms: docs, PreviousOutputs: outputs, OutputSchema: string(outputSchema)}
 	if p, ok := latestPlan(state); ok {
 		input.CurrentPlan = &p.Plan
 		if origin == plan.BackProposal {
@@ -457,7 +558,7 @@ func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte
 	}
 	records, err := e.records()
 	if err != nil {
-		return Result{}, err
+		return brief.Brief{}, err
 	}
 	effective := state.AnsweredQuestions()
 	for _, record := range records {
@@ -481,12 +582,20 @@ func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte
 			}
 		}
 	}
-	b, err := brief.BuildPlanner(input)
-	if err != nil {
-		return Result{}, err
+	if meta.Context == nil {
+		meta.Context = &ledger.InstructionContext{Findings: input.PreviousFindings, CurrentPlan: input.CurrentPlan, RemainingPlan: input.RemainingPlan, HumanInstructions: input.HumanInstructions}
+		for _, output := range input.PreviousOutputs {
+			meta.Context.Outputs = append(meta.Context.Outputs, ledger.InstructionOutput{StageID: output.StageID, Content: output.Content})
+		}
+	} else {
+		input.PreviousOutputs = instructionOutputs(meta.Context)
+		input.PreviousFindings = meta.Context.Findings
+		input.CurrentPlan, input.RemainingPlan = meta.Context.CurrentPlan, meta.Context.RemainingPlan
+		input.HumanInstructions = meta.Context.HumanInstructions
 	}
-	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Runner: "devkit-planner", Text: "Launch the planner with: devkit-instruction " + meta.ID}, Reference: ref, Origin: origin, TemplateName: t.Name}, b.Text)
+	return brief.BuildPlanner(input)
 }
+
 func (e *Engine) workInstruction(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, round *ledger.Round) (Result, error) {
 	meta, fresh, err := e.issuance(form.InstructionWork, round.ID, round, p.Version, "")
 	if err != nil {
@@ -494,67 +603,12 @@ func (e *Engine) workInstruction(ctx context.Context, state *ledger.State, p pla
 	}
 	if !fresh {
 		old, err := e.readInstruction(meta.ID)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err != nil {
 			return Result{}, err
 		}
-		if err == nil {
-			if old.BriefText != "" {
-				return e.publishInstruction(meta, false, old, "")
-			}
-			if _, err := os.Stat(old.Instruction.Brief); err == nil {
-				return e.publishInstruction(meta, false, old, "")
-			} else if !errors.Is(err, os.ErrNotExist) {
-				return Result{}, err
-			}
-		}
+		return e.publishInstruction(meta, false, old, "")
 	}
-	ref := round.StartTarget.Tree
-	template, err := e.asset(ctx, ref, "templates/brief/work.md.tmpl")
-	if err != nil {
-		return Result{}, err
-	}
-	definition, err := e.asset(ctx, ref, "stages/"+stage.ID+".md")
-	if err != nil {
-		return Result{}, err
-	}
-	_, docs, err := e.normDocuments(ctx, ref)
-	if err != nil {
-		return Result{}, err
-	}
-	facts, err := e.repository(ctx, ref)
-	if err != nil {
-		return Result{}, err
-	}
-	facts.AvailableChecks = stage.Checks
-	outputs, err := e.outputs(state)
-	if err != nil {
-		return Result{}, err
-	}
-	input := brief.WorkInput{RequestTemplate: string(template), InstructionID: meta.ID, Stage: stage, StageDefinition: string(definition), Plan: p, Purpose: p.Task, Repository: facts, Norms: docs, PreviousOutputs: outputs, PreviousFindings: state.UnresolvedBlocking(round.StageRunID), OutputSchema: string(e.schemas["progress"])}
-	for _, condition := range p.CompletionConditions {
-		input.Verification = append(input.Verification, condition.ID+": "+condition.Description)
-	}
-	records, err := e.records()
-	if err != nil {
-		return Result{}, err
-	}
-	for _, r := range records {
-		switch value := r.Payload.(type) {
-		case *ledger.Judgment:
-			if value.Command != nil {
-				for _, previous := range state.Rounds(round.StageRunID) {
-					if previous.ID == value.RoundID {
-						input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: value.Aspect, Runner: plan.Runner(value.Runner)}, ExitCode: value.Command.ExitCode, Output: value.Command.Output})
-					}
-				}
-			}
-		case *ledger.StageRun:
-			if value.ID == round.StageRunID && value.StopReason != "" {
-				input.PreCommitOutput = value.StopReason
-			}
-		}
-	}
-	b, err := brief.BuildWork(input)
+	b, err := e.workBrief(ctx, state, p, stage, round, &meta)
 	if err != nil {
 		return Result{}, err
 	}
@@ -565,8 +619,87 @@ func (e *Engine) workInstruction(ctx context.Context, state *ledger.State, p pla
 			return Result{}, err
 		}
 	}
-	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Text: "Perform the work described in the brief, then run devkit submit."}, Reference: ref}, b.Text)
+	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Text: "Perform the work described in the brief, then run devkit submit."}, Reference: round.StartTarget.Tree}, b.Text)
 }
+
+func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, round *ledger.Round, meta *ledger.Instruction) (brief.Brief, error) {
+	ref := round.StartTarget.Tree
+	template, err := e.asset(ctx, ref, "templates/brief/work.md.tmpl")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	definition, err := e.asset(ctx, ref, "stages/"+stage.ID+".md")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	_, docs, err := e.normDocuments(ctx, ref)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	facts, err := e.repository(ctx, ref)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	facts.AvailableChecks = stage.Checks
+	outputs, err := e.outputs(state)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	outputSchema, err := e.asset(ctx, ref, "schemas/progress.json")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	input := brief.WorkInput{RequestTemplate: string(template), InstructionID: meta.ID, Stage: stage, StageDefinition: string(definition), Plan: p, Purpose: p.Task, Repository: facts, Norms: docs, PreviousOutputs: outputs, PreviousFindings: state.UnresolvedBlocking(round.StageRunID), OutputSchema: string(outputSchema)}
+	for _, condition := range p.CompletionConditions {
+		input.Verification = append(input.Verification, condition.ID+": "+condition.Description)
+	}
+	commands := []check.Judgment{}
+	records, err := e.records()
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	for _, r := range records {
+		switch value := r.Payload.(type) {
+		case *ledger.Judgment:
+			if value.Command != nil {
+				for _, previous := range state.Rounds(round.StageRunID) {
+					if previous.ID == value.RoundID {
+						input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: value.Aspect, Runner: plan.Runner(value.Runner)}, ExitCode: value.Command.ExitCode, Output: value.Command.Output})
+						commands = append(commands, value.Judgment)
+					}
+				}
+			}
+		case *ledger.StageRun:
+			if value.ID == round.StageRunID && value.StopReason != "" {
+				input.PreCommitOutput = value.StopReason
+			}
+		}
+	}
+	if meta.Context == nil {
+		meta.Context = &ledger.InstructionContext{Findings: input.PreviousFindings, Commands: commands, PreCommitOutput: input.PreCommitOutput}
+		for _, output := range input.PreviousOutputs {
+			meta.Context.Outputs = append(meta.Context.Outputs, ledger.InstructionOutput{StageID: output.StageID, Content: output.Content})
+		}
+	} else {
+		input.PreviousOutputs = instructionOutputs(meta.Context)
+		input.PreviousFindings = meta.Context.Findings
+		input.PreCommitOutput = meta.Context.PreCommitOutput
+		input.CommandOutputs = nil
+		for _, command := range meta.Context.Commands {
+			input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: command.Aspect, Runner: plan.Runner(command.Runner)}, ExitCode: command.Command.ExitCode, Output: command.Command.Output})
+		}
+	}
+	return brief.BuildWork(input)
+}
+
+func instructionOutputs(context *ledger.InstructionContext) []brief.StageOutput {
+	var outputs []brief.StageOutput
+	for _, output := range context.Outputs {
+		outputs = append(outputs, brief.StageOutput{StageID: output.StageID, Content: output.Content})
+	}
+	return outputs
+}
+
 func (e *Engine) table(ctx context.Context, ref string) (router.Table, error) {
 	data, err := e.asset(ctx, ref, "router/default.toml")
 	if err != nil {

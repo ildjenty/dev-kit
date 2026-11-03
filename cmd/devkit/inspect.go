@@ -10,8 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/engine"
 	"github.com/ildjenty/dev-kit/internal/form"
@@ -110,7 +108,7 @@ func inspect(ctx context.Context, e *engine.Engine, name string, f *flag.FlagSet
 	if err != nil {
 		return err
 	}
-	norms, err := normativeReferences(ctx, w, tree)
+	norms, err := engine.NormativeReferences(ctx, w, tree)
 	if err != nil {
 		return err
 	}
@@ -169,27 +167,4 @@ func parseStructure(data []byte, version string) (*view.Structure, error) {
 	}
 	structure.Version = version
 	return &structure, nil
-}
-
-func normativeReferences(ctx context.Context, w *workspace.Workspace, ref string) ([]form.NormReference, error) {
-	ids, err := w.NormativeIDs(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	paths := make([]string, 0, len(ids))
-	for path := range ids {
-		paths = append(paths, path)
-	}
-	slices.Sort(paths)
-	refs := make([]form.NormReference, 0, len(paths))
-	for _, path := range paths {
-		ref := form.NormReference{Path: path}
-		if path == ".devkit" || strings.HasSuffix(path, "/agents") {
-			ref.TreeID = ids[path]
-		} else {
-			ref.BlobID = ids[path]
-		}
-		refs = append(refs, ref)
-	}
-	return refs, nil
 }

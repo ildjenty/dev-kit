@@ -133,7 +133,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		}
 		return nil
 	}
-	e, err := engine.New(ctx, cwd, sessionID())
+	e, err := newEngine(ctx, cwd, sessionID())
 	if err != nil {
 		return err
 	}

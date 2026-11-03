@@ -17,11 +17,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
-type detectionInput struct {
-	Spec     check.DetectionSpec     `json:"spec"`
-	Identity check.DetectionIdentity `json:"identity"`
-	Examples map[string]string       `json:"examples"`
-}
+type detectionInput = ledger.InstructionDetection
 
 func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check) (detectionInput, error) {
 	expanded, err := e.expanded(ctx, ref)
@@ -211,19 +207,7 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 		return Result{}, false, err
 	}
 	data := instructionData{Reference: ref, Instruction: form.Instruction{ID: meta.ID, Kind: form.InstructionDetectionTest, Runner: string(item.Runner), TargetPath: path, Text: "Run the detection test with the assigned judge: devkit-instruction " + meta.ID}, Request: &request, Detection: &input}
-	template, err := e.asset(ctx, ref, "templates/brief/judgment.md.tmpl")
-	if err != nil {
-		return Result{}, false, err
-	}
-	content, err := json.MarshalIndent(struct {
-		Request   check.Request  `json:"request"`
-		Detection detectionInput `json:"detection"`
-	}{request, input}, "", "  ")
-	if err != nil {
-		return Result{}, false, err
-	}
-	text := "Evaluate each example independently against the aspect. Return an observation for each file. For violations, explain whether the blocking finding detects the intended violation; for conforming and allowed cases, explain why the relevant difference is respected. Each nested judgment must use the instruction ID, aspect, target, and norms from the request.\n\n```json\n" + string(content) + "\n```"
-	b, err := brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: meta.ID, Content: text, OutputSchema: string(output)})
+	b, err := e.detectionBrief(ctx, data)
 	if err != nil {
 		return Result{}, false, err
 	}
@@ -233,12 +217,37 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 	}
 	return e.executeDetection(ctx, state, meta, data, r)
 }
+func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brief.Brief, error) {
+	if err := e.hydrateRequest(ctx, data); err != nil {
+		return brief.Brief{}, err
+	}
+	template, err := e.asset(ctx, data.Reference, "templates/brief/judgment.md.tmpl")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	content, err := json.MarshalIndent(struct {
+		Request   check.Request  `json:"request"`
+		Detection detectionInput `json:"detection"`
+	}{*data.Request, *data.Detection}, "", "  ")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	text := "Evaluate each example independently against the aspect. Return an observation for each file. For violations, explain whether the blocking finding detects the intended violation; for conforming and allowed cases, explain why the relevant difference is respected. Each nested judgment must use the instruction ID, aspect, target, and norms from the request.\n\n```json\n" + string(content) + "\n```"
+	schema, err := e.asset(ctx, data.Reference, "schemas/detection-result.json")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, OutputSchema: string(schema)})
+}
 func (e *Engine) executeDetection(ctx context.Context, state *ledger.State, meta ledger.Instruction, data instructionData, r Result) (Result, bool, error) {
 	settings, err := e.settings(ctx, data.Reference)
 	if err != nil {
 		return Result{}, false, err
 	}
 	if command, ok := settings.Judges[data.Instruction.Runner]; ok {
+		if err := e.hydrateRequest(ctx, data); err != nil {
+			return Result{}, false, err
+		}
 		expected, err := e.workspace.SnapshotTree(ctx)
 		if err != nil {
 			return Result{}, false, err

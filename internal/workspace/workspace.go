@@ -68,6 +68,19 @@ func (w *Workspace) Head(ctx context.Context) (string, error) {
 	return w.line(ctx, nil, "rev-parse", "--verify", "HEAD^{commit}")
 }
 
+// PreCommitPath returns the effective pre-commit hook path relative to the checkout.
+func (w *Workspace) PreCommitPath(ctx context.Context) (string, error) {
+	output, err := w.run(ctx, nil, "rev-parse", "--path-format=absolute", "--git-path", "hooks/pre-commit")
+	if err != nil {
+		return "", err
+	}
+	path, err := filepath.Rel(w.root, strings.TrimSpace(string(output)))
+	if err != nil {
+		return "", err
+	}
+	return filepath.ToSlash(path), nil
+}
+
 // CreateBranch creates a branch from the current HEAD and switches to it.
 // Pass devkit/<work ID> as the work branch name.
 func (w *Workspace) CreateBranch(ctx context.Context, name string) error {
