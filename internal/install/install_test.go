@@ -5,13 +5,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/BurntSushi/toml"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
@@ -159,6 +162,13 @@ func TestInitPreservesExistingFilesAndSettings(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, body := range preserved {
+		if name == "devkit.toml" {
+			configuration, err := config.Parse(readFile(t, root, name))
+			if err != nil || !slices.Equal(configuration.Router.HumanConfirmation, []string{"custom"}) {
+				t.Fatalf("existing devkit settings were lost: %+v, %v", configuration, err)
+			}
+			continue
+		}
 		if string(readFile(t, root, name)) != body {
 			t.Errorf("existing file was overwritten: %s", name)
 		}
@@ -409,5 +419,44 @@ func TestDoctorUsesLatestSessionStart(t *testing.T) {
 		if check := checkNamed(t, report, "hook_session"); check.OK != (body == observation) {
 			t.Fatalf("latest observation was not validated: %s: %+v", body, check)
 		}
+	}
+}
+
+func TestInitMergesDenyDefaults(t *testing.T) {
+	for _, existing := range []bool{false, true} {
+		t.Run(fmt.Sprint(existing), func(t *testing.T) {
+			root := repository(t)
+			if existing {
+				writeFile(t, root, "devkit.toml", "kit_version = \""+kit.Version+"\"\n[deny]\nrules = [\"CustomTool\"]\njudge = [\"CustomWrite\"]\n")
+			}
+			if _, err := Init(context.Background(), root, nil); err != nil {
+				t.Fatal(err)
+			}
+			configuration, err := config.Parse(readFile(t, root, "devkit.toml"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, rule := range []string{"Bash(git push *)", "Agent(fork)"} {
+				if !slices.Contains(configuration.Deny.Rules, rule) {
+					t.Errorf("missing default rule %q", rule)
+				}
+			}
+			for _, tool := range []string{"apply_patch", "Edit", "Write", "NotebookEdit"} {
+				if !slices.Contains(configuration.Deny.Judge, tool) {
+					t.Errorf("missing judge tool %q", tool)
+				}
+			}
+			if existing && (!slices.Contains(configuration.Deny.Rules, "CustomTool") || !slices.Contains(configuration.Deny.Judge, "CustomWrite")) {
+				t.Fatal("existing deny settings were replaced")
+			}
+			before := readFile(t, root, "devkit.toml")
+			result, err := Init(context.Background(), root, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(result.Changes) != 0 || !bytes.Equal(before, readFile(t, root, "devkit.toml")) {
+				t.Fatal("repeated init changed settings")
+			}
+		})
 	}
 }

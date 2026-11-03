@@ -66,9 +66,18 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 	if err != nil {
 		return result, err
 	}
-	if err := result.addFile("devkit.toml", configuration); err != nil {
+	deny, err := k.ReadFile("hosts/deny.toml")
+	if err != nil {
 		return result, err
 	}
+	configuration, err = mergeTOML(configuration, deny)
+	if err != nil {
+		return result, err
+	}
+	if _, err := config.Parse(configuration); err != nil {
+		return result, err
+	}
+	result.addChange("devkit.toml", existing, configuration)
 	for _, pair := range [][2]string{
 		{"plans", ".devkit/plans"},
 		{"checks", ".devkit/checks"},

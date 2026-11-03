@@ -2,9 +2,21 @@
 
 dev-kit は、Claude Code や Codex CLI のセッション内で、リポジトリ専用の開発ループを回すための道具である。
 
-dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバイナリである。リポジトリの持ち主が[ループの雛形](docs/architecture/data.md#ループの雛形-plantemplate)(作業の段階と判定・承認の組み合わせ)を組む。kit は[7つの部品](docs/design.md#部品)、原則、[固定物](docs/architecture/modules.md#kit)(バージョン付きの資産)、`devkit` を提供する。現在は設計段階で、コードはまだない。
+dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバイナリである。リポジトリの持ち主が[ループの雛形](docs/architecture/data.md#ループの雛形-plantemplate)(作業の段階と判定・承認の組み合わせ)を組む。kit は[7つの部品](docs/design.md#部品)、原則、[固定物](docs/architecture/modules.md#kit)(バージョン付きの資産)、`devkit` を提供する。
 
-バイナリの配布と導入は [install](docs/architecture/modules.md#install)、導入後の確認は [doctor](docs/architecture/modules.md#doctor-の確認項目)に従う。
+## Installation
+
+Install Go (the version required by `go.mod`) and Git, then clone this repository. Run the script from the repository you want to initialize:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+cd /path/to/your-repository
+/path/to/dev-kit/install.sh
+```
+
+The script builds `devkit`, installs it in `~/.local/bin`, and runs `devkit init` in the current checkout. Pass a different directory on `PATH` as its optional argument. Existing repository settings and assets are preserved; missing kit settings, including deny defaults, are merged.
+
+In Codex, trust the project interactively and trust each project hook through `/hooks`. In Claude Code, accept workspace trust. Start a new host session and run `devkit doctor`, then use `/devkit` to begin. Run `devkit help` for command arguments. See [install](docs/architecture/modules.md#install) and [doctor](docs/architecture/modules.md#doctor-の確認項目) for the design.
 
 ## 参照順序
 

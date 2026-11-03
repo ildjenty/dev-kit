@@ -1,11 +1,256 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+
+	"github.com/ildjenty/dev-kit/internal/engine"
+	"github.com/ildjenty/dev-kit/internal/external"
+	"github.com/ildjenty/dev-kit/internal/install"
+	"github.com/ildjenty/dev-kit/internal/kit"
+	"github.com/ildjenty/dev-kit/internal/ledger"
+	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 )
 
+const usage = `Usage: devkit <command> [arguments]
+  start [--plan <name>] <task>
+  next
+  submit <file>
+  plan <file> | plan --withdraw
+  answer [--interpretation approved|rejected|deferred|text] [--text <text>]
+         [--observation <basename>] [--supersedes <answer_record_id>] <question_id>
+  external --target <target> [--instruction <id>] <kind> <input_file>
+  external --recover <operation_id>
+  note <decision|evidence|lesson> <file>
+  pause [reason]
+  resume
+  abort
+  status [--records | --record <id>]
+  view
+  init
+  doctor
+  version
+  hook <event> [--host claude-code|codex]
+`
+
 func main() {
-	fmt.Fprintln(os.Stderr, "devkit is not implemented.")
-	os.Exit(2)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := run(ctx, os.Args[1:], os.Stdin, os.Stdout); err != nil {
+		fmt.Fprintln(os.Stderr, "devkit:", err)
+		os.Exit(1)
+	}
+}
+
+func sessionID() string {
+	if id := os.Getenv("CLAUDE_CODE_SESSION_ID"); id != "" {
+		return id
+	}
+	return os.Getenv("CODEX_THREAD_ID")
+}
+
+func flags(name string) *flag.FlagSet {
+	f := flag.NewFlagSet(name, flag.ContinueOnError)
+	f.SetOutput(io.Discard)
+	return f
+}
+
+func parse(f *flag.FlagSet, args []string, min, max int) error {
+	if err := f.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return fmt.Errorf("%s", usage)
+		}
+		return err
+	}
+	if f.NArg() < min || f.NArg() > max {
+		return fmt.Errorf("invalid arguments for %s; run devkit help", f.Name())
+	}
+	return nil
+}
+
+func run(ctx context.Context, args []string, input io.Reader, output io.Writer) error {
+	if len(args) == 0 || args[0] == "help" || args[0] == "--help" || args[0] == "-h" {
+		_, err := io.WriteString(output, usage)
+		return err
+	}
+	name, args := args[0], args[1:]
+	f := flags(name)
+	if name == "hook" {
+		return runHook(ctx, args, input, output)
+	}
+	if name == "version" {
+		if err := parse(f, args, 0, 0); err != nil {
+			return err
+		}
+		_, err := fmt.Fprintln(output, "devkit", kit.Version)
+		return err
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	if name == "init" || name == "doctor" {
+		if err := parse(f, args, 0, 0); err != nil {
+			return err
+		}
+		if name == "init" {
+			result, err := install.Init(ctx, cwd, nil)
+			if err != nil {
+				return err
+			}
+			return writeOutput(output, filepath.Join(result.Root, ".devkit/run"), "init.json", result)
+		}
+		report, err := install.Doctor(ctx, cwd, sessionID())
+		if err != nil {
+			return err
+		}
+		if err := writeOutput(output, filepath.Join(report.Root, ".devkit/run"), "doctor.json", report); err != nil {
+			return err
+		}
+		if !report.Healthy() {
+			return errors.New("doctor found issues; review the report")
+		}
+		return nil
+	}
+	e, err := engine.New(ctx, cwd, sessionID())
+	if err != nil {
+		return err
+	}
+	var result engine.Result
+	switch name {
+	case "start":
+		template := f.String("plan", "default", "Repository plan template")
+		if err := parse(f, args, 1, len(args)); err != nil {
+			return err
+		}
+		result, err = e.Start(ctx, engine.StartRequest{Template: *template, Task: strings.Join(f.Args(), " ")})
+	case "next", "resume", "abort":
+		if err := parse(f, args, 0, 0); err != nil {
+			return err
+		}
+		switch name {
+		case "next":
+			result, err = e.Next(ctx)
+		case "resume":
+			result, err = e.Resume(ctx)
+		case "abort":
+			result, err = e.Abort(ctx)
+		}
+	case "pause":
+		if err := parse(f, args, 0, len(args)); err != nil {
+			return err
+		}
+		result, err = e.Pause(ctx, strings.Join(f.Args(), " "))
+	case "submit", "plan", "note":
+		withdraw := false
+		if name == "plan" {
+			f.BoolVar(&withdraw, "withdraw", false, "Withdraw the latest proposal")
+		}
+		if err := f.Parse(args); err != nil {
+			return err
+		}
+		if withdraw {
+			if f.NArg() != 0 {
+				return errors.New("plan --withdraw does not accept a file")
+			}
+			result, err = e.WithdrawPlan(ctx)
+			break
+		}
+		count := 1
+		if name == "note" {
+			count = 2
+		}
+		if f.NArg() != count {
+			return fmt.Errorf("%s requires %d arguments; run devkit help", name, count)
+		}
+		data, readErr := os.ReadFile(f.Arg(count - 1))
+		if readErr != nil {
+			return readErr
+		}
+		switch name {
+		case "submit":
+			result, err = e.Submit(ctx, data)
+		case "plan":
+			result, err = e.Plan(ctx, data)
+		case "note":
+			result, err = e.Note(ctx, ledger.Kind(f.Arg(0)), data)
+		}
+	case "answer":
+		interpretation := f.String("interpretation", "text", "Interpretation of the observed human input")
+		text := f.String("text", "", "Interpreted answer text")
+		observation := f.String("observation", "", "Observed prompt basename")
+		supersedes := f.String("supersedes", "", "Previous answer record ID")
+		if err := parse(f, args, 1, 1); err != nil {
+			return err
+		}
+		result, err = e.Answer(ctx, engine.AnswerRequest{QuestionID: f.Arg(0), Interpretation: ledger.Interpretation(*interpretation), Text: *text, Observation: *observation, Supersedes: *supersedes})
+	case "external":
+		target := f.String("target", "", "Concrete external target")
+		instruction := f.String("instruction", "", "External instruction ID")
+		recoverID := f.String("recover", "", "Query an interrupted operation")
+		if err := f.Parse(args); err != nil {
+			return err
+		}
+		if *recoverID != "" {
+			if f.NArg() != 0 || *target != "" || *instruction != "" {
+				return errors.New("external --recover accepts only an operation ID")
+			}
+			result, err = e.RecoverExternal(ctx, *recoverID)
+			break
+		}
+		if f.NArg() != 2 || *target == "" {
+			return errors.New("external requires --target <target> <kind> <input_file>")
+		}
+		data, readErr := os.ReadFile(f.Arg(1))
+		if readErr != nil {
+			return readErr
+		}
+		result, err = e.External(ctx, external.Request{Kind: f.Arg(0), Target: *target, Input: json.RawMessage(data), InstructionID: *instruction})
+	case "status", "view":
+		return inspect(ctx, e, name, f, args, output)
+	default:
+		return fmt.Errorf("unknown command %q; run devkit help", name)
+	}
+	if err != nil {
+		return err
+	}
+	return writeOutput(output, filepath.Join(e.Root(), ".devkit/run/work", result.WorkID), "response.json", result)
+}
+
+func writeOutput(output io.Writer, root string, name string, value any) error {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return err
+	}
+	if len(data) > 3000 {
+		if err := fsstore.New(root).Publish(name, append(data, '\n')); err != nil {
+			return err
+		}
+		switch value := value.(type) {
+		case engine.Result:
+			fmt.Fprintf(output, "Work %s: %s; paused=%t.\n", value.WorkID, value.Status, value.Paused)
+		case engine.Status:
+			fmt.Fprintf(output, "Work %s: %s; paused=%t.\n", value.WorkID, value.Position.Status, value.Position.Paused)
+		case install.Result:
+			fmt.Fprintf(output, "Initialized %s (%d changes).\n", value.Root, len(value.Changes))
+			for _, guidance := range value.Guidance {
+				fmt.Fprintln(output, guidance)
+			}
+		case install.Report:
+			fmt.Fprintf(output, "Doctor: healthy=%t.\n", value.Healthy())
+		}
+		_, err = fmt.Fprintln(output, "Full output:", filepath.Join(root, name))
+		return err
+	}
+	_, err = fmt.Fprintln(output, string(data))
+	return err
 }
