@@ -59,8 +59,3 @@ graph LR
 - **役割**: 計画・判定・進行・記録・表示を分担する。7つの部品と実装モジュールの対応、runtime の内訳と依存は [modules.md](architecture/modules.md)で定める。
 - **配置**: [育てるもの](architecture/data.md#所有と生存期間)(リポジトリが所有して git で管理する資産)を含む利用側の配置は [layout.md](architecture/layout.md)で定める。
 - **hook**: SessionStart・Stop・PreToolUse・SubagentStop・UserPromptSubmit の5イベント。[hooks.md](architecture/hooks.md)
-
-## 未確認の前提
-
-- Codex の UserPromptSubmit が回答後の訂正を含めて入力ごとに発火するか。発火の範囲は未確認とする。
-- Codex の Bash の出力上限はいくつか。値は未確認とする。

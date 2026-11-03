@@ -8,7 +8,7 @@ dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバ�
 
 ## 参照順序
 
-1. [docs/architecture.md](docs/architecture.md): 構成と動作の概要。作業の流れ、保証の範囲、[未確認の前提](docs/architecture.md#未確認の前提)。
+1. [docs/architecture.md](docs/architecture.md): 構成と動作の概要。作業の流れ、保証の範囲。
 2. [docs/design.md](docs/design.md): 基本方針と、7つの部品の役割。
 3. [principles/README.md](principles/README.md): [check](docs/parts/check.md)(評価と判定の部品)が評価基準とする原則の一覧と、原則の書き方。
 
@@ -18,7 +18,7 @@ dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバ�
 
 ## ファイル構成
 
-- [docs/architecture.md](docs/architecture.md): 設計の概要と[未確認の前提](docs/architecture.md#未確認の前提)。
+- [docs/architecture.md](docs/architecture.md): 設計の概要。
 - [docs/architecture/](docs/architecture/): 設計の詳細。
   - [flow.md](docs/architecture/flow.md): 開始から完了までの流れ。
   - [data.md](docs/architecture/data.md): 記録と状態。
