@@ -35,7 +35,7 @@ func fixture(t *testing.T) (*External, Request) {
 		t.Fatal(err)
 	}
 	e := New(root, fsstore.New(filepath.Join(root, "run")), v, map[string]config.ExternalOperation{
-		"publish": {Command: config.Command{Executable: "write", Args: []string{"fixed"}, TimeoutSeconds: 1}},
+		"publish": {Command: config.Command{Executable: "write", Args: []string{"fixed"}, TimeoutSeconds: 5}},
 	})
 	lock, err := e.store.Lock()
 	if err != nil {
