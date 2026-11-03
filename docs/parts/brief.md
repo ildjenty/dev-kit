@@ -2,7 +2,7 @@
 
 ## 責務
 
-brief は、[作業者](../architecture/data.md#計画-plan)(作業を行うロール)への指示と、[判定者](../architecture/data.md#計画-plan)(評価を担うロール)・[計画者](../architecture/data.md#計画-plan)(計画を作るロール)への依頼文を組み立てる。公開する型と操作、バージョンの計算、他の部品との境界は [brief のモジュール契約](../architecture/modules.md#brief)に従い、計画の型と意味論は [plan](../architecture/modules.md#plan)(計画の意味論を扱う実装)が扱う。
+brief は、[作業者](../architecture/data.md#計画-plan)(作業を行うロール)への指示と、[判定者](../architecture/data.md#計画-plan)(評価を担うロール)・[計画者](../architecture/data.md#計画-plan)(計画を作るロール)への依頼文を組み立てる。公開する型と操作、他の部品との境界は [brief のモジュール契約](../architecture/modules.md#brief)に従い、計画の型と意味論は [plan](../architecture/modules.md#plan)(計画の意味論を扱う実装)が扱う。
 
 ## 入力と出力
 
@@ -20,11 +20,11 @@ brief は、[作業者](../architecture/data.md#計画-plan)(作業を行うロ�
 
 ### 出力
 
-brief の内容とバージョンを返し、計算・書き出しの責務は [brief のモジュール契約](../architecture/modules.md#brief)、指示との対応と配置は[指示](../architecture/data.md#指示-instruction)と[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。作業の brief には、誰のために何を行い、何を変更してよいか・いけないか、コマンドの実行結果や観察できる結果で完了条件をどう確認するかを既知の情報とともに示し、計画の上限と[終了ブロック](../architecture/data.md#進捗-progress)(作業結果の記録)の返却要件を含める。
+brief の内容を返し、組み立て・書き出しの責務は [brief のモジュール契約](../architecture/modules.md#brief)、指示との対応と配置は[指示](../architecture/data.md#指示-instruction)と[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。作業の brief には、誰のために何を行い、何を変更してよいか・いけないか、コマンドの実行結果や観察できる結果で完了条件をどう確認するかを既知の情報とともに示し、計画の上限と[終了ブロック](../architecture/data.md#進捗-progress)(作業結果の記録)の返却要件を含める。
 
 ## 保証
 
-同じ入力からは同じ内容とバージョンを組み立てる。外部入出力の扱いは[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従い、規範の入力は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。
+同じ入力からは同じ内容を組み立てる。外部入出力の扱いは[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従い、規範の入力は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。
 
 [一時状態](../architecture/data.md#進捗-progress)(再開まで引き継ぐ状況)の無効条件の照合は [ledger のモジュール契約](../architecture/modules.md#ledger)に従い、brief は無効なものを除いた入力から組み立てる。
 

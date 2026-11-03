@@ -40,11 +40,9 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 確認状況の表示項目は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。判定値と有効性の条件は[判定結果](../architecture/data.md#check-の結果-judgment)(観点から対象を判定した記録)に従う。
 
-#### 閲覧の記録と確認済みの集合
-
 [必読集合](../architecture/modules.md#view)(必ず読む記録の集合)の対象はリンク先の定義、表示と残件数のまとめ方は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
 
-閲覧の記録と確認済みの集合の導出は[状態変更の定義](../architecture/data.md#決定と証拠-decision--evidence)、承認・却下・保留の状態変更の経路は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
+確認済みの集合は[人の回答・承認が参照する記録](../architecture/data.md#決定と証拠-decision--evidence)から導く。承認・却下・保留の状態変更の経路は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
 
 #### 構造図
 

@@ -6,7 +6,7 @@ hook はホストの5つのイベントを受け、セッションの現在地�
 
 Claude Code と Codex CLI を対象とし、どちらも既定のホストとはしない。ホストは `devkit hook <event>` を呼び、標準入力の JSON を host/event が共通イベントへ変換する。出力も host/event がホストの形式と上限に合わせる。
 
-束縛は[セッションの観測](data.md#セッションの観測-sessionobservation)から取得する。束縛がなければ早期終了するが、SessionStart の観測と PreToolUse・UserPromptSubmit の最終観測時刻の更新は先に行う。UserPromptSubmit の本文は束縛があるときだけ、未回答の問いの有無にかかわらず、回答後の訂正も含めて常に観測する。これにより、他の skill や plugin と同じリポジトリで使える。
+束縛は[セッションの観測](data.md#セッションの観測-sessionobservation)から取得する。束縛がなければ早期終了するが、SessionStart の観測と PreToolUse の最終観測時刻の更新は先に行う。UserPromptSubmit の本文は束縛があるときだけ、未回答の問いの有無にかかわらず、回答後の訂正も含めて常に観測する。これにより、他の skill や plugin と同じリポジトリで使える。
 
 セッションの観測は `.devkit/run/sessions/<session_id>/<時刻>-<イベント>.json` に追記型で公開し、共有ファイルを上書きしない。`<イベント>` には hook のイベント名、または[束縛を書く CLI](data.md#セッションとブランチ)の操作名を使う。読み手は最新の観測を取る。
 
@@ -53,6 +53,6 @@ Claude Code の継続回数の上限は8回である。ホストが数える継�
 ## UserPromptSubmit
 
 - **入力**: セッション ID と `prompt`。
-- **判断**: [共通処理](#共通処理)の条件で最終観測時刻を更新し、本文を観測する。中断の定型との照合は[中断](guarantees.md#中断)に従う。
+- **判断**: [共通処理](#共通処理)の条件で本文を観測する。中断の定型との照合は[中断](guarantees.md#中断)に従う。
 - **出力**: 観測した入力を[回答の受理](guarantees.md#回答の受理)と[中断・再開](guarantees.md#中断)の根拠にする。hook 自身は承認を決めない。
-- **書く生成物**: セッションの観測の UserPromptSubmit 最終観測時刻、`prompts/<session_id>-<時刻>.txt`、該当時の[中断の観測](data.md#中断の観測-pauseobservation)。[共通処理](#共通処理)の条件で観測した本文はそのまま保存する。
+- **書く生成物**: `prompts/<session_id>-<時刻>.txt`、該当時の[中断の観測](data.md#中断の観測-pauseobservation)。[共通処理](#共通処理)の条件で観測した本文はそのまま保存する。

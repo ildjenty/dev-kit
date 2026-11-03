@@ -24,7 +24,7 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 ### 問い・回答・承認
 
-[問い](../architecture/data.md#問い-question)(人への確認事項)と[回答・承認](../architecture/data.md#回答承認-answer--approval)(問いへの判断)の保存項目と同一性・訂正・競合の解決は各定義、受理の条件と期限は[回答の受理](../architecture/guarantees.md#回答の受理)に従う。
+[問い](../architecture/data.md#問い-question)(人への確認事項)と[回答・承認](../architecture/data.md#回答承認-answer--approval)(問いへの判断)の保存項目と同一性・訂正は各定義、受理の条件と期限は[回答の受理](../architecture/guarantees.md#回答の受理)に従う。
 
 ### ステージの実行
 
