@@ -16,19 +16,19 @@ form は固定フォーマットの型と、[スキーマ・テンプレート](
 
 #### 問い
 
-問い(人への確認事項)の文面に添える回答の案内は[問いの定義](../architecture/data.md#問い-question)に従う。回答の受理と訂正は[回答の受理](../architecture/guarantees.md#回答の受理)、停止する範囲と進められる範囲の表示は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
+問い(人への確認事項)の文面に添える回答の案内は[問いの定義](../architecture/data.md#問い-question)に従う。回答の受理と訂正は[回答の受理](../architecture/guarantees.md#回答の受理)、停止しているステージと理由の表示は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
 
 画面のデザインの承認時の表示要件は[問いの定義](../architecture/data.md#問い-question)に従う。
 
 ### テンプレート
 
-テンプレートの対象と PR 本文の節の構成は [form の定義](../architecture/modules.md#form)に従う。
+テンプレートの対象と PR 本文に含める情報は [form の定義](../architecture/modules.md#form)に従う。
 
 [観点ファイル](../architecture/modules.md#check)(判定の確認事項)の例は[観点と検出試験](../architecture/examples.md#観点と検出試験)を参照する。
 
 PR 本文で共有する情報は[資産の更新と共有](../architecture/data.md#資産の更新と共有)、記載内容は [`principles/writing.md` の原則1](../../principles/writing.md#1-結論と人の判断に必要なことを先に書く)に従う。
 
-設計案には供給されたテンプレートを適用し、元に戻せないもの(変更困難な決定)の一覧、または「該当なし」を含める。判断は [`principles/designing.md` の原則1](../../principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する)に従う。
+設計案には供給されたテンプレートを適用し、元に戻せないもの(変更困難な決定)は[計画の一覧](../architecture/data.md#計画-plan)に従う。
 
 ## 保証
 

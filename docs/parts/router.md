@@ -22,21 +22,17 @@ router は、分類表に基づいて次の行動を分類する。
 
 #### 教訓の反映先
 
-- **返す値**: 教訓の反映先を返す。候補と優先順は[人への確認対象](../architecture/guarantees.md#人への確認対象)に従う。
-- **対象**: 指摘や失敗、同じ手順の繰り返しやコピー、[メタループの振り返り](../meta-loop.md#メタループ)(会話の記録の検討)から改善案が出たとき。
-
-分類と記録の分担は[作業の指示](../architecture/flow.md#作業の指示)、人による候補の選択は[メタループの入口](../meta-loop.md#メタループ)に従う。移行の記録(教訓を反映先へ移した記録)の保存先と参照の制約は[規則と強制手段](../architecture/data.md#規則と強制手段-rules)に従う。
+教訓の記録と反映先の提案は[メタループ](../meta-loop.md#メタループ)、反映先の優先順は[教訓の反映先](../architecture/guarantees.md#教訓の反映先)に従う。
 
 #### 振り返りの判定
 
-- **返す値**: 案の分類を返す。分類値は[メタループの振り返り](../meta-loop.md#メタループ)に従う。
-- **対象**: 振り返りで案が出たとき。
+案に対する判断の記録と変更の承認は[メタループ](../meta-loop.md#メタループ)に従う。
 
 ## 保証
 
 分類とループの進行の責務の境界は [router の契約](../architecture/modules.md#router)、ファイルの読み書きの制約は[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従う。
 
-router による[完了条件](../architecture/guarantees.md#完了条件)(ステージを終える条件)の照合と、[plan](../architecture/modules.md#plan)(計画の意味論を扱う実装)との分担は [router の契約](../architecture/modules.md#router)に従う。回答・承認の受理は[回答の受理](../architecture/guarantees.md#回答の受理)、その前提となる [hook](../architecture/hooks.md)(ホストイベントとの接続)の稼働確認は[再開と hook の稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)に従う。
+router による[完了条件](../architecture/guarantees.md#完了条件)(ステージを終える条件)の照合と、[plan](../architecture/modules.md#plan)(計画の意味論を扱う実装)との分担は [router の契約](../architecture/modules.md#router)に従う。回答・承認の受理は[回答の受理](../architecture/guarantees.md#回答の受理)、必要な観測の照合は[再開と hook の稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)に従う。
 
 ### ロールと実行主体
 

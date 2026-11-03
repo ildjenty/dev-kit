@@ -1,6 +1,6 @@
 # 最小の例
 
-雛形・計画・設定をつなぐ設計例である。現在は実装前であり、以下の英語キーは例の表記で、実装済みの JSON Schema を示すものではない。規則の正本は [PlanTemplate と Plan](data.md#ループの雛形-plantemplate)、[config](modules.md#config)、[検出試験](guarantees.md#検出試験)に置く。
+雛形・計画・設定は [PlanTemplate と Plan](data.md#ループの雛形-plantemplate)、[config](modules.md#config)、[検出試験](guarantees.md#検出試験)に従う。
 
 ## 雛形と計画
 
@@ -42,13 +42,12 @@
 ```json
 {
   "version": 1,
-  "template": { "name": "default", "path": ".devkit/plans/default.json", "content_hash": "ad129ad29196a75002c26666388190219abb207bc4b79b69d1aa23da211e9ee5" },
+  "template": { "name": "default", "content_hash": "ad129ad29196a75002c26666388190219abb207bc4b79b69d1aa23da211e9ee5" },
   "task": "保存ボタンの文言を『登録』から『保存』に変える",
   "completion_conditions": [
     { "id": "C1", "description": "保存ボタンに『保存』と表示され、既存のテストが通る" }
   ],
   "start_stage": "implement",
-  "excluded_stages": ["research"],
   "stages": [
     {
       "id": "implement",
@@ -62,7 +61,6 @@
       "transitions": { "fix": "implement", "ask": "implement", "back": "implement", "done": null }
     }
   ],
-  "required_checks": ["command:test", "wording"],
   "external_operations": []
 }
 ```
@@ -72,14 +70,11 @@
 ```json
 {
   "instruction_id": "<作業指示 ID>",
-  "judgment": "PASS",
   "termination_kind": "完了を主張",
-  "next_action": "作業結果の判定を受ける",
-  "changed_files": ["src/save-button.tsx"],
+  "work_performed": ["保存ボタンの文言を『登録』から『保存』に変更した"],
   "confirmed": ["保存ボタンに『保存』と表示され、既存のテストが通る"],
   "unconfirmed": [],
-  "unreferenced_inputs": [],
-  "prohibited_changes": ["保存処理の挙動を変えない"],
+  "obstacles": [],
   "temporary_state": [],
   "resume_conditions": []
 }
@@ -99,7 +94,7 @@ test = { executable = "./scripts/test", args = [], timeout_seconds = 120 }
 review = { executable = "./scripts/judge", args = [], timeout_seconds = 120, output_schema = ".devkit/kit/v1/schemas/judgment.json" }
 
 [deny]
-rules = ["Bash(git push *)", "Agent(fork)", "Agent(model:*)", "Agent(effort:*)"]
+rules = ["Bash(git push *)", "Agent(fork)"]
 
 [router]
 human_confirmation = ["billing_changed"]

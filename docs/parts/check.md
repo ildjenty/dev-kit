@@ -10,7 +10,7 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 評価対象と[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(評価対象の識別値)・場所、固定した規範と観点、依頼と結果の照合に必要な資料を受け取る。[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)の[終了ブロック](../architecture/data.md#進捗-progress)(作業結果の記録)や修正時の[指摘の参照](../architecture/data.md#指摘-finding)を含む入力の構成は[判定依頼の公開契約](../architecture/modules.md#check)、観点「差分」の入力は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
-規範の入力は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。対象の受け渡し、コマンドの実行場所と実行前後の照合は[判定対象の展開と完了時の永続化](../architecture/guarantees.md#判定対象の展開と完了時の永続化)に従う。
+規範の入力は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。対象の受け渡し、コマンドの実行場所と照合は[判定対象の展開と完了時の永続化](../architecture/guarantees.md#判定対象の展開と完了時の永続化)に従う。
 
 [判定者](../architecture/data.md#計画-plan)(評価を担うロール)の結果ファイルまたはコマンド実行結果を受け取り、[受理境界](../architecture/guarantees.md#判定結果の受理)(結果を取り込む際の照合条件)で照合する。判定者サブエージェントの返却形式は [form](../architecture/modules.md#form)(スキーマとテンプレートを持つ部品)と[作業結果の判定](../architecture/flow.md#作業結果の判定)、判定コマンド(`[judges]`)(判定を返すコマンド)の出力スキーマは [config](../architecture/modules.md#config)(設定を解析する実装)に従う。
 
@@ -34,9 +34,9 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 ### 実行主体と受理
 
-[実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する担当)の指定は[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)の check、種類と割り当て制限は[計画](../architecture/data.md#計画-plan)(雛形から作る課題ごとの実行内容)と[操作の禁止とサブエージェントの制限](../architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。検証コマンド(`[commands]`)(テストなどを実行するコマンド)を使う `command:` の check と判定コマンドの登録は [config](../architecture/modules.md#config)で定める。
+[実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する担当)の指定は[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)の check、種類と必要な確認能力は[計画](../architecture/data.md#計画-plan)(雛形から作る課題ごとの実行内容)と[操作の禁止とサブエージェントの制限](../architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。検証コマンド(`[commands]`)(テストなどを実行するコマンド)を使う `command:` の check と判定コマンドの登録は [config](../architecture/modules.md#config)で定める。
 
-サブエージェントの設定は[リポジトリ内の定義](../architecture/layout.md#指示ファイルとホスト設定)、起動時の制限は [PreToolUse](../architecture/hooks.md#pretooluse)(ツール実行前の hook)に従う。起動と結果の来歴の照合、重複結果と判定の食い違いの扱いは[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+サブエージェントの設定は[リポジトリ内の定義](../architecture/layout.md#指示ファイルとホスト設定)、起動時の制限は [PreToolUse](../architecture/hooks.md#pretooluse)(ツール実行前の hook)に従う。起動と結果の来歴の照合、重複結果の扱いは[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
 コマンド実行結果の Judgment への変換は[作業結果の判定](../architecture/flow.md#作業結果の判定)と[受理境界](../architecture/guarantees.md#判定結果の受理)に従う。結果の保存の責務は [check のモジュール契約](../architecture/modules.md#check)に従い、判定の有効性は[対象のバージョンと規範の識別](../architecture/data.md#check-の結果-judgment)で照合する。
 

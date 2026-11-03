@@ -32,7 +32,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 ##### 経緯
 
-過去の判断や変更の経緯は [view の表示構成](../architecture/modules.md#view-の表示構成)に従って示す。
+現在に影響する効果と過去の判断・確認の扱いは [view の表示構成](../architecture/modules.md#view-の表示構成)に従って示す。
 
 #### 判断対象ごとの表示
 
@@ -40,9 +40,9 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 確認状況の表示項目は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。判定値と有効性の条件は[判定結果](../architecture/data.md#check-の結果-judgment)(観点から対象を判定した記録)に従う。
 
-[必読集合](../architecture/modules.md#view)(必ず読む記録の集合)の対象はリンク先の定義、表示と残件数のまとめ方は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
+未回答の問いや未解決の指摘などの表示は [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
 
-回答済みの集合と保留の扱いは[決定と証拠](../architecture/data.md#決定と証拠-decision--evidence)、承認・却下・保留の状態変更の経路は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
+承認・却下・保留の状態変更の経路は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
 
 #### 構造図
 
@@ -50,4 +50,4 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 ## 保証
 
-表示の責務と他の部品との境界は [view の契約](../architecture/modules.md#view)、本体の重複表示と必読集合の扱いは [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。
+表示の責務と他の部品との境界は [view の契約](../architecture/modules.md#view)、本体の重複表示と未解決状態の扱いは [view の表示構成](../architecture/modules.md#view-の表示構成)に従う。

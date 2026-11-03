@@ -38,12 +38,12 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 - **完了条件**: 完了の主張の受理と確定は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)・[完了条件](../architecture/guarantees.md#完了条件)に従う。[検出試験](../architecture/guarantees.md#検出試験)(観点ファイルの判定能力の試験)の対象は同節、判定コマンドと `command:` の check の実行は [engine](../architecture/modules.md#engine)、判定者による check の起動と結果の受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 - **対象と規範**: 判定の対象への結び付けと有効性は [Judgment](../architecture/data.md#check-の結果-judgment)(観点ごとの判定結果)、規範の固定は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。判定対象の展開と commit 直前の照合は、[展開と永続化](../architecture/guarantees.md#判定対象の展開と完了時の永続化)・[対象の照合](../architecture/guarantees.md#commit-直前の対象の照合)に従う。
 - **実行の記録と観測**: [実行の記録](../architecture/data.md#所有と生存期間)(作業が所有する履歴)の書き手の境界と公開方法は[記録の書き込みと排他](../architecture/data.md#記録の書き込みと排他)、排他は[作業の排他制御](../architecture/data.md#作業の排他制御)に従う。網羅性(成果物を記録した範囲)の表示は [view](../architecture/modules.md#view)に従う。
-- **再開**: 作業の特定は[セッションとブランチ](../architecture/data.md#セッションとブランチ)、直前の観測による進行の可否は[再開と hook の稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)、注入する現在地の組み立ては [checkpoint](../architecture/data.md#checkpoint)に従う。
+- **再開**: 作業の特定は[セッションとブランチ](../architecture/data.md#セッションとブランチ)、受理時に必要な観測の照合は[再開と hook の稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)、注入する現在地の組み立ては [checkpoint](../architecture/data.md#checkpoint)に従う。
 - **外部操作**: 承認済みの操作の実行と再送時の回復は、[外部操作の承認](../architecture/guarantees.md#外部操作の承認)・[外部操作の二重適用](../architecture/guarantees.md#外部操作の二重適用)に従う。
 - **再計画**: 再計画に伴う [StageRun](../architecture/data.md#ステージの実行-stagerun)(ステージの実行の記録)と計画の切り替えは[計画のバージョン](../architecture/data.md#計画のバージョン)、手順は [router の判断](../architecture/flow.md#router-の判断)に従う。
 - **ホストと git に任せる範囲**: サブエージェントの起動と隔離、worktree の扱いは[ホストと git に任せる範囲](../architecture/guarantees.md#実装対象外の機能)、並行作業の配置は[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。
 - **メタループの編集**: [メタループ](../meta-loop.md#メタループ)(ループ自体を改善するループ)の編集を宣言したステージの扱いと、人への確認の条件は[人への確認対象](../architecture/guarantees.md#人への確認対象)に従う。
-- **互換性**: バイナリ・固定物・記録形式のバージョンの不一致と、読めない記録は[ロールアウト](../architecture/guarantees.md#ロールアウト)に従って報告する。
+- **互換性**: バイナリ・固定物のバージョンの不一致と、読めない記録は[ロールアウト](../architecture/guarantees.md#ロールアウト)に従って報告する。
 - **停止の補助**: 停止の判断は [Stop](../architecture/hooks.md#stop)、中断と継続上限は[中断](../architecture/guarantees.md#中断)、完了の確定は[完了条件](../architecture/guarantees.md#完了条件)に従う。
 - **checkpoint の注入**: 出力上限を超えた場合の注入内容は[性能と出力の上限](../architecture/guarantees.md#性能と出力の上限)に従う。
-- **登録と実行権限**: hook の登録と `devkit` の実行権限は[権限の境界](../architecture/guarantees.md#権限の境界)に従う。ホストの設定とプロジェクトの信頼(workspace trust / `trust_level`)の確認は [doctor](../architecture/modules.md#doctor-の確認項目)、hook の実際の稼働は[セッションの観測](../architecture/data.md#セッションの観測-sessionobservation)と[稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)で確かめる。
+- **登録と実行権限**: hook の登録と `devkit` の実行権限は[権限の境界](../architecture/guarantees.md#権限の境界)に従う。ホストの設定と必要な観測の不足、信頼設定の確認先は [doctor](../architecture/modules.md#doctor-の確認項目)、hook の実際の稼働は[セッションの観測](../architecture/data.md#セッションの観測-sessionobservation)と[稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)で確かめる。

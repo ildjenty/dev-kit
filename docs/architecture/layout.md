@@ -52,8 +52,7 @@ dev-kit/
 ```text
 <repo>/
   devkit.toml                kit のバージョン、判定コマンドと検証コマンド、外部操作、deny、分類表の追記。git 管理
-  .githooks/pre-commit       init が用意。既存の hook の仕組みがあれば作らない。git 管理
-  .claude/settings.json      hook の登録、excludedCommands、記録・結果・観測・展開先への Edit の deny、Bash(devkit *) の allow の提案。init が項目を足す。git 管理
+  .claude/settings.json      hook の登録、excludedCommands、記録・結果への Edit の deny、Bash(devkit *) の allow の提案。init が項目を足す。git 管理
   .claude/agents/devkit-*.md 判定者・計画者のサブエージェント定義。init が書く。git 管理
   .claude/skills/devkit -> ../../.agents/skills/devkit   skill 単位のリンク。git 管理
   .codex/hooks.json          hook の登録。init が項目を足す。git 管理
@@ -64,7 +63,7 @@ dev-kit/
   .devkit/                   git 管理(run/ を除く)
     plans/<name>.json        利用者が組むループの雛形。init が kit の既定をコピー
     checks/<観点ID>.md        観点ファイル。違反例・適合例は checks/<観点ID>/ の下
-    rules.md                 規則と強制手段。移行記録も項目として持つ
+    rules.md                 規則と強制手段
     detect.json              検出試験の合格記録の索引
     structure.json           構造ステージを使うときだけ
     kit/<バージョン>/         固定物のコピー
@@ -85,7 +84,7 @@ dev-kit/
       work/<作業ID>/
         records/<ULID>.json  追記のみの記録
         run.lock
-        inbox/               終了ブロック・計画・note の入力 JSON
+        inbox/               終了ブロック・計画・note の入力 JSON の既定の場所
         prompts/             人の入力の観測(UserPromptSubmit が書く)
         stops/<ULID>.json    作業単位の継続回数と上限到達時の問い(Stop が書く)
         brief/               next が書く brief と判定依頼
@@ -102,7 +101,7 @@ dev-kit/
 
 同じ機械で複数の作業を並行するときは、ホストや git の worktree 機能で別のチェックアウトを開く。それぞれが自分の `.devkit/run/` を持つ。育てるものの読み出しは[規範の固定](guarantees.md#規範の固定)に従う。
 
-pre-commit の共有と導入は[完了条件](guarantees.md#完了条件)に従う。
+pre-commit の共有と既存 hook の扱いは[完了条件](guarantees.md#完了条件)に従う。
 
 ## 指示ファイルとホスト設定
 

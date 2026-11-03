@@ -73,8 +73,6 @@ graph LR
 - 両ホストの `agent_transcript_path` の形式から最初の prompt を取り出せるか。抽出の可否は未確認とする。
 - Codex の PreToolUse がサブエージェントの起動を捕まえるか。捕捉の可否は未確認とする。
 - Claude Code の `-p` で `Agent(fork)` などの引数を PreToolUse で判定できるか。判定の可否は未確認とする。
-- Claude Code の `Agent(effort:*)` が effort の上書きを禁止できるか。禁止の可否は未確認とする。
-- Claude Code の hook の登録に `onFailure: "block"` 相当を使えるか。設定の可否は未確認とする。
 - settings の Stop hook がサブエージェントの終了で発火するか。未確認であり、発火する場合は `agent_id` で無視する。
 - Codex の Stop の継続上限と Bash の出力上限はいくつか。値は未確認とする。
 - Claude Code の skill がシンボリックリンクされたディレクトリをたどるか。追跡の可否は未確認とする。
@@ -82,4 +80,4 @@ graph LR
 
 ### effort と model の取得元
 
-Claude Code の `effort.level` と Codex の `model` を SubagentStop のイベント JSON または transcript のどの項目から取得できるか。当面は取得元を未確認とし、[判定結果の受理](architecture/guarantees.md#判定結果の受理)の照合条件を維持し、設定値を観測値の代わりに使わない。
+Claude Code の `effort.level` と Codex の `model` を SubagentStop のイベント JSON または transcript のどの項目から取得できるか。取得元は未確認であり、来歴の扱いは [Judgment](architecture/data.md#check-の結果-judgment)に従う。設定値を観測値の代わりに使わない。

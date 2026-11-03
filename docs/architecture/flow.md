@@ -20,7 +20,7 @@
 
 engine は [brief の責務](modules.md#brief)で定める入力を解決して brief を組み立てる。観点ファイル(check の確認事項を定めるファイル)の参照元と、規範全体の読み出しは[規範の固定](guarantees.md#規範の固定)に従う。
 
-エージェントはセッション内で作業し、他の skill や plugin も使える。途中の決定や調査結果は `devkit note`、作業の[終了ブロック](data.md#進捗-progress)(作業結果を固定形式で返す JSON)は `devkit submit <ファイル>` で渡す。教訓も `note` で渡し、分類と記録は [engine の責務](modules.md#engine)に従う。入力 JSON の場所と受理の条件は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。コミットは[完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に委ねる。
+エージェントはセッション内で作業し、他の skill や plugin も使える。途中の決定や調査結果は `devkit note`、作業の[終了ブロック](data.md#進捗-progress)(作業結果を固定形式で返す JSON)は `devkit submit <ファイル>` で渡す。教訓も `note` で渡し、記録は [engine の責務](modules.md#engine)に従う。入力 JSON の場所と受理の条件は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。コミットは[完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に委ねる。
 
 ## 作業結果の提出
 
@@ -28,7 +28,7 @@ engine は `submit` で[状態遷移と受理条件](data.md#状態遷移と受�
 
 ## 作業結果の判定
 
-engine は `next` の中で、ステージに置いた `command:` の check(終了コードによる検証)をすべて判定者の check より先に実行する。雛形の列挙順は同じ種類の中だけ有効とする。コマンドの実行場所と実行前後の照合、不一致時の進行は[判定対象の展開と完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に従う。環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。照合を通った実行結果は、終了コードと出力を [Judgment](data.md#check-の結果-judgment)(check の結果)に変換し、終了コードが0なら `PASS`、0以外なら `FAIL`、期限超過は `NOT ASSESSED` とする。必須の `command:` の check が `FAIL` なら、判定者を実行せず、engine が「修正する」として記録して出力を次の brief に含める。
+engine は `next` の中で、ステージに置いた `command:` の check(終了コードによる検証)をすべて判定者の check より先に実行する。雛形の列挙順は同じ種類の中だけ有効とする。コマンドの実行場所と照合、不一致時の進行は[判定対象の展開と完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に従う。環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。照合を通った実行結果は、終了コードと出力を [Judgment](data.md#check-の結果-judgment)(check の結果)に変換し、終了コードが0なら `PASS`、0以外なら `FAIL`、期限超過は `NOT ASSESSED` とする。必須の `command:` の check が `FAIL` なら、判定者を実行せず、engine が「修正する」として記録して出力を次の brief に含める。
 
 `devkit next` は判定依頼を `brief/<指示 ID>.md` に書き、[対象を展開](guarantees.md#判定対象の展開と完了時の永続化)して、指示 ID と展開先のパスを返す。そのラウンドの終了ブロックを含む判定依頼の内容は [check の契約](modules.md#check)、観点「差分」の有効な承認・委任の一覧は[判定結果の受理](guarantees.md#判定結果の受理)に従う。
 
@@ -57,7 +57,7 @@ engine は [Finding と完了条件 ID](data.md#指摘-finding)の差分から�
 
 ## 外部操作
 
-エージェントは `devkit external <種別> <入力ファイル> --request <要求 ID>` を実行する。入力ファイルの場所は[状態遷移と受理条件](data.md#状態遷移と受理条件)を参照する。engine が[操作を識別](guarantees.md#外部操作の二重適用)し、[承認の条件](guarantees.md#外部操作の承認)に従って受理する。確認待ちになれば、人の回答を `answer` で記録してから同じ呼び出しを再実行する。external が実行と結果の記録を担い、結果を返す。
+エージェントは `devkit external <種別> <入力ファイル>` を実行する。入力ファイルの場所は[状態遷移と受理条件](data.md#状態遷移と受理条件)を参照する。engine が[操作を識別](guarantees.md#外部操作の二重適用)し、必要な問いを起票する。開始直前の承認照合は[承認の条件](guarantees.md#外部操作の承認)に従う。確認待ちになれば、人の回答を `answer` で記録してから同じ呼び出しを再実行する。external が実行と結果の記録を担い、結果を返す。
 
 ## hook
 
