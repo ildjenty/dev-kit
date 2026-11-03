@@ -35,7 +35,7 @@ func fixture(t *testing.T) (*External, Request) {
 		t.Fatal(err)
 	}
 	e := New(root, fsstore.New(filepath.Join(root, "run")), v, map[string]config.ExternalOperation{
-		"publish": {Command: config.Command{Executable: "write", Args: []string{"fixed"}, TimeoutSeconds: 5}},
+		"publish": {Command: config.Command{Executable: "write", Args: []string{"fixed"}, TimeoutSeconds: 1}},
 	})
 	lock, err := e.store.Lock()
 	if err != nil {
@@ -288,6 +288,8 @@ func TestCommandBoundary(t *testing.T) {
 	}
 	r := e.registrations[request.Kind]
 	r.Args = []string{"$(must-not-expand) *"}
+	// Allow extra time so a loaded machine does not turn this boundary test into a timeout test.
+	r.TimeoutSeconds = 10
 	e.registrations[request.Kind] = r
 	approve(t, e, request)
 	result, err := e.Execute(context.Background(), request)
