@@ -492,6 +492,10 @@ func (e *Engine) regenerateBrief(ctx context.Context, meta ledger.Instruction, d
 					if !ok {
 						return brief.Brief{}, errors.New("bound stage is missing")
 					}
+					stage, err = e.roundStage(ctx, stage, round)
+					if err != nil {
+						return brief.Brief{}, err
+					}
 					return e.workBrief(ctx, state, p, stage, round, &meta)
 				}
 			}
@@ -620,7 +624,11 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 		return brief.Brief{}, err
 	}
 	if meta.Context == nil {
-		meta.Context = &ledger.InstructionContext{Findings: input.PreviousFindings, CurrentPlan: input.CurrentPlan, RemainingPlan: input.RemainingPlan, HumanInstructions: input.HumanInstructions}
+		main, err := e.mainInstructions("planner", "")
+		if err != nil {
+			return brief.Brief{}, err
+		}
+		meta.Context = &ledger.InstructionContext{MainInstructions: main, Findings: input.PreviousFindings, CurrentPlan: input.CurrentPlan, RemainingPlan: input.RemainingPlan, HumanInstructions: input.HumanInstructions}
 		for _, output := range input.PreviousOutputs {
 			meta.Context.Outputs = append(meta.Context.Outputs, ledger.InstructionOutput{StageID: output.StageID, Content: output.Content})
 		}
@@ -641,7 +649,12 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 	for i := range input.StageDefinitions {
 		items = append(items, spill{"Stage definition " + input.StageDefinitions[i].Path, &input.StageDefinitions[i].Content})
 	}
-	return e.fitBrief(meta, settings.BriefMaxBytes(), items, func() (brief.Brief, error) { return brief.BuildPlanner(input) })
+	main := meta.Context.MainInstructions
+	items = append(items, spill{"Main agent instructions", &main})
+	return e.fitBrief(meta, settings.BriefMaxBytes(), items, func() (brief.Brief, error) {
+		body, err := brief.BuildPlanner(input)
+		return mainInstructionBrief(body, main), err
+	})
 }
 
 func (e *Engine) workInstruction(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, round *ledger.Round) (Result, error) {
@@ -681,7 +694,12 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	return e.fitBrief(meta, settings.BriefMaxBytes(), workSpills(&input), func() (brief.Brief, error) { return brief.BuildWork(input) })
+	main := meta.Context.MainInstructions
+	items := append(workSpills(&input), spill{"Main agent instructions", &main})
+	return e.fitBrief(meta, settings.BriefMaxBytes(), items, func() (brief.Brief, error) {
+		body, err := brief.BuildWork(input)
+		return mainInstructionBrief(body, main), err
+	})
 }
 
 func (e *Engine) workInput(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, round *ledger.Round, meta *ledger.Instruction) (brief.WorkInput, error) {
@@ -755,7 +773,11 @@ func (e *Engine) workContext(state *ledger.State, stage plan.Stage, round *ledge
 			return err
 		}
 		input.PreviousOutputs, input.CurrentMaterial = selectOutputs(adopted, selection), material
-		meta.Context = &ledger.InstructionContext{Findings: input.PreviousFindings, Commands: commands, PreCommitOutput: input.PreCommitOutput, CurrentMaterial: material}
+		main, err := e.mainInstructions("worker", stage.ID)
+		if err != nil {
+			return err
+		}
+		meta.Context = &ledger.InstructionContext{MainInstructions: main, Findings: input.PreviousFindings, Commands: commands, PreCommitOutput: input.PreCommitOutput, CurrentMaterial: material}
 		meta.Context.Outputs = contextOutputs(input.PreviousOutputs)
 	} else {
 		input.PreviousOutputs = instructionOutputs(meta.Context)
@@ -767,7 +789,7 @@ func (e *Engine) workContext(state *ledger.State, stage plan.Stage, round *ledge
 			input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: command.Aspect, Runner: plan.Runner(command.Runner)}, ExitCode: command.Command.ExitCode, Output: command.Command.Output})
 		}
 	}
-	input.WorkHistoryPath, err = e.historyIndex(state, meta, historyScope{Kind: stage.WorkerHistory(), RunID: round.StageRunID}, adopted)
+	input.WorkHistoryPath, err = e.historyIndex(state, meta, historyScope{Kind: stage.WorkerHistory(), RunID: round.StageRunID, WorkerStage: stage.ID}, adopted)
 	return err
 }
 

@@ -43,6 +43,17 @@ const (
 
 const KindResultRejection Kind = "result_rejection"
 
+const KindMainInstruction Kind = "main_instruction"
+
+// MainInstruction records verbatim guidance from the main agent for the current work.
+type MainInstruction struct {
+	Text     string `json:"text"`
+	StageID  string `json:"stage_id,omitempty"`
+	Audience string `json:"audience,omitempty"`
+}
+
+func (*MainInstruction) recordKind() Kind { return KindMainInstruction }
+
 // Payload is a record payload. Only the record types in this package implement it.
 // Use pointers to payloads when constructing records.
 type Payload interface {
@@ -197,6 +208,7 @@ type MergeInput struct {
 
 // Merge records the ordered inputs and each recoverable merge step without moving HEAD.
 type Merge struct {
+	Repair     bool         `json:"repair,omitempty"`
 	RoundID    string       `json:"round_id"`
 	Head       string       `json:"head"`
 	Inputs     []MergeInput `json:"inputs"`
@@ -316,6 +328,7 @@ type InstructionOutput struct {
 
 // InstructionContext keeps issuance-time facts, without storing rendered briefs.
 type InstructionContext struct {
+	MainInstructions  string              `json:"main_instructions,omitempty"`
 	Outputs           []InstructionOutput `json:"outputs"`
 	Findings          []check.Finding     `json:"findings"`
 	CurrentPlan       *plan.Plan          `json:"current_plan,omitempty"`

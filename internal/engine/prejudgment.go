@@ -79,9 +79,18 @@ func (e *Engine) judgmentBriefText(ctx context.Context, state *ledger.State, p p
 		if err != nil {
 			return brief.Brief{}, err
 		}
-		meta.Context = &ledger.InstructionContext{CurrentMaterial: material}
+		stage, _, err := e.roundPlanStage(state, round)
+		if err != nil {
+			return brief.Brief{}, err
+		}
+		main, err := e.mainInstructions("planner", stage.ID)
+		if err != nil {
+			return brief.Brief{}, err
+		}
+		meta.Context = &ledger.InstructionContext{MainInstructions: main, CurrentMaterial: material}
 	}
-	return brief.BuildJudgmentBrief(brief.JudgmentBriefInput{RequestTemplate: string(template), InstructionID: meta.ID, Check: item, Plan: p, Requirements: facts.Requirements, CurrentMaterial: meta.Context.CurrentMaterial, OutputSchema: string(schema)})
+	body, err := brief.BuildJudgmentBrief(brief.JudgmentBriefInput{RequestTemplate: string(template), InstructionID: meta.ID, Check: item, Plan: p, Requirements: facts.Requirements, CurrentMaterial: meta.Context.CurrentMaterial, OutputSchema: string(schema)})
+	return mainInstructionBrief(body, meta.Context.MainInstructions), err
 }
 
 func (e *Engine) regenerateJudgmentBrief(ctx context.Context, state *ledger.State, meta ledger.Instruction) (brief.Brief, error) {

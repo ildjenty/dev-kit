@@ -14,6 +14,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/hook"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/plan"
+	"github.com/ildjenty/dev-kit/internal/workspace"
 )
 
 func (e *Engine) unitPath(id string) string {
@@ -38,7 +39,7 @@ func (e *Engine) prepareUnitRetry(ctx context.Context, state *ledger.State, meta
 			if err := e.active(); err != nil {
 				return err
 			}
-			_, err := e.workspace.AddWorktree(ctx, meta.TargetPath, round.StartCommit)
+			_, err := e.unitWorktree(ctx, state, round, meta.TargetPath)
 			return err
 		}
 	}
@@ -121,7 +122,7 @@ func (e *Engine) unitInstruction(ctx context.Context, state *ledger.State, p pla
 	if err := e.active(); err != nil {
 		return Result{}, err
 	}
-	if _, err := e.workspace.AddWorktree(ctx, meta.TargetPath, round.StartCommit); err != nil {
+	if _, err := e.unitWorktree(ctx, state, round, meta.TargetPath); err != nil {
 		return Result{}, err
 	}
 	b, err := e.workBrief(ctx, state, p, stage, round, &meta)
@@ -141,7 +142,7 @@ func (e *Engine) freezeUnits(ctx context.Context, state *ledger.State, stage pla
 	if err != nil {
 		return nil, err
 	}
-	merge := &ledger.Merge{RoundID: round.ID, Head: head, Current: round.StartCommit, BeforeTree: round.StartTarget.Tree, Status: "ready"}
+	merge := &ledger.Merge{RoundID: round.ID, Head: head, Current: round.StartCommit, BeforeTree: round.StartTarget.Tree, Status: "ready", Repair: round.MergeFix}
 	for _, unit := range stage.Units {
 		results := state.UnitResults(round.ID)
 		index := slices.IndexFunc(results, func(r *ledger.UnitResult) bool { return r.UnitID == unit.ID })
@@ -180,7 +181,7 @@ func (e *Engine) mergeUnits(ctx context.Context, state *ledger.State, p plan.Pla
 			return Result{}, false, err
 		}
 	}
-	progress := mergedProgress(round.ID, state.UnitResults(round.ID))
+	progress := repairProgress(state, round, mergedProgress(round.ID, state.UnitResults(round.ID)))
 	_, accepted, err := e.submittedArtifact(round, progress)
 	if err != nil {
 		return Result{}, false, err
@@ -231,6 +232,11 @@ func (e *Engine) mergeUnit(ctx context.Context, round *ledger.Round, saved *ledg
 		return err
 	}
 	if tree == merge.BeforeTree && tree != merge.ResultTree {
+		if merge.Repair {
+			if _, err := e.workspace.ResolveMerge(ctx); err != nil {
+				return err
+			}
+		}
 		if err := e.workspace.Merge(ctx, merge.Inputs[0].Commit+"^", merge.Current, merge.Inputs[merge.Applied].Commit); err != nil {
 			return err
 		}
@@ -403,4 +409,13 @@ func (e *Engine) validateUnitReport(state *ledger.State, instruction ledger.Inst
 		}
 	}
 	return errors.New("worker round is missing")
+}
+
+func (e *Engine) unitWorktree(ctx context.Context, state *ledger.State, round *ledger.Round, path string) (*workspace.Workspace, error) {
+	if round.MergeFix {
+		if merge := previousMerge(state, round); merge != nil && merge.Status == "conflict" {
+			return e.workspace.AddMergeWorktree(ctx, path, round.StartCommit)
+		}
+	}
+	return e.workspace.AddWorktree(ctx, path, round.StartCommit)
 }

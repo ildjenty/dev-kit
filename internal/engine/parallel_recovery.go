@@ -57,7 +57,7 @@ func (e *Engine) rejectAmbiguousAnswer(state *ledger.State) (bool, error) {
 func unitResultRound(state *ledger.State, runID string) *ledger.Round {
 	var source *ledger.Round
 	for _, round := range state.Rounds(runID) {
-		if len(state.UnitResults(round.ID)) > 0 {
+		if !round.MergeFix && len(state.UnitResults(round.ID)) > 0 {
 			source = round
 		}
 	}
@@ -116,20 +116,13 @@ func (e *Engine) completeMergeInput(ctx context.Context, merge *ledger.Merge, tr
 }
 
 func (e *Engine) repairedMerge(ctx context.Context, state *ledger.State, round *ledger.Round) (*ledger.Merge, error) {
-	if merge, ok := state.RoundMerge(round.ID); ok {
+	if merge, ok := state.RoundMerge(round.ID); ok && (!merge.Repair || merge.Status != "merged") {
 		return merge, nil
 	}
 	if !round.MergeFix {
 		return nil, nil
 	}
-	var previous *ledger.Merge
-	for _, prior := range state.Rounds(round.StageRunID) {
-		if prior.ID < round.ID {
-			if merge, ok := state.RoundMerge(prior.ID); ok {
-				previous = merge
-			}
-		}
-	}
+	previous := previousMerge(state, round)
 	if previous == nil {
 		return nil, errors.New("merge repair is missing its recorded inputs")
 	}
@@ -236,4 +229,34 @@ func (e *Engine) checkMergedSubmission(ctx context.Context, state *ledger.State,
 	reason := fmt.Sprintf("The work checkout differs from the recorded unit merge. Inspect and fix the differences before submitting. Recorded HEAD: %s. Current HEAD: %s. Differing files: %s. Unresolved files: %s", merge.Head, head, strings.Join(paths, ", "), strings.Join(conflicts, ", "))
 	_, err = e.fixRound(ctx, state, p, stage, run, &copy, reason)
 	return true, err
+}
+
+func previousMerge(state *ledger.State, round *ledger.Round) *ledger.Merge {
+	var previous *ledger.Merge
+	for _, prior := range state.Rounds(round.StageRunID) {
+		if prior.ID < round.ID {
+			if merge, ok := state.RoundMerge(prior.ID); ok && !merge.Repair {
+				previous = merge
+			}
+		}
+	}
+	return previous
+}
+
+// roundUnitResults includes the fixed original unit reports throughout merge repair rounds.
+func roundUnitResults(state *ledger.State, round *ledger.Round) []*ledger.UnitResult {
+	var results []*ledger.UnitResult
+	for _, prior := range state.Rounds(round.StageRunID) {
+		if prior.ID > round.ID {
+			break
+		}
+		if !round.MergeFix && prior.ID != round.ID {
+			continue
+		}
+		if !prior.MergeFix {
+			results = nil
+		}
+		results = append(results, state.UnitResults(prior.ID)...)
+	}
+	return results
 }

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:devkit:form:main-instruction",
+  "type": "object",
+  "properties": {
+    "text": {"type": "string", "minLength": 1, "pattern": "\\S"},
+    "stage_id": {"type": "string", "minLength": 1},
+    "audience": {"enum": ["planner", "worker"]}
+  },
+  "required": ["text"],
+  "additionalProperties": false
+}

@@ -125,6 +125,8 @@ func readRecord(raw fsstore.Record, validator *Validator) (Record, error) {
 		payload = &Evidence{}
 	case KindLesson:
 		payload = &Lesson{}
+	case KindMainInstruction:
+		payload = &MainInstruction{}
 	case KindStateChange:
 		payload = &StateChange{}
 	case KindQuestion:

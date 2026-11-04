@@ -99,8 +99,9 @@ func roundOutput(state *ledger.State, records []ledger.Record, run *ledger.Stage
 	if progress := roundProgress(records, round.ID); progress != nil {
 		text.WriteString("\nReport:\n\n" + reportText(progress.Progress.Report, progress.Progress) + "\n")
 	}
-	for _, unit := range state.UnitResults(round.ID) {
-		if len(state.UnitResults(round.ID)) == 1 && unit.UnitID == run.StageID {
+	units := roundUnitResults(state, round)
+	for _, unit := range units {
+		if len(units) == 1 && unit.UnitID == run.StageID && !round.MergeFix {
 			continue
 		}
 		fmt.Fprintf(&text, "\nUnit %s report:\n\n%s\n", unit.UnitID, reportText(unit.Report, unit.Progress))

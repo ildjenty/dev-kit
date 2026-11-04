@@ -17,7 +17,8 @@ type Validator struct {
 
 // NewValidator takes schemas keyed by filename without the .json extension.
 // Required names are decision, evidence, progress, question, judgment, finding,
-// reference, instruction, plan-template, and plan.
+// reference, instruction, plan-template, and plan. Include main-instruction to
+// validate main-agent guidance records.
 func NewValidator(sources map[string][]byte) (*Validator, error) {
 	resources := make(map[string][]byte)
 	for name, source := range sources {
@@ -80,6 +81,12 @@ func NewValidator(sources map[string][]byte) (*Validator, error) {
 	if err != nil {
 		return nil, err
 	}
+	if source, ok := sources["main-instruction"]; ok {
+		v.forms["main-instruction"], err = form.CompileSchema(source)
+		if err != nil {
+			return nil, err
+		}
+	}
 	v.plans, err = plan.NewValidator(sources["plan-template"], sources["plan"])
 	if err != nil {
 		return nil, err
@@ -91,6 +98,9 @@ func (v *Validator) check(name string, value any) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
+	}
+	if v.forms[name] == nil {
+		return fmt.Errorf("record schema %q is required", name)
 	}
 	return v.forms[name].Validate(data)
 }
@@ -150,6 +160,8 @@ func (v *Validator) validateRaw(payload Payload, data []byte) error {
 	}
 	schema := ""
 	switch payload.(type) {
+	case *MainInstruction:
+		schema = "main-instruction"
 	case *Decision:
 		schema = "decision"
 	case *Evidence:
@@ -178,6 +190,9 @@ func (v *Validator) validateRaw(payload Payload, data []byte) error {
 	data, err := json.Marshal(fields)
 	if err != nil {
 		return err
+	}
+	if v.forms[schema] == nil {
+		return fmt.Errorf("record schema %q is required", schema)
 	}
 	return v.forms[schema].Validate(data)
 }
@@ -225,6 +240,8 @@ func (v *Validator) judgment(j Judgment) error {
 
 func (v *Validator) validatePayload(payload Payload) error {
 	switch p := payload.(type) {
+	case *MainInstruction:
+		return v.check("main-instruction", p)
 	case *Work:
 		return nil
 	case *Pause:

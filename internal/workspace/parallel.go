@@ -156,3 +156,27 @@ func (w *Workspace) ResolveMerge(ctx context.Context) (string, error) {
 	}
 	return w.SnapshotTree(ctx)
 }
+
+// AddMergeWorktree creates a detached checkout with the source checkout's unmerged index.
+// Existing worker checkouts are preserved when an instruction is retried.
+func (w *Workspace) AddMergeWorktree(ctx context.Context, path, commit string) (*Workspace, error) {
+	_, err := os.Lstat(path)
+	fresh := errors.Is(err, os.ErrNotExist)
+	unit, err := w.AddWorktree(ctx, path, commit)
+	if err != nil || !fresh {
+		return unit, err
+	}
+	index, err := w.run(ctx, nil, "ls-files", "--stage", "-z")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := unit.run(ctx, nil, "read-tree", "--empty"); err != nil {
+		return nil, err
+	}
+	command := unit.command(ctx, nil, "update-index", "-z", "--index-info")
+	command.Stdin = bytes.NewReader(index)
+	if output, err := command.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("git update-index: %w: %s", err, output)
+	}
+	return unit, nil
+}

@@ -22,8 +22,8 @@ func validateRoles(stages []plan.Stage, settings config.Config) error {
 		if !exists || assignee.Kind != "work" && assignee.Kind != "human" {
 			return fmt.Errorf("%s: assignee must name a work or human role", stage.ID)
 		}
-		if stage.Split && (assignee.Kind != "work" || assignee.Agent != "") {
-			return fmt.Errorf("%s: split stages require a session work assignee", stage.ID)
+		if stage.Split && assignee.Kind != "work" {
+			return fmt.Errorf("%s: split stages require a work assignee", stage.ID)
 		}
 		if err := validateCheckRoles(stage, settings); err != nil {
 			return err
@@ -36,7 +36,7 @@ func validateRoles(stages []plan.Stage, settings config.Config) error {
 		}
 		for _, rule := range stage.Transitions.FixRules {
 			role, exists := roles[string(rule.Assignee)]
-			if !exists || role.Kind != "work" || stage.Split && role.Agent != "" {
+			if !exists || role.Kind != "work" {
 				return fmt.Errorf("%s: fix assignee %q must name an eligible work role", stage.ID, rule.Assignee)
 			}
 		}
@@ -78,7 +78,10 @@ func (e *Engine) roundStage(ctx context.Context, stage plan.Stage, round *ledger
 	if role.Kind == "human" {
 		stage.Assignee = plan.Human
 	}
-	if role.Kind == "work" && role.Agent != "" && !round.MergeFix {
+	if round.MergeFix && role.Kind == "work" && role.Agent == "" {
+		stage.Units = nil
+	}
+	if role.Kind == "work" && role.Agent != "" && (!stage.Split || len(stage.Units) == 0 || round.MergeFix) {
 		stage.Units = []plan.Unit{{ID: stage.ID, Description: "Perform the stage work.", Scope: "The agreed stage scope.", Role: string(stage.Assignee)}}
 		stage.Split = true
 	}

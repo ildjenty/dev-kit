@@ -193,9 +193,9 @@ func TestRolePlanValidation(t *testing.T) {
 	for _, stage := range []plan.Stage{
 		{ID: "s", Assignee: "missing"},
 		{ID: "s", Assignee: "judge"},
-		{ID: "s", Assignee: "worker", Split: true},
+		{ID: "s", Assignee: "human", Split: true},
 		{ID: "s", Assignee: "worker", Checks: []plan.Check{{Runner: "planner"}}},
-		{ID: "s", Assignee: "worker", Split: true, Units: []plan.Unit{{Role: "worker"}}},
+		{ID: "s", Assignee: "worker", Split: true, Units: []plan.Unit{{Role: "human"}}},
 		{ID: "s", Assignee: "worker", Transitions: plan.Transitions{FixRules: []plan.FixRule{{Assignee: "human"}}}},
 	} {
 		if err := validateRoles([]plan.Stage{stage}, settings); err == nil {

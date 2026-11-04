@@ -24,7 +24,8 @@ import (
 )
 
 const usage = `Usage: devkit <command> [arguments]
-  start [--plan <name>] <task>
+  start [--plan <name>] <task> | start [--plan <name>] --task-file <file>
+  instruct <file>
   next
   submit <file>
   plan <file> | plan --withdraw
@@ -111,11 +112,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	var result engine.Result
 	switch name {
 	case "start":
-		template := f.String("plan", "", "Repository plan template")
-		if err := parse(f, args, 1, len(args)); err != nil {
-			return err
-		}
-		result, err = e.Start(ctx, engine.StartRequest{Template: *template, Task: strings.Join(f.Args(), " ")})
+		result, err = runStartCommand(ctx, e, f, args)
 	case "next", "resume", "abort":
 		if err := parse(f, args, 0, 0); err != nil {
 			return err
@@ -133,7 +130,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 			return err
 		}
 		result, err = e.Pause(ctx, strings.Join(f.Args(), " "))
-	case "submit", "plan", "note":
+	case "submit", "plan", "note", "instruct":
 		result, err = runRecordCommand(ctx, e, name, f, args)
 	case "answer":
 		interpretation := f.String("interpretation", "text", "Interpretation of the observed human input")
@@ -398,6 +395,8 @@ func runRecordCommand(ctx context.Context, e *engine.Engine, name string, f *fla
 		result, err = e.Plan(ctx, data)
 	case "note":
 		result, err = e.Note(ctx, ledger.Kind(f.Arg(0)), data)
+	case "instruct":
+		result, err = e.Instruct(ctx, data)
 	}
 	return result, err
 }
@@ -426,4 +425,30 @@ func runExternalCommand(ctx context.Context, e *engine.Engine, f *flag.FlagSet, 
 	}
 	result, err = e.External(ctx, external.Request{Kind: f.Arg(0), Target: *target, Input: json.RawMessage(data), InstructionID: *instruction})
 	return result, err
+}
+
+func runStartCommand(ctx context.Context, e *engine.Engine, f *flag.FlagSet, args []string) (engine.Result, error) {
+	template := f.String("plan", "", "Repository plan template")
+	taskFile := f.String("task-file", "", "File containing the task text")
+	if err := parse(f, args, 0, len(args)); err != nil {
+		return engine.Result{}, err
+	}
+	fromFile := false
+	f.Visit(func(option *flag.Flag) {
+		if option.Name == "task-file" {
+			fromFile = true
+		}
+	})
+	if fromFile == (f.NArg() > 0) {
+		return engine.Result{}, errors.New("start requires exactly one of a task argument or --task-file <file>")
+	}
+	task := strings.Join(f.Args(), " ")
+	if fromFile {
+		data, err := os.ReadFile(*taskFile)
+		if err != nil {
+			return engine.Result{}, err
+		}
+		task = string(data)
+	}
+	return e.Start(ctx, engine.StartRequest{Template: *template, Task: task})
 }

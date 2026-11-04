@@ -123,7 +123,7 @@ func (e *Engine) initialize() error {
 		}
 	}
 	forms := map[string]*form.Schema{}
-	for _, name := range []string{"progress", "planner-result", "judgment", "detection-result", "judgment-brief"} {
+	for _, name := range []string{"progress", "planner-result", "judgment", "detection-result", "judgment-brief", "main-instruction"} {
 		forms[name], err = form.CompileSchemaWithResources(e.schemas[name], resources)
 		if err != nil {
 			return err
@@ -135,7 +135,7 @@ func (e *Engine) initialize() error {
 
 // SchemaNames returns the kit schema names required by forward operations.
 func SchemaNames() []string {
-	return []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan", "planner-result", "detection-result", "judgment-brief", "structure"}
+	return []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan", "planner-result", "detection-result", "judgment-brief", "structure", "main-instruction"}
 }
 
 // Historical record validation remains available while forward assets are edited.

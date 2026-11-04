@@ -40,7 +40,7 @@ func workValidator(ctx context.Context, w *workspace.Workspace, workRoot string)
 			return nil, errors.New("work and binary kit versions do not match")
 		}
 		sources := make(map[string][]byte)
-		for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
+		for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan", "main-instruction"} {
 			sources[name], err = kit.Schema(name)
 			if err != nil {
 				return nil, err

@@ -16,10 +16,11 @@ import (
 // historyScope selects the optional history of a fixed index deterministically from records.
 // Required judgment evidence is supplied as current material regardless of the scope.
 type historyScope struct {
-	Kind   plan.History
-	RunID  string
-	Aspect string
-	Runner string
+	WorkerStage string
+	Kind        plan.History
+	RunID       string
+	Aspect      string
+	Runner      string
 }
 
 // historyIndex writes the fixed index for an instruction: every adopted output followed by the
@@ -51,6 +52,15 @@ func (e *Engine) historyText(state *ledger.State, scope historyScope, adopted []
 	text.WriteString("# Adopted outputs\n\n")
 	for _, output := range adopted {
 		fmt.Fprintf(&text, "## %s\n\n%s\n\n", output.StageID, output.Content)
+	}
+	if scope.WorkerStage != "" {
+		instructions, err := e.mainInstructions("worker", scope.WorkerStage)
+		if err != nil {
+			return "", err
+		}
+		if instructions != "" {
+			text.WriteString("# Main agent instruction records\n" + instructions + "\n")
+		}
 	}
 	fmt.Fprintf(&text, "# History (scope: %s)\n\n", scope.Kind)
 	if scope.Kind == plan.HistoryNone {

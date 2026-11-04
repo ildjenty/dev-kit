@@ -1230,7 +1230,7 @@ func (e *Engine) advanceOpenRound(ctx context.Context, state *ledger.State, p pl
 	if stage.Assignee == plan.Human {
 		return e.advanceHumanRound(ctx, state, stage, run, round)
 	}
-	if stage.Split && len(stage.Units) > 0 && !round.MergeFix {
+	if stage.Split && len(stage.Units) > 0 {
 		return e.advanceUnits(ctx, state, p, stage, run, round)
 	}
 	if run.State == ledger.StageExternalWait {

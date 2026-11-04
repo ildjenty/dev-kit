@@ -99,9 +99,9 @@ func (e *Engine) roundEvidence(ctx context.Context, state *ledger.State, request
 		return "", err
 	}
 	var text strings.Builder
-	units := state.UnitResults(round.ID)
+	units := roundUnitResults(state, round)
 	for _, unit := range units {
-		if len(units) == 1 {
+		if len(units) == 1 && !round.MergeFix {
 			// A one-unit round's report is the judged round report.
 			continue
 		}
