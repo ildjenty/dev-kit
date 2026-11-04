@@ -261,6 +261,7 @@ graph TD
   install --> kit
   install --> ledger
   install --> workspace
+  install --> fsstore
   engine --> plan
   engine --> brief
   engine --> check
@@ -274,6 +275,10 @@ graph TD
   engine --> hook
   engine --> kit
   external --> ledger
+  external --> config
+  external --> form
+  external --> plan
+  external --> fsstore
   hook --> ledger
   hook --> config
   hook --> hostevent[host/event]
@@ -292,6 +297,7 @@ graph TD
   check --> form
   router --> plan
   router --> check
+  router --> form
   kit --> assets[assets: 埋め込み]
 ```
 

@@ -2,3 +2,7 @@
 "aqua:fe3dback/go-arch-lint" = "1.19.0"
 "aqua:golangci/golangci-lint" = "2.15.0"
 go = "1.27.3"
+
+[tasks.lint]
+description = "Check module dependency rules and function complexity"
+run = ["go-arch-lint check", "golangci-lint run ./..."]
