@@ -1197,7 +1197,7 @@ func TestDetectionPassRestoresMissingIndex(t *testing.T) {
 	}
 }
 
-func TestStartResumesBeforeInitialInstruction(t *testing.T) {
+func TestStartRefusesUnfinishedWorkBeforeInitialInstruction(t *testing.T) {
 	for _, bound := range []bool{false, true} {
 		t.Run(map[bool]string{false: "before_binding", true: "after_binding"}[bound], func(t *testing.T) {
 			e, ctx := fixture(t)
@@ -1234,9 +1234,8 @@ func TestStartResumesBeforeInitialInstruction(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			resumed, err := reopened.Start(ctx, request)
-			if err != nil || resumed.WorkID != initial.WorkID || resumed.Instruction == nil || resumed.Instruction.Kind != form.InstructionPlan {
-				t.Fatalf("interrupted start did not resume: %+v, %v", resumed, err)
+			if _, err := reopened.Start(ctx, request); err == nil || !strings.Contains(err.Error(), initial.WorkID) {
+				t.Fatalf("interrupted start did not refuse unfinished work: %v", err)
 			}
 		})
 	}

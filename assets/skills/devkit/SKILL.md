@@ -25,6 +25,10 @@ If start is refused because no SessionStart observation exists, use `devkit doct
 
 `devkit init` commits installed files after confirmation unless `--no-commit` is used. Before creating a branch or records, start requires an existing HEAD and verifies that existing configured norms, `devkit.toml`, and agent definitions are committed and unmodified; if refused, commit the installation changes first as instructed.
 
+## Parallel loops
+
+Run each loop in its own git worktree and host session. Do not start a new task in a checkout with unfinished work, including paused work. Use `git worktree add <path> -b <branch>` or the host's worktree feature, then open a new session there. Devkit uses that checkout's `.devkit/run/`; git and the host create and manage worktrees.
+
 ## Following next instructions
 
 - **Planning**: Launch the specified `devkit-planner`. When instructed to replan, launch the specified planner through the same procedure. For plan checks, detection tests, and judgments, launch the assigned judge. After results arrive, call `devkit next` to accept results captured by the hook.

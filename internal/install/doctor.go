@@ -84,6 +84,10 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 	}
 	for _, name := range []string{".devkit/run/sessions", ".devkit/run/work"} {
 		info, err := os.Stat(filepath.Join(r.Root, name))
+		if errors.Is(err, os.ErrNotExist) {
+			r.add(name, "Runtime directory will be created when needed.", nil)
+			continue
+		}
 		if err == nil && !info.IsDir() {
 			err = fmt.Errorf("expected a directory: %s", name)
 		}
@@ -150,6 +154,9 @@ func requireFile(path string) error {
 func (r *Report) checkWorkVersions(configVersion string) {
 	root := filepath.Join(r.Root, ".devkit/run/work")
 	entries, err := os.ReadDir(root)
+	if errors.Is(err, os.ErrNotExist) {
+		return
+	}
 	if err != nil {
 		r.add("work_versions", "", err)
 		return

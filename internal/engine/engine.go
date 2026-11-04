@@ -331,6 +331,14 @@ func (e *Engine) mutation(ctx context.Context) (*fsstore.Lock, error) {
 
 // Start creates a work branch and a planner instruction from a repository template.
 func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error) {
+	checkout, err := e.lockStart()
+	if err != nil {
+		return Result{}, err
+	}
+	defer checkout.Close()
+	if err := e.requireUnusedCheckout(); err != nil {
+		return Result{}, err
+	}
 	if err := e.checkSession(); err != nil {
 		return Result{}, err
 	}
@@ -361,15 +369,6 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	}
 	if !localName(name) || strings.TrimSpace(request.Task) == "" {
 		return Result{}, errors.New("a template name and task are required")
-	}
-	if e.workID != "" {
-		state, err := e.load()
-		if err != nil {
-			return Result{}, err
-		}
-		if state.WorkStatus() == ledger.WorkActive {
-			return e.resumeStart(ctx, state, obs, name, request.Task)
-		}
 	}
 	source, err := e.asset(ctx, head, "plans/"+name+".json")
 	if err != nil {
@@ -827,50 +826,4 @@ func (e *Engine) requireStartNorms(ctx context.Context, head string, settings co
 		return fmt.Errorf("required rules file %s: %w", p.Rules, err)
 	}
 	return nil
-}
-
-func (e *Engine) resumeStart(ctx context.Context, state *ledger.State, obs *hook.SessionObservation, name, taskText string) (Result, error) {
-	lock, err := e.store().Lock()
-	if err != nil {
-		return Result{}, err
-	}
-	defer lock.Close()
-	if err := e.active(); err != nil {
-		return Result{}, err
-	}
-	records, err := e.records()
-	if err != nil {
-		return Result{}, err
-	}
-	for _, record := range records {
-		switch record.Payload.(type) {
-		case *ledger.Instruction, *ledger.PlanVersion:
-			return Result{}, errors.New("the session is already bound to active work")
-		}
-	}
-	work, _ := state.Work()
-	branch, err := e.workspace.Branch(ctx)
-	if err != nil {
-		return Result{}, err
-	}
-	if branch != work.Branch {
-		return Result{}, errors.New("work branch does not match")
-	}
-	task, err := os.ReadFile(filepath.Join(e.workRoot(), work.TaskRef))
-	if err != nil {
-		return Result{}, err
-	}
-	if string(task) != taskText {
-		return Result{}, errors.New("task does not match the interrupted start")
-	}
-	template, source, err := e.template(ctx, work.BaseCommit, name)
-	if err != nil {
-		return Result{}, err
-	}
-	bound := *obs
-	bound.WorkID, bound.ObservedAt = e.workID, time.Now().UTC()
-	if err = hook.PublishSession(e.runRoot(), bound, "bind"); err != nil {
-		return Result{}, err
-	}
-	return e.planner(ctx, template, source, 1, plan.InitialProposal)
 }
