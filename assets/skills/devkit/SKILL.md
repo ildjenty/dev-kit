@@ -74,7 +74,7 @@ Keep runtime records under the fixed, untracked `.devkit/run/` location. Preserv
 
 ## Plan approval
 
-When `next` returns a plan approval question, present it as generated, including the original request, completion conditions, stages, structural differences, required checks, and `open_questions`. Do not replace it with your own summary. The human may answer freely; record the answer with `devkit answer`. A nonempty `open_questions` array requires human approval under every plan approval policy. Answers to open questions and revision requests go back to the planner as rejection and replanning instructions.
+When `next` returns a plan approval question, present it as generated, including the original request, completion conditions, stages, structural differences, required checks, and `open_questions`. Do not replace it with your own summary. The human may answer freely; record the answer with `devkit answer`. A nonempty `open_questions` array requires human approval under every plan approval policy. Answers to open questions and revision requests go back to the planner as rejection and replanning instructions: record them with `--interpretation rejected` and the human's answer as text, even when the human agrees with the recommendation. Devkit refuses to approve a plan that still has open questions, so the revised plan's completion conditions carry the answers.
 
 ## Changes to the loop
 

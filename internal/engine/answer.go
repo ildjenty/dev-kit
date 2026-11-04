@@ -99,6 +99,9 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 	if err := validateRoleContinuation(question, request); err != nil {
 		return Result{}, err
 	}
+	if err := e.validateOpenQuestionAnswer(question, request); err != nil {
+		return Result{}, err
+	}
 	if err := e.recordAnswer(state, question, request, original, observedAt); err != nil {
 		return Result{}, err
 	}
@@ -367,6 +370,19 @@ func (e *Engine) deferQuestion(question *form.Question) (Result, error) {
 		return Result{}, err
 	}
 	return e.issueQuestion(state, replacement)
+}
+
+// validateOpenQuestionAnswer refuses to approve a plan that still has open questions: the
+// human's answers must reach the planner so the plan's completion conditions carry them.
+func (e *Engine) validateOpenQuestionAnswer(question *form.Question, request AnswerRequest) error {
+	if question.ApprovalTarget.Kind != form.ApprovalPlan || request.Interpretation != ledger.AnswerApproved {
+		return nil
+	}
+	p, ok, err := e.boundPlan(question.ApprovalTarget.Plan)
+	if err != nil || !ok || len(p.OpenQuestions) == 0 {
+		return err
+	}
+	return fmt.Errorf("plan %d has open questions, so it cannot be approved as is; record the human's answer with --interpretation rejected and the answer as text, so the planner revises the plan with it, then present the revised plan", p.Version)
 }
 
 func validateRoleContinuation(question *form.Question, request AnswerRequest) error {

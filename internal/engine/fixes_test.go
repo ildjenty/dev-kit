@@ -257,10 +257,20 @@ func TestOpenQuestionsRequireApprovalUnderDeviationPolicy(t *testing.T) {
 	if asked.Instruction.Question == nil || asked.Instruction.Question.StopCategory != "plan_approval" || !strings.Contains(asked.Instruction.Question.Text, p.OpenQuestions[0]) {
 		t.Fatalf("open questions bypassed the human: %+v", asked)
 	}
-	answerResult(t, e, asked, ledger.AnswerRejected)
+	// Approving would drop the human's answer to the open question; it must reach the planner.
+	observeAnswer(t, e, "Approve; document Linux and macOS.")
+	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: asked.Instruction.Question.ID, Interpretation: ledger.AnswerApproved}); err == nil || !strings.Contains(err.Error(), "open questions") {
+		t.Fatalf("a plan with open questions was approved: %v", err)
+	}
+	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: asked.Instruction.Question.ID, Interpretation: ledger.AnswerRejected, Text: "Document Linux and macOS."}); err != nil {
+		t.Fatal(err)
+	}
 	revised := checkedNext(t, e)
 	if revised.Instruction.Kind != form.InstructionPlan {
 		t.Fatalf("rejection did not return to planner: %+v", revised)
+	}
+	if brief, err := os.ReadFile(revised.Instruction.Brief); err != nil || !strings.Contains(string(brief), "Document Linux and macOS.") {
+		t.Fatalf("the planner did not receive the answer to the open question: %v", err)
 	}
 }
 
