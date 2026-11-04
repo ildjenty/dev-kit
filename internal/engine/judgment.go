@@ -1102,7 +1102,7 @@ func (e *Engine) askRoundApproval(ctx context.Context, state *ledger.State, p pl
 	return e.issueQuestion(state, q)
 }
 
-func (e *Engine) roundConfirmationCategories(ctx context.Context, round *ledger.Round, settings config.Config) ([]string, error) {
+func (e *Engine) roundConfirmationCategories(ctx context.Context, state *ledger.State, round *ledger.Round, settings config.Config) ([]string, error) {
 	target := *round.ReturnedTarget
 	base, err := e.stageDiffBase(round)
 	if err != nil {
@@ -1114,6 +1114,11 @@ func (e *Engine) roundConfirmationCategories(ctx context.Context, round *ledger.
 	}
 	categories := differenceCategories(paths, settings)
 	categories = slices.DeleteFunc(categories, func(category string) bool { return category == config.MetaLoopEdit })
+	// Loop edits a human already approved before this round need no second confirmation.
+	work, _ := state.Work()
+	if confirmed, _ := confirmedLoopEdits(state); confirmed != work.BaseCommit {
+		base = confirmed
+	}
 	if changed, err := e.metaLoopChanged(ctx, base, target.Tree); err != nil {
 		return nil, err
 	} else if changed && !slices.Contains(categories, config.MetaLoopEdit) {
@@ -1148,7 +1153,7 @@ func (e *Engine) decideRound(ctx context.Context, p plan.Plan, stage plan.Stage,
 	rule.RequireDetectionTests = settings.DetectionRequired()
 	completion := router.CheckCompletion(router.CompletionInput{Rule: rule, TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments, Detection: requirements, DetectionTests: tests})
 	summary := check.Aggregate(judgments)
-	categories, err := e.roundConfirmationCategories(ctx, round, settings)
+	categories, err := e.roundConfirmationCategories(ctx, state, round, settings)
 	if err != nil {
 		return Result{}, err
 	}

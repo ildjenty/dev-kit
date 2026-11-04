@@ -437,7 +437,9 @@ func (e *Engine) metaLoopChanged(ctx context.Context, before, after string) (boo
 	return slices.Contains(paths, hookPath), err
 }
 
-func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run *ledger.StageRun, tree string) (string, *form.Question, error) {
+// confirmedLoopEdits returns the tree whose loop edits a human last approved (the work's base
+// commit when none were approved) and the latest rejection made after that approval, if any.
+func confirmedLoopEdits(state *ledger.State) (string, *form.Question) {
 	work, _ := state.Work()
 	base := work.BaseCommit
 	var rejected *form.Question
@@ -466,6 +468,11 @@ func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run
 	if lastRejection < lastApproval {
 		rejected = nil
 	}
+	return base, rejected
+}
+
+func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run *ledger.StageRun, tree string) (string, *form.Question, error) {
+	base, rejected := confirmedLoopEdits(state)
 	settings, err := e.settings(ctx, base)
 	if err != nil {
 		return "", nil, err

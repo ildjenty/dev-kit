@@ -273,9 +273,11 @@ func TestFixRoundDiffAndClassificationAreCumulative(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	categories, err := e.roundConfirmationCategories(ctx, round, settings)
-	if err != nil || !strings.Contains(strings.Join(categories, ","), config.DependencyChanged) || !strings.Contains(strings.Join(categories, ","), config.MetaLoopEdit) {
-		t.Fatalf("cumulative classification lost: %v, %v", categories, err)
+	categories, err := e.roundConfirmationCategories(ctx, state, round, settings)
+	// The dependency change from the failed round still counts; the loop edit was approved before
+	// this round, so it does not ask again.
+	if err != nil || !strings.Contains(strings.Join(categories, ","), config.DependencyChanged) || strings.Contains(strings.Join(categories, ","), config.MetaLoopEdit) {
+		t.Fatalf("cumulative classification is wrong: %v, %v", categories, err)
 	}
 }
 

@@ -218,8 +218,11 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	}
 	write(t, e.Root(), "greet.sh", "#!/bin/sh\nprintf 'Hello\\n'\nexit 0\n")
 	submit(correction, "implement")
-	approve(next(), "meta_loop_edit")
+	// The registration was approved before round two, so the completion commit does not ask again.
 	retrospective := next()
+	if retrospective.Instruction == nil || retrospective.Instruction.Question != nil {
+		t.Fatalf("approved loop edit was confirmed twice or the stage did not complete: %+v", retrospective)
+	}
 	body, err := e.instructionBrief(retrospective.Instruction.ID)
 	if err != nil {
 		t.Fatal(err)
