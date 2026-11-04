@@ -117,41 +117,12 @@ func inspect(ctx context.Context, e *engine.Engine, name string, f *flag.FlagSet
 	if status.Position.Plan != nil {
 		targets = append(targets, form.TargetVersion{Kind: form.TargetPlan, Plan: status.Position.Plan.Plan.Version})
 	}
-	var structure *view.Structure
-	source, err := w.ReadFile(ctx, tree, "devkit.toml")
-	if err != nil {
-		return err
-	}
-	settings, err := config.Parse(source)
-	if err != nil {
-		return err
-	}
-	data, err := os.ReadFile(filepath.Join(e.Root(), settings.RepositoryPaths().Structure))
-	if err == nil {
-		structure, err = parseStructure(data, fmt.Sprintf("%x", sha256.Sum256(data)))
-	} else if errors.Is(err, os.ErrNotExist) {
-		err = nil
-	}
+	structure, revisions, err := viewStructures(ctx, w, e.Root(), tree)
 	if err != nil {
 		return err
 	}
 	if structure != nil {
 		targets = append(targets, form.TargetVersion{Kind: form.TargetStructure, Structure: structure.Version})
-	}
-	history, err := w.StructureHistory(ctx, "HEAD", settings.RepositoryPaths().Structure)
-	if err != nil {
-		return err
-	}
-	var revisions []view.StructureRevision
-	for _, item := range history {
-		revision := view.StructureRevision{Commit: item.Commit}
-		if !item.Deleted {
-			revision.Structure, err = parseStructure(item.Content, fmt.Sprintf("%x", sha256.Sum256(item.Content)))
-			if err != nil {
-				return err
-			}
-		}
-		revisions = append(revisions, revision)
 	}
 	html, err := view.Generate(view.Input{Ledger: state, Records: records, Decisions: decisions, Targets: targets, Norms: norms, Structure: structure, StructureHistory: revisions})
 	if err != nil {
@@ -176,4 +147,41 @@ func parseStructure(data []byte, version string) (*view.Structure, error) {
 	}
 	structure.Version = version
 	return &structure, nil
+}
+
+func viewStructures(ctx context.Context, w *workspace.Workspace, root, tree string) (*view.Structure, []view.StructureRevision, error) {
+	var structure *view.Structure
+	source, err := w.ReadFile(ctx, tree, "devkit.toml")
+	if err != nil {
+		return nil, nil, err
+	}
+	settings, err := config.Parse(source)
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := os.ReadFile(filepath.Join(root, settings.RepositoryPaths().Structure))
+	if err == nil {
+		structure, err = parseStructure(data, fmt.Sprintf("%x", sha256.Sum256(data)))
+	} else if errors.Is(err, os.ErrNotExist) {
+		err = nil
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	history, err := w.StructureHistory(ctx, "HEAD", settings.RepositoryPaths().Structure)
+	if err != nil {
+		return nil, nil, err
+	}
+	var revisions []view.StructureRevision
+	for _, item := range history {
+		revision := view.StructureRevision{Commit: item.Commit}
+		if !item.Deleted {
+			revision.Structure, err = parseStructure(item.Content, fmt.Sprintf("%x", sha256.Sum256(item.Content)))
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+		revisions = append(revisions, revision)
+	}
+	return structure, revisions, nil
 }

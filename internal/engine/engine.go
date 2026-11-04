@@ -349,26 +349,8 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	if settings.KitVersion != e.version {
 		return Result{}, errors.New("configuration and binary kit versions do not match")
 	}
-	p := settings.RepositoryPaths()
-	paths := []string{"devkit.toml"}
-	roots := []string{p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md"}
-	committed, err := e.workspace.NormativeIDs(ctx, head, roots...)
-	if err != nil {
+	if err := e.requireStartNorms(ctx, head, settings); err != nil {
 		return Result{}, err
-	}
-	for _, path := range roots {
-		_, err := os.Lstat(filepath.Join(e.Root(), filepath.FromSlash(path)))
-		if err == nil || committed[path] != "" {
-			paths = append(paths, path)
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return Result{}, err
-		}
-	}
-	if err := e.workspace.RequireCommitted(ctx, paths...); err != nil {
-		return Result{}, err
-	}
-	if _, err := e.workspace.ReadFile(ctx, head, p.Rules); err != nil {
-		return Result{}, fmt.Errorf("required rules file %s: %w", p.Rules, err)
 	}
 	if err := e.initialize(); err != nil {
 		return Result{}, err
@@ -386,49 +368,7 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 			return Result{}, err
 		}
 		if state.WorkStatus() == ledger.WorkActive {
-			lock, err := e.store().Lock()
-			if err != nil {
-				return Result{}, err
-			}
-			defer lock.Close()
-			if err := e.active(); err != nil {
-				return Result{}, err
-			}
-			records, err := e.records()
-			if err != nil {
-				return Result{}, err
-			}
-			for _, record := range records {
-				switch record.Payload.(type) {
-				case *ledger.Instruction, *ledger.PlanVersion:
-					return Result{}, errors.New("the session is already bound to active work")
-				}
-			}
-			work, _ := state.Work()
-			branch, err := e.workspace.Branch(ctx)
-			if err != nil {
-				return Result{}, err
-			}
-			if branch != work.Branch {
-				return Result{}, errors.New("work branch does not match")
-			}
-			task, err := os.ReadFile(filepath.Join(e.workRoot(), work.TaskRef))
-			if err != nil {
-				return Result{}, err
-			}
-			if string(task) != request.Task {
-				return Result{}, errors.New("task does not match the interrupted start")
-			}
-			template, source, err := e.template(ctx, work.BaseCommit, name)
-			if err != nil {
-				return Result{}, err
-			}
-			bound := *obs
-			bound.WorkID, bound.ObservedAt = e.workID, time.Now().UTC()
-			if err = hook.PublishSession(e.runRoot(), bound, "bind"); err != nil {
-				return Result{}, err
-			}
-			return e.planner(ctx, template, source, 1, plan.InitialProposal)
+			return e.resumeStart(ctx, state, obs, name, request.Task)
 		}
 	}
 	source, err := e.asset(ctx, head, "plans/"+name+".json")
@@ -855,4 +795,75 @@ func (e *Engine) bundledSchema(source []byte) ([]byte, error) {
 		resources[name+".json"] = body
 	}
 	return form.BundleSchema(source, resources)
+}
+
+func (e *Engine) requireStartNorms(ctx context.Context, head string, settings config.Config) error {
+	p := settings.RepositoryPaths()
+	paths := []string{"devkit.toml"}
+	roots := []string{p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md"}
+	committed, err := e.workspace.NormativeIDs(ctx, head, roots...)
+	if err != nil {
+		return err
+	}
+	for _, path := range roots {
+		_, err := os.Lstat(filepath.Join(e.Root(), filepath.FromSlash(path)))
+		if err == nil || committed[path] != "" {
+			paths = append(paths, path)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	if err := e.workspace.RequireCommitted(ctx, paths...); err != nil {
+		return err
+	}
+	if _, err := e.workspace.ReadFile(ctx, head, p.Rules); err != nil {
+		return fmt.Errorf("required rules file %s: %w", p.Rules, err)
+	}
+	return nil
+}
+
+func (e *Engine) resumeStart(ctx context.Context, state *ledger.State, obs *hook.SessionObservation, name, taskText string) (Result, error) {
+	lock, err := e.store().Lock()
+	if err != nil {
+		return Result{}, err
+	}
+	defer lock.Close()
+	if err := e.active(); err != nil {
+		return Result{}, err
+	}
+	records, err := e.records()
+	if err != nil {
+		return Result{}, err
+	}
+	for _, record := range records {
+		switch record.Payload.(type) {
+		case *ledger.Instruction, *ledger.PlanVersion:
+			return Result{}, errors.New("the session is already bound to active work")
+		}
+	}
+	work, _ := state.Work()
+	branch, err := e.workspace.Branch(ctx)
+	if err != nil {
+		return Result{}, err
+	}
+	if branch != work.Branch {
+		return Result{}, errors.New("work branch does not match")
+	}
+	task, err := os.ReadFile(filepath.Join(e.workRoot(), work.TaskRef))
+	if err != nil {
+		return Result{}, err
+	}
+	if string(task) != taskText {
+		return Result{}, errors.New("task does not match the interrupted start")
+	}
+	template, source, err := e.template(ctx, work.BaseCommit, name)
+	if err != nil {
+		return Result{}, err
+	}
+	bound := *obs
+	bound.WorkID, bound.ObservedAt = e.workID, time.Now().UTC()
+	if err = hook.PublishSession(e.runRoot(), bound, "bind"); err != nil {
+		return Result{}, err
+	}
+	return e.planner(ctx, template, source, 1, plan.InitialProposal)
 }

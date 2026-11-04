@@ -52,32 +52,7 @@ func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 			result.Stages = removeStage(result.Stages, stage.ID)
 		}
 	}
-	for i := len(ids) - 1; i >= 0; i-- {
-		id := ids[i]
-		if slices.ContainsFunc(template.Stages, func(s Stage) bool { return s.ID == id }) {
-			continue
-		}
-		index := slices.IndexFunc(result.Stages, func(s Stage) bool { return s.ID == id })
-		stage := result.Stages[index]
-		if i+1 < len(ids) {
-			before := ids[i+1]
-			stage.Transitions.Done = &before
-			for j := range result.Stages {
-				done := result.Stages[j].Transitions.Done
-				if done != nil && *done == before {
-					result.Stages[j].Transitions.Done = &id
-				}
-			}
-		} else {
-			stage.Transitions.Done = nil
-			for j := range result.Stages {
-				if result.Stages[j].Transitions.Done == nil {
-					result.Stages[j].Transitions.Done = &id
-				}
-			}
-		}
-		result.Stages[index] = stage
-	}
+	result.insertOptionalStages(template, ids)
 	ordered := make([]Stage, 0, len(ids))
 	for _, id := range ids {
 		stage, _ := result.Stage(id)
@@ -187,23 +162,7 @@ func Deviations(template PlanTemplate, p Plan) []Deviation {
 			result = append(result, Deviation{Kind: AddedStage, StageID: stage.ID})
 			continue
 		}
-		if original.Gate.Required && !stage.Gate.Required {
-			result = append(result, Deviation{Kind: RemovedGate, StageID: stage.ID})
-		}
-		for _, action := range []Transition{Fix, Ask, Back, Done} {
-			before, _ := original.Transitions.Next(action)
-			after, _ := stage.Transitions.Next(action)
-			if !reflect.DeepEqual(before, after) {
-				result = append(result, Deviation{Kind: ChangedTransition, StageID: stage.ID, Transition: action})
-			}
-		}
-		for _, required := range original.RequiredChecks() {
-			if !slices.ContainsFunc(stage.Checks, func(c Check) bool {
-				return c.Required && c.Aspect == required.Aspect && c.Runner == required.Runner
-			}) {
-				result = append(result, Deviation{Kind: RemovedRequiredCheck, StageID: stage.ID, Aspect: required.Aspect, Runner: required.Runner})
-			}
-		}
+		result = append(result, stageDeviations(original, stage)...)
 	}
 	return result
 }
@@ -226,4 +185,55 @@ func (p Plan) RequiresApproval(template PlanTemplate, policy string, lastApprove
 		}
 	}
 	return false
+}
+
+func (p *Plan) insertOptionalStages(template PlanTemplate, ids []string) {
+	for i := len(ids) - 1; i >= 0; i-- {
+		id := ids[i]
+		if slices.ContainsFunc(template.Stages, func(s Stage) bool { return s.ID == id }) {
+			continue
+		}
+		index := slices.IndexFunc(p.Stages, func(s Stage) bool { return s.ID == id })
+		stage := p.Stages[index]
+		if i+1 < len(ids) {
+			before := ids[i+1]
+			stage.Transitions.Done = &before
+			for j := range p.Stages {
+				done := p.Stages[j].Transitions.Done
+				if done != nil && *done == before {
+					p.Stages[j].Transitions.Done = &id
+				}
+			}
+		} else {
+			stage.Transitions.Done = nil
+			for j := range p.Stages {
+				if p.Stages[j].Transitions.Done == nil {
+					p.Stages[j].Transitions.Done = &id
+				}
+			}
+		}
+		p.Stages[index] = stage
+	}
+}
+
+func stageDeviations(original, stage Stage) []Deviation {
+	var result []Deviation
+	if original.Gate.Required && !stage.Gate.Required {
+		result = append(result, Deviation{Kind: RemovedGate, StageID: stage.ID})
+	}
+	for _, action := range []Transition{Fix, Ask, Back, Done} {
+		before, _ := original.Transitions.Next(action)
+		after, _ := stage.Transitions.Next(action)
+		if !reflect.DeepEqual(before, after) {
+			result = append(result, Deviation{Kind: ChangedTransition, StageID: stage.ID, Transition: action})
+		}
+	}
+	for _, required := range original.RequiredChecks() {
+		if !slices.ContainsFunc(stage.Checks, func(c Check) bool {
+			return c.Required && c.Aspect == required.Aspect && c.Runner == required.Runner
+		}) {
+			result = append(result, Deviation{Kind: RemovedRequiredCheck, StageID: stage.ID, Aspect: required.Aspect, Runner: required.Runner})
+		}
+	}
+	return result
 }

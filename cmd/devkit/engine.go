@@ -36,34 +36,9 @@ func newEngine(ctx context.Context, cwd, session string) (*engine.Engine, error)
 		}
 	}
 	if workID == "" {
-		branch, err := w.Branch(ctx)
+		workID, err = branchWorkID(ctx, w, runRoot)
 		if err != nil {
 			return nil, err
-		}
-		entries, err := os.ReadDir(filepath.Join(runRoot, "work"))
-		if err != nil && !os.IsNotExist(err) {
-			return nil, err
-		}
-		for _, entry := range entries {
-			if !entry.IsDir() {
-				continue
-			}
-			records, err := fsstore.New(filepath.Join(runRoot, "work", entry.Name())).List()
-			if err != nil {
-				return nil, err
-			}
-			for _, record := range records {
-				if record.Kind != string(ledger.KindWork) {
-					continue
-				}
-				var work ledger.Work
-				if err := fsstore.DecodePayload(record.Payload, &work); err != nil {
-					return nil, err
-				}
-				if work.Branch == branch {
-					workID = work.ID
-				}
-			}
 		}
 	}
 	if workID != "" && !localName(workID) {
@@ -109,4 +84,38 @@ func newEngine(ctx context.Context, cwd, session string) (*engine.Engine, error)
 			return schemas, nil
 		},
 	})
+}
+
+func branchWorkID(ctx context.Context, w *workspace.Workspace, runRoot string) (string, error) {
+	workID := ""
+	branch, err := w.Branch(ctx)
+	if err != nil {
+		return "", err
+	}
+	entries, err := os.ReadDir(filepath.Join(runRoot, "work"))
+	if err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		records, err := fsstore.New(filepath.Join(runRoot, "work", entry.Name())).List()
+		if err != nil {
+			return "", err
+		}
+		for _, record := range records {
+			if record.Kind != string(ledger.KindWork) {
+				continue
+			}
+			var work ledger.Work
+			if err := fsstore.DecodePayload(record.Payload, &work); err != nil {
+				return "", err
+			}
+			if work.Branch == branch {
+				workID = work.ID
+			}
+		}
+	}
+	return workID, nil
 }

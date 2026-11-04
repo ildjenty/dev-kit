@@ -302,11 +302,55 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.KitVersion) == "" {
 		return fmt.Errorf("kit_version is required")
 	}
+	if err := c.validateCommands(); err != nil {
+		return err
+	}
+	if err := c.validateJudges(); err != nil {
+		return err
+	}
+	if err := c.validateExternalOperations(); err != nil {
+		return err
+	}
+	if err := c.validateDeny(); err != nil {
+		return err
+	}
+	if err := c.validateRouter(); err != nil {
+		return err
+	}
+	if err := c.validatePlanSettings(); err != nil {
+		return err
+	}
+	if err := c.validatePaths(); err != nil {
+		return err
+	}
+	if err := c.validateApproval(); err != nil {
+		return err
+	}
+	if err := c.validateGit(); err != nil {
+		return err
+	}
+	if err := c.validateDependencyFiles(); err != nil {
+		return err
+	}
+	if err := c.validateContinuationLimit(); err != nil {
+		return err
+	}
+	if err := c.validateLessonDestinations(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c Config) validateCommands() error {
 	for name, command := range c.Commands {
 		if err := validateCommand("commands", name, command); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func (c Config) validateJudges() error {
 	for name, judge := range c.Judges {
 		if err := validateCommand("judges", name, judge.Command); err != nil {
 			return err
@@ -315,6 +359,10 @@ func (c Config) Validate() error {
 			return fmt.Errorf("judges.%s.output_schema is required", name)
 		}
 	}
+	return nil
+}
+
+func (c Config) validateExternalOperations() error {
 	for name, operation := range c.External {
 		if err := validateCommand("external", name, operation.Command); err != nil {
 			return err
@@ -328,6 +376,10 @@ func (c Config) Validate() error {
 			return fmt.Errorf("external.%s.occurrence_field must not contain only whitespace", name)
 		}
 	}
+	return nil
+}
+
+func (c Config) validateDeny() error {
 	for _, rule := range c.Deny.Rules {
 		if !validDenyRule(rule) {
 			return fmt.Errorf("invalid deny.rules format: %q", rule)
@@ -338,6 +390,10 @@ func (c Config) Validate() error {
 			return fmt.Errorf("invalid deny.judge tool name: %q", tool)
 		}
 	}
+	return nil
+}
+
+func (c Config) validateRouter() error {
 	for _, item := range c.Router.HumanConfirmation {
 		switch item {
 		case DependencyChanged, TargetChangedAgain:
@@ -345,6 +401,10 @@ func (c Config) Validate() error {
 			return fmt.Errorf("unknown router.human_confirmation category: %q", item)
 		}
 	}
+	return nil
+}
+
+func (c Config) validatePlanSettings() error {
 	if strings.TrimSpace(c.PlanCheck.Aspect) == "" {
 		return fmt.Errorf("plan_check.aspect must not be empty")
 	}
@@ -354,6 +414,10 @@ func (c Config) Validate() error {
 	if strings.TrimSpace(c.DefaultPlan) == "" {
 		return fmt.Errorf("default_plan must not be empty")
 	}
+	return nil
+}
+
+func (c Config) validatePaths() error {
 	paths := []struct {
 		name  string
 		value string
@@ -385,6 +449,10 @@ func (c Config) Validate() error {
 			}
 		}
 	}
+	return nil
+}
+
+func (c Config) validateApproval() error {
 	switch c.Approval.Plan {
 	case "requirements", "always", "deviation":
 	default:
@@ -395,6 +463,10 @@ func (c Config) Validate() error {
 	default:
 		return fmt.Errorf("approval.meta_loop_edit must be confirm or allow")
 	}
+	return nil
+}
+
+func (c Config) validateGit() error {
 	if !strings.Contains(c.Git.Branch, "{work_id}") || !validBranchName(strings.ReplaceAll(c.Git.Branch, "{work_id}", "work")) {
 		return fmt.Errorf("git.branch must contain {work_id} and render a valid git branch name")
 	}
@@ -405,14 +477,26 @@ func (c Config) Validate() error {
 	if strings.ContainsAny(placeholders, "{}") {
 		return fmt.Errorf("git.commit_message contains an unknown or malformed placeholder")
 	}
+	return nil
+}
+
+func (c Config) validateDependencyFiles() error {
 	for _, pattern := range c.Classification.DependencyFiles {
 		if _, err := path.Match(pattern, ""); err != nil {
 			return fmt.Errorf("invalid classification.dependency_files pattern %q: %w", pattern, err)
 		}
 	}
+	return nil
+}
+
+func (c Config) validateContinuationLimit() error {
 	if c.Limits.StopContinuation < 1 {
 		return fmt.Errorf("limits.stop_continuation must be at least 1")
 	}
+	return nil
+}
+
+func (c Config) validateLessonDestinations() error {
 	seen := make(map[string]bool)
 	for _, destination := range c.Lessons.Destinations {
 		switch destination {

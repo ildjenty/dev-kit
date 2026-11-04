@@ -35,17 +35,7 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		return response(state), nil
 	}
 	if warning != "" {
-		r := response(state)
-		r.Warning = warning
-		pending := state.UnacceptedInstructions()
-		if len(pending) > 0 {
-			data, err := e.readInstructionFacts(pending[len(pending)-1].ID)
-			if err != nil {
-				return r, err
-			}
-			r.Instruction = &data.Instruction
-		}
-		return r, nil
+		return e.branchWarning(state, warning)
 	}
 	if err := e.initialize(); err != nil {
 		return result, err
@@ -84,328 +74,13 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		if state.WorkStatus() != ledger.WorkActive {
 			return e.terminal(ctx, state)
 		}
-		if err = e.importStops(state); err != nil {
-			return result, err
-		}
-		state, err = e.load()
-		if err != nil {
-			return result, err
-		}
-		if recovered, err := e.recoverSubmission(ctx, state); err != nil {
-			return result, err
-		} else if recovered {
-			continue
-		}
-
-		if questions := e.currentQuestions(state); len(questions) > 0 {
-			q := questions[0]
-			if q.ApprovalTarget.Kind == form.ApprovalTree {
-				tree, err := e.workspace.SnapshotTree(ctx)
-				if err != nil {
-					return result, err
-				}
-				if tree != q.ApprovalTarget.Tree {
-					replacement := q
-					replacement.ID = ulidString()
-					replacement.ApprovalTarget.Tree = tree
-					if err := e.refreshQuestionEvidence(ctx, state, &replacement); err != nil {
-						return result, err
-					}
-					if round, ok := state.OpenRound(); ok && round.ReturnedTarget != nil && q.StopCategory != "detection_failed" {
-						if err = e.replaceQuestionTarget(ctx, round, tree); err != nil {
-							return result, err
-						}
-					}
-					if _, err = e.append(&ledger.Question{Question: replacement, Supersedes: q.ID}); err != nil {
-						return result, err
-					}
-					continue
-				}
-			}
-			return e.issueQuestion(state, q)
-		}
-		changed, err := e.acceptPending(ctx, state)
-		if err != nil {
-			return result, err
-		}
-		if changed {
-			continue
-		}
-		if run, ok := state.LatestStageRun(); ok && run.State != ledger.StageInvalidated {
-			if recovered, r, err := e.recoverCommit(ctx, state, run); err != nil || recovered {
-				if err != nil || r.Instruction != nil || r.Paused || r.Message != "" {
-					return r, err
-				}
-				continue
-			}
-		}
-		head, err := e.workspace.Head(ctx)
-		if err != nil {
-			return result, err
-		}
-		norms, err := e.norms(ctx, head)
-		if err != nil {
-			return result, err
-		}
-		proposals := state.PlanEvaluations(norms)
-		highest := 0
-		for _, proposal := range proposals {
-			highest = max(highest, proposal.Plan.Version)
-		}
-		for _, issued := range state.UnacceptedInstructions() {
-			if issued.Kind == form.InstructionPlan && issued.PlanVersion > highest {
-				data, err := e.readInstruction(issued.ID)
-				if err != nil {
-					return result, err
-				}
-				t, source, err := e.template(ctx, head, data.TemplateName)
-				if err != nil {
-					return result, err
-				}
-				return e.planner(ctx, t, source, issued.PlanVersion, data.Origin)
-			}
-		}
-		if len(proposals) == 0 {
-			for _, i := range state.UnacceptedInstructions() {
-				if i.Kind == form.InstructionPlan {
-					data, err := e.readInstruction(i.ID)
-					if err != nil {
-						return result, err
-					}
-					if i.SessionID != e.sessionID {
-						t, source, err := e.template(ctx, data.Reference, data.TemplateName)
-						if err != nil {
-							return result, err
-						}
-						return e.planner(ctx, t, source, i.PlanVersion, data.Origin)
-					}
-					return e.publishInstruction(i, false, data, "")
-				}
-			}
-			return result, errors.New("initial planning instruction is missing; retry devkit start with the original task and template")
-		}
-		latest := proposals[len(proposals)-1]
-		for latest.Withdrawn && latest.Origin == plan.HumanProposal && len(proposals) > 1 {
-			proposals = proposals[:len(proposals)-1]
-			latest = proposals[len(proposals)-1]
-		}
-		t, source, err := e.template(ctx, head, latest.Plan.Template.Name)
-		if err != nil {
-			return result, err
-		}
-		if latest.Withdrawn || latest.Rejected || latest.Judgment == plan.PlanFail {
-			rounds, err := e.planRounds()
-			if err != nil {
-				return result, err
-			}
-			if !latest.Rejected && !latest.Withdrawn && t.PlanRoundsReached(rounds) {
-				q := e.question(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: latest.Plan.Version}, "plan_round_limit", "The plan check round limit was reached. Explain how to continue.", "")
-				if _, answered := state.ResolveAnswer(q.ApprovalTarget); !answered {
-					q, err = e.saveQuestion(state, q, "")
-					if err != nil {
-						return result, err
-					}
-					return e.issueQuestion(state, q)
-				}
-			}
-			n, err := e.highestPlan()
-			if err != nil {
-				return result, err
-			}
-			return e.planner(ctx, t, source, n+1, latest.Origin)
-		}
-		if latest.Judgment == plan.PlanPending {
-			r, err := e.planCheck(ctx, state, latest.Plan)
-			if err != nil || r.Instruction != nil || r.Paused {
-				return r, err
-			}
-			continue
-		}
-		if latest.Judgment == plan.PlanNotAssessed {
-			q := e.question(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: latest.Plan.Version}, "plan_not_assessed", "The plan could not be assessed. Provide revision instructions.", "")
-			q, err = e.saveQuestion(state, q, "")
-			if err != nil {
-				return result, err
-			}
-			return e.issueQuestion(state, q)
-		}
-		settings, err := e.settings(ctx, head)
-		if err != nil {
-			return result, err
-		}
-		var lastApproved *plan.Plan
-		for _, previous := range state.PlanEvaluations(nil) {
-			if previous.Plan.Version < latest.Plan.Version && previous.Approved && !previous.Rejected && !previous.Withdrawn {
-				p := previous.Plan
-				lastApproved = &p
-			}
-		}
-		if !latest.Executable(t, settings.PlanApproval(), lastApproved) {
-			text, err := e.planApprovalText(state, t, latest.Plan)
-			if err != nil {
-				return result, err
-			}
-			q := e.question(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: latest.Plan.Version}, "plan_approval", text, latest.Plan.StartStage)
-			q, err = e.saveQuestion(state, q, "")
-			if err != nil {
-				return result, err
-			}
-			return e.issueQuestion(state, q)
-		}
-		p, executable := state.ExecutablePlan(t, norms, settings.PlanApproval())
-		if !executable {
-			n, err := e.highestPlan()
-			if err != nil {
-				return result, err
-			}
-			return e.planner(ctx, t, source, n+1, plan.BackProposal)
-		}
-		run, hasRun := state.LatestStageRun()
-		stageID := p.StartStage
-		if hasRun {
-			if run.State == ledger.StageInvalidated {
-				rounds := state.Rounds(run.ID)
-				if len(rounds) > 0 && rounds[len(rounds)-1].Decision != nil && rounds[len(rounds)-1].Decision.Action == plan.Back {
-					old, ok := findPlan(proposals, run.PlanVersion)
-					if !ok {
-						return result, errors.New("bound plan is missing")
-					}
-					target, err := old.Next(run.StageID, plan.Back)
-					if err != nil {
-						return result, err
-					}
-					stageID = *target
-				} else {
-					stageID = run.StageID
-				}
-			} else if run.State == ledger.StageCompleted {
-				old, ok, err := e.boundPlan(run.PlanVersion)
-				if err != nil {
-					return Result{}, err
-				}
-				if !ok {
-					return result, errors.New("bound plan is missing")
-				}
-				target, err := old.Next(run.StageID, plan.Done)
-				if err != nil {
-					return result, err
-				}
-				if target == nil {
-					if err = e.active(); err != nil {
-						return result, err
-					}
-					if _, err = e.append(&ledger.StateChange{WorkStatus: ledger.WorkCompleted}); err != nil {
-						return result, err
-					}
-					continue
-				}
-				if *target == "replan" {
-					stageID = p.StartStage
-				} else {
-					stageID = *target
-				}
-			} else {
-				old, ok, err := e.boundPlan(run.PlanVersion)
-				if err != nil {
-					return Result{}, err
-				}
-				if !ok {
-					return result, errors.New("bound plan is missing")
-				}
-				p = old
-				stageID = run.StageID
-				rounds := state.Rounds(run.ID)
-				if len(rounds) > 0 && rounds[len(rounds)-1].Decision != nil {
-					d := rounds[len(rounds)-1].Decision
-					target, err := p.Next(stageID, d.Action)
-					if err != nil {
-						return result, err
-					}
-					if target != nil && *target != stageID {
-						stageID = *target
-						hasRun = false
-					}
-				}
-			}
-		}
-		stage, ok := p.Stage(stageID)
-		if !ok {
-			return result, fmt.Errorf("stage %q is missing from plan %d", stageID, p.Version)
-		}
-		if !hasRun || run.State == ledger.StageCompleted || run.State == ledger.StageInvalidated {
-			if err = e.active(); err != nil {
-				return result, err
-			}
-			run = &ledger.StageRun{StageID: stageID, PlanVersion: p.Version, State: ledger.StageWorking, NextActor: "worker"}
-			if _, err = e.append(run); err != nil {
-				return result, err
-			}
-			continue
-		}
-		if round, ok := state.OpenRound(); ok {
-			if round.ReturnedTarget != nil {
-				r, err := e.judgeRound(ctx, state, p, stage, run, round)
-				if err != nil || r.Instruction != nil || r.Paused || r.Message != "" {
-					return r, err
-				}
-				continue
-			}
-			if stage.Assignee == plan.Human {
-				target := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: round.StartTarget.Tree}
-				if answer, ok := humanStageAnswer(state, run, round); ok {
-					progress := form.Progress{InstructionID: "human-" + round.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{answer.Text}}
-					if err = e.recordSubmission(ctx, state, run, round, progress); err != nil {
-						return result, err
-					}
-					continue
-				}
-				q := e.question(target, "human_stage", "Provide the output for human stage "+stage.ID+".", stage.ID)
-				q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
-				q, err = e.saveQuestion(state, q, "")
-				if err != nil {
-					return result, err
-				}
-				return e.issueQuestion(state, q)
-			}
-			if run.State == ledger.StageExternalWait {
-				update := *run
-				update.State, update.NextActor, update.StopReason = ledger.StageWorking, "worker", ""
-				if _, err = e.append(&update); err != nil {
-					return result, err
-				}
-			}
-			return e.workInstruction(ctx, state, p, stage, round)
-		}
-		if err = e.active(); err != nil {
-			return result, err
-		}
-		snapshot, err := e.workspace.Snapshot(ctx, e.workID)
-		if err != nil {
-			return result, err
-		}
-		startRef, question, err := e.confirmRoundNorms(ctx, state, run, snapshot.Tree)
-		if err != nil {
-			return result, err
-		}
-		if question != nil {
-			return e.issueQuestion(state, *question)
-		}
-		if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), startRef, run.ID); err != nil || pending {
-			if err != nil || r.Instruction != nil || r.Paused {
-				return r, err
-			}
-			continue
-		}
-		norms, err = e.norms(ctx, startRef)
-		if err != nil {
-			return result, err
-		}
-		round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: snapshot.Tree}, NormReference: startRef, Norms: norms}
-		if _, err = e.append(round); err != nil {
-			return result, err
+		r, ready, stepErr := e.advanceNext(ctx, state)
+		if stepErr != nil || ready {
+			return r, stepErr
 		}
 	}
 }
+
 func findPlan(versions []plan.VersionEvaluation, n int) (plan.Plan, bool) {
 	for _, v := range versions {
 		if v.Plan.Version == n {
@@ -554,25 +229,9 @@ func (e *Engine) recordSubmission(ctx context.Context, state *ledger.State, run 
 	if err := e.active(); err != nil {
 		return err
 	}
-	records, err := e.records()
+	artifact, accepted, err := e.submittedArtifact(round, progress)
 	if err != nil {
 		return err
-	}
-	var artifact *ledger.Artifact
-	accepted := false
-	for _, record := range records {
-		if record.ID <= round.ID {
-			continue
-		}
-		if a, ok := record.Payload.(*ledger.Artifact); ok && a.Before == round.StartTarget && a.ChangeKind == "submission" {
-			artifact = a
-		}
-		if saved, ok := record.Payload.(*ledger.Progress); ok && saved.RoundID == round.ID {
-			if !reflect.DeepEqual(saved.Progress, progress) {
-				return errors.New("resubmission differs from the recorded progress")
-			}
-			accepted = true
-		}
 	}
 	if artifact == nil {
 		snapshot, err := e.workspace.Snapshot(ctx, e.workID)
@@ -946,35 +605,16 @@ func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.P
 	if err := e.active(); err != nil {
 		return Result{}, err
 	}
-	if err := e.checkSession(); err != nil {
+	if err := e.checkCommitSession(ctx, state); err != nil {
 		return Result{}, err
-	}
-	branch, err := e.workspace.Branch(ctx)
-	if err != nil {
-		return Result{}, err
-	}
-	work, _ := state.Work()
-	if branch != work.Branch {
-		return Result{}, errors.New("work branch does not match")
 	}
 	head, err := e.workspace.Head(ctx)
 	if err != nil {
 		return Result{}, err
 	}
-	before, err := e.commitBase(round)
+	before, err := e.recordCommitBase(ctx, round, head)
 	if err != nil {
 		return Result{}, err
-	}
-	if before == "" {
-		before = head
-		tree, err := e.workspace.CommitTree(ctx, head)
-		if err != nil {
-			return Result{}, err
-		}
-		target := form.TargetVersion{Kind: form.TargetTree, Tree: tree}
-		if _, err := e.append(&ledger.Artifact{Before: target, After: target, ChangeKind: "commit_base", Commit: head, CompletionConditionIDs: []string{}, Decisions: []form.Reference{}}); err != nil {
-			return Result{}, err
-		}
 	}
 	var commit workspace.CommitResult
 	if head != before {
@@ -1021,58 +661,7 @@ func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.P
 	if commit.Tree != round.ReturnedTarget.Tree {
 		return e.refreshTarget(ctx, state, run, round, commit.Commit)
 	}
-	if err = e.active(); err != nil {
-		return Result{}, err
-	}
-	judgments, err := e.roundJudgments(round)
-	if err != nil {
-		return Result{}, err
-	}
-	summary := check.Aggregate(judgments)
-	records, err := e.records()
-	if err != nil {
-		return Result{}, err
-	}
-	recorded := false
-	for _, record := range records {
-		if artifact, ok := record.Payload.(*ledger.Artifact); ok && record.ID > round.ID && artifact.ChangeKind == "commit" && artifact.Commit == commit.Commit {
-			recorded = true
-		}
-	}
-	if !recorded {
-		if _, err = e.append(&ledger.Artifact{Before: round.StartTarget, After: *round.ReturnedTarget, CompletionConditionIDs: summary.CompletionConditionIDs, ChangeKind: "commit", Decisions: []form.Reference{}, Commit: commit.Commit}); err != nil {
-			return Result{}, err
-		}
-	}
-	if round.Decision == nil {
-		copy := *round
-		copy.Decision = &router.Decision{Action: plan.Done, Reason: "All completion conditions passed and the stage completion was recorded at HEAD."}
-		if _, err = e.append(&copy); err != nil {
-			return Result{}, err
-		}
-	}
-	update := *run
-	update.State = ledger.StageCompleted
-	update.Commit = commit.Commit
-	update.NextActor = ""
-	update.StopReason = commit.Output
-	if _, err = e.append(&update); err != nil {
-		return Result{}, err
-	}
-	next, err := p.Next(stage.ID, plan.Done)
-	if err != nil {
-		return Result{}, err
-	}
-	if next == nil {
-		if _, err = e.append(&ledger.StateChange{WorkStatus: ledger.WorkCompleted}); err != nil {
-			return Result{}, err
-		}
-	}
-	state, err = e.load()
-	if err != nil {
-		return Result{}, err
-	}
-	return response(state), nil
+	return e.recordStageCommit(p, stage, run, round, commit)
 }
 
 // RecoverExternal queries an interrupted external operation without repeating its write.
@@ -1162,4 +751,518 @@ func (e *Engine) replaceQuestionTarget(ctx context.Context, round *ledger.Round,
 	copy.ReturnedTarget = &target
 	_, err = e.append(&copy)
 	return err
+}
+
+func (e *Engine) advanceNext(ctx context.Context, state *ledger.State) (Result, bool, error) {
+	if err := e.importStops(state); err != nil {
+		return Result{}, false, err
+	}
+	state, err := e.load()
+	if err != nil {
+		return Result{}, false, err
+	}
+	if recovered, err := e.recoverSubmission(ctx, state); err != nil {
+		return Result{}, false, err
+	} else if recovered {
+		return Result{}, false, nil
+	}
+
+	if questions := e.currentQuestions(state); len(questions) > 0 {
+		return e.advanceQuestion(ctx, state, questions[0])
+	}
+	changed, err := e.acceptPending(ctx, state)
+	if err != nil {
+		return Result{}, false, err
+	}
+	if changed {
+		return Result{}, false, nil
+	}
+	if run, ok := state.LatestStageRun(); ok && run.State != ledger.StageInvalidated {
+		if recovered, r, err := e.recoverCommit(ctx, state, run); err != nil || recovered {
+			if err != nil || r.Instruction != nil || r.Paused || r.Message != "" {
+				return r, true, err
+			}
+			return Result{}, false, nil
+		}
+	}
+	return e.advancePlan(ctx, state)
+}
+
+func (e *Engine) advanceQuestion(ctx context.Context, state *ledger.State, q form.Question) (Result, bool, error) {
+	if q.ApprovalTarget.Kind == form.ApprovalTree {
+		tree, err := e.workspace.SnapshotTree(ctx)
+		if err != nil {
+			return Result{}, false, err
+		}
+		if tree != q.ApprovalTarget.Tree {
+			replacement := q
+			replacement.ID = ulidString()
+			replacement.ApprovalTarget.Tree = tree
+			if err := e.refreshQuestionEvidence(ctx, state, &replacement); err != nil {
+				return Result{}, false, err
+			}
+			if round, ok := state.OpenRound(); ok && round.ReturnedTarget != nil && q.StopCategory != "detection_failed" {
+				if err = e.replaceQuestionTarget(ctx, round, tree); err != nil {
+					return Result{}, false, err
+				}
+			}
+			if _, err = e.append(&ledger.Question{Question: replacement, Supersedes: q.ID}); err != nil {
+				return Result{}, false, err
+			}
+			return Result{}, false, nil
+		}
+	}
+	r, err := e.issueQuestion(state, q)
+	return r, true, err
+}
+
+func (e *Engine) pendingPlanner(ctx context.Context, state *ledger.State, proposals []plan.VersionEvaluation, head string) (Result, bool, error) {
+	highest := 0
+	for _, proposal := range proposals {
+		highest = max(highest, proposal.Plan.Version)
+	}
+	for _, issued := range state.UnacceptedInstructions() {
+		if issued.Kind == form.InstructionPlan && issued.PlanVersion > highest {
+			data, err := e.readInstruction(issued.ID)
+			if err != nil {
+				return Result{}, true, err
+			}
+			t, source, err := e.template(ctx, head, data.TemplateName)
+			if err != nil {
+				return Result{}, true, err
+			}
+			r, err := e.planner(ctx, t, source, issued.PlanVersion, data.Origin)
+			return r, true, err
+		}
+	}
+	if len(proposals) == 0 {
+		for _, i := range state.UnacceptedInstructions() {
+			if i.Kind == form.InstructionPlan {
+				data, err := e.readInstruction(i.ID)
+				if err != nil {
+					return Result{}, true, err
+				}
+				if i.SessionID != e.sessionID {
+					t, source, err := e.template(ctx, data.Reference, data.TemplateName)
+					if err != nil {
+						return Result{}, true, err
+					}
+					r, err := e.planner(ctx, t, source, i.PlanVersion, data.Origin)
+					return r, true, err
+				}
+				r, err := e.publishInstruction(i, false, data, "")
+				return r, true, err
+			}
+		}
+		return Result{}, true, errors.New("initial planning instruction is missing; retry devkit start with the original task and template")
+	}
+	return Result{}, false, nil
+}
+
+func (e *Engine) reviseFailedPlan(ctx context.Context, state *ledger.State, latest plan.VersionEvaluation, t plan.PlanTemplate, source []byte) (Result, error) {
+	rounds, err := e.planRounds()
+	if err != nil {
+		return Result{}, err
+	}
+	if !latest.Rejected && !latest.Withdrawn && t.PlanRoundsReached(rounds) {
+		q := e.question(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: latest.Plan.Version}, "plan_round_limit", "The plan check round limit was reached. Explain how to continue.", "")
+		if _, answered := state.ResolveAnswer(q.ApprovalTarget); !answered {
+			q, err = e.saveQuestion(state, q, "")
+			if err != nil {
+				return Result{}, err
+			}
+			return e.issueQuestion(state, q)
+		}
+	}
+	n, err := e.highestPlan()
+	if err != nil {
+		return Result{}, err
+	}
+	return e.planner(ctx, t, source, n+1, latest.Origin)
+}
+
+func (e *Engine) advancePlan(ctx context.Context, state *ledger.State) (Result, bool, error) {
+	head, err := e.workspace.Head(ctx)
+	if err != nil {
+		return Result{}, false, err
+	}
+	norms, err := e.norms(ctx, head)
+	if err != nil {
+		return Result{}, false, err
+	}
+	proposals := state.PlanEvaluations(norms)
+	if r, ready, err := e.pendingPlanner(ctx, state, proposals, head); err != nil || ready {
+		return r, ready, err
+	}
+	latest := proposals[len(proposals)-1]
+	for latest.Withdrawn && latest.Origin == plan.HumanProposal && len(proposals) > 1 {
+		proposals = proposals[:len(proposals)-1]
+		latest = proposals[len(proposals)-1]
+	}
+	t, source, err := e.template(ctx, head, latest.Plan.Template.Name)
+	if err != nil {
+		return Result{}, false, err
+	}
+	return e.advanceProposal(ctx, state, latest, t, source, head, norms, proposals)
+}
+
+func (e *Engine) advanceProposal(ctx context.Context, state *ledger.State, latest plan.VersionEvaluation, t plan.PlanTemplate, source []byte, head string, norms []form.NormReference, proposals []plan.VersionEvaluation) (Result, bool, error) {
+	if latest.Withdrawn || latest.Rejected || latest.Judgment == plan.PlanFail {
+		r, err := e.reviseFailedPlan(ctx, state, latest, t, source)
+		return r, true, err
+	}
+	if latest.Judgment == plan.PlanPending {
+		r, err := e.planCheck(ctx, state, latest.Plan)
+		if err != nil || r.Instruction != nil || r.Paused {
+			return r, true, err
+		}
+		return Result{}, false, nil
+	}
+	if latest.Judgment == plan.PlanNotAssessed {
+		q := e.question(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: latest.Plan.Version}, "plan_not_assessed", "The plan could not be assessed. Provide revision instructions.", "")
+		q, err := e.saveQuestion(state, q, "")
+		if err != nil {
+			return Result{}, false, err
+		}
+		r, err := e.issueQuestion(state, q)
+		return r, true, err
+	}
+	return e.advanceApprovedPlan(ctx, state, latest, t, source, head, norms, proposals)
+}
+
+func (e *Engine) advanceApprovedPlan(ctx context.Context, state *ledger.State, latest plan.VersionEvaluation, t plan.PlanTemplate, source []byte, head string, norms []form.NormReference, proposals []plan.VersionEvaluation) (Result, bool, error) {
+	settings, err := e.settings(ctx, head)
+	if err != nil {
+		return Result{}, false, err
+	}
+	var lastApproved *plan.Plan
+	for _, previous := range state.PlanEvaluations(nil) {
+		if previous.Plan.Version < latest.Plan.Version && previous.Approved && !previous.Rejected && !previous.Withdrawn {
+			p := previous.Plan
+			lastApproved = &p
+		}
+	}
+	if !latest.Executable(t, settings.PlanApproval(), lastApproved) {
+		text, err := e.planApprovalText(state, t, latest.Plan)
+		if err != nil {
+			return Result{}, false, err
+		}
+		q := e.question(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: latest.Plan.Version}, "plan_approval", text, latest.Plan.StartStage)
+		q, err = e.saveQuestion(state, q, "")
+		if err != nil {
+			return Result{}, false, err
+		}
+		r, err := e.issueQuestion(state, q)
+		return r, true, err
+	}
+	p, executable := state.ExecutablePlan(t, norms, settings.PlanApproval())
+	if !executable {
+		n, err := e.highestPlan()
+		if err != nil {
+			return Result{}, false, err
+		}
+		r, err := e.planner(ctx, t, source, n+1, plan.BackProposal)
+		return r, true, err
+	}
+	return e.advanceStages(ctx, state, p, proposals)
+}
+
+func (e *Engine) advanceStages(ctx context.Context, state *ledger.State, p plan.Plan, proposals []plan.VersionEvaluation) (Result, bool, error) {
+	run, ok := state.LatestStageRun()
+	if !ok {
+		return Result{}, false, e.startStage(p, p.StartStage)
+	}
+	switch run.State {
+	case ledger.StageInvalidated:
+		return Result{}, false, e.restartInvalidatedStage(state, p, run, proposals)
+	case ledger.StageCompleted:
+		return Result{}, false, e.advanceCompletedStage(p, run)
+	default:
+		return e.advanceActiveStage(ctx, state, run)
+	}
+}
+
+func (e *Engine) restartInvalidatedStage(state *ledger.State, p plan.Plan, run *ledger.StageRun, proposals []plan.VersionEvaluation) error {
+	stageID := run.StageID
+	rounds := state.Rounds(run.ID)
+	if len(rounds) > 0 && rounds[len(rounds)-1].Decision != nil && rounds[len(rounds)-1].Decision.Action == plan.Back {
+		old, ok := findPlan(proposals, run.PlanVersion)
+		if !ok {
+			return errors.New("bound plan is missing")
+		}
+		target, err := old.Next(run.StageID, plan.Back)
+		if err != nil {
+			return err
+		}
+		stageID = *target
+	}
+	return e.startStage(p, stageID)
+}
+
+func (e *Engine) advanceCompletedStage(p plan.Plan, run *ledger.StageRun) error {
+	old, ok, err := e.boundPlan(run.PlanVersion)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errors.New("bound plan is missing")
+	}
+	target, err := old.Next(run.StageID, plan.Done)
+	if err != nil {
+		return err
+	}
+	if target == nil {
+		if err := e.active(); err != nil {
+			return err
+		}
+		_, err := e.append(&ledger.StateChange{WorkStatus: ledger.WorkCompleted})
+		return err
+	}
+	stageID := *target
+	if stageID == "replan" {
+		stageID = p.StartStage
+	}
+	return e.startStage(p, stageID)
+}
+
+func (e *Engine) startStage(p plan.Plan, stageID string) error {
+	if _, ok := p.Stage(stageID); !ok {
+		return fmt.Errorf("stage %q is missing from plan %d", stageID, p.Version)
+	}
+	if err := e.active(); err != nil {
+		return err
+	}
+	run := &ledger.StageRun{StageID: stageID, PlanVersion: p.Version, State: ledger.StageWorking, NextActor: "worker"}
+	_, err := e.append(run)
+	return err
+}
+
+func (e *Engine) advanceActiveStage(ctx context.Context, state *ledger.State, run *ledger.StageRun) (Result, bool, error) {
+	p, ok, err := e.boundPlan(run.PlanVersion)
+	if err != nil {
+		return Result{}, false, err
+	}
+	if !ok {
+		return Result{}, false, errors.New("bound plan is missing")
+	}
+	stageID := run.StageID
+	rounds := state.Rounds(run.ID)
+	if len(rounds) > 0 && rounds[len(rounds)-1].Decision != nil {
+		target, err := p.Next(stageID, rounds[len(rounds)-1].Decision.Action)
+		if err != nil {
+			return Result{}, false, err
+		}
+		if target != nil && *target != stageID {
+			return Result{}, false, e.startStage(p, *target)
+		}
+	}
+	stage, ok := p.Stage(stageID)
+	if !ok {
+		return Result{}, false, fmt.Errorf("stage %q is missing from plan %d", stageID, p.Version)
+	}
+	if round, ok := state.OpenRound(); ok {
+		return e.advanceOpenRound(ctx, state, p, stage, run, round)
+	}
+	return e.openStageRound(ctx, state, stage, run)
+}
+
+func (e *Engine) advanceOpenRound(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round) (Result, bool, error) {
+	if round.ReturnedTarget != nil {
+		r, err := e.judgeRound(ctx, state, p, stage, run, round)
+		if err != nil || r.Instruction != nil || r.Paused || r.Message != "" {
+			return r, true, err
+		}
+		return Result{}, false, nil
+	}
+	if stage.Assignee == plan.Human {
+		return e.advanceHumanRound(ctx, state, stage, run, round)
+	}
+	if run.State == ledger.StageExternalWait {
+		update := *run
+		update.State, update.NextActor, update.StopReason = ledger.StageWorking, "worker", ""
+		if _, err := e.append(&update); err != nil {
+			return Result{}, false, err
+		}
+	}
+	r, err := e.workInstruction(ctx, state, p, stage, round)
+	return r, true, err
+}
+
+func (e *Engine) advanceHumanRound(ctx context.Context, state *ledger.State, stage plan.Stage, run *ledger.StageRun, round *ledger.Round) (Result, bool, error) {
+	target := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: round.StartTarget.Tree}
+	if answer, ok := humanStageAnswer(state, run, round); ok {
+		progress := form.Progress{InstructionID: "human-" + round.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{answer.Text}}
+		if err := e.recordSubmission(ctx, state, run, round, progress); err != nil {
+			return Result{}, false, err
+		}
+		return Result{}, false, nil
+	}
+	q := e.question(target, "human_stage", "Provide the output for human stage "+stage.ID+".", stage.ID)
+	q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
+	q, err := e.saveQuestion(state, q, "")
+	if err != nil {
+		return Result{}, false, err
+	}
+	r, err := e.issueQuestion(state, q)
+	return r, true, err
+}
+
+func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage plan.Stage, run *ledger.StageRun) (Result, bool, error) {
+	if err := e.active(); err != nil {
+		return Result{}, false, err
+	}
+	snapshot, err := e.workspace.Snapshot(ctx, e.workID)
+	if err != nil {
+		return Result{}, false, err
+	}
+	startRef, question, err := e.confirmRoundNorms(ctx, state, run, snapshot.Tree)
+	if err != nil {
+		return Result{}, false, err
+	}
+	if question != nil {
+		r, err := e.issueQuestion(state, *question)
+		return r, true, err
+	}
+	if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), startRef, run.ID); err != nil || pending {
+		if err != nil || r.Instruction != nil || r.Paused {
+			return r, true, err
+		}
+		return Result{}, false, nil
+	}
+	norms, err := e.norms(ctx, startRef)
+	if err != nil {
+		return Result{}, false, err
+	}
+	round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: snapshot.Tree}, NormReference: startRef, Norms: norms}
+	if _, err = e.append(round); err != nil {
+		return Result{}, false, err
+	}
+	return Result{}, false, nil
+}
+
+func (e *Engine) branchWarning(state *ledger.State, warning string) (Result, error) {
+	r := response(state)
+	r.Warning = warning
+	pending := state.UnacceptedInstructions()
+	if len(pending) > 0 {
+		data, err := e.readInstructionFacts(pending[len(pending)-1].ID)
+		if err != nil {
+			return r, err
+		}
+		r.Instruction = &data.Instruction
+	}
+	return r, nil
+}
+
+func (e *Engine) submittedArtifact(round *ledger.Round, progress form.Progress) (*ledger.Artifact, bool, error) {
+	records, err := e.records()
+	if err != nil {
+		return nil, false, err
+	}
+	var artifact *ledger.Artifact
+	accepted := false
+	for _, record := range records {
+		if record.ID <= round.ID {
+			continue
+		}
+		if a, ok := record.Payload.(*ledger.Artifact); ok && a.Before == round.StartTarget && a.ChangeKind == "submission" {
+			artifact = a
+		}
+		if saved, ok := record.Payload.(*ledger.Progress); ok && saved.RoundID == round.ID {
+			if !reflect.DeepEqual(saved.Progress, progress) {
+				return nil, false, errors.New("resubmission differs from the recorded progress")
+			}
+			accepted = true
+		}
+	}
+	return artifact, accepted, nil
+}
+
+func (e *Engine) recordStageCommit(p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, commit workspace.CommitResult) (Result, error) {
+	if err := e.active(); err != nil {
+		return Result{}, err
+	}
+	judgments, err := e.roundJudgments(round)
+	if err != nil {
+		return Result{}, err
+	}
+	summary := check.Aggregate(judgments)
+	records, err := e.records()
+	if err != nil {
+		return Result{}, err
+	}
+	recorded := false
+	for _, record := range records {
+		if artifact, ok := record.Payload.(*ledger.Artifact); ok && record.ID > round.ID && artifact.ChangeKind == "commit" && artifact.Commit == commit.Commit {
+			recorded = true
+		}
+	}
+	if !recorded {
+		if _, err = e.append(&ledger.Artifact{Before: round.StartTarget, After: *round.ReturnedTarget, CompletionConditionIDs: summary.CompletionConditionIDs, ChangeKind: "commit", Decisions: []form.Reference{}, Commit: commit.Commit}); err != nil {
+			return Result{}, err
+		}
+	}
+	if round.Decision == nil {
+		copy := *round
+		copy.Decision = &router.Decision{Action: plan.Done, Reason: "All completion conditions passed and the stage completion was recorded at HEAD."}
+		if _, err = e.append(&copy); err != nil {
+			return Result{}, err
+		}
+	}
+	update := *run
+	update.State = ledger.StageCompleted
+	update.Commit = commit.Commit
+	update.NextActor = ""
+	update.StopReason = commit.Output
+	if _, err = e.append(&update); err != nil {
+		return Result{}, err
+	}
+	next, err := p.Next(stage.ID, plan.Done)
+	if err != nil {
+		return Result{}, err
+	}
+	if next == nil {
+		if _, err = e.append(&ledger.StateChange{WorkStatus: ledger.WorkCompleted}); err != nil {
+			return Result{}, err
+		}
+	}
+	state, err := e.load()
+	if err != nil {
+		return Result{}, err
+	}
+	return response(state), nil
+}
+
+func (e *Engine) recordCommitBase(ctx context.Context, round *ledger.Round, head string) (string, error) {
+	before, err := e.commitBase(round)
+	if err != nil {
+		return "", err
+	}
+	if before == "" {
+		before = head
+		tree, err := e.workspace.CommitTree(ctx, head)
+		if err != nil {
+			return "", err
+		}
+		target := form.TargetVersion{Kind: form.TargetTree, Tree: tree}
+		if _, err := e.append(&ledger.Artifact{Before: target, After: target, ChangeKind: "commit_base", Commit: head, CompletionConditionIDs: []string{}, Decisions: []form.Reference{}}); err != nil {
+			return "", err
+		}
+	}
+	return before, nil
+}
+
+func (e *Engine) checkCommitSession(ctx context.Context, state *ledger.State) error {
+	if err := e.checkSession(); err != nil {
+		return err
+	}
+	branch, err := e.workspace.Branch(ctx)
+	if err != nil {
+		return err
+	}
+	work, _ := state.Work()
+	if branch != work.Branch {
+		return errors.New("work branch does not match")
+	}
+	return nil
 }

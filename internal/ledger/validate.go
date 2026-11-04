@@ -254,24 +254,7 @@ func (v *Validator) validatePayload(payload Payload) error {
 	case *Approval:
 		return v.answer(p.Answer)
 	case *ExternalOp:
-		if err := v.check("external_target", p.ExternalOperationTarget); err != nil {
-			return err
-		}
-		if err := required(p.ApprovalID); err != nil {
-			return err
-		}
-		if len(p.Input) == 0 || !json.Valid(p.Input) {
-			return fmt.Errorf("external operation input is required")
-		}
-		switch p.Status {
-		case ExternalRunning:
-		case ExternalSucceeded, ExternalFailed, ExternalUnknown:
-			if p.BeforeID == "" {
-				return fmt.Errorf("external operation result requires its before record")
-			}
-		default:
-			return fmt.Errorf("unknown external operation status: %q", p.Status)
-		}
+		return v.validateExternalOperation(p)
 	case *Progress:
 		if err := required(p.RoundID); err != nil {
 			return err
@@ -280,56 +263,11 @@ func (v *Validator) validatePayload(payload Payload) error {
 	case *Judgment:
 		return v.judgment(*p)
 	case *DetectionTest:
-		if err := required(p.InstructionID, p.Aspect, p.Runner, p.Identity.AspectHash, p.Identity.SpecHash, p.Identity.RunnerHash); err != nil {
-			return err
-		}
-		if len(p.Cases) == 0 {
-			return fmt.Errorf("detection test cases are required")
-		}
-		for _, result := range p.Cases {
-			if err := required(result.File, result.Observation.File, result.Observation.Reason); err != nil {
-				return err
-			}
-			switch result.Kind {
-			case "violation", "conforming", "allowed":
-			default:
-				return fmt.Errorf("unknown detection case kind: %q", result.Kind)
-			}
-			switch result.Expected {
-			case form.Pass, form.Fail, form.NotAssessed:
-			default:
-				return fmt.Errorf("unknown detection case judgment: %q", result.Expected)
-			}
-			if err := v.judgment(Judgment{Judgment: result.Observation.Judgment}); err != nil {
-				return err
-			}
-		}
+		return v.validateDetectionTest(p)
 	case *StageRun:
 		return nil
 	case *Round:
-		if err := v.check("target_version", p.StartTarget); err != nil {
-			return err
-		}
-		if p.ReturnedTarget != nil {
-			if err := v.check("target_version", p.ReturnedTarget); err != nil {
-				return err
-			}
-		}
-		if p.Norms == nil {
-			return fmt.Errorf("round norms are required")
-		}
-		for _, norm := range p.Norms {
-			if err := v.check("norm_reference", norm); err != nil {
-				return err
-			}
-		}
-		if p.Decision != nil {
-			switch p.Decision.Action {
-			case plan.Fix, plan.Ask, plan.Back, plan.Done:
-			default:
-				return fmt.Errorf("unknown round action: %q", p.Decision.Action)
-			}
-		}
+		return v.validateRound(p)
 	case *Instruction:
 		if err := required(p.SessionID); err != nil {
 			return err
@@ -349,6 +287,83 @@ func (v *Validator) validatePayload(payload Payload) error {
 			return fmt.Errorf("artifact completion conditions and decisions are required")
 		}
 		return required(p.ChangeKind)
+	}
+	return nil
+}
+
+func (v *Validator) validateExternalOperation(p *ExternalOp) error {
+	if err := v.check("external_target", p.ExternalOperationTarget); err != nil {
+		return err
+	}
+	if err := required(p.ApprovalID); err != nil {
+		return err
+	}
+	if len(p.Input) == 0 || !json.Valid(p.Input) {
+		return fmt.Errorf("external operation input is required")
+	}
+	switch p.Status {
+	case ExternalRunning:
+	case ExternalSucceeded, ExternalFailed, ExternalUnknown:
+		if p.BeforeID == "" {
+			return fmt.Errorf("external operation result requires its before record")
+		}
+	default:
+		return fmt.Errorf("unknown external operation status: %q", p.Status)
+	}
+	return nil
+}
+
+func (v *Validator) validateDetectionTest(p *DetectionTest) error {
+	if err := required(p.InstructionID, p.Aspect, p.Runner, p.Identity.AspectHash, p.Identity.SpecHash, p.Identity.RunnerHash); err != nil {
+		return err
+	}
+	if len(p.Cases) == 0 {
+		return fmt.Errorf("detection test cases are required")
+	}
+	for _, result := range p.Cases {
+		if err := required(result.File, result.Observation.File, result.Observation.Reason); err != nil {
+			return err
+		}
+		switch result.Kind {
+		case "violation", "conforming", "allowed":
+		default:
+			return fmt.Errorf("unknown detection case kind: %q", result.Kind)
+		}
+		switch result.Expected {
+		case form.Pass, form.Fail, form.NotAssessed:
+		default:
+			return fmt.Errorf("unknown detection case judgment: %q", result.Expected)
+		}
+		if err := v.judgment(Judgment{Judgment: result.Observation.Judgment}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (v *Validator) validateRound(p *Round) error {
+	if err := v.check("target_version", p.StartTarget); err != nil {
+		return err
+	}
+	if p.ReturnedTarget != nil {
+		if err := v.check("target_version", p.ReturnedTarget); err != nil {
+			return err
+		}
+	}
+	if p.Norms == nil {
+		return fmt.Errorf("round norms are required")
+	}
+	for _, norm := range p.Norms {
+		if err := v.check("norm_reference", norm); err != nil {
+			return err
+		}
+	}
+	if p.Decision != nil {
+		switch p.Decision.Action {
+		case plan.Fix, plan.Ask, plan.Back, plan.Done:
+		default:
+			return fmt.Errorf("unknown round action: %q", p.Decision.Action)
+		}
 	}
 	return nil
 }

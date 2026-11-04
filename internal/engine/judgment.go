@@ -88,23 +88,15 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 		return meta, instructionData{}, false, err
 	}
 	if !fresh {
-		data, err := e.readInstruction(meta.ID)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+		previousID := meta.ID
+		data, reusable, err := e.reuseJudgment(ctx, &meta, item, target, ref)
+		if err != nil {
 			return meta, instructionData{}, false, err
 		}
-		if err == nil && data.Request != nil {
-			norms, err := e.norms(ctx, ref)
-			if err != nil {
-				return meta, instructionData{}, false, err
-			}
-			previous := check.Judgment{JudgmentResult: form.JudgmentResult{TargetVersion: data.Request.TargetVersion, Norms: normRefs(data.Request.Norms)}}
-			if data.Request.Runner == string(item.Runner) && previous.ValidFor(target, norms) {
-				return meta, data, false, nil
-			}
-			meta.Reissue++
-			meta.ID = instructionID(e.workID, kind, key, meta.Reissue)
-			fresh = true
+		if reusable {
+			return meta, data, false, nil
 		}
+		fresh = meta.ID != previousID
 	}
 	norms, _, err := e.normDocuments(ctx, ref)
 	if err != nil {
@@ -156,21 +148,7 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 		norms[0].Content += "\n" + evidence
 	}
 	input := check.RequestInput{Kind: requestKind, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: aspect, TargetVersion: target, TargetPath: path, Norms: norms, OutputSchema: schema, CompletionConditionIDs: append([]string{}, item.CompletionConditionIDs...), Progress: progress, PreviousFindings: findings, Authorizations: []check.Authorization{}}
-	answers := state.AnsweredQuestions()
-	for _, q := range state.Questions() {
-		answer, ok := answers[q.ID]
-		if !ok || answer.Answer.Interpretation != ledger.AnswerApproved && answer.Answer.Interpretation != ledger.AnswerText {
-			continue
-		}
-		effective, ok := state.ResolveAnswer(q.ApprovalTarget)
-		if !ok || effective.RecordID != answer.RecordID {
-			continue
-		}
-		applicable := q.ApprovalTarget.Kind == form.ApprovalTree && q.ApprovalTarget.Tree == target.Tree || q.ApprovalTarget.Kind == form.ApprovalPlan && q.ApprovalTarget.Plan == version || q.ApprovalTarget.Kind == form.ApprovalDecision || q.ApprovalTarget.Kind == form.ApprovalWork
-		if applicable {
-			input.Authorizations = append(input.Authorizations, check.Authorization{Target: q.ApprovalTarget, Scope: q.Text + "\n" + answer.Answer.Text + "\nOriginal human input: " + answer.Answer.Original, Evidence: []form.Reference{{RecordID: answer.RecordID}}})
-		}
-	}
+	input.Authorizations = judgmentAuthorizations(state, target, version)
 	request, err := check.PrepareRequest(input)
 	if err != nil {
 		return meta, instructionData{}, false, err
@@ -252,21 +230,8 @@ func (e *Engine) hydrateRequest(ctx context.Context, data instructionData) error
 		return err
 	}
 	if data.Request.Kind == check.RoundRequest {
-		records, err := e.records()
-		if err != nil {
+		if err := e.hydrateRoundNorms(ctx, data.Instruction.ID, norms); err != nil {
 			return err
-		}
-		for _, record := range records {
-			if meta, ok := record.Payload.(*ledger.Instruction); ok && meta.ID == data.Instruction.ID {
-				state, err := e.load()
-				if err != nil {
-					return err
-				}
-				if err := e.roundNorms(ctx, state, meta.RoundID, meta.PlanVersion, norms); err != nil {
-					return err
-				}
-				break
-			}
 		}
 	}
 	records, err := e.records()
@@ -393,44 +358,10 @@ func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan
 	return issued, nil
 }
 func (e *Engine) acceptPending(ctx context.Context, state *ledger.State) (bool, error) {
-	entries, err := os.ReadDir(filepath.Join(e.workRoot(), "results"))
-	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
-	}
-	if err != nil {
+	observations, err := e.pendingObservations(state)
+	if err != nil || observations == nil {
 		return false, err
 	}
-	type observed struct {
-		result hook.SubagentResult
-		path   string
-	}
-	observations := []observed{}
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-		relevant := false
-		for _, instruction := range state.UnacceptedInstructions() {
-			if strings.HasPrefix(entry.Name(), instruction.ID+"-") {
-				relevant = true
-				break
-			}
-		}
-		if !relevant {
-			continue
-		}
-		name := filepath.Join(e.workRoot(), "results", entry.Name())
-		data, err := os.ReadFile(name)
-		if err != nil {
-			return false, err
-		}
-		var result hook.SubagentResult
-		if err = json.Unmarshal(data, &result); err != nil {
-			return false, fmt.Errorf("result %s: %w", name, err)
-		}
-		observations = append(observations, observed{result, name})
-	}
-	slices.SortStableFunc(observations, func(a, b observed) int { return a.result.ObservedAt.Compare(b.result.ObservedAt) })
 	for _, instruction := range state.UnacceptedInstructions() {
 		if instruction.Kind != form.InstructionPlan && instruction.Kind != form.InstructionJudgment && instruction.Kind != form.InstructionPlanCheck && instruction.Kind != form.InstructionDetectionTest {
 			continue
@@ -439,91 +370,20 @@ func (e *Engine) acceptPending(ctx context.Context, state *ledger.State) (bool, 
 		if err != nil {
 			return false, err
 		}
-		if instruction.Kind == form.InstructionPlanCheck || instruction.Kind == form.InstructionDetectionTest {
-			ref, err := e.workspace.Head(ctx)
-			if err != nil {
-				return false, err
-			}
-			if instruction.Kind == form.InstructionDetectionTest && instruction.StageRunID != "" {
-				tree, err := e.workspace.SnapshotTree(ctx)
-				if err != nil {
-					return false, err
-				}
-				run, ok := state.LatestStageRun()
-				if !ok || run.ID != instruction.StageRunID {
-					continue
-				}
-				confirmed, question, err := e.confirmRoundNorms(ctx, state, run, tree)
-				if err != nil {
-					return false, err
-				}
-				if question != nil {
-					return false, nil
-				}
-				ref = confirmed
-			}
-			if request.Detection != nil {
-				current, err := e.detectionInput(ctx, ref, plan.Check{Aspect: request.Request.Aspect.ID, Runner: plan.Runner(request.Request.Runner)})
-				if err != nil {
-					return false, err
-				}
-				if current.Identity != request.Detection.Identity {
-					continue
-				}
-			} else {
-				norms, err := e.norms(ctx, ref)
-				if err != nil {
-					return false, err
-				}
-				previous := check.Judgment{JudgmentResult: form.JudgmentResult{TargetVersion: request.Request.TargetVersion, Norms: normRefs(request.Request.Norms)}}
-				if !previous.ValidFor(request.Request.TargetVersion, norms) {
-					continue
-				}
-			}
+		current, blocked, err := e.pendingRequestCurrent(ctx, state, instruction, request)
+		if err != nil || blocked {
+			return false, err
+		}
+		if !current {
+			continue
 		}
 		for _, obs := range observations {
-			result := obs.result
-			if result.InstructionID != instruction.ID {
+			if obs.result.InstructionID != instruction.ID {
 				continue
 			}
-			if result.AgentID == "" || result.Runner != request.Instruction.Runner {
-				return false, fmt.Errorf("result %s: runner or agent identity does not match", obs.path)
-			}
-			provenance := check.Provenance{Source: check.SubagentResult, InstructionID: instruction.ID, Runner: result.Runner, AgentID: result.AgentID, Effort: result.Effort, Model: result.Model, ResultPath: obs.path}
-			if instruction.Kind == form.InstructionPlan {
-				var output form.PlannerResult
-				if err = e.forms["planner-result"].Decode(result.Content, &output); err != nil {
-					return false, err
-				}
-				if output.InstructionID != instruction.ID {
-					return false, errors.New("planner instruction ID does not match")
-				}
-				p, err := e.plans.ParsePlan(output.Plan)
-				if err != nil {
-					return false, err
-				}
-				if p.Version != instruction.PlanVersion {
-					return false, errors.New("planner version does not match the requested version")
-				}
-				return true, e.acceptPlan(ctx, state, p, request.Origin, instruction.ID)
-			}
-			if request.Detection != nil {
-				return true, e.acceptDetection(ctx, state, instruction, request, result.Content, provenance)
-			}
-			if request.Request == nil {
-				return false, errors.New("judgment request is missing")
-			}
-			_, schema, err := e.outputSchema(ctx, request.Reference, result.Runner)
-			if err != nil {
-				return false, err
-			}
-			judgment, accepted, err := check.AcceptResult(*request.Request, result.Content, schema, provenance, state.LatestJudgments(request.Request.TargetVersion, normRefs(request.Request.Norms)))
-			if err != nil {
-				return false, err
-			}
-			if accepted {
-				_, err = e.append(&ledger.Judgment{Judgment: judgment, RoundID: instruction.RoundID})
-				return true, err
+			accepted, err := e.acceptObservedResult(ctx, state, instruction, request, obs)
+			if accepted || err != nil {
+				return accepted, err
 			}
 		}
 	}
@@ -570,197 +430,14 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 		if err != nil {
 			return Result{}, err
 		}
-		judgments, err := e.roundJudgments(round)
-		if err != nil {
-			return Result{}, err
-		}
-		var existing *check.Judgment
-		for _, j := range judgments {
-			if j.Aspect == item.Aspect && j.Runner == string(item.Runner) {
-				copy := j
-				existing = &copy
-			}
-		}
-		if existing != nil {
-			if commandTargetChanged(*existing) {
-				return e.fixRound(ctx, state, p, stage, run, round, "A command changed its target.")
-			}
-			if item.Required && item.Runner.IsCommand() && existing.Judgment == check.Fail {
-				return e.fixRound(ctx, state, p, stage, run, round, "A required command check failed.")
-			}
-			continue
-		}
-		key := round.ID + ":" + item.Aspect
-		meta, request, fresh, err := e.judgmentInstruction(ctx, state, item, form.InstructionJudgment, key, roundReference(round), target, path, round, p.Version)
-		if err != nil {
-			return Result{}, err
-		}
-		issued, err := e.publishJudgment(ctx, meta, request, fresh)
-		if err != nil {
-			return Result{}, err
-		}
-		settings, err := e.settings(ctx, roundReference(round))
-		if err != nil {
-			return Result{}, err
-		}
-		if item.Runner.IsCommand() {
-			command, ok := settings.Commands[strings.TrimPrefix(string(item.Runner), "command:")]
-			var judgment check.Judgment
-			if !ok {
-				judgment, err = check.UnregisteredCommand(*request.Request)
-			} else {
-				judgment, err = e.runCheck(ctx, *request.Request, command, stage.ID, target.Tree)
-			}
-			if err != nil {
-				return Result{}, err
-			}
-			if _, err = e.append(&ledger.Judgment{Judgment: judgment, RoundID: round.ID}); err != nil {
-				return Result{}, err
-			}
-			if commandTargetChanged(judgment) {
-				return e.fixRound(ctx, state, p, stage, run, round, "A command check changed its target.")
-			}
-			if judgment.Judgment == check.Fail && item.Required {
-				result, err := e.fixRound(ctx, state, p, stage, run, round, "A required command check failed.")
-				if !ok && err == nil && result.Instruction == nil {
-					result = response(state)
-					result.Message = judgment.Findings[0].Scenario + "\nCorrect this finding, then run devkit next to open the fix round."
-				}
-				return result, err
-			}
-			continue
-		}
-		if command, ok := settings.Judges[string(item.Runner)]; ok {
-			judgment, err := e.runJudge(ctx, request, command, stage.ID, target.Tree)
-			if err != nil {
-				return Result{}, err
-			}
-			if _, err = e.append(&ledger.Judgment{Judgment: judgment, RoundID: round.ID}); err != nil {
-				return Result{}, err
-			}
-			if commandTargetChanged(judgment) {
-				return e.fixRound(ctx, state, p, stage, run, round, "A judgment command changed its target.")
-			}
-			continue
-		}
-		if !strings.HasPrefix(string(item.Runner), "devkit-") {
-			return Result{}, fmt.Errorf("judge %q is neither a registered command nor a devkit subagent", item.Runner)
-		}
-		return issued, nil
-	}
-	state, err = e.load()
-	if err != nil {
-		return Result{}, err
-	}
-	judgments, err := e.roundJudgments(round)
-	if err != nil {
-		return Result{}, err
-	}
-	targets := map[string]form.TargetVersion{}
-	for _, item := range stage.Checks {
-		targets[item.Target] = target
-	}
-	requirements, tests, err := e.detectionContext(ctx, stage.RequiredChecks(), roundReference(round))
-	if err != nil {
-		return Result{}, err
-	}
-	settings, err := e.settings(ctx, roundReference(round))
-	if err != nil {
-		return Result{}, err
-	}
-	rule := stage.CompletionRule()
-	rule.RequireDetectionTests = settings.DetectionRequired()
-	completion := router.CheckCompletion(router.CompletionInput{Rule: rule, TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments, Detection: requirements, DetectionTests: tests})
-	summary := check.Aggregate(judgments)
-	paths, err := e.workspace.ChangedFiles(ctx, round.StartTarget.Tree, target.Tree)
-	if err != nil {
-		return Result{}, err
-	}
-	categories := differenceCategories(paths, settings)
-	categories = slices.DeleteFunc(categories, func(category string) bool { return category == config.MetaLoopEdit })
-	if changed, err := e.metaLoopChanged(ctx, roundReference(round), target.Tree); err != nil {
-		return Result{}, err
-	} else if changed && !slices.Contains(categories, config.MetaLoopEdit) {
-		categories = append(categories, config.MetaLoopEdit)
-	}
-	approvalTarget := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}
-	if gateApproved(state, run, round, approvalTarget) {
-		categories = nil
-	}
-	_, humanAnswered := humanStageAnswer(state, run, round)
-	termination := form.TerminationCompleted
-	records, err := e.records()
-	if err != nil {
-		return Result{}, err
-	}
-	for _, r := range records {
-		if progress, ok := r.Payload.(*ledger.Progress); ok && progress.RoundID == round.ID {
-			termination = progress.TerminationKind
+		r, ready, err := e.judgeRoundCheck(ctx, state, p, stage, run, round, item, path)
+		if err != nil || ready {
+			return r, err
 		}
 	}
-	progressMade, noProgress, err := e.progress(state, run.ID, round, summary)
-	if err != nil {
-		return Result{}, err
-	}
-	window, err := e.roundWindow(state, run.ID, round)
-	if err != nil {
-		return Result{}, err
-	}
-	table, err := e.table(ctx, roundReference(round))
-	if err != nil {
-		return Result{}, err
-	}
-	decision, err := table.Decide(router.Input{Summary: summary, Stage: stage, CompletedRounds: len(window), PreviousNoProgressRounds: noProgress, ProgressMade: progressMade, TerminationKind: termination, Completion: completion, Confirmation: router.ConfirmationInput{Categories: categories, GateApproved: gateApproved(state, run, round, approvalTarget), HumanStageAnswered: humanAnswered}})
-	if err != nil {
-		return Result{}, err
-	}
-	if decision.Action == plan.Done {
-		return e.finishCommit(ctx, state, p, stage, run, round)
-	}
-	if decision.Action == plan.Ask {
-		category := "stage_confirmation"
-		if table.ClassifyConfirmation(router.ConfirmationInput{Categories: []string{config.MetaLoopEdit}}).Required && slices.Contains(categories, config.MetaLoopEdit) {
-			category = config.MetaLoopEdit
-		}
-		text, err := e.stageQuestionText(ctx, stage, round, decision.Reason)
-		if err != nil {
-			return Result{}, err
-		}
-		if category == config.MetaLoopEdit {
-			text, err = e.loopEditText(ctx, roundReference(round), target.Tree, "Approve development loop edits before committing this stage? If rejected, the worker must undo the edits.\n\n"+text)
-			if err != nil {
-				return Result{}, err
-			}
-		}
-		q := e.question(approvalTarget, category, text, stage.ID)
-		q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
-		next, err := p.Next(stage.ID, plan.Ask)
-		if err != nil {
-			return Result{}, err
-		}
-		q.NextStage = *next
-		q, err = e.saveQuestion(state, q, "")
-		if err != nil {
-			return Result{}, err
-		}
-		// Keep a gate's evaluated round open so approval can complete the exact target.
-		if summary.Judgment == check.Pass && completion.ReadyToCommit && termination == form.TerminationCompleted {
-			update := *run
-			update.State = ledger.StageApprovalWait
-			update.NextActor = "human"
-			if _, err = e.append(&update); err != nil {
-				return Result{}, err
-			}
-		} else if err = e.closeRound(state, run, round, decision); err != nil {
-			return Result{}, err
-		}
-		return e.issueQuestion(state, q)
-	}
-	if err = e.closeRound(state, run, round, decision); err != nil {
-		return Result{}, err
-	}
-	return Result{}, nil
+	return e.decideRound(ctx, p, stage, run, round)
 }
+
 func (e *Engine) progress(state *ledger.State, runID string, current *ledger.Round, summary check.Summary) (bool, int, error) {
 	rounds, err := e.roundWindow(state, runID, current)
 	if err != nil {
@@ -1053,4 +730,424 @@ func humanStageAnswer(state *ledger.State, run *ledger.StageRun, round *ledger.R
 	}
 	answer, ok := state.AnsweredQuestions()[question.ID]
 	return answer.Answer, ok && answer.Answer.Target == question.ApprovalTarget && answer.Answer.Interpretation != ledger.AnswerDeferred
+}
+
+func (e *Engine) reuseJudgment(ctx context.Context, meta *ledger.Instruction, item plan.Check, target form.TargetVersion, ref string) (instructionData, bool, error) {
+	data, err := e.readInstruction(meta.ID)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return instructionData{}, false, err
+	}
+	if err == nil && data.Request != nil {
+		norms, err := e.norms(ctx, ref)
+		if err != nil {
+			return instructionData{}, false, err
+		}
+		previous := check.Judgment{JudgmentResult: form.JudgmentResult{TargetVersion: data.Request.TargetVersion, Norms: normRefs(data.Request.Norms)}}
+		if data.Request.Runner == string(item.Runner) && previous.ValidFor(target, norms) {
+			return data, true, nil
+		}
+		meta.Reissue++
+		meta.ID = instructionID(e.workID, meta.Kind, meta.TargetKey, meta.Reissue)
+	}
+	return instructionData{}, false, nil
+}
+
+func judgmentAuthorizations(state *ledger.State, target form.TargetVersion, version int) []check.Authorization {
+	authorizations := []check.Authorization{}
+	answers := state.AnsweredQuestions()
+	for _, q := range state.Questions() {
+		answer, ok := answers[q.ID]
+		if !ok || answer.Answer.Interpretation != ledger.AnswerApproved && answer.Answer.Interpretation != ledger.AnswerText {
+			continue
+		}
+		effective, ok := state.ResolveAnswer(q.ApprovalTarget)
+		if !ok || effective.RecordID != answer.RecordID {
+			continue
+		}
+		applicable := q.ApprovalTarget.Kind == form.ApprovalTree && q.ApprovalTarget.Tree == target.Tree || q.ApprovalTarget.Kind == form.ApprovalPlan && q.ApprovalTarget.Plan == version || q.ApprovalTarget.Kind == form.ApprovalDecision || q.ApprovalTarget.Kind == form.ApprovalWork
+		if applicable {
+			authorizations = append(authorizations, check.Authorization{Target: q.ApprovalTarget, Scope: q.Text + "\n" + answer.Answer.Text + "\nOriginal human input: " + answer.Answer.Original, Evidence: []form.Reference{{RecordID: answer.RecordID}}})
+		}
+	}
+	return authorizations
+}
+
+func (e *Engine) hydrateRoundNorms(ctx context.Context, instructionID string, norms []check.Norm) error {
+	records, err := e.records()
+	if err != nil {
+		return err
+	}
+	for _, record := range records {
+		if meta, ok := record.Payload.(*ledger.Instruction); ok && meta.ID == instructionID {
+			state, err := e.load()
+			if err != nil {
+				return err
+			}
+			if err := e.roundNorms(ctx, state, meta.RoundID, meta.PlanVersion, norms); err != nil {
+				return err
+			}
+			break
+		}
+	}
+	return nil
+}
+
+type observedResult struct {
+	result hook.SubagentResult
+	path   string
+}
+
+func (e *Engine) pendingObservations(state *ledger.State) ([]observedResult, error) {
+	entries, err := os.ReadDir(filepath.Join(e.workRoot(), "results"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	observations := []observedResult{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		relevant := false
+		for _, instruction := range state.UnacceptedInstructions() {
+			if strings.HasPrefix(entry.Name(), instruction.ID+"-") {
+				relevant = true
+				break
+			}
+		}
+		if !relevant {
+			continue
+		}
+		name := filepath.Join(e.workRoot(), "results", entry.Name())
+		data, err := os.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+		var result hook.SubagentResult
+		if err = json.Unmarshal(data, &result); err != nil {
+			return nil, fmt.Errorf("result %s: %w", name, err)
+		}
+		observations = append(observations, observedResult{result, name})
+	}
+	slices.SortStableFunc(observations, func(a, b observedResult) int { return a.result.ObservedAt.Compare(b.result.ObservedAt) })
+	return observations, nil
+}
+
+func (e *Engine) pendingRequestCurrent(ctx context.Context, state *ledger.State, instruction ledger.Instruction, request instructionData) (bool, bool, error) {
+	if instruction.Kind != form.InstructionPlanCheck && instruction.Kind != form.InstructionDetectionTest {
+		return true, false, nil
+	}
+	ref, err := e.workspace.Head(ctx)
+	if err != nil {
+		return false, false, err
+	}
+	if instruction.Kind == form.InstructionDetectionTest && instruction.StageRunID != "" {
+		tree, err := e.workspace.SnapshotTree(ctx)
+		if err != nil {
+			return false, false, err
+		}
+		run, ok := state.LatestStageRun()
+		if !ok || run.ID != instruction.StageRunID {
+			return false, false, nil
+		}
+		confirmed, question, err := e.confirmRoundNorms(ctx, state, run, tree)
+		if err != nil {
+			return false, false, err
+		}
+		if question != nil {
+			return false, true, nil
+		}
+		ref = confirmed
+	}
+	if request.Detection != nil {
+		current, err := e.detectionInput(ctx, ref, plan.Check{Aspect: request.Request.Aspect.ID, Runner: plan.Runner(request.Request.Runner)})
+		if err != nil {
+			return false, false, err
+		}
+		if current.Identity != request.Detection.Identity {
+			return false, false, nil
+		}
+	} else {
+		norms, err := e.norms(ctx, ref)
+		if err != nil {
+			return false, false, err
+		}
+		previous := check.Judgment{JudgmentResult: form.JudgmentResult{TargetVersion: request.Request.TargetVersion, Norms: normRefs(request.Request.Norms)}}
+		if !previous.ValidFor(request.Request.TargetVersion, norms) {
+			return false, false, nil
+		}
+	}
+	return true, false, nil
+}
+
+func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, instruction ledger.Instruction, request instructionData, obs observedResult) (bool, error) {
+	result := obs.result
+	if result.AgentID == "" || result.Runner != request.Instruction.Runner {
+		return false, fmt.Errorf("result %s: runner or agent identity does not match", obs.path)
+	}
+	provenance := check.Provenance{Source: check.SubagentResult, InstructionID: instruction.ID, Runner: result.Runner, AgentID: result.AgentID, Effort: result.Effort, Model: result.Model, ResultPath: obs.path}
+	if instruction.Kind == form.InstructionPlan {
+		return e.acceptPlannerResult(ctx, state, instruction, request.Origin, result.Content)
+	}
+	if request.Detection != nil {
+		return true, e.acceptDetection(ctx, state, instruction, request, result.Content, provenance)
+	}
+	if request.Request == nil {
+		return false, errors.New("judgment request is missing")
+	}
+	_, schema, err := e.outputSchema(ctx, request.Reference, result.Runner)
+	if err != nil {
+		return false, err
+	}
+	judgment, accepted, err := check.AcceptResult(*request.Request, result.Content, schema, provenance, state.LatestJudgments(request.Request.TargetVersion, normRefs(request.Request.Norms)))
+	if err != nil {
+		return false, err
+	}
+	if accepted {
+		_, err = e.append(&ledger.Judgment{Judgment: judgment, RoundID: instruction.RoundID})
+		return true, err
+	}
+	return false, nil
+}
+
+func (e *Engine) acceptPlannerResult(ctx context.Context, state *ledger.State, instruction ledger.Instruction, origin plan.ProposalOrigin, content []byte) (bool, error) {
+	var output form.PlannerResult
+	if err := e.forms["planner-result"].Decode(content, &output); err != nil {
+		return false, err
+	}
+	if output.InstructionID != instruction.ID {
+		return false, errors.New("planner instruction ID does not match")
+	}
+	p, err := e.plans.ParsePlan(output.Plan)
+	if err != nil {
+		return false, err
+	}
+	if p.Version != instruction.PlanVersion {
+		return false, errors.New("planner version does not match the requested version")
+	}
+	return true, e.acceptPlan(ctx, state, p, origin, instruction.ID)
+}
+
+func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item plan.Check, path string) (Result, bool, error) {
+	target := *round.ReturnedTarget
+	judgments, err := e.roundJudgments(round)
+	if err != nil {
+		return Result{}, false, err
+	}
+	var existing *check.Judgment
+	for _, j := range judgments {
+		if j.Aspect == item.Aspect && j.Runner == string(item.Runner) {
+			copy := j
+			existing = &copy
+		}
+	}
+	if existing != nil {
+		if commandTargetChanged(*existing) {
+			r, err := e.fixRound(ctx, state, p, stage, run, round, "A command changed its target.")
+			return r, true, err
+		}
+		if item.Required && item.Runner.IsCommand() && existing.Judgment == check.Fail {
+			r, err := e.fixRound(ctx, state, p, stage, run, round, "A required command check failed.")
+			return r, true, err
+		}
+		return Result{}, false, nil
+	}
+	key := round.ID + ":" + item.Aspect
+	meta, request, fresh, err := e.judgmentInstruction(ctx, state, item, form.InstructionJudgment, key, roundReference(round), target, path, round, p.Version)
+	if err != nil {
+		return Result{}, false, err
+	}
+	issued, err := e.publishJudgment(ctx, meta, request, fresh)
+	if err != nil {
+		return Result{}, false, err
+	}
+	settings, err := e.settings(ctx, roundReference(round))
+	if err != nil {
+		return Result{}, false, err
+	}
+	if item.Runner.IsCommand() {
+		return e.judgeCommandCheck(ctx, state, p, stage, run, round, item, request, settings)
+	}
+	if command, ok := settings.Judges[string(item.Runner)]; ok {
+		judgment, err := e.runJudge(ctx, request, command, stage.ID, target.Tree)
+		if err != nil {
+			return Result{}, false, err
+		}
+		if _, err = e.append(&ledger.Judgment{Judgment: judgment, RoundID: round.ID}); err != nil {
+			return Result{}, false, err
+		}
+		if commandTargetChanged(judgment) {
+			r, err := e.fixRound(ctx, state, p, stage, run, round, "A judgment command changed its target.")
+			return r, true, err
+		}
+		return Result{}, false, nil
+	}
+	if !strings.HasPrefix(string(item.Runner), "devkit-") {
+		return Result{}, false, fmt.Errorf("judge %q is neither a registered command nor a devkit subagent", item.Runner)
+	}
+	return issued, true, nil
+}
+
+func (e *Engine) judgeCommandCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item plan.Check, request instructionData, settings config.Config) (Result, bool, error) {
+	target := *round.ReturnedTarget
+	var err error
+	command, ok := settings.Commands[strings.TrimPrefix(string(item.Runner), "command:")]
+	var judgment check.Judgment
+	if !ok {
+		judgment, err = check.UnregisteredCommand(*request.Request)
+	} else {
+		judgment, err = e.runCheck(ctx, *request.Request, command, stage.ID, target.Tree)
+	}
+	if err != nil {
+		return Result{}, false, err
+	}
+	if _, err = e.append(&ledger.Judgment{Judgment: judgment, RoundID: round.ID}); err != nil {
+		return Result{}, false, err
+	}
+	if commandTargetChanged(judgment) {
+		r, err := e.fixRound(ctx, state, p, stage, run, round, "A command check changed its target.")
+		return r, true, err
+	}
+	if judgment.Judgment == check.Fail && item.Required {
+		result, err := e.fixRound(ctx, state, p, stage, run, round, "A required command check failed.")
+		if !ok && err == nil && result.Instruction == nil {
+			result = response(state)
+			result.Message = judgment.Findings[0].Scenario + "\nCorrect this finding, then run devkit next to open the fix round."
+		}
+		return result, true, err
+	}
+	return Result{}, false, nil
+}
+
+func (e *Engine) askRoundApproval(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, decision router.Decision, table router.Table, categories []string, summary check.Summary, completion router.Completion, termination form.TerminationKind) (Result, error) {
+	target := *round.ReturnedTarget
+	approvalTarget := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}
+	category := "stage_confirmation"
+	if table.ClassifyConfirmation(router.ConfirmationInput{Categories: []string{config.MetaLoopEdit}}).Required && slices.Contains(categories, config.MetaLoopEdit) {
+		category = config.MetaLoopEdit
+	}
+	text, err := e.stageQuestionText(ctx, stage, round, decision.Reason)
+	if err != nil {
+		return Result{}, err
+	}
+	if category == config.MetaLoopEdit {
+		text, err = e.loopEditText(ctx, roundReference(round), target.Tree, "Approve development loop edits before committing this stage? If rejected, the worker must undo the edits.\n\n"+text)
+		if err != nil {
+			return Result{}, err
+		}
+	}
+	q := e.question(approvalTarget, category, text, stage.ID)
+	q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
+	next, err := p.Next(stage.ID, plan.Ask)
+	if err != nil {
+		return Result{}, err
+	}
+	q.NextStage = *next
+	q, err = e.saveQuestion(state, q, "")
+	if err != nil {
+		return Result{}, err
+	}
+	// Keep a gate's evaluated round open so approval can complete the exact target.
+	if summary.Judgment == check.Pass && completion.ReadyToCommit && termination == form.TerminationCompleted {
+		update := *run
+		update.State = ledger.StageApprovalWait
+		update.NextActor = "human"
+		if _, err = e.append(&update); err != nil {
+			return Result{}, err
+		}
+	} else if err = e.closeRound(state, run, round, decision); err != nil {
+		return Result{}, err
+	}
+	return e.issueQuestion(state, q)
+}
+
+func (e *Engine) roundConfirmationCategories(ctx context.Context, round *ledger.Round, settings config.Config) ([]string, error) {
+	target := *round.ReturnedTarget
+	paths, err := e.workspace.ChangedFiles(ctx, round.StartTarget.Tree, target.Tree)
+	if err != nil {
+		return nil, err
+	}
+	categories := differenceCategories(paths, settings)
+	categories = slices.DeleteFunc(categories, func(category string) bool { return category == config.MetaLoopEdit })
+	if changed, err := e.metaLoopChanged(ctx, roundReference(round), target.Tree); err != nil {
+		return nil, err
+	} else if changed && !slices.Contains(categories, config.MetaLoopEdit) {
+		categories = append(categories, config.MetaLoopEdit)
+	}
+	return categories, nil
+}
+
+func (e *Engine) decideRound(ctx context.Context, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round) (Result, error) {
+	target := *round.ReturnedTarget
+	state, err := e.load()
+	if err != nil {
+		return Result{}, err
+	}
+	judgments, err := e.roundJudgments(round)
+	if err != nil {
+		return Result{}, err
+	}
+	targets := map[string]form.TargetVersion{}
+	for _, item := range stage.Checks {
+		targets[item.Target] = target
+	}
+	requirements, tests, err := e.detectionContext(ctx, stage.RequiredChecks(), roundReference(round))
+	if err != nil {
+		return Result{}, err
+	}
+	settings, err := e.settings(ctx, roundReference(round))
+	if err != nil {
+		return Result{}, err
+	}
+	rule := stage.CompletionRule()
+	rule.RequireDetectionTests = settings.DetectionRequired()
+	completion := router.CheckCompletion(router.CompletionInput{Rule: rule, TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments, Detection: requirements, DetectionTests: tests})
+	summary := check.Aggregate(judgments)
+	categories, err := e.roundConfirmationCategories(ctx, round, settings)
+	if err != nil {
+		return Result{}, err
+	}
+	approvalTarget := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}
+	if gateApproved(state, run, round, approvalTarget) {
+		categories = nil
+	}
+	_, humanAnswered := humanStageAnswer(state, run, round)
+	termination := form.TerminationCompleted
+	records, err := e.records()
+	if err != nil {
+		return Result{}, err
+	}
+	for _, r := range records {
+		if progress, ok := r.Payload.(*ledger.Progress); ok && progress.RoundID == round.ID {
+			termination = progress.TerminationKind
+		}
+	}
+	progressMade, noProgress, err := e.progress(state, run.ID, round, summary)
+	if err != nil {
+		return Result{}, err
+	}
+	window, err := e.roundWindow(state, run.ID, round)
+	if err != nil {
+		return Result{}, err
+	}
+	table, err := e.table(ctx, roundReference(round))
+	if err != nil {
+		return Result{}, err
+	}
+	decision, err := table.Decide(router.Input{Summary: summary, Stage: stage, CompletedRounds: len(window), PreviousNoProgressRounds: noProgress, ProgressMade: progressMade, TerminationKind: termination, Completion: completion, Confirmation: router.ConfirmationInput{Categories: categories, GateApproved: gateApproved(state, run, round, approvalTarget), HumanStageAnswered: humanAnswered}})
+	if err != nil {
+		return Result{}, err
+	}
+	if decision.Action == plan.Done {
+		return e.finishCommit(ctx, state, p, stage, run, round)
+	}
+	if decision.Action == plan.Ask {
+		return e.askRoundApproval(ctx, state, p, stage, run, round, decision, table, categories, summary, completion, termination)
+	}
+	if err = e.closeRound(state, run, round, decision); err != nil {
+		return Result{}, err
+	}
+	return Result{}, nil
 }

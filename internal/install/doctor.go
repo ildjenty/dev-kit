@@ -160,39 +160,13 @@ func (r *Report) checkWorkVersions(configVersion string) {
 			continue
 		}
 		if validator == nil {
-			sources := make(map[string][]byte)
-			for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
-				source, err := kit.Schema(name)
-				if err != nil {
-					r.add("work_versions", "", err)
-					return
-				}
-				sources[name] = source
-			}
-			validator, err = ledger.NewValidator(sources)
+			validator, err = workVersionValidator()
 			if err != nil {
 				r.add("work_versions", "", err)
 				return
 			}
 		}
-		records, err := ledger.List(fsstore.New(filepath.Join(root, entry.Name())), validator)
-		found := false
-		if err == nil {
-			for _, record := range records {
-				work, ok := record.Payload.(*ledger.Work)
-				if !ok {
-					continue
-				}
-				found = true
-				if work.KitVersion != kit.Version || configVersion != "" && work.KitVersion != configVersion {
-					err = fmt.Errorf("Work kit version %q does not match binary %q and configuration %q", work.KitVersion, kit.Version, configVersion)
-					break
-				}
-			}
-			if !found {
-				err = fmt.Errorf("Work record is missing")
-			}
-		}
+		err := checkWorkVersion(filepath.Join(root, entry.Name()), validator, configVersion)
 		r.add("work_version/"+entry.Name(), "The recorded Work kit version is compatible.", err)
 	}
 }
@@ -241,4 +215,38 @@ func (r *Report) checkSession(sessionID string) {
 		return
 	}
 	r.add("hook_session", "", fmt.Errorf("SessionStart observation is missing for session %q. %s", sessionID, trustGuidance))
+}
+
+func workVersionValidator() (*ledger.Validator, error) {
+	sources := make(map[string][]byte)
+	for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
+		source, err := kit.Schema(name)
+		if err != nil {
+			return nil, err
+		}
+		sources[name] = source
+	}
+	return ledger.NewValidator(sources)
+}
+
+func checkWorkVersion(root string, validator *ledger.Validator, configVersion string) error {
+	records, err := ledger.List(fsstore.New(root), validator)
+	found := false
+	if err == nil {
+		for _, record := range records {
+			work, ok := record.Payload.(*ledger.Work)
+			if !ok {
+				continue
+			}
+			found = true
+			if work.KitVersion != kit.Version || configVersion != "" && work.KitVersion != configVersion {
+				err = fmt.Errorf("Work kit version %q does not match binary %q and configuration %q", work.KitVersion, kit.Version, configVersion)
+				break
+			}
+		}
+		if !found {
+			err = fmt.Errorf("Work record is missing")
+		}
+	}
+	return err
 }

@@ -202,12 +202,8 @@ func (v *Validator) validate(r Record) error {
 			return fmt.Errorf("plan version must be positive")
 		}
 	case *StateChange:
-		if p.WorkStatus != "" {
-			if p.DecisionID != "" || p.DecisionStatus != "" || p.AnswerID != "" || p.WorkStatus != WorkCompleted && p.WorkStatus != WorkAborted {
-				return fmt.Errorf("invalid work state change")
-			}
-		} else if p.DecisionID == "" || p.AnswerID == "" || p.DecisionStatus != DecisionApproved && p.DecisionStatus != DecisionRejected && p.DecisionStatus != DecisionDeferred {
-			return fmt.Errorf("invalid decision state change")
+		if err := validateStateChange(p); err != nil {
+			return err
 		}
 	}
 	for _, ref := range references(r) {
@@ -281,4 +277,15 @@ func references(r Record) []form.Reference {
 		refs = append(refs, p.Decisions...)
 	}
 	return refs
+}
+
+func validateStateChange(p *StateChange) error {
+	if p.WorkStatus != "" {
+		if p.DecisionID != "" || p.DecisionStatus != "" || p.AnswerID != "" || p.WorkStatus != WorkCompleted && p.WorkStatus != WorkAborted {
+			return fmt.Errorf("invalid work state change")
+		}
+	} else if p.DecisionID == "" || p.AnswerID == "" || p.DecisionStatus != DecisionApproved && p.DecisionStatus != DecisionRejected && p.DecisionStatus != DecisionDeferred {
+		return fmt.Errorf("invalid decision state change")
+	}
+	return nil
 }

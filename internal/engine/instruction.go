@@ -264,21 +264,7 @@ func (e *Engine) outputs(state *ledger.State) ([]brief.StageOutput, error) {
 		}
 	}
 
-	for _, run := range state.StageRuns() {
-		if run.State != ledger.StageCompleted {
-			continue
-		}
-		for _, r := range records {
-			if progress, ok := r.Payload.(*ledger.Progress); ok {
-				for _, round := range state.Rounds(run.ID) {
-					if progress.RoundID == round.ID {
-						data, _ := json.MarshalIndent(progress.Progress, "", "  ")
-						outputs = append(outputs, brief.StageOutput{StageID: run.StageID, Content: string(data)})
-					}
-				}
-			}
-		}
-	}
+	outputs = append(outputs, completedStageOutputs(state, records)...)
 	return outputs, nil
 }
 func originalRequest(work *ledger.Work) string {
@@ -358,34 +344,7 @@ func (e *Engine) publishInstruction(meta ledger.Instruction, fresh bool, data in
 		return Result{}, err
 	}
 	if fresh {
-		meta.Reference, meta.Runner, meta.TargetPath = data.Reference, i.Runner, i.TargetPath
-		meta.TemplateName, meta.Origin = data.TemplateName, data.Origin
-		meta.Request, meta.Detection = data.Request, data.Detection
-		if data.Request != nil {
-			request := *data.Request
-			request.Norms = slices.Clone(request.Norms)
-			for i := range request.Norms {
-				request.Norms[i].Content = ""
-			}
-			meta.Request = &request
-		}
-		if meta.RoundID != "" {
-			state, err := e.load()
-			if err != nil {
-				return Result{}, err
-			}
-			if round, ok := state.OpenRound(); ok && round.ID == meta.RoundID && round.SessionID != e.sessionID {
-				copy := *round
-				copy.SessionID = e.sessionID
-				if _, err = e.append(&copy); err != nil {
-					return Result{}, err
-				}
-			}
-		}
-		if err = e.active(); err != nil {
-			return Result{}, err
-		}
-		if _, err = e.append(&meta); err != nil {
+		if err := e.recordInstruction(meta, data); err != nil {
 			return Result{}, err
 		}
 	}
@@ -598,31 +557,8 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 			input.RemainingPlan = remaining
 		}
 	}
-	records, err := e.records()
-	if err != nil {
+	if err := e.plannerHistory(state, &input); err != nil {
 		return brief.Brief{}, err
-	}
-	effective := state.AnsweredQuestions()
-	for _, record := range records {
-		if q, ok := record.Payload.(*ledger.Question); ok && q.Supersedes != "" {
-			delete(effective, q.Supersedes)
-		}
-	}
-	for _, r := range records {
-		switch p := r.Payload.(type) {
-		case *ledger.Answer:
-			if effective[p.QuestionID].RecordID == r.ID {
-				input.HumanInstructions += p.Text + "\n"
-			}
-		case *ledger.Approval:
-			if effective[p.QuestionID].RecordID == r.ID {
-				input.HumanInstructions += p.Text + "\n"
-			}
-		case *ledger.Judgment:
-			if p.TargetVersion.Kind == form.TargetPlan {
-				input.PreviousFindings = append(input.PreviousFindings, p.Findings...)
-			}
-		}
 	}
 	if meta.Context == nil {
 		meta.Context = &ledger.InstructionContext{Findings: input.PreviousFindings, CurrentPlan: input.CurrentPlan, RemainingPlan: input.RemainingPlan, HumanInstructions: input.HumanInstructions}
@@ -699,27 +635,9 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 	for _, condition := range p.CompletionConditions {
 		input.Verification = append(input.Verification, condition.ID+": "+condition.Description)
 	}
-	commands := []check.Judgment{}
-	records, err := e.records()
+	commands, err := e.workCommandOutputs(state, round.StageRunID, &input)
 	if err != nil {
 		return brief.Brief{}, err
-	}
-	for _, r := range records {
-		switch value := r.Payload.(type) {
-		case *ledger.Judgment:
-			if value.Command != nil {
-				for _, previous := range state.Rounds(round.StageRunID) {
-					if previous.ID == value.RoundID {
-						input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: value.Aspect, Runner: plan.Runner(value.Runner)}, ExitCode: value.Command.ExitCode, Output: value.Command.Output})
-						commands = append(commands, value.Judgment)
-					}
-				}
-			}
-		case *ledger.StageRun:
-			if value.ID == round.StageRunID && value.StopReason != "" {
-				input.PreCommitOutput = value.StopReason
-			}
-		}
 	}
 	if meta.Context == nil {
 		meta.Context = &ledger.InstructionContext{Findings: input.PreviousFindings, Commands: commands, PreCommitOutput: input.PreCommitOutput}
@@ -844,4 +762,114 @@ func (e *Engine) issueQuestion(state *ledger.State, q form.Question) (Result, er
 		return Result{}, err
 	}
 	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Question: &q, Text: q.Text}}, text)
+}
+
+func completedStageOutputs(state *ledger.State, records []ledger.Record) []brief.StageOutput {
+	var outputs []brief.StageOutput
+	for _, run := range state.StageRuns() {
+		if run.State != ledger.StageCompleted {
+			continue
+		}
+		for _, r := range records {
+			if progress, ok := r.Payload.(*ledger.Progress); ok {
+				for _, round := range state.Rounds(run.ID) {
+					if progress.RoundID == round.ID {
+						data, _ := json.MarshalIndent(progress.Progress, "", "  ")
+						outputs = append(outputs, brief.StageOutput{StageID: run.StageID, Content: string(data)})
+					}
+				}
+			}
+		}
+	}
+	return outputs
+}
+
+func (e *Engine) recordInstruction(meta ledger.Instruction, data instructionData) error {
+	meta.Reference, meta.Runner, meta.TargetPath = data.Reference, data.Instruction.Runner, data.Instruction.TargetPath
+	meta.TemplateName, meta.Origin = data.TemplateName, data.Origin
+	meta.Request, meta.Detection = data.Request, data.Detection
+	if data.Request != nil {
+		request := *data.Request
+		request.Norms = slices.Clone(request.Norms)
+		for i := range request.Norms {
+			request.Norms[i].Content = ""
+		}
+		meta.Request = &request
+	}
+	if meta.RoundID != "" {
+		state, err := e.load()
+		if err != nil {
+			return err
+		}
+		if round, ok := state.OpenRound(); ok && round.ID == meta.RoundID && round.SessionID != e.sessionID {
+			copy := *round
+			copy.SessionID = e.sessionID
+			if _, err = e.append(&copy); err != nil {
+				return err
+			}
+		}
+	}
+	if err := e.active(); err != nil {
+		return err
+	}
+	if _, err := e.append(&meta); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *Engine) plannerHistory(state *ledger.State, input *brief.PlannerInput) error {
+	records, err := e.records()
+	if err != nil {
+		return err
+	}
+	effective := state.AnsweredQuestions()
+	for _, record := range records {
+		if q, ok := record.Payload.(*ledger.Question); ok && q.Supersedes != "" {
+			delete(effective, q.Supersedes)
+		}
+	}
+	for _, r := range records {
+		switch p := r.Payload.(type) {
+		case *ledger.Answer:
+			if effective[p.QuestionID].RecordID == r.ID {
+				input.HumanInstructions += p.Text + "\n"
+			}
+		case *ledger.Approval:
+			if effective[p.QuestionID].RecordID == r.ID {
+				input.HumanInstructions += p.Text + "\n"
+			}
+		case *ledger.Judgment:
+			if p.TargetVersion.Kind == form.TargetPlan {
+				input.PreviousFindings = append(input.PreviousFindings, p.Findings...)
+			}
+		}
+	}
+	return nil
+}
+
+func (e *Engine) workCommandOutputs(state *ledger.State, stageRunID string, input *brief.WorkInput) ([]check.Judgment, error) {
+	commands := []check.Judgment{}
+	records, err := e.records()
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range records {
+		switch value := r.Payload.(type) {
+		case *ledger.Judgment:
+			if value.Command != nil {
+				for _, previous := range state.Rounds(stageRunID) {
+					if previous.ID == value.RoundID {
+						input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: value.Aspect, Runner: plan.Runner(value.Runner)}, ExitCode: value.Command.ExitCode, Output: value.Command.Output})
+						commands = append(commands, value.Judgment)
+					}
+				}
+			}
+		case *ledger.StageRun:
+			if value.ID == stageRunID && value.StopReason != "" {
+				input.PreCommitOutput = value.StopReason
+			}
+		}
+	}
+	return commands, nil
 }

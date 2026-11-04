@@ -80,13 +80,17 @@ func Format(host Host, name Name, result Result) ([]byte, error) {
 	if specific.Permission != "" || specific.Context != "" {
 		out.Specific = &specific
 	}
+	return fitOutput(host, out, &specific, result.Summary)
+}
+
+func fitOutput(host Host, out output, specific *specificOutput, summary string) ([]byte, error) {
 	data, err := json.Marshal(out)
 	if err != nil || fits(host, string(data)) {
 		return data, err
 	}
 	const guide = "\nRun `devkit status` for the full text"
 	if specific.Context != "" {
-		specific.Context = result.Summary + guide
+		specific.Context = summary + guide
 		data, err = json.Marshal(out)
 		if err != nil || fits(host, string(data)) {
 			return data, err
@@ -97,7 +101,7 @@ func Format(host Host, name Name, result Result) ([]byte, error) {
 		suffix := ""
 		text := *field
 		if field == &specific.Context && text != "" {
-			text = result.Summary
+			text = summary
 			suffix = guide
 		}
 		runes := []rune(text)

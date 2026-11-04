@@ -92,56 +92,65 @@ func (s *State) ResolveDecisions(_ DecisionContext) ([]ResolvedDecision, error) 
 			replacements[old] = append(replacements[old], index)
 		}
 	}
-	visited, visiting := make(map[int]bool), make(map[int]bool)
-	var resolve func(int) (bool, error)
-	resolve = func(index int) (bool, error) {
-		if visited[index] {
-			return decisions[index].Active, nil
-		}
-		decision := &decisions[index]
-		if visiting[index] {
-			return false, fmt.Errorf("decision graph contains a cycle at %s", decision.RecordID)
-		}
-		visiting[index] = true
-		valid := decision.Status != DecisionRejected && decision.Status != DecisionDeferred
-		for _, ref := range decision.Decision.DependsOn {
-			var active bool
-			if ref.RecordID != "" {
-				dependency, exists := byRecord[ref.RecordID]
-				if !exists {
-					return false, fmt.Errorf("decision %s: dependency %q is not a decision", decision.RecordID, ref.RecordID)
-				}
-				var err error
-				active, err = resolve(dependency)
-				if err != nil {
-					return false, err
-				}
-			} else {
-				continue
-			}
-			if !active {
-				decision.InactiveDependencies = append(decision.InactiveDependencies, ref)
-				valid = false
-			}
-		}
-		for _, replacement := range replacements[index] {
-			active, err := resolve(replacement)
-			if err != nil {
-				return false, err
-			}
-			if active || len(decisions[replacement].SupersededBy) != 0 {
-				decision.SupersededBy = append(decision.SupersededBy, form.Reference{RecordID: decisions[replacement].RecordID})
-				valid = false
-			}
-		}
-		decision.Active = valid
-		visiting[index], visited[index] = false, true
-		return valid, nil
-	}
+	graph := decisionGraph{decisions: decisions, byRecord: byRecord, replacements: replacements,
+		visited: make(map[int]bool), visiting: make(map[int]bool)}
 	for index := range decisions {
-		if _, err := resolve(index); err != nil {
+		if _, err := graph.resolve(index); err != nil {
 			return nil, err
 		}
 	}
 	return decisions, nil
+}
+
+type decisionGraph struct {
+	decisions    []ResolvedDecision
+	byRecord     map[string]int
+	replacements map[int][]int
+	visited      map[int]bool
+	visiting     map[int]bool
+}
+
+func (g decisionGraph) resolve(index int) (bool, error) {
+	if g.visited[index] {
+		return g.decisions[index].Active, nil
+	}
+	decision := &g.decisions[index]
+	if g.visiting[index] {
+		return false, fmt.Errorf("decision graph contains a cycle at %s", decision.RecordID)
+	}
+	g.visiting[index] = true
+	valid := decision.Status != DecisionRejected && decision.Status != DecisionDeferred
+	for _, ref := range decision.Decision.DependsOn {
+		var active bool
+		if ref.RecordID != "" {
+			dependency, exists := g.byRecord[ref.RecordID]
+			if !exists {
+				return false, fmt.Errorf("decision %s: dependency %q is not a decision", decision.RecordID, ref.RecordID)
+			}
+			var err error
+			active, err = g.resolve(dependency)
+			if err != nil {
+				return false, err
+			}
+		} else {
+			continue
+		}
+		if !active {
+			decision.InactiveDependencies = append(decision.InactiveDependencies, ref)
+			valid = false
+		}
+	}
+	for _, replacement := range g.replacements[index] {
+		active, err := g.resolve(replacement)
+		if err != nil {
+			return false, err
+		}
+		if active || len(g.decisions[replacement].SupersededBy) != 0 {
+			decision.SupersededBy = append(decision.SupersededBy, form.Reference{RecordID: g.decisions[replacement].RecordID})
+			valid = false
+		}
+	}
+	decision.Active = valid
+	g.visiting[index], g.visited[index] = false, true
+	return valid, nil
 }

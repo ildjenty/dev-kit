@@ -149,47 +149,7 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 		meta.StageRunID = stageRunID[0]
 	}
 	if !fresh {
-		data, err := e.readInstruction(meta.ID)
-		if err != nil {
-			return Result{}, false, err
-		}
-		pending := false
-		for _, i := range state.UnacceptedInstructions() {
-			if i.ID == meta.ID {
-				pending = true
-			}
-		}
-		if !pending {
-			recorded, err := e.records()
-			if err != nil {
-				return Result{}, false, err
-			}
-			var test *check.DetectionTest
-			for _, record := range recorded {
-				if result, ok := record.Payload.(*ledger.DetectionTest); ok && result.InstructionID == meta.ID {
-					copy := result.DetectionTest
-					test = &copy
-				}
-			}
-			if test == nil {
-				return Result{}, false, errors.New("accepted detection result is missing")
-			}
-			if test.Passed {
-				return Result{}, true, e.publishDetection(ctx, *test)
-			}
-			q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: data.Request.TargetVersion.Tree}, "detection_failed", "The detection test failed. Revise the aspect or propose a plan without this required check.", "")
-			q, err = e.saveQuestion(state, q, "")
-			if err != nil {
-				return Result{}, false, err
-			}
-			r, err := e.issueQuestion(state, q)
-			return r, true, err
-		}
-		r, err := e.publishInstruction(meta, false, data, "")
-		if err != nil {
-			return Result{}, false, err
-		}
-		return e.executeDetection(ctx, state, meta, data, r)
+		return e.resumeDetection(ctx, state, meta)
 	}
 	aspect, err := e.aspect(ctx, ref, item.Aspect)
 	if err != nil {
@@ -385,4 +345,52 @@ func (e *Engine) publishDetection(ctx context.Context, test check.DetectionTest)
 		return err
 	}
 	return fsstore.New(e.Root()).Publish(settings.RepositoryPaths().Detect, append(encoded, '\n'))
+}
+
+func (e *Engine) resumeDetection(ctx context.Context, state *ledger.State, meta ledger.Instruction) (Result, bool, error) {
+	data, err := e.readInstruction(meta.ID)
+	if err != nil {
+		return Result{}, false, err
+	}
+	pending := false
+	for _, i := range state.UnacceptedInstructions() {
+		if i.ID == meta.ID {
+			pending = true
+		}
+	}
+	if !pending {
+		return e.restoreDetection(ctx, state, meta.ID, data.Request)
+	}
+	r, err := e.publishInstruction(meta, false, data, "")
+	if err != nil {
+		return Result{}, false, err
+	}
+	return e.executeDetection(ctx, state, meta, data, r)
+}
+
+func (e *Engine) restoreDetection(ctx context.Context, state *ledger.State, instructionID string, request *check.Request) (Result, bool, error) {
+	recorded, err := e.records()
+	if err != nil {
+		return Result{}, false, err
+	}
+	var test *check.DetectionTest
+	for _, record := range recorded {
+		if result, ok := record.Payload.(*ledger.DetectionTest); ok && result.InstructionID == instructionID {
+			copy := result.DetectionTest
+			test = &copy
+		}
+	}
+	if test == nil {
+		return Result{}, false, errors.New("accepted detection result is missing")
+	}
+	if test.Passed {
+		return Result{}, true, e.publishDetection(ctx, *test)
+	}
+	q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: request.TargetVersion.Tree}, "detection_failed", "The detection test failed. Revise the aspect or propose a plan without this required check.", "")
+	q, err = e.saveQuestion(state, q, "")
+	if err != nil {
+		return Result{}, false, err
+	}
+	r, err := e.issueQuestion(state, q)
+	return r, true, err
 }

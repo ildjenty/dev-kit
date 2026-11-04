@@ -80,23 +80,7 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 	if err := result.removeSkillLink(); err != nil {
 		return result, err
 	}
-	for _, fragment := range hostFragments {
-		data, err := fs.ReadFile(files, fragment.source)
-		if err != nil {
-			return result, err
-		}
-		strip := stripJSON
-		switch filepath.Ext(fragment.target) {
-		case ".toml":
-			strip = stripTOML
-		case ".rules":
-			strip = stripLines
-		}
-		if err := result.strip(fragment.target, data, strip); err != nil {
-			return result, fmt.Errorf("%s: %w", fragment.target, err)
-		}
-	}
-	if err := result.strip(".gitignore", []byte(".devkit/run/\n"), stripLines); err != nil {
+	if err := result.stripHostSettings(files); err != nil {
 		return result, err
 	}
 	if len(result.Changes) != 0 && confirm != nil {
@@ -104,35 +88,7 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 			return result, err
 		}
 	}
-	if err := filepath.WalkDir(filepath.Join(result.Root, ".devkit/run"), func(name string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			return os.Chmod(name, 0o755)
-		}
-		return nil
-	}); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return result, err
-	}
-	for _, change := range result.Changes {
-		target := filepath.Join(result.Root, filepath.FromSlash(change.Path))
-		if change.Remove {
-			err = os.Remove(target)
-		} else {
-			err = writeConfig(target, change.After)
-		}
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return result, err
-		}
-	}
-	// The listed files are gone; this also removes the empty directories left in them.
-	for _, name := range []string{".devkit/run"} {
-		if err := os.RemoveAll(filepath.Join(result.Root, filepath.FromSlash(name))); err != nil {
-			return result, err
-		}
-	}
-	return result, result.pruneDirectories()
+	return result, result.removeInstallation()
 }
 
 func (r *Result) removeConfig(files fs.FS) error {
@@ -356,20 +312,8 @@ func stripSettings(current, installed map[string]any) bool {
 			}
 		case []any:
 			if array, ok := have.([]any); ok {
-				kept := array[:0:0]
-				for _, item := range array {
-					if !slices.ContainsFunc(want, func(value any) bool { return reflect.DeepEqual(item, value) }) {
-						kept = append(kept, item)
-					}
-				}
-				if len(kept) != len(array) {
-					changed = true
-				}
-				if len(kept) == 0 {
-					delete(current, key)
-				} else {
-					current[key] = kept
-				}
+				removed := stripArraySetting(current, key, array, want)
+				changed = changed || removed
 			}
 		default:
 			if reflect.DeepEqual(have, want) {
@@ -398,4 +342,79 @@ func stripLines(before, fragment []byte) ([]byte, error) {
 		return before, nil
 	}
 	return after, nil
+}
+
+func stripArraySetting(current map[string]any, key string, array, want []any) bool {
+	changed := false
+	kept := array[:0:0]
+	for _, item := range array {
+		if !slices.ContainsFunc(want, func(value any) bool { return reflect.DeepEqual(item, value) }) {
+			kept = append(kept, item)
+		}
+	}
+	if len(kept) != len(array) {
+		changed = true
+	}
+	if len(kept) == 0 {
+		delete(current, key)
+	} else {
+		current[key] = kept
+	}
+	return changed
+}
+
+func (r *Result) stripHostSettings(files fs.FS) error {
+	for _, fragment := range hostFragments {
+		data, err := fs.ReadFile(files, fragment.source)
+		if err != nil {
+			return err
+		}
+		strip := stripJSON
+		switch filepath.Ext(fragment.target) {
+		case ".toml":
+			strip = stripTOML
+		case ".rules":
+			strip = stripLines
+		}
+		if err := r.strip(fragment.target, data, strip); err != nil {
+			return fmt.Errorf("%s: %w", fragment.target, err)
+		}
+	}
+	if err := r.strip(".gitignore", []byte(".devkit/run/\n"), stripLines); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *Result) removeInstallation() error {
+	var err error
+	if err := filepath.WalkDir(filepath.Join(r.Root, ".devkit/run"), func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return os.Chmod(name, 0o755)
+		}
+		return nil
+	}); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	for _, change := range r.Changes {
+		target := filepath.Join(r.Root, filepath.FromSlash(change.Path))
+		if change.Remove {
+			err = os.Remove(target)
+		} else {
+			err = writeConfig(target, change.After)
+		}
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	// The listed files are gone; this also removes the empty directories left in them.
+	for _, name := range []string{".devkit/run"} {
+		if err := os.RemoveAll(filepath.Join(r.Root, filepath.FromSlash(name))); err != nil {
+			return err
+		}
+	}
+	return r.pruneDirectories()
 }

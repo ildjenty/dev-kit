@@ -72,23 +72,7 @@ func (s *State) UnacceptedInstructions() []Instruction {
 		}
 	}
 
-	type key struct {
-		kind   form.InstructionKind
-		target string
-	}
-	latest := []Instruction{}
-	indices := make(map[key]int)
-	for _, record := range s.records {
-		if instruction, ok := record.Payload.(*Instruction); ok {
-			k := key{instruction.Kind, instruction.TargetKey}
-			if index, exists := indices[k]; exists {
-				latest[index] = *instruction
-			} else {
-				indices[k] = len(latest)
-				latest = append(latest, *instruction)
-			}
-		}
-	}
+	latest := s.latestInstructions()
 	runs := make(map[string]*StageRun)
 	rounds := make(map[string]*Round)
 	for _, run := range s.StageRuns() {
@@ -109,14 +93,8 @@ func (s *State) UnacceptedInstructions() []Instruction {
 		if instruction.PlanVersion != 0 && (withdrawn[instruction.PlanVersion] || instruction.PlanVersion < latestPlan && instruction.RoundID == "" && instruction.StageRunID == "") {
 			continue
 		}
-		if run := runs[instruction.StageRunID]; run != nil && (run.State == StageCompleted || run.State == StageInvalidated) {
+		if closedInstructionStage(instruction, runs, rounds) {
 			continue
-		}
-		if round := rounds[instruction.RoundID]; round != nil {
-			run := runs[round.StageRunID]
-			if round.Decision != nil || run != nil && (run.State == StageCompleted || run.State == StageInvalidated) {
-				continue
-			}
 		}
 		if instruction.QuestionID != "" && !pendingQuestions[instruction.QuestionID] {
 			continue
@@ -161,4 +139,38 @@ func BuildCheckpoint(store *fsstore.Store, stops []StopObservation, validator *V
 		return Checkpoint{}, err
 	}
 	return state.Checkpoint()
+}
+
+func (s *State) latestInstructions() []Instruction {
+	type key struct {
+		kind   form.InstructionKind
+		target string
+	}
+	latest := []Instruction{}
+	indices := make(map[key]int)
+	for _, record := range s.records {
+		if instruction, ok := record.Payload.(*Instruction); ok {
+			k := key{instruction.Kind, instruction.TargetKey}
+			if index, exists := indices[k]; exists {
+				latest[index] = *instruction
+			} else {
+				indices[k] = len(latest)
+				latest = append(latest, *instruction)
+			}
+		}
+	}
+	return latest
+}
+
+func closedInstructionStage(instruction Instruction, runs map[string]*StageRun, rounds map[string]*Round) bool {
+	if run := runs[instruction.StageRunID]; run != nil && (run.State == StageCompleted || run.State == StageInvalidated) {
+		return true
+	}
+	if round := rounds[instruction.RoundID]; round != nil {
+		run := runs[round.StageRunID]
+		if round.Decision != nil || run != nil && (run.State == StageCompleted || run.State == StageInvalidated) {
+			return true
+		}
+	}
+	return false
 }

@@ -110,19 +110,9 @@ func mergeSettings(current, required map[string]any, prefix string) (bool, error
 			}
 		case []any:
 			if array, ok := have.([]any); ok {
-				for _, item := range want {
-					found := false
-					for _, existing := range array {
-						if reflect.DeepEqual(existing, item) {
-							found = true
-							break
-						}
-					}
-					if !found {
-						array = append(array, item)
-						changed = true
-					}
-				}
+				merged, added := mergeArray(array, want)
+				array = merged
+				changed = changed || added
 				current[key] = array
 				continue
 			}
@@ -196,4 +186,22 @@ func appendLines(before, fragment []byte) []byte {
 		}
 	}
 	return after
+}
+
+func mergeArray(array, required []any) ([]any, bool) {
+	changed := false
+	for _, item := range required {
+		found := false
+		for _, existing := range array {
+			if reflect.DeepEqual(existing, item) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			array = append(array, item)
+			changed = true
+		}
+	}
+	return array, changed
 }

@@ -102,50 +102,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		return err
 	}
 	if name == "init" || name == "uninstall" || name == "doctor" {
-		yes := false
-		noCommit := false
-		if name == "init" {
-			f.BoolVar(&noCommit, "no-commit", false, "Skip committing initialization changes")
-		}
-		if name == "init" || name == "uninstall" {
-			f.BoolVar(&yes, "yes", false, "Apply changes without confirmation")
-		}
-		if err := parse(f, args, 0, 0); err != nil {
-			return err
-		}
-		if name == "init" {
-			w, err := workspace.Open(ctx, cwd)
-			if err != nil {
-				return err
-			}
-			result, err := install.Init(ctx, cwd, func(changes []install.Change) error {
-				return confirmInit(changes, filepath.Join(w.Root(), ".devkit/run"), input, output, yes)
-			}, install.InitOptions{NoCommit: noCommit})
-			if err != nil {
-				return err
-			}
-			return writeOutput(output, filepath.Join(result.Root, ".devkit/run"), "init.json", result)
-		}
-		if name == "uninstall" {
-			result, err := install.Uninstall(ctx, cwd, func(changes []install.Change) error {
-				return confirmUninstall(changes, input, output, yes)
-			})
-			if err != nil {
-				return err
-			}
-			return writeUninstalled(output, result)
-		}
-		report, err := install.Doctor(ctx, cwd, sessionID())
-		if err != nil {
-			return err
-		}
-		if err := writeOutput(output, filepath.Join(report.Root, ".devkit/run"), "doctor.json", report); err != nil {
-			return err
-		}
-		if !report.Healthy() {
-			return errors.New("doctor found issues; review the report")
-		}
-		return nil
+		return runInstallation(ctx, cwd, name, f, args, input, output)
 	}
 	e, err := newEngine(ctx, cwd, sessionID())
 	if err != nil {
@@ -177,39 +134,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		}
 		result, err = e.Pause(ctx, strings.Join(f.Args(), " "))
 	case "submit", "plan", "note":
-		withdraw := false
-		if name == "plan" {
-			f.BoolVar(&withdraw, "withdraw", false, "Withdraw the latest proposal")
-		}
-		if err := f.Parse(args); err != nil {
-			return err
-		}
-		if withdraw {
-			if f.NArg() != 0 {
-				return errors.New("plan --withdraw does not accept a file")
-			}
-			result, err = e.WithdrawPlan(ctx)
-			break
-		}
-		count := 1
-		if name == "note" {
-			count = 2
-		}
-		if f.NArg() != count {
-			return fmt.Errorf("%s requires %d arguments; run devkit help", name, count)
-		}
-		data, readErr := os.ReadFile(f.Arg(count - 1))
-		if readErr != nil {
-			return readErr
-		}
-		switch name {
-		case "submit":
-			result, err = e.Submit(ctx, data)
-		case "plan":
-			result, err = e.Plan(ctx, data)
-		case "note":
-			result, err = e.Note(ctx, ledger.Kind(f.Arg(0)), data)
-		}
+		result, err = runRecordCommand(ctx, e, name, f, args)
 	case "answer":
 		interpretation := f.String("interpretation", "text", "Interpretation of the observed human input")
 		text := f.String("text", "", "Interpreted answer text")
@@ -220,27 +145,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 		}
 		result, err = e.Answer(ctx, engine.AnswerRequest{QuestionID: f.Arg(0), Interpretation: ledger.Interpretation(*interpretation), Text: *text, Observation: *observation, Supersedes: *supersedes})
 	case "external":
-		target := f.String("target", "", "Concrete external target")
-		instruction := f.String("instruction", "", "External instruction ID")
-		recoverID := f.String("recover", "", "Query an interrupted operation")
-		if err := f.Parse(args); err != nil {
-			return err
-		}
-		if *recoverID != "" {
-			if f.NArg() != 0 || *target != "" || *instruction != "" {
-				return errors.New("external --recover accepts only an operation ID")
-			}
-			result, err = e.RecoverExternal(ctx, *recoverID)
-			break
-		}
-		if f.NArg() != 2 || *target == "" {
-			return errors.New("external requires --target <target> <kind> <input_file>")
-		}
-		data, readErr := os.ReadFile(f.Arg(1))
-		if readErr != nil {
-			return readErr
-		}
-		result, err = e.External(ctx, external.Request{Kind: f.Arg(0), Target: *target, Input: json.RawMessage(data), InstructionID: *instruction})
+		result, err = runExternalCommand(ctx, e, f, args)
 	case "status", "view":
 		return inspect(ctx, e, name, f, args, output)
 	default:
@@ -410,4 +315,115 @@ func writeOutput(output io.Writer, root string, name string, value any) error {
 	}
 	_, err = fmt.Fprintln(output, string(data))
 	return err
+}
+
+func runInstallation(ctx context.Context, cwd, name string, f *flag.FlagSet, args []string, input io.Reader, output io.Writer) error {
+	yes := false
+	noCommit := false
+	if name == "init" {
+		f.BoolVar(&noCommit, "no-commit", false, "Skip committing initialization changes")
+	}
+	if name == "init" || name == "uninstall" {
+		f.BoolVar(&yes, "yes", false, "Apply changes without confirmation")
+	}
+	if err := parse(f, args, 0, 0); err != nil {
+		return err
+	}
+	if name == "init" {
+		w, err := workspace.Open(ctx, cwd)
+		if err != nil {
+			return err
+		}
+		result, err := install.Init(ctx, cwd, func(changes []install.Change) error {
+			return confirmInit(changes, filepath.Join(w.Root(), ".devkit/run"), input, output, yes)
+		}, install.InitOptions{NoCommit: noCommit})
+		if err != nil {
+			return err
+		}
+		return writeOutput(output, filepath.Join(result.Root, ".devkit/run"), "init.json", result)
+	}
+	if name == "uninstall" {
+		result, err := install.Uninstall(ctx, cwd, func(changes []install.Change) error {
+			return confirmUninstall(changes, input, output, yes)
+		})
+		if err != nil {
+			return err
+		}
+		return writeUninstalled(output, result)
+	}
+	report, err := install.Doctor(ctx, cwd, sessionID())
+	if err != nil {
+		return err
+	}
+	if err := writeOutput(output, filepath.Join(report.Root, ".devkit/run"), "doctor.json", report); err != nil {
+		return err
+	}
+	if !report.Healthy() {
+		return errors.New("doctor found issues; review the report")
+	}
+	return nil
+}
+
+func runRecordCommand(ctx context.Context, e *engine.Engine, name string, f *flag.FlagSet, args []string) (engine.Result, error) {
+	var result engine.Result
+	var err error
+	withdraw := false
+	if name == "plan" {
+		f.BoolVar(&withdraw, "withdraw", false, "Withdraw the latest proposal")
+	}
+	if err := f.Parse(args); err != nil {
+		return engine.Result{}, err
+	}
+	if withdraw {
+		if f.NArg() != 0 {
+			return engine.Result{}, errors.New("plan --withdraw does not accept a file")
+		}
+		return e.WithdrawPlan(ctx)
+	}
+	count := 1
+	if name == "note" {
+		count = 2
+	}
+	if f.NArg() != count {
+		return engine.Result{}, fmt.Errorf("%s requires %d arguments; run devkit help", name, count)
+	}
+	data, readErr := os.ReadFile(f.Arg(count - 1))
+	if readErr != nil {
+		return engine.Result{}, readErr
+	}
+	switch name {
+	case "submit":
+		result, err = e.Submit(ctx, data)
+	case "plan":
+		result, err = e.Plan(ctx, data)
+	case "note":
+		result, err = e.Note(ctx, ledger.Kind(f.Arg(0)), data)
+	}
+	return result, err
+}
+
+func runExternalCommand(ctx context.Context, e *engine.Engine, f *flag.FlagSet, args []string) (engine.Result, error) {
+	var result engine.Result
+	var err error
+	target := f.String("target", "", "Concrete external target")
+	instruction := f.String("instruction", "", "External instruction ID")
+	recoverID := f.String("recover", "", "Query an interrupted operation")
+	if err := f.Parse(args); err != nil {
+		return engine.Result{}, err
+	}
+	if *recoverID != "" {
+		if f.NArg() != 0 || *target != "" || *instruction != "" {
+			return engine.Result{}, errors.New("external --recover accepts only an operation ID")
+		}
+		return e.RecoverExternal(ctx, *recoverID)
+	}
+	if f.NArg() != 2 || *target == "" {
+		return engine.Result{}, errors.New("external requires --target <target> <kind> <input_file>")
+	}
+	data, readErr := os.ReadFile(f.Arg(1))
+	if readErr != nil {
+		return engine.Result{}, readErr
+	}
+	result, err = e.External(ctx, external.Request{Kind: f.Arg(0), Target: *target, Input: json.RawMessage(data), InstructionID: *instruction})
+	return result, err
 }

@@ -121,36 +121,50 @@ func validateStages(start string, stages, optional []Stage, conditions map[strin
 		return fmt.Errorf("start stage is not selected: %q", start)
 	}
 	for _, stage := range all {
-		for _, action := range []Transition{Fix, Ask, Back, Done} {
-			target, _ := stage.Transitions.Next(action)
-			if action == Done && target != nil && *target == "replan" {
-				continue
-			}
-			if target != nil && !ids[*target] {
-				return fmt.Errorf("%s: %s transition target not found: %q", stage.ID, action, *target)
-			}
-			if target != nil && slices.ContainsFunc(stages, func(s Stage) bool { return s.ID == stage.ID }) &&
-				!slices.ContainsFunc(stages, func(s Stage) bool { return s.ID == *target }) {
-				return fmt.Errorf("%s: %s references an unselected optional stage: %q", stage.ID, action, *target)
-			}
+		if err := validateStageTransitions(stage, stages, ids); err != nil {
+			return err
 		}
-		for i, check := range stage.Checks {
-			if slices.ContainsFunc(stage.Checks[:i], func(previous Check) bool {
-				return previous.Aspect == check.Aspect && previous.Runner == check.Runner &&
-					(previous.Target != check.Target || !slices.Equal(previous.CompletionConditionIDs, check.CompletionConditionIDs))
-			}) {
-				return fmt.Errorf("%s: conflicting check mappings for aspect %q and runner %q", stage.ID, check.Aspect, check.Runner)
-			}
-			if check.Runner == "command:" {
-				return fmt.Errorf("%s: command name is missing", stage.ID)
-			}
-			if (check.Runner.IsCommand() || strings.HasPrefix(check.Aspect, "command:")) && check.Aspect != string(check.Runner) {
-				return fmt.Errorf("%s: command aspect and runner differ", stage.ID)
-			}
-			for _, id := range check.CompletionConditionIDs {
-				if conditions != nil && !conditions[id] {
-					return fmt.Errorf("%s: completion condition not found: %q", stage.ID, id)
-				}
+		if err := validateStageChecks(stage, conditions); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateStageTransitions(stage Stage, stages []Stage, ids map[string]bool) error {
+	for _, action := range []Transition{Fix, Ask, Back, Done} {
+		target, _ := stage.Transitions.Next(action)
+		if action == Done && target != nil && *target == "replan" {
+			continue
+		}
+		if target != nil && !ids[*target] {
+			return fmt.Errorf("%s: %s transition target not found: %q", stage.ID, action, *target)
+		}
+		if target != nil && slices.ContainsFunc(stages, func(s Stage) bool { return s.ID == stage.ID }) &&
+			!slices.ContainsFunc(stages, func(s Stage) bool { return s.ID == *target }) {
+			return fmt.Errorf("%s: %s references an unselected optional stage: %q", stage.ID, action, *target)
+		}
+	}
+	return nil
+}
+
+func validateStageChecks(stage Stage, conditions map[string]bool) error {
+	for i, check := range stage.Checks {
+		if slices.ContainsFunc(stage.Checks[:i], func(previous Check) bool {
+			return previous.Aspect == check.Aspect && previous.Runner == check.Runner &&
+				(previous.Target != check.Target || !slices.Equal(previous.CompletionConditionIDs, check.CompletionConditionIDs))
+		}) {
+			return fmt.Errorf("%s: conflicting check mappings for aspect %q and runner %q", stage.ID, check.Aspect, check.Runner)
+		}
+		if check.Runner == "command:" {
+			return fmt.Errorf("%s: command name is missing", stage.ID)
+		}
+		if (check.Runner.IsCommand() || strings.HasPrefix(check.Aspect, "command:")) && check.Aspect != string(check.Runner) {
+			return fmt.Errorf("%s: command aspect and runner differ", stage.ID)
+		}
+		for _, id := range check.CompletionConditionIDs {
+			if conditions != nil && !conditions[id] {
+				return fmt.Errorf("%s: completion condition not found: %q", stage.ID, id)
 			}
 		}
 	}

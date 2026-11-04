@@ -55,33 +55,11 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error, options
 		return Result{}, err
 	}
 	result := Result{Root: w.Root(), Guidance: []string{trustGuidance, commandGuidance}}
-	configuration := []byte(fmt.Sprintf("kit_version = %q\n", kit.Version))
-	existing, err := os.ReadFile(filepath.Join(result.Root, "devkit.toml"))
-	if err == nil {
-		configuration = existing
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return result, err
-	}
-	c, err := config.Parse(configuration)
+	paths, err := result.addConfiguration()
 	if err != nil {
 		return result, err
 	}
-	if c.KitVersion != kit.Version {
-		return result, fmt.Errorf("kit version mismatch: binary %q, devkit.toml %q", kit.Version, c.KitVersion)
-	}
-	deny, err := kit.HostFragment("deny.toml")
-	if err != nil {
-		return result, err
-	}
-	configuration, err = mergeTOML(configuration, deny)
-	if err != nil {
-		return result, err
-	}
-	if _, err := config.Parse(configuration); err != nil {
-		return result, err
-	}
-	result.addChange("devkit.toml", existing, configuration)
-	if err := result.addNorms(c.RepositoryPaths()); err != nil {
+	if err := result.addNorms(paths); err != nil {
 		return result, err
 	}
 	for _, pair := range [][2]string{
@@ -96,61 +74,16 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error, options
 	if err := result.addSkillLink(); err != nil {
 		return result, err
 	}
-	for _, fragment := range hostFragments {
-		data, err := kit.HostFragment(strings.TrimPrefix(fragment.source, "hosts/"))
-		if err != nil {
-			return result, err
-		}
-		before, err := readOptional(filepath.Join(result.Root, fragment.target))
-		if err != nil {
-			return result, err
-		}
-		after, err := fragment.merge(before, data)
-		if err != nil {
-			return result, fmt.Errorf("%s: %w", fragment.target, err)
-		}
-		result.addChange(fragment.target, before, after)
-	}
-	before, err := readOptional(filepath.Join(result.Root, ".gitignore"))
-	if err != nil {
+	if err := result.addHostSettings(ctx); err != nil {
 		return result, err
 	}
-	ignored, err := runtimeIgnored(ctx, result.Root)
-	if err != nil {
-		return result, err
-	}
-	after := appendLines(before, []byte(".devkit/run/\n"))
-	if !ignored && bytes.Equal(before, after) {
-		after = bytes.Clone(before)
-		if len(after) != 0 && after[len(after)-1] != '\n' {
-			after = append(after, '\n')
-		}
-		after = append(after, ".devkit/run/\n"...)
-	}
-	result.addChange(".gitignore", before, after)
 	if len(result.Changes) != 0 && confirm != nil {
 		if err := confirm(result.Changes); err != nil {
 			return result, err
 		}
 	}
-	for _, name := range []string{".devkit/run/sessions", ".devkit/run/work"} {
-		if err := os.MkdirAll(filepath.Join(result.Root, name), 0o755); err != nil {
-			return result, err
-		}
-	}
-	for _, change := range result.Changes {
-		target := filepath.Join(result.Root, filepath.FromSlash(change.Path))
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return result, err
-		}
-		if change.Symlink {
-			err = os.Symlink(string(change.After), target)
-		} else {
-			err = writeConfig(target, change.After)
-		}
-		if err != nil {
-			return result, err
-		}
+	if err := result.writeInstallation(); err != nil {
+		return result, err
 	}
 	if len(options) == 0 || !options[0].NoCommit {
 		if err := result.commit(ctx); err != nil {
@@ -315,4 +248,94 @@ func runGit(ctx context.Context, root string, args ...string) ([]byte, error) {
 		return output, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, output)
 	}
 	return output, nil
+}
+
+func (r *Result) addConfiguration() (config.Paths, error) {
+	configuration := []byte(fmt.Sprintf("kit_version = %q\n", kit.Version))
+	existing, err := os.ReadFile(filepath.Join(r.Root, "devkit.toml"))
+	if err == nil {
+		configuration = existing
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return config.Paths{}, err
+	}
+	c, err := config.Parse(configuration)
+	if err != nil {
+		return config.Paths{}, err
+	}
+	if c.KitVersion != kit.Version {
+		return config.Paths{}, fmt.Errorf("kit version mismatch: binary %q, devkit.toml %q", kit.Version, c.KitVersion)
+	}
+	deny, err := kit.HostFragment("deny.toml")
+	if err != nil {
+		return config.Paths{}, err
+	}
+	configuration, err = mergeTOML(configuration, deny)
+	if err != nil {
+		return config.Paths{}, err
+	}
+	if _, err := config.Parse(configuration); err != nil {
+		return config.Paths{}, err
+	}
+	r.addChange("devkit.toml", existing, configuration)
+	return c.RepositoryPaths(), nil
+}
+
+func (r *Result) addHostSettings(ctx context.Context) error {
+	for _, fragment := range hostFragments {
+		data, err := kit.HostFragment(strings.TrimPrefix(fragment.source, "hosts/"))
+		if err != nil {
+			return err
+		}
+		before, err := readOptional(filepath.Join(r.Root, fragment.target))
+		if err != nil {
+			return err
+		}
+		after, err := fragment.merge(before, data)
+		if err != nil {
+			return fmt.Errorf("%s: %w", fragment.target, err)
+		}
+		r.addChange(fragment.target, before, after)
+	}
+	before, err := readOptional(filepath.Join(r.Root, ".gitignore"))
+	if err != nil {
+		return err
+	}
+	ignored, err := runtimeIgnored(ctx, r.Root)
+	if err != nil {
+		return err
+	}
+	after := appendLines(before, []byte(".devkit/run/\n"))
+	if !ignored && bytes.Equal(before, after) {
+		after = bytes.Clone(before)
+		if len(after) != 0 && after[len(after)-1] != '\n' {
+			after = append(after, '\n')
+		}
+		after = append(after, ".devkit/run/\n"...)
+	}
+	r.addChange(".gitignore", before, after)
+	return nil
+}
+
+func (r *Result) writeInstallation() error {
+	var err error
+	for _, name := range []string{".devkit/run/sessions", ".devkit/run/work"} {
+		if err := os.MkdirAll(filepath.Join(r.Root, name), 0o755); err != nil {
+			return err
+		}
+	}
+	for _, change := range r.Changes {
+		target := filepath.Join(r.Root, filepath.FromSlash(change.Path))
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return err
+		}
+		if change.Symlink {
+			err = os.Symlink(string(change.After), target)
+		} else {
+			err = writeConfig(target, change.After)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

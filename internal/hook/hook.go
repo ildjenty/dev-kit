@@ -94,25 +94,7 @@ func (h Handler) Process(e event.Event) (result event.Result, err error) {
 	}
 	switch e.Name {
 	case event.SessionStart:
-		stops, err := ReadStops(h.workRoot())
-		if err != nil {
-			return event.Result{}, err
-		}
-		checkpoint, err := ledger.BuildCheckpoint(fsstore.New(h.workRoot()), stops, h.Validator)
-		if err != nil {
-			return event.Result{}, err
-		}
-		data, err := json.MarshalIndent(checkpoint, "", "  ")
-		if err != nil {
-			return event.Result{}, err
-		}
-		summary := fmt.Sprintf("Work %s: %s.", h.WorkID, checkpoint.Position.Status)
-		if checkpoint.Position.Paused {
-			summary += " Work is paused. Use `devkit resume` only when explicitly requested by the human."
-		} else {
-			summary += " Run `devkit next` for the current instruction."
-		}
-		return event.Result{AdditionalContext: summary + "\n\n```json\n" + string(data) + "\n```", Summary: summary}, nil
+		return h.sessionStart()
 	case event.PreToolUse:
 		return h.preToolUse(e, state)
 	case event.SubagentStop:
@@ -206,45 +188,9 @@ func (h Handler) stop(e event.Event, state *ledger.State, now time.Time) (event.
 				observation.LimitReached = last.LimitReached
 			}
 		}
-		if _, _, paused := state.Paused(); !paused {
-			questions := state.UnansweredQuestions()
-			if len(questions) != 0 {
-				for _, question := range questions {
-					if question.StopObservation != nil {
-						result.SystemMessage, err = form.RenderMarkdown(question)
-						if err != nil {
-							return result, err
-						}
-						break
-					}
-				}
-			} else if !stopAllowed(state) {
-				observation.Continuations++
-				limit := 3
-				if h.ReadConfig != nil {
-					work, _ := state.Work()
-					ref := work.Branch
-					if round, ok := state.OpenRound(); ok {
-						ref = round.StartTarget.Tree
-					}
-					settings, err := h.ReadConfig(ref)
-					if err != nil {
-						return result, err
-					}
-					limit = settings.StopContinuation()
-				}
-				if observation.Continuations >= limit {
-					observation.LimitReached = true
-					question := continuationQuestion(h.WorkID, observation, state.CurrentPosition())
-					observation.Question = &question
-					result.SystemMessage, err = form.RenderMarkdown(question)
-					if err != nil {
-						return result, err
-					}
-				} else {
-					result.Decision, result.Reason = event.Block, "Run `devkit next`."
-				}
-			}
+		result, err = h.stopDecision(state, &observation)
+		if err != nil {
+			return result, err
 		}
 	}
 	if err := publishJSON(fsstore.New(h.workRoot()), filepath.Join("stops", observation.ID+".json"), observation); err != nil {
@@ -285,4 +231,81 @@ func continuationQuestion(workID string, stop ledger.StopObservation, position l
 		question.StoppedStage, question.NextStage = position.StageRun.StageID, position.StageRun.StageID
 	}
 	return question
+}
+
+func (h Handler) sessionStart() (event.Result, error) {
+	stops, err := ReadStops(h.workRoot())
+	if err != nil {
+		return event.Result{}, err
+	}
+	checkpoint, err := ledger.BuildCheckpoint(fsstore.New(h.workRoot()), stops, h.Validator)
+	if err != nil {
+		return event.Result{}, err
+	}
+	data, err := json.MarshalIndent(checkpoint, "", "  ")
+	if err != nil {
+		return event.Result{}, err
+	}
+	summary := fmt.Sprintf("Work %s: %s.", h.WorkID, checkpoint.Position.Status)
+	if checkpoint.Position.Paused {
+		summary += " Work is paused. Use `devkit resume` only when explicitly requested by the human."
+	} else {
+		summary += " Run `devkit next` for the current instruction."
+	}
+	return event.Result{AdditionalContext: summary + "\n\n```json\n" + string(data) + "\n```", Summary: summary}, nil
+}
+
+func (h Handler) stopDecision(state *ledger.State, observation *ledger.StopObservation) (event.Result, error) {
+	result := event.Result{}
+	if _, _, paused := state.Paused(); paused {
+		return result, nil
+	}
+	var err error
+	questions := state.UnansweredQuestions()
+	if len(questions) != 0 {
+		for _, question := range questions {
+			if question.StopObservation != nil {
+				result.SystemMessage, err = form.RenderMarkdown(question)
+				if err != nil {
+					return result, err
+				}
+				break
+			}
+		}
+	} else if !stopAllowed(state) {
+		observation.Continuations++
+		limit, err := h.continuationLimit(state)
+		if err != nil {
+			return result, err
+		}
+		if observation.Continuations >= limit {
+			observation.LimitReached = true
+			question := continuationQuestion(h.WorkID, *observation, state.CurrentPosition())
+			observation.Question = &question
+			result.SystemMessage, err = form.RenderMarkdown(question)
+			if err != nil {
+				return result, err
+			}
+		} else {
+			result.Decision, result.Reason = event.Block, "Run `devkit next`."
+		}
+	}
+	return result, nil
+}
+
+func (h Handler) continuationLimit(state *ledger.State) (int, error) {
+	limit := 3
+	if h.ReadConfig != nil {
+		work, _ := state.Work()
+		ref := work.Branch
+		if round, ok := state.OpenRound(); ok {
+			ref = round.StartTarget.Tree
+		}
+		settings, err := h.ReadConfig(ref)
+		if err != nil {
+			return 0, err
+		}
+		limit = settings.StopContinuation()
+	}
+	return limit, nil
 }

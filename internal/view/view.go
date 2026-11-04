@@ -125,217 +125,19 @@ func Generate(input Input) (string, error) {
 		decisions[decision.RecordID] = decision
 		decisionRecords[decision.Decision.ID] = decision.RecordID
 	}
-	questionRecords := make(map[string]string)
-	for _, record := range input.Records {
-		if question, ok := record.Payload.(*ledger.Question); ok {
-			questionRecords[question.ID] = record.ID
-		}
-	}
 	pending := input.Ledger.UnansweredQuestions()
-	pendingIDs := make(map[string]bool, len(pending))
-	for _, question := range pending {
-		pendingIDs[question.ID] = true
+	if err := p.addQuestions(input, pending, decisionRecords, lastAnswer); err != nil {
+		return "", err
 	}
-	answers := input.Ledger.AnsweredQuestions()
-	for _, question := range input.Ledger.Questions() {
-		recordID := questionRecords[question.ID]
-		id := anchor("question", question.ID)
-		if recordID != "" {
-			id = anchor("record", recordID)
-		}
-		text, err := form.RenderMarkdown(question)
-		if err != nil {
-			return "", err
-		}
-		entry := item{ID: id, Title: "Question " + question.ID, Text: text, Expanded: true}
-		if recordID != "" && recordID > lastAnswer {
-			entry.Tags = append(entry.Tags, "New")
-		}
-		entry.Links = references(question.Evidence)
-		if question.StopObservation != nil {
-			entry.Links = append(entry.Links, references([]form.Reference{*question.StopObservation})...)
-		}
-		entry.Links = append(entry.Links, relatedChanges(input.Records, question.ApprovalTarget, decisionRecords)...)
-		entry.Fields = append(entry.Fields, field{"Target version", approvalLabel(question.ApprovalTarget)})
-		entry.Links = append(entry.Links, questionChecks(input, question.ApprovalTarget)...)
-		for _, decision := range input.Decisions {
-			if slices.ContainsFunc(entry.Links, func(ref link) bool {
-				return ref.Href == "#"+anchor("record", decision.RecordID)
-			}) {
-				entry.Fields = append(entry.Fields, field{"Decision " + decision.Decision.ID + " validity", decision.Decision.Validity})
-				if len(decision.Decision.Conditions) != 0 {
-					entry.Fields = append(entry.Fields, field{"Decision " + decision.Decision.ID + " conditions", strings.Join(decision.Decision.Conditions, "\n")})
-				}
-			}
-		}
-		if answer, ok := answers[question.ID]; ok {
-			entry.Fields = append(entry.Fields, field{"Approval state", string(answer.Answer.Interpretation)})
-			if answer.Answer.Interpretation == ledger.AnswerApproved {
-				entry.Tags = append(entry.Tags, "Approved")
-			}
-			effective := "No"
-			if approval, ok := input.Ledger.ResolveApproval(question.ApprovalTarget); ok && approval.RecordID == answer.RecordID {
-				effective = "Yes"
-			}
-			entry.Fields = append(entry.Fields, field{"Effective approval for target", effective})
-		} else {
-			entry.Fields = append(entry.Fields, field{"Approval state", "Unreviewed"})
-		}
-		if pendingIDs[question.ID] {
-			entry.Tags = append(entry.Tags, "Unreviewed")
-			p.Attention = append(p.Attention, entry)
-		} else {
-			p.History = append(p.History, entry)
-		}
-		if answer, ok := answers[question.ID]; ok {
-			p.Answered = append(p.Answered, link{question.ID + ": " + string(answer.Answer.Interpretation), "#" + anchor("record", answer.RecordID)})
-		}
-	}
-	// Findings retain their original judgment as their single detailed body.
-	for _, run := range input.Ledger.IncompleteStageRuns() {
-		for _, finding := range input.Ledger.UnresolvedBlocking(run.ID) {
-			entry := item{Title: "Unresolved blocking finding " + finding.ID,
-				Fields: []field{{"Stage", stageLabel(input, run)}, {"Stop reason", run.StopReason}, {"Next actor", run.NextActor}}}
-			for i := len(input.Records) - 1; i >= 0; i-- {
-				record := input.Records[i]
-				judgment, ok := record.Payload.(*ledger.Judgment)
-				if !ok || !roundInRun(input.Ledger, judgment.RoundID, run.ID) {
-					continue
-				}
-				if slices.ContainsFunc(judgment.Findings, func(f form.Finding) bool { return f.ID == finding.ID }) {
-					entry.Links = []link{recordLink(record.ID, "Finding and evidence")}
-					entry.Fields = append(entry.Fields, field{"Target version", targetLabel(judgment.TargetVersion)})
-					entry.Fields = append(entry.Fields, judgmentFields(input, judgment)...)
-					entry.Links = append(entry.Links, relatedChanges(input.Records, approvalTarget(judgment.TargetVersion), decisionRecords)...)
-					if answer, ok := input.Ledger.ResolveAnswer(approvalTarget(judgment.TargetVersion)); ok {
-						entry.Fields = append(entry.Fields, field{"Approval state", string(answer.Answer.Interpretation)})
-					} else {
-						entry.Fields = append(entry.Fields, field{"Approval state", "Unreviewed"})
-					}
-					break
-				}
-			}
-			p.Attention = append(p.Attention, entry)
-		}
-	}
-	var provisional, deferred []item
-	for _, record := range input.Records {
-		ref := recordLink(record.ID, string(record.Kind())+" "+record.ID)
-		if record.ID > lastAnswer {
-			p.Recent = append(p.Recent, ref)
-		}
-		if _, ok := record.Payload.(*ledger.Question); ok {
-			continue
-		}
-		entry := item{ID: anchor("record", record.ID), Title: ref.Label}
-		if record.ID > lastAnswer {
-			entry.Tags = append(entry.Tags, "New")
-		}
-		current := false
-		switch value := record.Payload.(type) {
-		case *ledger.Decision:
-			resolved, ok := decisions[record.ID]
-			if !ok {
-				return "", fmt.Errorf("view requires resolved decision %s", record.ID)
-			}
-			entry.Title = "Decision " + value.ID
-			text, err := form.RenderMarkdown(value.Decision)
-			if err != nil {
-				return "", err
-			}
-			entry.Text = text
-			entry.Fields = []field{{"Approval state", string(resolved.Status)}, {"Active in records", fmt.Sprint(resolved.Active)}, {"Condition assessment", "For agents and people to assess"}}
-			entry.Links = references(value.DependsOn)
-			entry.Links = append(entry.Links, references(value.Evidence)...)
-			entry.Links = append(entry.Links, references(resolved.SupersededBy)...)
-			entry.Links = append(entry.Links, references(resolved.InactiveDependencies)...)
-			entry.Links = append(entry.Links, relatedChanges(input.Records, form.ApprovalTarget{Kind: form.ApprovalDecision, DecisionID: value.ID}, decisionRecords)...)
-			current = resolved.Active
-			if resolved.Status == ledger.DecisionApproved {
-				entry.Tags = append(entry.Tags, "Approved")
-			} else if resolved.Status == ledger.DecisionPending {
-				entry.Tags = append(entry.Tags, "Unreviewed")
-			}
-			if value.Provisional && resolved.Active {
-				entry.Links = append(entry.Links, dependentChecks(input, record.ID)...)
-				if resolved.Status != ledger.DecisionApproved {
-					provisional = append(provisional, item{Title: "Review provisional decision at the next gate or PR review", Links: []link{recordLink(record.ID, value.ID)}})
-				}
-			}
-			if resolved.Status == ledger.DecisionDeferred && len(value.Conditions) != 0 && len(resolved.SupersededBy) == 0 {
-				deferred = append(deferred, item{Title: "Reconsider deferred decision", Links: []link{recordLink(record.ID, value.ID)}, Fields: []field{{"Conditions", strings.Join(value.Conditions, "\n")}}})
-			}
-		case *ledger.Artifact:
-			entry.Title = "Change " + value.ChangeKind
-			entry.Fields = []field{{"Before", targetLabel(value.Before)}, {"After", targetLabel(value.After)},
-				{"Completion conditions", conditionLabels(input, value.CompletionConditionIDs)}, {"Commit", value.Commit}}
-			entry.Links = references(value.Decisions)
-			current = currentArtifact(input, value)
-			for _, reference := range value.Decisions {
-				if decision, ok := decisions[reference.RecordID]; ok && !decision.Active {
-					entry.Fields = append(entry.Fields, field{"Decision dependency", "Referenced decision is no longer active in the records: " + decision.Decision.ID + ". This does not undo the recorded change."})
-				}
-			}
-			if answer, ok := input.Ledger.ResolveApproval(approvalTarget(value.After)); ok {
-				entry.Tags = append(entry.Tags, "Approved")
-				entry.Links = append(entry.Links, recordLink(answer.RecordID, "Approval"))
-			} else {
-				entry.Tags = append(entry.Tags, "Unreviewed")
-			}
-		case *ledger.Judgment:
-			entry.Title = "Check " + value.Aspect
-			entry.Fields = judgmentFields(input, value)
-			current = currentJudgment(input, value)
-			// The result format contains checked scopes and the full findings.
-			text, err := form.RenderMarkdown(value.JudgmentResult)
-			if err != nil {
-				return "", err
-			}
-			entry.Text = text
-			if answer, ok := input.Ledger.ResolveAnswer(approvalTarget(value.TargetVersion)); ok {
-				entry.Fields = append(entry.Fields, field{"Approval state", string(answer.Answer.Interpretation)})
-			} else {
-				entry.Fields = append(entry.Fields, field{"Approval state", "Unreviewed"})
-			}
-		default:
-			data, err := json.MarshalIndent(record.Payload, "", "  ")
-			if err != nil {
-				return "", fmt.Errorf("render record %s: %w", record.ID, err)
-			}
-			entry.Text = string(data)
-		}
-		if current {
-			p.Current = append(p.Current, entry)
-		} else {
-			p.History = append(p.History, entry)
-		}
+	p.addBlockingFindings(input, decisionRecords)
+	provisional, deferred, err := p.addRecords(input, decisions, decisionRecords, lastAnswer)
+	if err != nil {
+		return "", err
 	}
 	p.Attention = append(p.Attention, provisional...)
 	p.Attention = append(p.Attention, deferred...)
 	p.Summary = summary(input, position, pending, provisional, deferred)
-	if position.Plan != nil {
-		for _, condition := range position.Plan.Plan.CompletionConditions {
-			found := false
-			for _, record := range input.Records {
-				if judgment, ok := record.Payload.(*ledger.Judgment); ok && currentJudgment(input, judgment) && slices.Contains(judgment.CompletionConditionIDs, condition.ID) {
-					approval := "Unreviewed"
-					if answer, ok := input.Ledger.ResolveAnswer(approvalTarget(judgment.TargetVersion)); ok {
-						approval = string(answer.Answer.Interpretation)
-					}
-					p.Coverage = append(p.Coverage, coverage{Condition: condition.ID + ": " + condition.Description,
-						Target: targetLabel(judgment.TargetVersion), Method: judgment.Method,
-						Checked: strings.Join(judgment.CheckedScope, "\n"), Unchecked: strings.Join(judgment.UncheckedScope, "\n"),
-						Judgment: string(judgment.JudgmentResult.Judgment), Validity: "Valid", Approval: approval,
-						Check: recordLink(record.ID, judgment.Aspect)})
-					found = true
-				}
-			}
-			if !found {
-				p.Coverage = append(p.Coverage, coverage{Condition: condition.ID + ": " + condition.Description,
-					Judgment: string(form.NotAssessed), Unchecked: "No current check recorded for this condition.", Approval: "Unreviewed"})
-			}
-		}
-	}
+	p.addCoverage(input, position)
 	p.Structure, p.StructureHistory = structureDiagrams(input)
 	var output bytes.Buffer
 	if err := pageTemplate.Execute(&output, p); err != nil {
@@ -672,4 +474,269 @@ func structureChanges(before, after *Structure) []string {
 		}
 	}
 	return changes
+}
+
+func (p *page) addQuestions(input Input, pending []form.Question, decisionRecords map[string]string, lastAnswer string) error {
+	questionRecords := make(map[string]string)
+	for _, record := range input.Records {
+		if question, ok := record.Payload.(*ledger.Question); ok {
+			questionRecords[question.ID] = record.ID
+		}
+	}
+	pendingIDs := make(map[string]bool, len(pending))
+	for _, question := range pending {
+		pendingIDs[question.ID] = true
+	}
+	answers := input.Ledger.AnsweredQuestions()
+	for _, question := range input.Ledger.Questions() {
+		recordID := questionRecords[question.ID]
+		id := anchor("question", question.ID)
+		if recordID != "" {
+			id = anchor("record", recordID)
+		}
+		text, err := form.RenderMarkdown(question)
+		if err != nil {
+			return err
+		}
+		entry := item{ID: id, Title: "Question " + question.ID, Text: text, Expanded: true}
+		if recordID != "" && recordID > lastAnswer {
+			entry.Tags = append(entry.Tags, "New")
+		}
+		entry.Links = references(question.Evidence)
+		if question.StopObservation != nil {
+			entry.Links = append(entry.Links, references([]form.Reference{*question.StopObservation})...)
+		}
+		entry.Links = append(entry.Links, relatedChanges(input.Records, question.ApprovalTarget, decisionRecords)...)
+		entry.Fields = append(entry.Fields, field{"Target version", approvalLabel(question.ApprovalTarget)})
+		entry.Links = append(entry.Links, questionChecks(input, question.ApprovalTarget)...)
+		entry.Fields = append(entry.Fields, linkedDecisionFields(entry.Links, input.Decisions)...)
+		if answer, ok := answers[question.ID]; ok {
+			entry.Fields = append(entry.Fields, field{"Approval state", string(answer.Answer.Interpretation)})
+			if answer.Answer.Interpretation == ledger.AnswerApproved {
+				entry.Tags = append(entry.Tags, "Approved")
+			}
+			effective := "No"
+			if approval, ok := input.Ledger.ResolveApproval(question.ApprovalTarget); ok && approval.RecordID == answer.RecordID {
+				effective = "Yes"
+			}
+			entry.Fields = append(entry.Fields, field{"Effective approval for target", effective})
+		} else {
+			entry.Fields = append(entry.Fields, field{"Approval state", "Unreviewed"})
+		}
+		if pendingIDs[question.ID] {
+			entry.Tags = append(entry.Tags, "Unreviewed")
+			p.Attention = append(p.Attention, entry)
+		} else {
+			p.History = append(p.History, entry)
+		}
+		if answer, ok := answers[question.ID]; ok {
+			p.Answered = append(p.Answered, link{question.ID + ": " + string(answer.Answer.Interpretation), "#" + anchor("record", answer.RecordID)})
+		}
+	}
+	return nil
+}
+
+func linkedDecisionFields(links []link, decisions []ledger.ResolvedDecision) []field {
+	var fields []field
+	for _, decision := range decisions {
+		if slices.ContainsFunc(links, func(ref link) bool {
+			return ref.Href == "#"+anchor("record", decision.RecordID)
+		}) {
+			fields = append(fields, field{"Decision " + decision.Decision.ID + " validity", decision.Decision.Validity})
+			if len(decision.Decision.Conditions) != 0 {
+				fields = append(fields, field{"Decision " + decision.Decision.ID + " conditions", strings.Join(decision.Decision.Conditions, "\n")})
+			}
+		}
+	}
+	return fields
+}
+
+func (p *page) addBlockingFindings(input Input, decisionRecords map[string]string) {
+	// Findings retain their original judgment as their single detailed body.
+	for _, run := range input.Ledger.IncompleteStageRuns() {
+		for _, finding := range input.Ledger.UnresolvedBlocking(run.ID) {
+			entry := blockingFindingItem(input, run, finding.ID, decisionRecords)
+			p.Attention = append(p.Attention, entry)
+		}
+	}
+}
+
+func blockingFindingItem(input Input, run *ledger.StageRun, findingID string, decisionRecords map[string]string) item {
+	entry := item{Title: "Unresolved blocking finding " + findingID,
+		Fields: []field{{"Stage", stageLabel(input, run)}, {"Stop reason", run.StopReason}, {"Next actor", run.NextActor}}}
+	for i := len(input.Records) - 1; i >= 0; i-- {
+		record := input.Records[i]
+		judgment, ok := record.Payload.(*ledger.Judgment)
+		if !ok || !roundInRun(input.Ledger, judgment.RoundID, run.ID) {
+			continue
+		}
+		if slices.ContainsFunc(judgment.Findings, func(f form.Finding) bool { return f.ID == findingID }) {
+			entry.Links = []link{recordLink(record.ID, "Finding and evidence")}
+			entry.Fields = append(entry.Fields, field{"Target version", targetLabel(judgment.TargetVersion)})
+			entry.Fields = append(entry.Fields, judgmentFields(input, judgment)...)
+			entry.Links = append(entry.Links, relatedChanges(input.Records, approvalTarget(judgment.TargetVersion), decisionRecords)...)
+			if answer, ok := input.Ledger.ResolveAnswer(approvalTarget(judgment.TargetVersion)); ok {
+				entry.Fields = append(entry.Fields, field{"Approval state", string(answer.Answer.Interpretation)})
+			} else {
+				entry.Fields = append(entry.Fields, field{"Approval state", "Unreviewed"})
+			}
+			break
+		}
+	}
+	return entry
+}
+
+func (p *page) addRecords(input Input, decisions map[string]ledger.ResolvedDecision, decisionRecords map[string]string, lastAnswer string) ([]item, []item, error) {
+	var provisional, deferred []item
+	for _, record := range input.Records {
+		ref := recordLink(record.ID, string(record.Kind())+" "+record.ID)
+		if record.ID > lastAnswer {
+			p.Recent = append(p.Recent, ref)
+		}
+		if _, ok := record.Payload.(*ledger.Question); ok {
+			continue
+		}
+		entry := item{ID: anchor("record", record.ID), Title: ref.Label}
+		if record.ID > lastAnswer {
+			entry.Tags = append(entry.Tags, "New")
+		}
+		current := false
+		switch value := record.Payload.(type) {
+		case *ledger.Decision:
+			resolved, ok := decisions[record.ID]
+			if !ok {
+				return nil, nil, fmt.Errorf("view requires resolved decision %s", record.ID)
+			}
+			var err error
+			entry, err = decisionRecordItem(input, entry, record.ID, value, resolved, decisionRecords)
+			if err != nil {
+				return nil, nil, err
+			}
+			current = resolved.Active
+			review, reconsider := decisionAttention(record.ID, value, resolved)
+			provisional = append(provisional, review...)
+			deferred = append(deferred, reconsider...)
+		case *ledger.Artifact:
+			entry, current = artifactRecordItem(input, entry, value, decisions)
+		case *ledger.Judgment:
+			var err error
+			entry, current, err = judgmentRecordItem(input, entry, value)
+			if err != nil {
+				return nil, nil, err
+			}
+		default:
+			data, err := json.MarshalIndent(record.Payload, "", "  ")
+			if err != nil {
+				return nil, nil, fmt.Errorf("render record %s: %w", record.ID, err)
+			}
+			entry.Text = string(data)
+		}
+		if current {
+			p.Current = append(p.Current, entry)
+		} else {
+			p.History = append(p.History, entry)
+		}
+	}
+	return provisional, deferred, nil
+}
+
+func decisionRecordItem(input Input, entry item, recordID string, value *ledger.Decision, resolved ledger.ResolvedDecision, decisionRecords map[string]string) (item, error) {
+	entry.Title = "Decision " + value.ID
+	text, err := form.RenderMarkdown(value.Decision)
+	if err != nil {
+		return item{}, err
+	}
+	entry.Text = text
+	entry.Fields = []field{{"Approval state", string(resolved.Status)}, {"Active in records", fmt.Sprint(resolved.Active)}, {"Condition assessment", "For agents and people to assess"}}
+	entry.Links = references(value.DependsOn)
+	entry.Links = append(entry.Links, references(value.Evidence)...)
+	entry.Links = append(entry.Links, references(resolved.SupersededBy)...)
+	entry.Links = append(entry.Links, references(resolved.InactiveDependencies)...)
+	entry.Links = append(entry.Links, relatedChanges(input.Records, form.ApprovalTarget{Kind: form.ApprovalDecision, DecisionID: value.ID}, decisionRecords)...)
+	if resolved.Status == ledger.DecisionApproved {
+		entry.Tags = append(entry.Tags, "Approved")
+	} else if resolved.Status == ledger.DecisionPending {
+		entry.Tags = append(entry.Tags, "Unreviewed")
+	}
+	if value.Provisional && resolved.Active {
+		entry.Links = append(entry.Links, dependentChecks(input, recordID)...)
+	}
+	return entry, nil
+}
+
+func decisionAttention(recordID string, value *ledger.Decision, resolved ledger.ResolvedDecision) ([]item, []item) {
+	var provisional, deferred []item
+	if value.Provisional && resolved.Active {
+		if resolved.Status != ledger.DecisionApproved {
+			provisional = append(provisional, item{Title: "Review provisional decision at the next gate or PR review", Links: []link{recordLink(recordID, value.ID)}})
+		}
+	}
+	if resolved.Status == ledger.DecisionDeferred && len(value.Conditions) != 0 && len(resolved.SupersededBy) == 0 {
+		deferred = append(deferred, item{Title: "Reconsider deferred decision", Links: []link{recordLink(recordID, value.ID)}, Fields: []field{{"Conditions", strings.Join(value.Conditions, "\n")}}})
+	}
+	return provisional, deferred
+}
+
+func artifactRecordItem(input Input, entry item, value *ledger.Artifact, decisions map[string]ledger.ResolvedDecision) (item, bool) {
+	entry.Title = "Change " + value.ChangeKind
+	entry.Fields = []field{{"Before", targetLabel(value.Before)}, {"After", targetLabel(value.After)},
+		{"Completion conditions", conditionLabels(input, value.CompletionConditionIDs)}, {"Commit", value.Commit}}
+	entry.Links = references(value.Decisions)
+	current := currentArtifact(input, value)
+	for _, reference := range value.Decisions {
+		if decision, ok := decisions[reference.RecordID]; ok && !decision.Active {
+			entry.Fields = append(entry.Fields, field{"Decision dependency", "Referenced decision is no longer active in the records: " + decision.Decision.ID + ". This does not undo the recorded change."})
+		}
+	}
+	if answer, ok := input.Ledger.ResolveApproval(approvalTarget(value.After)); ok {
+		entry.Tags = append(entry.Tags, "Approved")
+		entry.Links = append(entry.Links, recordLink(answer.RecordID, "Approval"))
+	} else {
+		entry.Tags = append(entry.Tags, "Unreviewed")
+	}
+	return entry, current
+}
+
+func judgmentRecordItem(input Input, entry item, value *ledger.Judgment) (item, bool, error) {
+	entry.Title = "Check " + value.Aspect
+	entry.Fields = judgmentFields(input, value)
+	current := currentJudgment(input, value)
+	// The result format contains checked scopes and the full findings.
+	text, err := form.RenderMarkdown(value.JudgmentResult)
+	if err != nil {
+		return item{}, false, err
+	}
+	entry.Text = text
+	if answer, ok := input.Ledger.ResolveAnswer(approvalTarget(value.TargetVersion)); ok {
+		entry.Fields = append(entry.Fields, field{"Approval state", string(answer.Answer.Interpretation)})
+	} else {
+		entry.Fields = append(entry.Fields, field{"Approval state", "Unreviewed"})
+	}
+	return entry, current, nil
+}
+
+func (p *page) addCoverage(input Input, position ledger.Position) {
+	if position.Plan != nil {
+		for _, condition := range position.Plan.Plan.CompletionConditions {
+			found := false
+			for _, record := range input.Records {
+				if judgment, ok := record.Payload.(*ledger.Judgment); ok && currentJudgment(input, judgment) && slices.Contains(judgment.CompletionConditionIDs, condition.ID) {
+					approval := "Unreviewed"
+					if answer, ok := input.Ledger.ResolveAnswer(approvalTarget(judgment.TargetVersion)); ok {
+						approval = string(answer.Answer.Interpretation)
+					}
+					p.Coverage = append(p.Coverage, coverage{Condition: condition.ID + ": " + condition.Description,
+						Target: targetLabel(judgment.TargetVersion), Method: judgment.Method,
+						Checked: strings.Join(judgment.CheckedScope, "\n"), Unchecked: strings.Join(judgment.UncheckedScope, "\n"),
+						Judgment: string(judgment.JudgmentResult.Judgment), Validity: "Valid", Approval: approval,
+						Check: recordLink(record.ID, judgment.Aspect)})
+					found = true
+				}
+			}
+			if !found {
+				p.Coverage = append(p.Coverage, coverage{Condition: condition.ID + ": " + condition.Description,
+					Judgment: string(form.NotAssessed), Unchecked: "No current check recorded for this condition.", Approval: "Unreviewed"})
+			}
+		}
+	}
 }
