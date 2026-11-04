@@ -90,7 +90,10 @@ func TestSchemaAndReferences(t *testing.T) {
 	for _, change := range []func(*Plan){
 		func(p *Plan) { p.Stages[0].Checks[0].CompletionConditionIDs = []string{"missing"} },
 		func(p *Plan) { p.Stages[0].Transitions.Back = "missing" },
-		func(p *Plan) { p.Stages[0].Checks[0].Aspect = "different" },
+		func(p *Plan) {
+			p.Stages[0].Checks[0].Runner = "command:test"
+			p.Stages[0].Checks[0].Aspect = "different"
+		},
 		func(p *Plan) { p.Stages = append(p.Stages, p.Stages[0]) },
 		func(p *Plan) { p.Stages[0].Limits.MaxRounds = 0 },
 		func(p *Plan) { p.Stages[0].Assignee = "judge" },
@@ -331,7 +334,7 @@ func TestCheckMappingsWithSharedAspectAndRunner(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			candidate := clonePlan(p)
-			duplicate := cloneCheck(candidate.Stages[0].Checks[1])
+			duplicate := cloneCheck(candidate.Stages[0].Checks[0])
 			tc.change(&duplicate)
 			candidate.Stages[0].Checks = append(candidate.Stages[0].Checks, duplicate)
 			err := v.ValidatePlan(candidate)

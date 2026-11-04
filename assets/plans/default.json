@@ -8,11 +8,6 @@
       "assignee": "worker",
       "checks": [
         {
-          "aspect": "command:test",
-          "runner": "command:test",
-          "required": true
-        },
-        {
           "aspect": "wording",
           "runner": "review",
           "required": true

@@ -37,6 +37,8 @@ type Result struct {
 
 const trustGuidance = "Open Codex interactively, trust the project, and trust each project hook through /hooks. In Claude Code, accept workspace trust and check the project hook settings. Start a new session and run devkit doctor to verify SessionStart observation."
 
+const commandGuidance = "The bundled templates in .devkit/plans/ use judge checks only. Once the repository has tests or other mechanical checks, register them under [commands] in devkit.toml and add command:<name> checks to your templates."
+
 // Init installs repository assets and merges the supplied host fragments.
 // It stages the kit copy first, then calls confirm with all remaining changes
 // before applying them. A nil callback means the caller already authorized them.
@@ -46,7 +48,7 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 	if err != nil {
 		return Result{}, err
 	}
-	result := Result{Root: w.Root(), Guidance: []string{trustGuidance}}
+	result := Result{Root: w.Root(), Guidance: []string{trustGuidance, commandGuidance}}
 	configuration := []byte(fmt.Sprintf("kit_version = %q\n", kit.Version))
 	existing, err := os.ReadFile(filepath.Join(result.Root, "devkit.toml"))
 	if err == nil {
