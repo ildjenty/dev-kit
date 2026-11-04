@@ -100,6 +100,9 @@ func TestOutOfRoundNormsUseCommittedHEAD(t *testing.T) {
 	if err != nil || question.Instruction.Question == nil || question.Instruction.Question.StopCategory != "meta_loop_edit" {
 		t.Fatalf("uncommitted rule became effective: %+v, %v", question, err)
 	}
+	if !strings.Contains(question.Instruction.Question.Text, workStartBase+":") {
+		t.Fatalf("loop edit question without an earlier approval did not name the work start as its base:\n%s", question.Instruction.Question.Text)
+	}
 }
 
 func TestCommittedNormChangeReissuesPendingPlanCheck(t *testing.T) {

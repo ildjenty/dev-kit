@@ -17,6 +17,7 @@ import (
 const (
 	stageStartBase   = "Comparison base (tree at the start of this stage run)"
 	lastApprovedBase = "Comparison base (tree at the last approved loop edit)"
+	workStartBase    = "Comparison base (commit the work started from)"
 )
 
 func (e *Engine) comparison(ctx context.Context, label, before, after string) (string, error) {
@@ -151,7 +152,7 @@ func (e *Engine) decisionFindings(round *ledger.Round) (string, error) {
 
 func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.State, q *form.Question) error {
 	work, _ := state.Work()
-	before, label := work.BaseCommit, "Comparison base (commit the work started from)"
+	before, label := work.BaseCommit, workStartBase
 	if q.StopCategory == config.MetaLoopEdit {
 		latest := ""
 		answers := state.AnsweredQuestions()
