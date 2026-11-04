@@ -36,7 +36,7 @@ func (e *Engine) workHistory(state *ledger.State, meta *ledger.Instruction) (str
 			}
 		}
 		for _, run := range state.StageRuns() {
-			fmt.Fprintf(&text, "Stage %s (%s): %d rounds\n", run.StageID, run.ID, len(state.Rounds(run.ID)))
+			fmt.Fprintf(&text, "Stage %s (%s): %d rounds, state: %s, plan version: %d\n", run.StageID, run.ID, len(state.Rounds(run.ID)), run.State, run.PlanVersion)
 		}
 		meta.Context.WorkHistory = text.String()
 	}

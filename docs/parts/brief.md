@@ -20,11 +20,15 @@ requirements と structure は、論理名から設定済みの作業ツリー�
 
 修正[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)では、指摘と検証の失敗情報を受け取る。入力の構成は[指摘の参照](../architecture/data.md#指摘-finding)、[brief のモジュール契約](../architecture/modules.md#brief)と[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
 
+分割した単位の作業依頼では、計画の単位 ID・説明・担当する範囲と、`.devkit/worktrees/<単位の指示 ID>/` に作る作業場所の絶対パスを受け取る。作業者 `devkit-worker` には、そこでだけ編集し、`schemas/progress.json` の終了ブロックを最終メッセージで返すよう指示する。合流がぶつかった場合のセッションの作業者への修正ラウンドには、ぶつかったファイルと単位を載せる。
+
 計画依頼の組み立てでは、[作業の開始](../architecture/flow.md#作業の開始)に従って[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)、人の要求の原文、`start` の課題、requirements を受け取り、再提案・再計画では[計画の check と承認ゲート](../architecture/flow.md#計画の-check-と承認ゲート)と[計画のバージョン](../architecture/data.md#計画のバージョン)に従って人の修正指示、check の指摘や残りの実行内容を受け取る。
 
 ステージの遷移 `done` が `"replan"` の場合も、ステージの完了後に既存の再計画の経路で残りを作り直す依頼を組み立てる。要件定義を特別扱いせず、雛形の遷移に従う。
 
 判定依頼の組み立てでは、[check](check.md#入力と出力)(判定依頼の内容を決める部品)が決めた内容を入力として受け取る。
+
+分割した作業の判定依頼は、単位の終了ブロックをまとめた作業者の終了ブロックと合流後のツリーを対象とする。差分はステージ開始時点からの累積差分であり、単位の変更とマージの結果を含める。単位ごとの判定依頼は作らない。
 
 計画の判定依頼には、作業に記録した要求の原文と `start` の課題を固定入力として渡す。再計画の依頼は、計画の check が `NOT ASSESSED` となった後に人が修正を指示した場合も、元の再計画の種別と残りの作業を保つ。
 
@@ -42,7 +46,7 @@ brief の内容を返し、組み立て・書き出しの責務は [brief のモ
 
 決定の有効条件・適用条件と[一時状態](../architecture/data.md#進捗-progress)(再開まで引き継ぐ状況)の条件は、出典・参照とともにそのまま項目に添えて渡す。[ledger のモジュール契約](../architecture/modules.md#ledger)に従い、条件を評価して入力を除外することはせず、有効かどうかはエージェントと人が判断する。
 
-判定者・計画者の起動方法と、[指示 ID](../architecture/data.md#指示-instruction)(依頼を識別する値)から依頼本文のファイルを特定して読む手順は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+作業者・判定者・計画者のサブエージェントの起動方法と、[指示 ID](../architecture/data.md#指示-instruction)(依頼を識別する値)から依頼本文のファイルを特定して読む手順は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
 停止の判断は [engine](../architecture/modules.md#engine) と [router](../architecture/modules.md#router)(次の行動を選ぶ部品)が担う。
 

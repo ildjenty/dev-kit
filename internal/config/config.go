@@ -30,6 +30,20 @@ type Config struct {
 	Limits         Limits                       `toml:"limits"`
 	Lessons        Lessons                      `toml:"lessons"`
 	Detection      Detection                    `toml:"detection"`
+	Parallel       Parallel                     `toml:"parallel"`
+}
+
+// Parallel limits the number of outstanding unit workers.
+type Parallel struct {
+	MaxWorkers int `toml:"max_workers"`
+}
+
+// MaxWorkers returns the effective limit for unit workers.
+func (c Config) MaxWorkers() int {
+	if c.Parallel.MaxWorkers == 0 {
+		return 3
+	}
+	return c.Parallel.MaxWorkers
 }
 
 // Paths holds repository-relative locations for repository-owned files.
@@ -284,6 +298,7 @@ func Parse(data []byte) (Config, error) {
 	c.PlanCheck = c.PlanCheckSettings()
 	c.Limits.StopContinuation = c.StopContinuation()
 	c.Lessons.Destinations = c.LessonDestinations()
+	c.Parallel.MaxWorkers = c.MaxWorkers()
 	metadata, err := toml.NewDecoder(bytes.NewReader(data)).Decode(&c)
 	if err != nil {
 		return Config{}, fmt.Errorf("parse configuration: %w", err)
@@ -299,6 +314,9 @@ func Parse(data []byte) (Config, error) {
 
 // Validate checks required settings and formats without checking path existence or kit compatibility.
 func (c Config) Validate() error {
+	if c.Parallel.MaxWorkers < 1 {
+		return fmt.Errorf("parallel.max_workers must be at least 1")
+	}
 	if strings.TrimSpace(c.KitVersion) == "" {
 		return fmt.Errorf("kit_version is required")
 	}

@@ -112,6 +112,7 @@ const (
 	RemovedGate          DeviationKind = "removed_gate"
 	ChangedTransition    DeviationKind = "changed_transition"
 	ChangedStartStage    DeviationKind = "changed_start_stage"
+	ChangedSplit         DeviationKind = "changed_split"
 	RemovedRequiredCheck DeviationKind = "removed_required_check"
 )
 
@@ -218,6 +219,9 @@ func (p *Plan) insertOptionalStages(template PlanTemplate, ids []string) {
 
 func stageDeviations(original, stage Stage) []Deviation {
 	var result []Deviation
+	if original.Split != stage.Split {
+		result = append(result, Deviation{Kind: ChangedSplit, StageID: stage.ID})
+	}
 	if original.Gate.Required && !stage.Gate.Required {
 		result = append(result, Deviation{Kind: RemovedGate, StageID: stage.ID})
 	}

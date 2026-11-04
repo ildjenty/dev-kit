@@ -22,7 +22,7 @@ Claude Code と Codex CLI を対象とし、どちらも既定のホストとは
 ## Stop
 
 - **入力**: このセッションに束縛された作業、ledger から導いた中断の有無と未受理の指示の種別、未取り込みの停止の観測、作業ごとの継続回数と照合した記録 ID。
-- **判断**: [中断](guarantees.md#中断)による停止の許可と継続上限を先に照合する。上限は `devkit.toml` の `[limits] stop_continuation` で設定し、既定3回、1以上を必須とし、無効にはできない。通常は問い・外部操作の確認・完了・中止・判定待ちなら停止を許し、それ以外はラウンドの有無ではなく作業単位で `block` する。
+- **判断**: [中断](guarantees.md#中断)による停止の許可と継続上限を先に照合する。上限は `devkit.toml` の `[limits] stop_continuation` で設定し、既定3回、1以上を必須とし、無効にはできない。通常は問い・外部操作の確認・完了・中止・判定待ち・単位の作業者の結果待ちなら停止を許し、それ以外はラウンドの有無ではなく作業単位で `block` する。
 - **出力**: `block` 時は理由として「`devkit next` を実行する」を返す。継続上限時の問いの提示は[中断](guarantees.md#中断)に従う。
 - **書く生成物**: [停止の観測](data.md#停止の観測-stopobservation)。問いの ledger への取り込みは CLI に委ねる。
 
@@ -45,13 +45,13 @@ Codex の `spawn_agent` は `tool_name: collaborationspawn_agent` として捕�
 
 Claude Code では、束縛のあるセッションで `subagent_type` が `devkit-` で始まる起動について、[規範の固定](guarantees.md#規範の固定)で定める担当定義の `model`・[`effort`](data.md#check-の結果-judgment)(推論量の設定)を実際に変える上書きを deny する。定義と同じ値の明示と、隔離指定(`isolation`)の有無だけでは拒否しない。起動条件は担当定義との照合で制限する。両ホストとも、ここで定める起動の制限をリポジトリ全体の `permissions.deny` には足さない。
 
-Codex では、束縛のあるセッションで呼び出し元の `agent_type` が devkit の判定者である場合、`[deny]` に列挙した書き込みを行うツール(`apply_patch`、書き込みのできる MCP ツールなど)を deny する。ファイルの読み取りには exec や node の REPL などを使える。
+Codex では、束縛のあるセッションで呼び出し元の `agent_type` が devkit の判定者・計画者である場合、`[deny] judge` に列挙した書き込みを行うツール(`apply_patch`、書き込みのできる MCP ツールなど)を deny する。ファイルの読み取りには exec や node の REPL などを使える。単位の作業者 `devkit-worker` はこの書き込み禁止の対象外であり、判定者・計画者への禁止は維持する。
 
 ## SubagentStop
 
 - **入力**: `agent_type`、`agent_id`、`last_assistant_message`、`agent_transcript_path`、取得できる場合はホストから観測した effort または model、発行済みの[指示](data.md#指示-instruction)。
-- **判断**: `agent_type` が devkit の判定者・計画者の定義名であることを確かめ、[最終メッセージの結果](guarantees.md#判定結果の受理)から指示 ID を取る。束縛があり、発行済みのサブエージェントへの指示と指示 ID・担当名が一致すれば採取する。計画の check と検出試験の指示も対象とし、指示 ID・担当名の不一致なら何もしない。最終メッセージを JSON として解析できない場合は失敗の観測を残す。
-- **出力**: 最終メッセージに来歴を添えて結果ファイルとして公開し、[判定結果の受理](guarantees.md#判定結果の受理)に渡す。JSON の解析失敗の観測も公開し、`next` が失敗の記録・結果の拒否・再指示と上限での人への問いを処理する。
+- **判断**: `agent_type` が devkit の作業者・判定者・計画者の定義名であることを確かめ、[最終メッセージの結果](guarantees.md#判定結果の受理)から指示 ID を取る。束縛があり、発行済みのサブエージェントへの指示と指示 ID・担当名が一致すれば採取する。単位の作業、計画の check と検出試験の指示も対象とし、指示 ID・担当名の不一致なら何もしない。最終メッセージを JSON として解析できない場合は失敗の観測を残す。同じ runner の未受理の指示が複数あり、指示 ID のない不正な最終メッセージをどの指示にも結び付けられない場合も観測を残す。
+- **出力**: 最終メッセージに来歴を添えて結果ファイルとして公開し、[判定結果の受理](guarantees.md#判定結果の受理)に渡す。`devkit-worker` の最終メッセージは `schemas/progress.json` の終了ブロックである。JSON の解析失敗の観測も公開し、`next` が失敗の記録・結果の拒否・再指示と上限での人への問いを処理する。指示に結び付けられない不正な結果は、観測を残して人に問う。
 - **書く生成物**: 結果ファイル `results/<指示 ID>-<agent_id>.json`、または JSON の解析失敗の観測である。結果ファイルには検証済みの指示 ID・担当、SubagentStop の観測時刻を添える。effort・model の来歴は [Judgment](data.md#check-の結果-judgment)に従う。
 
 両ホストで `agent_type` は定義の `name` と一致し、`last_assistant_message` から最終メッセージの本文を取得できる。Claude Code の `agent_transcript_path` は `<session>/subagents/agent-<id>.jsonl` で、最初の user メッセージから起動時の prompt を読める。Codex は rollout の JSONL を指すが、起動時の `message` は平文で取り出せない。

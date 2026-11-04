@@ -50,6 +50,8 @@ func (s *State) UnacceptedInstructions() []Instruction {
 		switch p := record.Payload.(type) {
 		case *Progress:
 			accepted[p.InstructionID] = true
+		case *UnitResult:
+			accepted[p.InstructionID] = true
 		case *Judgment:
 			accepted[p.InstructionID] = true
 		case *PlanVersion:

@@ -343,7 +343,7 @@ func (w *Workspace) workingIndex(ctx context.Context) ([]string, func() error, e
 	}
 	if err == nil {
 		var paths []byte
-		paths, err = w.run(ctx, env, "ls-files", "-z")
+		paths, err = w.indexPaths(ctx, env)
 		if err == nil {
 			for _, flag := range []string{"--no-assume-unchanged", "--no-skip-worktree"} {
 				cmd := w.command(ctx, env, "update-index", flag, "-z", "--stdin")

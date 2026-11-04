@@ -40,6 +40,8 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 記録内容と指示 ID の導出・出し直し・本文の扱いは [Round](../architecture/data.md#ラウンド-round)(作業依頼から判断までの往復)と [Instruction](../architecture/data.md#指示-instruction)(エージェントへの指示)の定義に従う。
 
+分割した作業では、単位ごとの作業指示・場所・終了ブロックと、合流の開始時の HEAD・入力として固定した SHA・結果を記録する。再開時は合流の記録と git のマージの状態を照合する。単位ごとの判定は記録せず、合流後のツリーと、単位の終了ブロックをまとめた作業者の終了ブロックをステージのラウンドで扱う。
+
 ### 進捗
 
 [終了ブロック](../architecture/data.md#進捗-progress)(ラウンドの作業報告)の記録は[進捗](../architecture/data.md#進捗-progress)、入力の場所と受理条件は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。

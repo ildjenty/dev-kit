@@ -36,6 +36,8 @@ const (
 	KindRound         Kind = "round"
 	KindInstruction   Kind = "instruction"
 	KindArtifact      Kind = "artifact"
+	KindUnitResult    Kind = "unit_result"
+	KindMerge         Kind = "merge"
 )
 
 const KindResultRejection Kind = "result_rejection"
@@ -175,6 +177,35 @@ type Progress struct {
 	RoundID string `json:"round_id"`
 }
 
+// UnitResult is a hook-observed worker termination block accepted for one unit.
+type UnitResult struct {
+	form.Progress
+	RoundID    string `json:"round_id"`
+	UnitID     string `json:"unit_id"`
+	AgentID    string `json:"agent_id"`
+	ResultPath string `json:"result_path"`
+}
+
+// MergeInput fixes one unit's working tree as an unbranched commit.
+type MergeInput struct {
+	InstructionID string `json:"instruction_id"`
+	UnitID        string `json:"unit_id"`
+	Commit        string `json:"commit"`
+}
+
+// Merge records the ordered inputs and each recoverable merge step without moving HEAD.
+type Merge struct {
+	RoundID    string       `json:"round_id"`
+	Head       string       `json:"head"`
+	Inputs     []MergeInput `json:"inputs"`
+	Applied    int          `json:"applied"`
+	Current    string       `json:"current"`
+	BeforeTree string       `json:"before_tree"`
+	ResultTree string       `json:"result_tree,omitempty"`
+	Conflicts  []string     `json:"conflicts,omitempty"`
+	Status     string       `json:"status"`
+}
+
 type Judgment struct {
 	check.Judgment
 	RoundID string `json:"round_id,omitempty"`
@@ -219,6 +250,8 @@ type StageRun struct {
 // Round updates retain the initial record ID. Decision closes the round.
 type Round struct {
 	ID             string               `json:"id"`
+	StartCommit    string               `json:"start_commit,omitempty"`
+	MergeFix       bool                 `json:"merge_fix,omitempty"`
 	StageRunID     string               `json:"stage_run_id"`
 	SessionID      string               `json:"session_id"`
 	StartTarget    form.TargetVersion   `json:"start_target"`
@@ -231,6 +264,7 @@ type Round struct {
 // Instruction stores issuance facts; engine regenerates its text and brief.
 type Instruction struct {
 	ID           string                `json:"id"`
+	Unit         *plan.Unit            `json:"unit,omitempty"`
 	Kind         form.InstructionKind  `json:"kind"`
 	TargetKey    string                `json:"target_key"`
 	Reissue      int                   `json:"reissue"`
@@ -317,3 +351,5 @@ func (*Instruction) recordKind() Kind   { return KindInstruction }
 func (*Artifact) recordKind() Kind      { return KindArtifact }
 
 func (*ResultRejection) recordKind() Kind { return KindResultRejection }
+func (*UnitResult) recordKind() Kind      { return KindUnitResult }
+func (*Merge) recordKind() Kind           { return KindMerge }

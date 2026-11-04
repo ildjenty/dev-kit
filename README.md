@@ -41,6 +41,10 @@ To remove devkit from a repository, run `devkit uninstall` there. It shows the c
 
 In Codex, trust the project interactively and trust each project hook through `/hooks`. In Claude Code, accept workspace trust. Start a new host session and run `devkit doctor`, then use `/devkit` to begin. Run `devkit help` for command arguments. See [install](docs/architecture/modules.md#install) and [doctor](docs/architecture/modules.md#doctor-の確認項目) for the design.
 
+Tools such as Go, npm, and pip that write caches outside the repository may fail when agents run them inside the host sandbox; host sandbox settings can allow those locations, while devkit's own verification commands run outside the sandbox.
+
+A repository can opt into parallel stage work with `split: true` in a template and `units` in its plan (each with `id`, `description`, and `scope`); `[parallel] max_workers` defaults to 3 and must be at least 1. Devkit creates detached unit worktrees under the ignored `.devkit/worktrees/<instruction_id>/`, issues `devkit-worker` instructions, fixes accepted results by SHA, and merges them into the work checkout for one ordinary stage round. Conflicts return to the session worker for a fix round; judgments, gates, loop-edit confirmation, limits, back/replan, and questions remain at stage level. Pause stops new instructions; abort and completion remove unchanged unit worktrees and report changed ones that remain. The bundled templates do not split stages.
+
 ## Reading order
 
 1. [docs/architecture.md](docs/architecture.md): Overview of the structure and behavior, the work flow and the scope of the guarantees.

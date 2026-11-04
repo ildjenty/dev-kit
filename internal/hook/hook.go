@@ -124,9 +124,15 @@ func (h Handler) subagentStop(e event.Event, state *ledger.State, now time.Time)
 		failure = "The final message has no instruction ID."
 	}
 	if failure != "" {
-		id, err := h.failedInstruction(e, state)
-		if err != nil || id == "" {
+		id, ambiguous, err := h.failedInstruction(e, state)
+		if err != nil {
 			return err
+		}
+		if id == "" {
+			if !ambiguous {
+				return nil
+			}
+			return publishSubagentResult(h.workRoot(), SubagentResult{Runner: e.AgentType, AgentID: e.AgentID, Host: e.Host, ObservedAt: now, Failure: failure, FinalMessage: e.LastAssistantMessage})
 		}
 		identity.InstructionID = id
 	}
@@ -164,7 +170,7 @@ func (h Handler) subagentStop(e event.Event, state *ledger.State, now time.Time)
 
 func subagentInstruction(kind form.InstructionKind) bool {
 	switch kind {
-	case form.InstructionJudgment, form.InstructionPlanCheck, form.InstructionDetectionTest, form.InstructionPlan:
+	case form.InstructionJudgment, form.InstructionPlanCheck, form.InstructionDetectionTest, form.InstructionPlan, form.InstructionUnitWork:
 		return true
 	}
 	return false
@@ -248,6 +254,8 @@ func stopAllowed(state *ledger.State) bool {
 		case form.InstructionQuestion, form.InstructionExternal, form.InstructionCompleted,
 			form.InstructionAborted, form.InstructionJudgmentWait, form.InstructionJudgment,
 			form.InstructionPlanCheck, form.InstructionDetectionTest, form.InstructionPlan:
+			return true
+		case form.InstructionUnitWork:
 			return true
 		}
 	}
@@ -350,9 +358,9 @@ func (h Handler) continuationLimit(state *ledger.State) (int, error) {
 	return limit, nil
 }
 
-func (h Handler) failedInstruction(e event.Event, state *ledger.State) (string, error) {
+func (h Handler) failedInstruction(e event.Event, state *ledger.State) (string, bool, error) {
 	if h.InstructionRunner == nil {
-		return "", fmt.Errorf("instruction runner resolver is required")
+		return "", false, fmt.Errorf("instruction runner resolver is required")
 	}
 	id := ""
 	for _, instruction := range state.UnacceptedInstructions() {
@@ -361,14 +369,14 @@ func (h Handler) failedInstruction(e event.Event, state *ledger.State) (string, 
 		}
 		runner, err := h.InstructionRunner(instruction)
 		if err != nil {
-			return "", err
+			return "", false, err
 		}
 		if runner == e.AgentType {
 			if id != "" {
-				return "", nil
+				return "", true, nil
 			}
 			id = instruction.ID
 		}
 	}
-	return id, nil
+	return id, false, nil
 }

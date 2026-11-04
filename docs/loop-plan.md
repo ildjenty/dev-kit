@@ -12,6 +12,8 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 
 ステージ(作業を区切る単位)の担当と [check](architecture/modules.md#check)(観点やコマンドによる確認)の実行主体(runner)は[計画](architecture/data.md#計画-plan)で定める。
 
+雛形のステージに `split: true` を書くと、そのステージの作業を単位に分けてよい。計画者は、そのステージの `units` に、計画内の ID、説明、担当する範囲を持つ単位の一覧を書く。範囲はファイルやディレクトリを文章で示してよい。単位がなければ通常のステージとして作業する。単位の ID の重複は検証で拒否し、範囲の重なりは計画の観点の判定者が指摘する。分割の追加・削除は雛形からの逸脱である。再計画で完了済みのステージを残りの計画に含めないことは逸脱に数えない。
+
 個別の承認なしに計画の承認だけで実行してよい[外部操作](architecture/flow.md#外部操作)(リポジトリ外への書き込み行為)は、[計画の宣言](architecture/data.md#計画-plan)と[外部操作の承認](architecture/guarantees.md#外部操作の承認)に従って扱う。
 
 計画には、要求のうち計画者が決められなかった点を任意の `open_questions`(文字列の配列)として記入する。曖昧な要求を推測で埋めない。完了条件の書き方と条件ごとの確認手段は[計画](architecture/data.md#計画-plan)に従う。
@@ -21,6 +23,8 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 計画の検証では、`done` をたどって同じステージを再び通る循環を拒否する。`"replan"` または `null` で遷移の連鎖を終える。
 
 ## 既定の雛形
+
+既定の雛形は分割を使わず、分割するステージはリポジトリが選ぶ。
 
 - **`default`**: `purpose → scope → structure → contract → steps → implement → retrospective`。候補は `research` と `prototype` である。`scope` に人の承認ゲートを置く。`implement` に必須の `command:test` と、観点 `test`・`diff` の check を置く。
 - **`fix`**: `implement → retrospective`。候補は `research` と `prototype` である。`implement` に必須の `command:test` と、観点 `test`・`diff` の check を置く。
@@ -33,6 +37,8 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 ## 例
 
 JSON の例は[雛形と計画](architecture/examples.md#雛形と計画)を参照する。check の実行主体として登録する[判定コマンド(`[judges]`)](architecture/modules.md#config)(判定結果を返すコマンド)と[検証コマンド(`[commands]`)](architecture/modules.md#config)(終了コードで検証結果を返すコマンド)の例は[設定](architecture/examples.md#設定)を参照する。
+
+steps の完了後に再計画し、implement の作業を手順ごとの単位に分ける例は[分割の雛形と計画](architecture/examples.md#分割の雛形と計画)に従う。
 
 ## 作成ルール
 
@@ -94,6 +100,8 @@ check と必要なゲートの進行は[計画の check と承認ゲート](arch
 ## ステージ実行時の扱い
 
 次の行動を選ぶ入力は [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)、必須 check とコミットの関係は[完了条件](architecture/guarantees.md#完了条件)に従う。起動・操作を要する check の実行主体は[操作の禁止とサブエージェントの制限](architecture/guarantees.md#操作の禁止とサブエージェントの制限)で定める。
+
+分割した作業は `devkit-worker` が単位ごとの worktree で進め、固定した SHA を作業ブランチへコミットしないマージで合流する。単位ごとの判定はせず、合流後のツリーを通常のステージのラウンドとして判定する。ゲート・確認・上限・戻り・再計画・問いもステージ単位である。作業者数は `[parallel] max_workers`(既定3、1以上)で制限し、1でも同じ作業場所と合流の手順を使う。実行・中断・中止・作業完了の扱いは[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。
 
 計画で使う `command:<name>` がラウンド開始時の `devkit.toml` に登録されていなければ、その check を `FAIL` とする。指摘は `auto-fixable` とし、「検証コマンド `<name>` が登録されていない。検証の手段を作り `devkit.toml` の `[commands.<name>]` に登録する」と伝える。作業者が用意したコマンドは、次のラウンド開始時のスナップショットから使う。登録はループ自身の変更として人が確認する。
 

@@ -69,6 +69,8 @@ type WorkInput struct {
 	CommandOutputs    []CommandOutput
 	PreCommitOutput   string
 	OutputSchema      string
+	Unit              *plan.Unit
+	WorktreePath      string
 }
 
 // JudgmentInput receives the request content and output schema selected by check.

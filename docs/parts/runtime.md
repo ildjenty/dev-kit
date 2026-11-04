@@ -5,7 +5,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 ## 責務
 
 - **進行**: runtime は[計画](../architecture/data.md#計画-plan)(課題ごとの実行内容)と [ledger](../architecture/modules.md#ledger)(記録を扱う部品)を使ってループを進める。実装モジュールへの責務配分は [engine](../architecture/modules.md#engine)(進行を担うモジュール)を含む[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従う。
-- **判定者・計画者との接続**: 起動主体は[全体構成](../architecture.md#全体構成)、最終メッセージと来歴の採取・受け渡しは [SubagentStop](../architecture/hooks.md#subagentstop)(サブエージェント終了時のイベント)、起動の定型と結果の受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+- **作業者・判定者・計画者との接続**: サブエージェントの起動主体は[全体構成](../architecture.md#全体構成)、最終メッセージと来歴の採取・受け渡しは [SubagentStop](../architecture/hooks.md#subagentstop)(サブエージェント終了時のイベント)、起動の定型と結果の受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 - **git と外部操作**: git 操作と[外部操作](../architecture/flow.md#外部操作)(リポジトリ外への書き込み)の責務配分は [workspace](../architecture/modules.md#workspace) と [external](../architecture/modules.md#external) の契約に従う。
 - **組み立て**: 設定、リポジトリの規範、バイナリが供給するスキーマと既定値の受け渡しを含む組み立ては [cmd/devkit](../architecture/modules.md#cmddevkit) の契約に従う。
 - **導入**: バイナリの配布、利用側の配置と設定の準備は [install](../architecture/modules.md#install) の契約に従う。
@@ -31,6 +31,12 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 
 `init` は導入内容を人が確認したあとコミットし、`--no-commit` で省略できる。HEAD がない、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合は、`start` を拒否して理由と直し方を返す。雛形の省略時は `default_plan`、ブランチと完了時のコミットは `[git]`、Stop の継続上限は `[limits] stop_continuation` に従う。
 
+作業中のチェックアウトでの2つ目の `start` は拒否する。別の worktree で新しいセッションを開けば、チェックアウトごとの `.devkit/run/` で複数のループを並行して回せる。
+
+雛形のステージの `split` と計画の `units` に従う単位の作業は、`devkit-worker` が `.devkit/worktrees/<単位の指示 ID>/` で進める。devkit はラウンド開始時のスナップショットのコミットから detached の worktree を作り、全単位の結果受理後にツリーを SHA で固定して作業ブランチへコミットしないマージで合流する。単位の終了ブロックをまとめ、合流後のツリーを通常のステージのラウンドで判定する。単位ごとの判定はしない。作業者数は `[parallel] max_workers`(既定3、1以上)で制限し、1でも作業場所と合流の手順は変えない。
+
+合流がぶつかった場合の修正ラウンド、合流の記録と再開時の照合、結果を指示に結び付けられない場合の問い、中断・中止・作業完了時の worktree の扱いは[分割した作業と合流](../architecture/flow.md#分割した作業と合流)に従う。`devkit-worker` は判定者用の `[deny] judge` の書き込み禁止の対象外である。
+
 ラウンド開始時に未登録の検証コマンドは、`auto-fixable` の指摘を伴う check の `FAIL` とする。作業者が検証の手段を作って登録し、既定では人の確認を経た次のラウンドから使う。
 
 既定の雛形は `default`・`fix`・`docs` であり、最後に作業者の retrospective を置く。すべての作業の brief と判定依頼が指示発行時点の作業履歴ファイルを参照し、振り返りはそこからすべての判定と指摘、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、人の回答や note の見逃しを確認する。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。規範を変えた場合はループ自身の変更として確認する。
@@ -49,7 +55,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 - **再開**: 作業の特定は[セッションとブランチ](../architecture/data.md#セッションとブランチ)、受理時に必要な観測の照合は[再開と hook の稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)、注入する現在地の組み立ては [checkpoint](../architecture/data.md#checkpoint)に従う。
 - **外部操作**: 承認済みの操作の実行と再送時の回復は、[外部操作の承認](../architecture/guarantees.md#外部操作の承認)・[外部操作の二重適用](../architecture/guarantees.md#外部操作の二重適用)に従う。
 - **再計画**: 前のステージへの戻りと、ステージの遷移 `done: "replan"` による完了後の残りの作り直しに、既存の再計画の経路を使う。作り直した計画にも計画の check と承認の条件を適用し、要件定義は特別扱いしない。再計画に伴う [StageRun](../architecture/data.md#ステージの実行-stagerun)(ステージの実行の記録)と計画の切り替えは[計画のバージョン](../architecture/data.md#計画のバージョン)、手順は [router の判断](../architecture/flow.md#router-の判断)に従う。
-- **ホストと git に任せる範囲**: サブエージェントの起動と隔離、worktree の扱いは[ホストと git に任せる範囲](../architecture/guarantees.md#実装対象外の機能)、並行作業の配置は[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。
+- **ホストと git に任せる範囲**: サブエージェントの起動と隔離、git の仕組みとの責務分担は[ホストと git に任せる範囲](../architecture/guarantees.md#実装対象外の機能)に従う。単位の worktree と合流は devkit が git 操作で管理し、ループ自体を並行して回す配置は[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。
 - **メタループの編集**: 規範・ホスト設定・skill・リポジトリ内で git が追跡する有効な pre-commit の設定の変更は、どのステージでも `[approval] meta_loop_edit` に従う。既定では変更が効く最初のラウンドの前に人が確認し、最後のラウンドの変更は判定後、完了時のコミット前に確認する。requirements と structure は成果としてステージの判定で確認する。
 - **互換性**: `kit_version` とバイナリの非互換と、読めない記録は[ロールアウト](../architecture/guarantees.md#ロールアウト)に従って報告する。
 - **停止の補助**: 停止の判断は [Stop](../architecture/hooks.md#stop)、中断と継続上限は[中断](../architecture/guarantees.md#中断)、完了の確定は[完了条件](../architecture/guarantees.md#完了条件)に従う。

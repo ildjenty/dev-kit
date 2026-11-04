@@ -171,6 +171,7 @@ type InstructionKind string
 
 const (
 	InstructionWork          InstructionKind = "work"
+	InstructionUnitWork      InstructionKind = "unit_work"
 	InstructionJudgmentWait  InstructionKind = "judgment_wait"
 	InstructionJudgment      InstructionKind = "judgment"
 	InstructionPlanCheck     InstructionKind = "plan_check"

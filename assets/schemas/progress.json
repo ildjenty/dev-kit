@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Termination block",
+  "description": "A session worker submits this block with devkit submit; a devkit-worker returns it as a JSON-only final message collected by SubagentStop for its unit instruction.",
   "type": "object",
   "properties": {
     "instruction_id": {

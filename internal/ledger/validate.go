@@ -121,6 +121,10 @@ func (v *Validator) validateRaw(payload Payload, data []byte) error {
 		requiredFields = []string{"operation_id", "kind", "target", "input_hash", "definition_hash", "executable_hash", "approval_id", "input", "status"}
 	case *Progress:
 		requiredFields = []string{"round_id"}
+	case *UnitResult:
+		requiredFields = []string{"round_id", "unit_id", "agent_id", "result_path"}
+	case *Merge:
+		requiredFields = []string{"round_id", "head", "inputs", "applied", "current", "before_tree", "status"}
 	case *Judgment:
 		requiredFields = []string{"runner", "provenance"}
 	case *ResultRejection:
@@ -262,6 +266,13 @@ func (v *Validator) validatePayload(payload Payload) error {
 			return err
 		}
 		return v.check("progress", p.Progress)
+	case *UnitResult:
+		if err := required(p.RoundID, p.UnitID, p.AgentID, p.ResultPath); err != nil {
+			return err
+		}
+		return v.check("progress", p.Progress)
+	case *Merge:
+		return validateMerge(p)
 	case *Judgment:
 		return v.judgment(*p)
 	case *ResultRejection:

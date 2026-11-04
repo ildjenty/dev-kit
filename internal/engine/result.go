@@ -49,6 +49,12 @@ func (e *Engine) retryRejected(ctx context.Context, state *ledger.State, meta le
 	meta.ID = instructionID(e.workID, meta.Kind, meta.TargetKey, meta.Reissue)
 	meta.SessionID = e.sessionID
 	data.Instruction.ID, data.Instruction.Brief = meta.ID, ""
+	if meta.Kind == form.InstructionUnitWork {
+		if err := e.prepareUnitRetry(ctx, state, meta); err != nil {
+			return err
+		}
+		data.Instruction.TargetPath = e.unitPath(meta.ID)
+	}
 	if data.Request != nil {
 		request := *data.Request
 		request.InstructionID = meta.ID

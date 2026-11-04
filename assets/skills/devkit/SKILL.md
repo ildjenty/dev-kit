@@ -33,13 +33,14 @@ Run each loop in its own git worktree and host session. Do not start a new task 
 
 - **Planning**: Launch the specified `devkit-planner`. When instructed to replan, launch the specified planner through the same procedure. For plan checks, detection tests, and judgments, launch the assigned judge. After results arrive, call `devkit next` to accept results captured by the hook.
 - **Work**: Read the brief and its references and carry out the agreed scope. Record unread inputs and their impact as unverified matters. Other skills and plugins may be used within the request's scope.
+- **Split work**: For each item in the returned `instructions` array, launch the assigned `devkit-worker` once using the single-line launch message below. Its brief gives an absolute detached worktree path and unit scope; the worker must edit only there and return progress JSON as its final message. Do not edit or submit the unit results yourself. Respect `[parallel] max_workers`; devkit issues eligible units as capacity becomes available. After results arrive, call `devkit next`; devkit fixes SHAs and merges units before one stage judgment with a cumulative diff. Resolve reported merge conflicts in the session worker fix round.
 - **Awaiting judgment**: Wait for results from judges or planners already launched. Do not launch duplicates for the same instruction ID; call `devkit next` after results arrive.
 - **Questions and external operation confirmation**: Present them in chat using the next section's procedure, end the turn, and wait for a human answer. Treat human-assigned stages the same way.
-- **Completion or abort**: Report the recorded state and actual remaining work, then finish. A worker's completion claim does not finalize completion.
+- **Completion or abort**: Report the recorded state, actual remaining work, and any changed unit worktrees devkit retained, then finish. A worker's completion claim does not finalize completion.
 
 If output returns a path instead of the body, read that file. Do not repeat `next` with an unchanged instruction to substitute for progression or approval.
 
-## Launching judges and planners
+## Launching judges, planners, and workers
 
 Use only the following single line as the launch message, inserting the returned instruction ID. Do not add self-evaluation, author reasoning, or additional requests.
 
@@ -49,7 +50,7 @@ devkit-instruction <instruction_id>
 
 This is not a command to execute. The subagent resolves the request by reading `.devkit/run/work/<work_id>/brief/<instruction_id>.md`, using the work ID contained in the instruction ID.
 
-- In Claude Code, use the assigned `devkit-judge` or `devkit-planner` as Agent's `subagent_type`. Do not inherit the parent's history or override the model or effort in the role definition.
+- In Claude Code, use the assigned `devkit-judge`, `devkit-planner`, or `devkit-worker` as Agent's `subagent_type`. Do not inherit the parent's history or override the model or effort in the role definition.
 - In Codex, use the assigned role as `spawn_agent`'s `agent_type` and always specify `fork_turns: "none"`. Use only the single line above as `message`.
 
 Subagents return results in their final messages. The parent must not transcribe, modify, or submit their results. Do not write `.devkit/run/**/results/` or `records/` through ordinary file editing. When a judgment or verification command is the runner, devkit executes it; do not launch a substitute judge.

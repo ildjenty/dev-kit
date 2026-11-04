@@ -22,7 +22,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 雛形と計画は[データ形式](data.md#データ形式)に従い、キーは英語とする。
 
 - **責務**: ループ計画の意味論を扱う。雛形と計画の JSON Schema による検証、[計画の雛形からの逸脱](data.md#計画-plan)の計算、router の分類から次のステージを選ぶ遷移、計数の上限の判定、現在のバージョンと残りの計画から新しいバージョンを作成する操作、およびその差分、実行可能なバージョンの判定、計画の承認で足りる外部操作の宣言の照合を扱う。遷移 `done` は次のステージ ID、作業の終了を表す `null`、ステージの完了後に残りを作り直す `"replan"` を扱う。
-- **持つデータ**: `PlanTemplate`、`Plan`、`Stage`、`Assignee`、`Gate`、`Transition`、`Limits` の型、ID 付きの完了条件、観点と完了条件の対応、check の実行主体、必須 check、任意の文字列配列 `open_questions`、宣言した外部操作、router が使うステージの完了条件の規則を持つ。
+- **持つデータ**: `PlanTemplate`、`Plan`、`Stage`、`Assignee`、`Gate`、`Transition`、`Limits` の型、ステージの `split`、ID・説明・担当する範囲を持つ単位の一覧 `units`、ID 付きの完了条件、観点と完了条件の対応、check の実行主体、必須 check、任意の文字列配列 `open_questions`、宣言した外部操作、router が使うステージの完了条件の規則を持つ。
 - **公開する契約**: 雛形と計画の型と、検証・逸脱の計算・遷移・上限判定・作り直し・実行可能なバージョンの判定を公開する。
 - **依存**: form を含む他のモジュールに依存しない。
 - **置くもの・置かないもの**: 入出力を伴わない計画の意味論を置く。保存は ledger に、進行は engine に置く。
@@ -30,6 +30,8 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 完了条件ごとの確認手段と、判定者・人・kit の責務の境界は[計画](data.md#計画-plan)に従う。
 
 計画の検証では、`done` をたどって同じステージを再び通る循環を拒否する。`"replan"` または `null` で遷移の連鎖を終える。
+
+`split: true` のステージは計画の `units` で作業を分けられ、単位がなければ通常のステージとして扱う。単位 ID の重複は検証で拒否し、担当する範囲の重なりは機械では検査せず計画の観点の判定者が指摘する。分割の追加・削除は逸脱として計算する。再計画で完了済みのステージを残りに含めないことは逸脱に数えない。既定の雛形は分割を使わない。
 
 ### brief
 
@@ -42,6 +44,8 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 計画者への依頼と計画の判定依頼には、作業に記録した人の要求の原文と `start` の課題の両方を固定入力として載せる。原文の観測がなければ、その旨を示す。計画の承認の問いは、要求の原文、課題、ID 付きの完了条件、採用したステージと外したステージ、逸脱の明示、各ステージの必須 check、課題固有の元に戻せないもの、宣言した外部操作、`open_questions` を計画などの記録から組み立てる。エージェントの要約には依存しない。
 
 決定や一時状態を渡す際は、自然文の条件と出典・参照をそのまま項目に添える。条件の充足は判定せず、エージェントと人が判断する。
+
+単位の作業者への brief には、単位の説明・担当する範囲と作業場所の絶対パスを載せ、そこでだけ編集させる。合流がぶつかった場合の修正ラウンドには、ぶつかったファイルと単位を載せる。合流後の判定依頼には、単位の終了ブロックをまとめたステージの終了ブロックと、単位の変更・マージ結果を含むステージ開始時点からの累積差分を使う。
 
 ### check
 
@@ -78,7 +82,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 ### ledger
 
 - **責務**: 記録の意味論、問い合わせ、派生値を扱う。決定の記録から承認・却下・保留、置換と記録内の依存関係を解決する。自然文の有効条件・適用条件と外部依存の充足は判定せず、そのまま決定に添える。[checkpoint](data.md#checkpoint)(記録から組み立てる現在地)の組み立てでは、一時状態を条件によって除外せず、確認方法・出典・無効になる条件を添える。作業の中断と中断前の現在地、決定とその記録上の状態、実行可能な計画のバージョンと提案中・却下・撤回の状態、観点ごとの最新判定とバージョンの一致、完了記録のない [StageRun](data.md#ステージの実行-stagerun)(1回のステージ実行)、未回答の問い、承認の解決、未解決の blocking の指摘、未受理の指示を派生値への問い合わせとして提供する。
-- **持つデータ**: 記録 ID と参照を持つ。形式の識別は[Work](data.md#作業-work)に従う。ペイロードは、作業、中断・再開、計画のバージョンと撤回、決定、証拠、状態変更、問い・回答・承認、外部書き込み、進捗、check の結果、検出試験の実行、ステージの実行、ラウンド、成果物である。[エンティティ](data.md#エンティティ)の型を用いる。
+- **持つデータ**: 記録 ID と参照を持つ。形式の識別は[Work](data.md#作業-work)に従う。ペイロードは、作業、中断・再開、計画のバージョンと撤回、決定、証拠、状態変更、問い・回答・承認、外部書き込み、進捗、check の結果、検出試験の実行、ステージの実行、ラウンド、単位ごとの作業指示・場所・結果、合流の開始時の HEAD・入力の SHA・結果、成果物である。[エンティティ](data.md#エンティティ)の型を用いる。
 - **公開する契約**: 記録の型、派生値の問い合わせ、決定と承認の解決を公開する。関数は ledger/fsstore の具体型を受け取る。未回答の問いの派生には、[checkpoint](data.md#checkpoint)と同じく未取り込みの停止の観測を含める。
 - **依存**: ペイロードに使う plan、check、router、form の型と、保存を担う ledger/fsstore に依存する。
 - **置くもの・置かないもの**: 記録の意味論と問い合わせを置く。ファイル形式は ledger/fsstore に、表示は view に置く。
@@ -99,9 +103,17 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **持つデータ**: 現在の作業、StageRun、ラウンド、指示の計算結果を扱う。受理した状態はすべて ledger に記録する。
 - **公開する契約**: `start`・`next`・`submit`・`plan`・`answer`・`external`・`note`・`pause`・`resume`・`abort` に対応する操作を公開する。`pause`・`resume` による中断・再開の直接の記録、中断中の `next` の応答と新しい指示・処理の抑止は[中断](guarantees.md#中断)に従う。継続上限の問いも停止の観測から受理する。実装の接続は[ポート](#モジュール境界と入出力の集約)の方針に従う。
 - **依存**: plan、brief、check、router、ledger、form、workspace、external、ledger/fsstore、config、hook、kit に依存する。
-- **置くもの・置かないもの**: 状態機械の進行、指示の計算、判定コマンドと検証コマンドの実行、判定者の結果の受理を置く。git の操作は workspace に、外部書き込みの実行は external に、保存の実装は ledger/fsstore に置く。判定者・計画者のサブエージェントを起動する処理は置かない。
+- **置くもの・置かないもの**: 状態機械の進行、指示の計算、単位の作業と合流の管理、判定コマンドと検証コマンドの実行、作業者・判定者・計画者の結果の受理を置く。git の操作は workspace に、外部書き込みの実行は external に、保存の実装は ledger/fsstore に置く。作業者・判定者・計画者のサブエージェントを起動する処理は置かない。
 
 `start` は HEAD がない場合、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合に、理由と直し方を返して拒否する。作業ブランチ名には `[git] branch` を使う。束縛前のセッションで観測した最新の人の入力を要求の原文として作業に結び付け、観測がなければ原文なしと記録する。
+
+作業中のチェックアウトでの2つ目の `start` は拒否する。別の worktree で新しいセッションを開けば、それぞれの `.devkit/run/` を持つループを並行して回せる。
+
+`split` のステージに単位があれば、engine は `[parallel] max_workers` の上限に従って単位ごとの作業指示を返し、workspace に detached の worktree の作成を依頼する。起点はラウンド開始時のスナップショットのコミットとし、場所は ignore する `.devkit/worktrees/<単位の指示 ID>/` とする。セッションが `devkit-worker` を起動し、SubagentStop の保存した終了ブロックを engine が受理する。
+
+すべての単位の結果を受理したら、engine は workspace で単位のツリーをコミットオブジェクトにして SHA で固定し、合流の開始時の HEAD・入力の SHA・結果を ledger に記録する。作業ブランチのチェックアウトへ固定した SHA を順に、コミットしないマージで合流する。ぶつかった場合はセッションの作業者への修正ラウンドにする。再開時は合流の記録と git のマージの状態を照合する。合流後のツリーと、単位の終了ブロックをまとめた作業者の終了ブロックを通常のステージのラウンドとして扱い、単位ごとの判定はしない。判定・ゲート・ループ自身の変更の確認・依存の変更の分類・上限・戻り・再計画・問い・完了時のコミットはステージ単位である。
+
+中断中は新しい単位の指示と合流を開始せず、起動済みの作業者の結果は受理条件を満たせば記録してよい。単位の結果待ちでは Stop が停止を許す。不正な最終メッセージに指示 ID がなく、同じ runner の複数の未受理の指示のどれにも結び付けられない場合は、観測を残して人に問う。中止・作業完了時は変更のない単位の worktree を削除し、変更の残るものは保持して場所を知らせる。破棄は人が git で行う。
 
 計画承認は `[approval] plan` に従う。既定の `requirements` では、最初の計画、直前に人が承認した計画から完了条件の ID または文面が変わった計画、雛形からの逸脱がある計画、外部操作を宣言した計画を人に確認する。完了条件が同じで逸脱も外部操作も未決事項もない再計画には再確認を求めない。`open_questions` への人の回答は、計画の却下と作り直しの指示として計画者に渡し、人による再提案の回数には上限を設けない。人が承認した完了条件を作業の完了基準とする。
 
@@ -133,6 +145,8 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **依存**: ledger、config、host/event、form、ledger/fsstore(生成物の公開)に依存する。ルートは cmd/devkit が workspace で解決し、作業 ID はセッションの観測の束縛から取得して渡す。cmd/devkit は workspace で解決した「規範の参照元から `devkit.toml` を読む関数値」も hook に渡し、hook が[規範の固定](guarantees.md#規範の固定)に従って読み出す。
 - **置くもの・置かないもの**: イベント処理を置く。モデルによる判定は置かず、書き込みは[記録の書き込みと排他](data.md#記録の書き込みと排他)に従う。
 
+SubagentStop は単位の作業者 `devkit-worker` の終了ブロックも保存する。PreToolUse は判定者・計画者の書き込み禁止を維持し、`devkit-worker` を `[deny] judge` の対象外とする。Stop は単位の作業者の結果待ちでも停止を許す。
+
 ### host/event
 
 - **責務**: hook のイベント JSON を共通イベント型へ変換し、ホストの上限と対応表に合わせて出力 JSON を整形する。
@@ -146,6 +160,8 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **責務**: git CLI を使い、次の操作を担う。
 
   - `[git] branch` に従うブランチの作成と切り替え。
+  - ラウンド開始時のスナップショットのコミットから、単位の指示 ID を名前にする detached の worktree を `.devkit/worktrees/` に作成する操作。変更の有無の取得と、中止・作業完了時の変更のない worktree の削除。
+  - 単位のツリーをブランチには含めないコミットオブジェクトにして SHA で固定する操作、作業ブランチのチェックアウトへの固定した SHA の順次のコミットしないマージ、ぶつかったファイルと git のマージの状態の取得。
   - 対象のバージョンとなるスナップショットとコミットオブジェクトの作成、コミットのツリーハッシュの取得、`git show` による読み出し、一時インデックスからの `git read-tree` と `git checkout-index --prefix` による展開。
   - [完了条件](guarantees.md#完了条件)に従う返却後のスナップショットと同じ index での `git commit`(hook を有効にして)。
   - 変更ファイルの一覧と構造の記録(既定 `.devkit/structure.json`、`[paths] structure` で変更可能)の履歴の取得、cwd のブランチ名の取得、チェックアウトのルートの解決。
@@ -158,7 +174,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 設定ファイルは `devkit.toml` とし、TOML で記述する。
 
-- **責務**: 渡された TOML の解析と検証を行う。記録形式とバイナリの互換性を識別する `kit_version`、`default_plan`、`[paths]`、`[approval]`、`[git]`、`[classification]`、`[limits]`、`[lessons]`、`[detection]`、`[plan_check]`、`[judges]` の判定コマンド(名前・実行ファイル・固定引数・期限・出力スキーマの指定)、`[commands]` の検証コマンド(名前・実行ファイル・固定引数・期限)、外部操作の登録、`[deny]`、`[router] human_confirmation` の上書き・追加・削除を扱う。分類表の追加・削除に未知の分類名があれば設定エラーとする。配置は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に従う。
+- **責務**: 渡された TOML の解析と検証を行う。記録形式とバイナリの互換性を識別する `kit_version`、`default_plan`、`[paths]`、`[approval]`、`[git]`、`[classification]`、`[limits]`、`[parallel]`、`[lessons]`、`[detection]`、`[plan_check]`、`[judges]` の判定コマンド(名前・実行ファイル・固定引数・期限・出力スキーマの指定)、`[commands]` の検証コマンド(名前・実行ファイル・固定引数・期限)、外部操作の登録、`[deny]`、`[router] human_confirmation` の上書き・追加・削除を扱う。分類表の追加・削除に未知の分類名があれば設定エラーとする。配置は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に従う。
 - **持つデータ**: 解析・検証した設定値と、各コマンドの登録定義を持つ。
 - **公開する契約**: 設定の解析・検証と内部の型への変換を公開する。
 - **依存**: 他のモジュールに依存しない。
@@ -176,6 +192,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - `[git] branch = "devkit/{work_id}"` は `{work_id}` を必須とする。`commit_message = "devkit: {stage} ({work_id})"` は `{stage}`・`{work_id}`・`{task}` を使える。`allow_empty_commit = true` は変更のないステージも空のコミットを作る。false ならコミットせず、その時点の HEAD で完了を記録する。
 - `[classification] dependency_files` は依存の宣言として扱うファイルの glob の一覧である。既定は各ディレクトリの `go.mod`・`go.sum`・`package.json`・`package-lock.json`・`yarn.lock`・`pnpm-lock.yaml`・`Cargo.toml`・`Cargo.lock`・`Gemfile`・`Gemfile.lock`・`requirements.txt`・`pyproject.toml`・`poetry.lock`・`uv.lock`・`composer.json`・`composer.lock` を対象とする。
 - `[limits] stop_continuation = 3` は Stop の継続上限であり、1以上で無効にはできない。計画の判定のやり直しとラウンドの上限は雛形が持ち、計画の判定のやり直しは既定3である。
+- `[parallel] max_workers = 3` は同時に動かす単位の作業者数の上限であり、1以上を必須とする。1でも単位を1つずつ同じ worktree と合流の手順で進める。
 - `[detection] required = true` は判定者が担当する必須 check に検出試験の合格を課す。`false` なら検出試験を指示せず、合格記録なしで判定を受理する。
 - `[lessons] destinations` の既定の優先順は、機械の検査(hook・lint・型・検証コマンド) → 雛形 → 観点 → 原則 → skill である。反映先はリポジトリの資産である。
 
@@ -187,7 +204,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 当面はこのリポジトリをクローンして `install.sh` を実行し、利用者の環境に Go を必要とする。`install.sh` は Go で `devkit` をビルドし、PATH の通った場所に配置する。正式な配布方法は後で決める。
 
-- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、`[paths]` で指定した場所に置く原則・ステージ定義・観点と検出試験の例・雛形・テンプレート・規則の初期内容、ignore、ホスト設定、既定のサブエージェント定義、skill とリンクを用意する。文章の規範は assets からコピーし、リポジトリが所有する。`init` は変更を人に確認したあと、導入したファイルをコミットする。`--no-commit` でコミットを省略できる。`uninstall` は `init` の逆を行う。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
+- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、`[paths]` で指定した場所に置く原則・ステージ定義・観点と検出試験の例・雛形・テンプレート・規則の初期内容、ignore、ホスト設定、既定の作業者 `devkit-worker`・判定者・計画者のサブエージェント定義、skill とリンクを用意する。単位の作業場所 `.devkit/worktrees/` も ignore する。文章の規範は assets からコピーし、リポジトリが所有する。`init` は変更を人に確認したあと、導入したファイルをコミットする。`--no-commit` でコミットを省略できる。`uninstall` は `init` の逆を行う。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
 - **持つデータ**: 導入する固定物と設定の断片、導入先との差分、doctor の照合結果を扱う。
 - **公開する契約**: `init`・`uninstall`・`doctor` に対応する導入・削除・照合の操作を公開する。`devkit uninstall [--yes]` は変更の一覧を示して人の確認を待ち、`--yes` で確認を省略する。doctor の項目は[doctor の確認項目](#doctor-の確認項目)に従う。
 - **依存**: config、kit、ledger、ledger/fsstore、workspace に依存する。
@@ -268,12 +285,12 @@ graph TD
   engine --> brief
   engine --> check
   engine --> router
-  engine --> ledger
+  engine -- 単位の結果と合流の記録 --> ledger
   engine --> form
-  engine --> workspace
+  engine -- worktreeの作成・SHAの固定・合流 --> workspace
   engine --> external
   engine --> fsstore
-  engine --> config
+  engine -- max_workersを含む設定 --> config
   engine --> hook
   engine --> kit
   external --> ledger

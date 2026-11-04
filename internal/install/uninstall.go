@@ -380,7 +380,7 @@ func (r *Result) stripHostSettings(files fs.FS) error {
 			return fmt.Errorf("%s: %w", fragment.target, err)
 		}
 	}
-	if err := r.strip(".gitignore", []byte(".devkit/run/\n"), stripLines); err != nil {
+	if err := r.strip(".gitignore", []byte(".devkit/run/\n.devkit/worktrees/\n"), stripLines); err != nil {
 		return err
 	}
 	return nil

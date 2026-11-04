@@ -28,6 +28,7 @@
 - **規則と強制手段**: 複数の作業で守る変更困難な決定を残す。更新はループ自身の変更として人が確認する。「手段: 未実装」と振り返りで繰り返し見つかる違反は、機械の検査へ移す候補にする。
 - **設定ファイル**: `devkit.toml` の項目は [config](architecture/modules.md#config)、配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。[判定コマンド](architecture/modules.md#config)(`[judges]`)は別エンジンによる判定に使う。[検証コマンド](architecture/modules.md#config)(`[commands]`)はテスト・型検査などに使い、`command:<name>` の [check](parts/check.md)(評価と判定の部品)から呼ぶ。実行の扱いは[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
 - **実行の記録と生成物**: `.devkit/run/` に固定し、git 管理しない。サブエージェント定義・hook・保護の設定・ignore がこの場所を前提にし、途中で変えると記録を見失うためである。後の作業に効かせたい決定は要件・構造・規則へ残す。記録から組み立てる [checkpoint](architecture/data.md#checkpoint)(再開用の派生状態)は保存する記録と区別する。
+- **単位の作業場所**: `.devkit/worktrees/<単位の指示 ID>/` に detached の worktree を作り、ignore する。記録の保護と重ならないよう `.devkit/run/` と分ける。中断中は保持し、中止・作業完了時は変更のない worktree だけを削除する。変更の残るものは保持して場所を知らせ、破棄は人が git で行う。
 - **バイナリが持つもの**: 記録とバイナリの約束である JSON Schema、分類表とロールの既定、ホスト設定の断片を持つ。人への確認の分類は `devkit.toml` の `[router] human_confirmation` で上書き・追加・削除できる。check の結果から次の行動への対応とロールは固定である。`kit_version` は記録形式とバイナリの互換性の識別であり、各作業に記録する。
 
 規範の識別に含めるのは、principles・stages・checks・plans・templates・rules・`devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md である。ラウンド開始時のスナップショットで固定する。requirements・structure・detect・`.devkit/run/` は含めず、これらの更新では規範の識別が変わらず、判定も失効しない。
@@ -42,11 +43,15 @@
 
 ## 実行の仕組みとの対応
 
-- **skill**: 作業の進め方をセッションに伝える手順である。開始、`next`、`submit`、`pause`、`resume`、問いの見せ方、判定者と計画者のサブエージェントの起動、振り返りを扱う。教訓の反映先の提案は[メタループ](meta-loop.md#メタループ)に従う。配置と指示ファイルとの関係は[指示ファイルとホスト設定](architecture/layout.md#指示ファイルとホスト設定)、手順は[処理の流れ](architecture/flow.md)、教訓の記録と改善は[メタループの入口](meta-loop.md#メタループ)を参照する。
+- **skill**: 作業の進め方をセッションに伝える手順である。開始、`next`、`submit`、`pause`、`resume`、問いの見せ方、作業者・判定者・計画者のサブエージェントの起動、振り返りを扱う。教訓の反映先の提案は[メタループ](meta-loop.md#メタループ)に従う。配置と指示ファイルとの関係は[指示ファイルとホスト設定](architecture/layout.md#指示ファイルとホスト設定)、手順は[処理の流れ](architecture/flow.md)、教訓の記録と改善は[メタループの入口](meta-loop.md#メタループ)を参照する。
 - **[runtime](parts/runtime.md)(実行を担う部品)**: セッションからの CLI 呼び出しとホストのイベントを受け取り、進行の指示と観測の記録を返す。責務の分担は[全体構成](architecture.md#全体構成)、作業の提出と完了は[作業結果の提出](architecture/flow.md#作業結果の提出)と[完了条件](architecture/guarantees.md#完了条件)に従う。
 - **ロールと実行主体**: ロール(作業や判断を担う役割)と実行主体(runner。check を実行する相手)を区別する。語彙と割り当ては[計画](architecture/data.md#計画-plan)、check の実行主体の指定は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。計画の作成は[作業の開始](architecture/flow.md#作業の開始)で計画者が担う。
 
 skill は `.agents/skills/devkit/`、サブエージェント定義は `.claude/agents/` と `.codex/agents/` に置く。
+
+`init` は単位の作業者 `devkit-worker` の定義も両ホストへ配る。雛形のステージの `split` と計画者が書く `units` で作業を分け、単位がなければ通常のステージとして進める。既定の雛形は分割を使わない。作業者は指定された worktree だけを編集し、判定者用の書き込み禁止 `[deny] judge` の対象外とする。結果をすべて受理した後の SHA の固定・合流・ステージ全体の判定は[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。
+
+ループ自体を並行して回す場合は、別の worktree で新しいセッションを開く。各チェックアウトは自分の `.devkit/run/` を持ち、作業中のチェックアウトでの2つ目の `start` は拒否する。
 
 brief の本文には、そのステージ定義、その判定の観点と参照する原則、規則、要件、関係する構造の記録だけを入れる。他の規範は論理名とパスの一覧で渡し、必要に応じて読ませる。パスはラウンド開始時のスナップショット、ラウンド外の判定なら指示を出す時点の作業ブランチの `HEAD` を `snap/` に展開した場所である。編集中の規範を参照させない。作業の範囲はスコープの出力と規則で渡す。
 
@@ -67,4 +72,5 @@ skill の手順では、再現手順の保存先とバージョンを修正開�
 - `[git] allow_empty_commit = true` は成果のないステージでも空のコミットを作る。`false` なら変更のないステージはコミットせず、その時点の HEAD で完了を記録する。
 - `[classification] dependency_files` は依存の宣言として扱うファイルの glob の一覧であり、既定の一覧を変更できる。分類表の追加・削除に未知の分類名を書けば設定エラーとする。
 - `[limits] stop_continuation = 3` は Stop の継続上限であり、1以上で無効にはできない。計画の check のやり直しの上限(既定3)とラウンドの上限は雛形が持つ。
+- `[parallel] max_workers = 3` は同時に動かす単位の作業者数の上限であり、1以上を必須とする。1でも同じ worktree と合流の手順で単位を1つずつ進める。
 - 検証コマンドの期限は `[commands.<name>]` の登録ごとに必須とする。

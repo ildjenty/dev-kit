@@ -224,7 +224,7 @@ func TestInitPreservesExistingFilesAndSettings(t *testing.T) {
 	if codex["model"] != "custom-model" || codex["sandbox_mode"] != "workspace-write" || codex["features"].(map[string]any)["custom"] != true {
 		t.Fatalf("TOML settings were not merged: %+v", codex)
 	}
-	if string(readFile(t, root, ".gitignore")) != "existing-ignore\n.devkit/run/\n" {
+	if string(readFile(t, root, ".gitignore")) != "existing-ignore\n.devkit/run/\n.devkit/worktrees/\n" {
 		t.Fatal("gitignore was not appended")
 	}
 	if !strings.HasPrefix(string(readFile(t, root, ".codex/rules/devkit.rules")), "# Existing rule.\n") {
@@ -344,7 +344,7 @@ func TestInitRepairsNegatedIgnore(t *testing.T) {
 	confirmed := false
 	if _, err := Init(ctx, root, func(changes []Change) error {
 		for _, change := range changes {
-			if change.Path == ".gitignore" && string(change.Before) == before && string(change.After) == before+".devkit/run/\n" {
+			if change.Path == ".gitignore" && string(change.Before) == before && string(change.After) == before+".devkit/run/\n.devkit/worktrees/\n" {
 				confirmed = true
 			}
 		}

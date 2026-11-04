@@ -137,6 +137,10 @@ func readRecord(raw fsstore.Record, validator *Validator) (Record, error) {
 		payload = &ExternalOp{}
 	case KindProgress:
 		payload = &Progress{}
+	case KindUnitResult:
+		payload = &UnitResult{}
+	case KindMerge:
+		payload = &Merge{}
 	case KindJudgment:
 		payload = &Judgment{}
 	case KindDetectionTest:
@@ -255,6 +259,10 @@ func references(r Record) []form.Reference {
 		add(p.ApprovalID)
 		add(p.BeforeID)
 	case *Progress:
+		add(p.RoundID)
+	case *UnitResult:
+		add(p.RoundID)
+	case *Merge:
 		add(p.RoundID)
 	case *Judgment:
 		add(p.RoundID)

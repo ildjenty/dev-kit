@@ -159,6 +159,77 @@ implement の終了ブロックの例である。`instruction_id` は作業の�
 
 retrospective は、その作業の判定と指摘、人の回答や教訓を確認して再発防止を反映し、purpose で反映していない要件を `.devkit/requirements.md` に残す。要件と構造の変更はステージの判定で確認し、規範を変更した場合はループ自身の変更として人に確認する。
 
+### 分割の雛形と計画
+
+リポジトリが分割を選ぶ雛形 `.devkit/plans/split.json` の `stages` の抜粋である。置き場所は `[paths] plans` で変更できる。steps の完了後に残りを再計画し、implement の作業を単位に分ける。既定の雛形は分割を使わない。
+
+```json
+[
+  {
+    "id": "steps",
+    "assignee": "worker",
+    "checks": [
+      { "aspect": "steps", "runner": "devkit-judge", "required": true }
+    ],
+    "gate": { "required": false, "reason": "手順ごとの目的と範囲を確かめる" },
+    "limits": { "max_rounds": 3, "max_no_progress": 2 },
+    "transitions": { "fix": "steps", "ask": "steps", "back": "steps", "done": "replan" }
+  },
+  {
+    "id": "implement",
+    "assignee": "worker",
+    "split": true,
+    "checks": [
+      { "aspect": "command:test", "runner": "command:test", "required": true },
+      { "aspect": "test", "runner": "devkit-judge", "required": true },
+      { "aspect": "diff", "runner": "devkit-judge", "required": true }
+    ],
+    "gate": { "required": false, "reason": "合流した成果をステージ全体で判定する" },
+    "limits": { "max_rounds": 3, "max_no_progress": 2 },
+    "transitions": { "fix": "implement", "ask": "implement", "back": "steps", "done": "retrospective" }
+  }
+]
+```
+
+steps で「保存処理とそのテスト」「利用手順」の2つの手順を決めた場合の、再計画した計画の implement の抜粋である。完了条件 `C1` は、保存処理が契約を満たし、利用手順が記述されていることを人が承認した条件とする。`completion_conditions` はその条件を引き継ぎ、残りのステージには implement と retrospective を置く。完了済みの steps を含めないことは逸脱に数えない。分割の追加・削除は逸脱であり、単位 ID の重複は検証で拒否する。範囲の重なりは計画の観点の判定者が指摘する。
+
+```json
+{
+  "start_stage": "implement",
+  "stages": [
+    {
+      "id": "implement",
+      "assignee": "worker",
+      "split": true,
+      "units": [
+        {
+          "id": "save",
+          "description": "保存処理と完了条件を確かめるテストを実装する",
+          "scope": "internal/save/ と、その保存処理のテスト"
+        },
+        {
+          "id": "usage",
+          "description": "保存の利用手順を記述する",
+          "scope": "docs/save.md"
+        }
+      ],
+      "checks": [
+        { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "合流後のツリー" },
+        { "aspect": "test", "runner": "devkit-judge", "required": true, "completion_condition_ids": ["C1"], "target": "保存処理のテストと登録済みコマンド" },
+        { "aspect": "diff", "runner": "devkit-judge", "required": true, "completion_condition_ids": ["C1"], "target": "単位の変更とマージ結果を含む累積差分" }
+      ],
+      "gate": { "required": false, "reason": "合流した成果をステージ全体で判定する" },
+      "limits": { "max_rounds": 3, "max_no_progress": 2 },
+      "transitions": { "fix": "implement", "ask": "implement", "back": "steps", "done": "retrospective" }
+    }
+  ]
+}
+```
+
+`next` が返す各単位の指示 ID で、セッションが `devkit-worker` を1行の `devkit-instruction <指示 ID>` で起動する。作業場所は `.devkit/worktrees/<単位の指示 ID>/` とし、計画内の `save`・`usage` はディレクトリ名に使わない。brief に絶対パスを載せ、そこでだけ編集させる。単位がなければ通常のステージとして進める。
+
+すべての単位の終了ブロックを受理したら、devkit が各ツリーをコミットオブジェクトにして SHA で固定し、作業ブランチへ順に、コミットしないマージで合流する。ぶつかった場合はセッションの作業者への修正ラウンドにする。合流後のツリーと、単位の終了ブロックをまとめた作業者の終了ブロックを通常のステージのラウンドとして判定し、単位ごとの判定はしない。合流の記録と再開、中断・中止・作業完了時の worktree の扱いは[分割した作業と合流](flow.md#分割した作業と合流)に従う。
+
 ## 設定
 
 `devkit.toml` の例である。`devkit-judge` はサブエージェント定義を使うため、判定コマンドの登録は不要である。検証コマンド `test` の実行ファイルは利用側で用意する。
@@ -197,6 +268,9 @@ dependency_files = ["go.mod", "go.sum", "package.json", "package-lock.json", "ya
 [limits]
 stop_continuation = 3
 
+[parallel]
+max_workers = 3
+
 [detection]
 required = true
 
@@ -213,6 +287,8 @@ rules = ["Bash(git push *)", "Agent(fork)"]
 ```
 
 `kit_version` は記録形式とバイナリの互換性を識別する値であり、作業にも記録する。`[paths]` の値は変更できる。実行の記録と生成物の `.devkit/run/` は固定である。`[detection] required` は既定 `true` であり、`false` なら検出試験を指示せず、合格記録なしで判定を受理する。`[lessons] destinations` は、機械の検査 → 雛形 → 観点 → 原則 → skill の優先順を表す。
+
+`[parallel] max_workers` は同時に動かす単位の作業者数の上限であり、既定は3、1以上を必須とする。1でも単位を1つずつ、同じ worktree と合流の手順で進める。
 
 `[router] human_confirmation` は `dependency_changed` と `target_changed_again` だけを変更でき、未知の分類名は設定エラーになる。check の結果から次の行動への対応とロールは固定である。ループ自身の変更の確認は `[approval] meta_loop_edit` だけに従う。`[plan_check]` は計画の check の観点と runner を指定し、登録済みの判定コマンドなら devkit が実行する。`[classification] dependency_files` は依存の宣言として扱うファイルの glob である。`[deny]` の構文は [PreToolUse](hooks.md#pretooluse)、結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)に従う。
 

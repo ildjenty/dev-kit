@@ -146,6 +146,10 @@ func (e *Engine) importStops(state *ledger.State) error {
 	return nil
 }
 func (e *Engine) terminal(ctx context.Context, state *ledger.State) (Result, error) {
+	retained, err := e.cleanupUnits(ctx, state)
+	if err != nil {
+		return Result{}, err
+	}
 	if err := removeExpansion(filepath.Join(e.workRoot(), "snap")); err != nil {
 		return Result{}, err
 	}
@@ -169,6 +173,9 @@ func (e *Engine) terminal(ctx context.Context, state *ledger.State) (Result, err
 	}
 	r := response(state)
 	r.Instruction = &form.Instruction{ID: meta.ID, Kind: kind, TargetKey: e.workID, Reissue: meta.Reissue, Text: "Work is " + string(state.WorkStatus()) + "."}
+	if len(retained) > 0 {
+		r.Warning = "Changed unit worktrees were retained:\n" + strings.Join(retained, "\n")
+	}
 	return r, nil
 }
 
@@ -504,6 +511,7 @@ func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run
 }
 
 func (e *Engine) planApprovalText(state *ledger.State, template plan.PlanTemplate, p plan.Plan) (string, error) {
+	template = state.ApprovalTemplate(template, p)
 	work, _ := state.Work()
 	original := originalRequest(work)
 	if work.OriginalRequest == nil {
@@ -964,7 +972,7 @@ func (e *Engine) advanceApprovedPlan(ctx context.Context, state *ledger.State, l
 			lastApproved = &p
 		}
 	}
-	if !latest.Executable(t, settings.PlanApproval(), lastApproved) {
+	if !latest.Executable(state.ApprovalTemplate(t, latest.Plan), settings.PlanApproval(), lastApproved) {
 		text, err := e.planApprovalText(state, t, latest.Plan)
 		if err != nil {
 			return Result{}, false, err
@@ -1089,6 +1097,9 @@ func (e *Engine) advanceActiveStage(ctx context.Context, state *ledger.State, ru
 }
 
 func (e *Engine) advanceOpenRound(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round) (Result, bool, error) {
+	if merge, ok := state.RoundMerge(round.ID); ok && merge.Status == "conflict" {
+		return e.mergeUnits(ctx, state, p, stage, run, round)
+	}
 	if round.ReturnedTarget != nil {
 		r, err := e.judgeRound(ctx, state, p, stage, run, round)
 		if err != nil || r.Instruction != nil || r.Paused || r.Message != "" {
@@ -1098,6 +1109,9 @@ func (e *Engine) advanceOpenRound(ctx context.Context, state *ledger.State, p pl
 	}
 	if stage.Assignee == plan.Human {
 		return e.advanceHumanRound(ctx, state, stage, run, round)
+	}
+	if stage.Split && len(stage.Units) > 0 && !round.MergeFix {
+		return e.advanceUnits(ctx, state, p, stage, run, round)
 	}
 	if run.State == ledger.StageExternalWait {
 		update := *run
@@ -1137,7 +1151,7 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 	if err != nil {
 		return Result{}, false, err
 	}
-	startRef, question, err := e.confirmRoundNorms(ctx, state, run, snapshot.Tree)
+	startRef, question, err := e.roundStartNorms(ctx, state, run, snapshot.Tree)
 	if err != nil {
 		return Result{}, false, err
 	}
@@ -1156,6 +1170,22 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 		return Result{}, false, err
 	}
 	round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: snapshot.Tree}, NormReference: startRef, Norms: norms}
+	if stage.Split && len(stage.Units) > 0 {
+		head, err := e.workspace.Head(ctx)
+		if err != nil {
+			return Result{}, false, err
+		}
+		base, err := e.workspace.CommitObject(ctx, e.workID, snapshot.Tree, head)
+		if err != nil {
+			return Result{}, false, err
+		}
+		round.StartCommit = base.Commit
+		previous := state.Rounds(run.ID)
+		if len(previous) > 0 {
+			merge, ok := state.RoundMerge(previous[len(previous)-1].ID)
+			round.MergeFix = previous[len(previous)-1].MergeFix || ok && merge.Status == "conflict"
+		}
+	}
 	if _, err = e.append(round); err != nil {
 		return Result{}, false, err
 	}

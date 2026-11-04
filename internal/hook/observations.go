@@ -66,6 +66,9 @@ func publishSubagentResult(workRoot string, result SubagentResult) error {
 		time.Sleep(min(100*time.Millisecond, remaining))
 	}
 	name := filepath.Join("results", result.InstructionID+"-"+result.AgentID+".json")
+	if result.InstructionID == "" {
+		name = filepath.Join("results", "unmatched-"+timestamp(result.ObservedAt)+"-"+result.AgentID+".json")
+	}
 	if _, err := os.Lstat(filepath.Join(workRoot, name)); err == nil {
 		return nil
 	} else if !os.IsNotExist(err) {

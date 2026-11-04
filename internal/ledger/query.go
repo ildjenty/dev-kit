@@ -392,5 +392,13 @@ func (s *State) ExecutablePlan(template plan.PlanTemplate, norms []form.NormRefe
 			}
 		}
 	}
-	return plan.ExecutableVersion(template, s.PlanEvaluations(norms), replanAfter, policy)
+	versions := s.PlanEvaluations(norms)
+	for i := len(versions) - 1; i >= 0; i-- {
+		if versions[i].Withdrawn && versions[i].Origin == plan.HumanProposal {
+			continue
+		}
+		template = s.ApprovalTemplate(template, versions[i].Plan)
+		break
+	}
+	return plan.ExecutableVersion(template, versions, replanAfter, policy)
 }

@@ -1,0 +1,160 @@
+# Unit work instruction
+
+Instruction ID: {{.InstructionID}}
+
+## Assigned unit
+
+Unit ID: {{.Unit.ID}}
+
+Description: {{.Unit.Description}}
+
+Scope: {{.Unit.Scope}}
+
+Absolute worktree path: {{.WorktreePath}}
+
+Edit only this detached worktree and the assigned scope. Do not edit the work checkout, other unit worktrees, or runtime records. Do not commit, merge, or run devkit submit. Return only the progress JSON as your final message; SubagentStop stores it and devkit merges the units before the stage judgment.
+
+## Users and purpose
+
+{{.Purpose}}
+
+## Stage definitions
+
+{{.StageDefinition}}
+
+## Current stage
+
+```json
+{{.StageJSON}}
+```
+
+## Task and plan
+
+```json
+{{.PlanJSON}}
+```
+
+Verify completion conditions against their IDs in the plan.
+The current stage allows {{.Stage.Limits.MaxRounds}} rounds and {{.Stage.Limits.MaxNoProgress}} consecutive rounds without progress.
+
+Use the scope stage output and rules.md to determine the change boundaries.
+
+## Verification of completion conditions
+{{range .Verification}}
+- {{.}}
+{{end}}
+{{template "repository" .Repository}}
+Items from the plan:
+{{range .Plan.IrreversibleDecisions}}
+- {{.}}
+{{end}}
+## Available checks
+
+```json
+{{.ChecksJSON}}
+```
+{{template "norms" .Norms}}
+{{template "normPaths" .NormPaths}}
+{{template "previousOutputs" .PreviousOutputs}}
+## Work history
+
+Work-history file: {{.WorkHistoryPath}}
+
+Use the work-history file referenced here as required by the stage definition. It is fixed when this instruction is issued.
+{{if .PreviousFindings}}
+## Previous findings and finding IDs
+
+```json
+{{.FindingsJSON}}
+```
+{{end}}
+{{range .CommandOutputs}}
+## Required command: check output
+
+Aspect: {{.Check.Aspect}}
+
+Runner: {{.Check.Runner}}
+
+Exit code: {{.ExitCode}}
+
+{{.Output}}
+{{end}}
+{{if .PreCommitOutput}}
+## pre-commit output
+
+{{.PreCommitOutput}}
+{{end}}
+## Returning the progress block
+
+Return only the work result JSON in your final message. Do not run `devkit submit`.
+Set `instruction_id` to this work instruction's ID. Use one of these termination kinds: `{{.TerminationCompleted}}` (claim completion), `{{.TerminationQuestion}}` (stop to ask), or `{{.TerminationStopped}}` (report a work stop).
+Record the work performed, confirmed items, unconfirmed items, obstacles, and resume conditions in the corresponding fields. For temporary state, record its content, verification method, source, and conditions that invalidate it.
+Record unreadable inputs and their effects as unconfirmed items. Add out-of-scope work and reasons for changes as needed.
+Devkit accepts all unit results, fixes their trees as SHAs, merges them, judges the merged stage tree, and records stage completion.
+
+```json
+{{.ProgressJSON}}
+```
+{{if .OutputSchema}}
+### Progress block and supporting JSON Schemas
+
+{{.OutputSchema}}
+{{end}}
+
+Supporting schemas describe recorded decisions, evidence, and lessons for reference. Return only progress JSON. The `structure` schema describes the structure product at the working-tree path above.
+{{range .SupportingSchemas}}
+### {{.Path}} JSON Schema
+
+```json
+{{.Content}}
+```
+{{end}}
+{{define "repository"}}
+## Relevant structure records
+
+Working-tree product: structure.json -> {{.Structure.Path}} ({{if .Structure.Exists}}exists{{else}}not created yet{{end}})
+{{range .LayoutGuides}}
+Reference: structure.json -> {{.Path}}
+
+{{.Content}}
+{{end}}
+## Rules and enforcement
+
+Reference: {{.Rules.Path}}
+
+{{.Rules.Content}}
+
+## Repository requirements
+
+Reference: requirements.md -> {{.Requirements.Path}} ({{if .Requirements.Exists}}exists{{else}}not created yet{{end}})
+
+{{.Requirements.Content}}
+
+## Irreversible decisions
+
+Shared difficult-to-change decisions from `rules.md`:
+{{range .IrreversibleDecisions}}
+- {{.}}
+{{end}}
+{{end}}{{define "norms"}}
+## Norms supplied in full
+{{range .}}
+Reference: {{.Path}}
+
+{{.Content}}
+{{end}}
+{{end}}{{define "normPaths"}}
+## Other fixed norms
+
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
+{{range .}}
+- Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
+{{end}}
+{{end}}{{define "previousOutputs"}}
+## Previous stage outputs
+{{range .}}
+### {{.StageID}}
+
+{{.Content}}
+{{end}}
+{{end}}

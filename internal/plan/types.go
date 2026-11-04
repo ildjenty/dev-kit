@@ -86,11 +86,20 @@ type Check struct {
 
 type Stage struct {
 	ID          string      `json:"id"`
+	Split       bool        `json:"split,omitempty"`
+	Units       []Unit      `json:"units,omitempty"`
 	Assignee    Assignee    `json:"assignee"`
 	Checks      []Check     `json:"checks"`
 	Gate        Gate        `json:"gate"`
 	Limits      Limits      `json:"limits"`
 	Transitions Transitions `json:"transitions"`
+}
+
+// Unit describes one worker's share of a split stage.
+type Unit struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+	Scope       string `json:"scope"`
 }
 
 func (s Stage) RequiredChecks() []Check {
@@ -191,6 +200,7 @@ func cloneCheck(c Check) Check {
 }
 
 func cloneStage(s Stage) Stage {
+	s.Units = slices.Clone(s.Units)
 	s.Checks = slices.Clone(s.Checks)
 	for i := range s.Checks {
 		s.Checks[i] = cloneCheck(s.Checks[i])

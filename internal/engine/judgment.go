@@ -363,6 +363,9 @@ func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan
 	return issued, nil
 }
 func (e *Engine) acceptPending(ctx context.Context, state *ledger.State) (bool, error) {
+	if changed, err := e.acceptAmbiguous(state); changed || err != nil {
+		return changed, err
+	}
 	if changed, err := e.reissueRejected(ctx, state); changed || err != nil {
 		return changed, err
 	}
@@ -371,7 +374,7 @@ func (e *Engine) acceptPending(ctx context.Context, state *ledger.State) (bool, 
 		return false, err
 	}
 	for _, instruction := range state.UnacceptedInstructions() {
-		if instruction.Kind != form.InstructionPlan && instruction.Kind != form.InstructionJudgment && instruction.Kind != form.InstructionPlanCheck && instruction.Kind != form.InstructionDetectionTest {
+		if instruction.Kind != form.InstructionPlan && instruction.Kind != form.InstructionJudgment && instruction.Kind != form.InstructionPlanCheck && instruction.Kind != form.InstructionDetectionTest && instruction.Kind != form.InstructionUnitWork {
 			continue
 		}
 		request, err := e.readInstruction(instruction.ID)
@@ -897,6 +900,9 @@ func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, 
 	}
 	if result.AgentID == "" || result.Runner != request.Instruction.Runner {
 		return e.rejectResult(instruction, obs, errors.New("runner or agent identity does not match"))
+	}
+	if instruction.Kind == form.InstructionUnitWork {
+		return e.acceptUnitResult(instruction, obs)
 	}
 	provenance := check.Provenance{Source: check.SubagentResult, InstructionID: instruction.ID, Runner: result.Runner, AgentID: result.AgentID, Effort: result.Effort, Model: result.Model, ResultPath: obs.path}
 	if instruction.Kind == form.InstructionPlan {

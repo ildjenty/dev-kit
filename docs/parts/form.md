@@ -14,6 +14,8 @@ form は固定フォーマットの型と、[スキーマ・テンプレート](
 
 終了ブロックのスキーマは[進捗](../architecture/data.md#進捗-progress)の必須項目を含めて定義する。入力ファイルの場所と受理条件は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
 
+単位の作業者 `devkit-worker` の最終メッセージにも、`schemas/progress.json` の終了ブロックを使う。単位の結果は SubagentStop が保存し、合流後は単位の終了ブロックをまとめた作業者の終了ブロックをステージのラウンドとして扱う。
+
 テンプレートの既定の置き場所は `.devkit/templates/` であり、`devkit.toml` の `[paths] templates` で変更できる。JSON Schema はバイナリと記録の約束であり、リポジトリで育てる対象にはしない。
 
 エージェントに渡すスキーマは、すべての `$ref` の参照先を同梱して単独で解釈できる形にする。作業の brief には note の種別一覧と各種別の同梱済みスキーマも渡す。構造の記録は `schemas/structure.json` に従う。

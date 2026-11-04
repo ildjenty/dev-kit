@@ -14,6 +14,10 @@ graph LR
   devkit -- 指示と依頼文 --> agent
   devkit -- 記録 --> run[.devkit/run/]
   agent -- 起動 --> sub[サブエージェント<br/>判定者・計画者]
+  agent -- 単位ごとに起動 --> worker[devkit-worker]
+  worker -- 単位の作業 --> trees[.devkit/worktrees/]
+  devkit -- 作成・SHAの固定・合流 --> trees
+  worker -- 終了ブロック --> hook
   sub -- 最終メッセージ --> hook[devkit hook]
   human -- 入力 --> hook
   hook -- 観測と結果ファイル --> run
@@ -21,7 +25,7 @@ graph LR
   host[ホスト] -- イベント --> hook
 ```
 
-- **セッションのエージェント**は実行役である。[brief](architecture/modules.md#brief)(作業や判定の依頼文)を読み、コードを書き、[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定の形式で書いた JSON)を返す。判定者と計画者のサブエージェントは、[定型の1行の prompt](architecture/guarantees.md#判定結果の受理)で起動する。
+- **セッションのエージェント**は実行役である。[brief](architecture/modules.md#brief)(作業や判定の依頼文)を読み、コードを書き、[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定の形式で書いた JSON)を返す。単位の作業者 `devkit-worker` と判定者・計画者のサブエージェントは、[定型の1行の prompt](architecture/guarantees.md#判定結果の受理)で起動する。
 - **`devkit`** は状態機械である。利用者が組んだ[ループの雛形](architecture/data.md#ループの雛形-plantemplate)(再利用するループの定義)から作る[計画](architecture/data.md#計画-plan)(課題ごとの実行内容)と記録から次の指示を計算し、[ステージの完了と設定に応じたコミットを確定し](architecture/guarantees.md#完了条件)、判定者の結果と人の答えを受理し、記録を書く。エージェントが Bash から呼ぶが、sandbox の外で動く。
 - **hook** は同じバイナリの別の呼び出し口である。セッションの開始時に状況を注入し、[Stop](architecture/hooks.md#stop)で停止の可否を判断し、危険な操作を拒み、サブエージェントの結果と人の入力を観測してファイルに書く。
 - **人**はチャットで問いに答える。`devkit answer` が hook の観測した入力をもとに回答を受理する条件は、[回答の受理](architecture/guarantees.md#回答の受理)で定める。
@@ -40,6 +44,10 @@ graph LR
 既定の `default` は `purpose` の遷移 `done` を `"replan"` とし、最初の計画に要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md`(`[paths] requirements` で変更可能)に書き、完了条件の案を作る。`purpose` の完了後、合意した完了条件で残りを再計画し、人が承認する。`fix` と `docs` はこの形を使わない。kit は要件定義を特別扱いせず、雛形の遷移に従う。
 
 [ラウンド](architecture/data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)の判定待ちでは、[Judgment](architecture/data.md#check-の結果-judgment)(`command:` の check を含む判定結果)を受理して次の行動を決める。
+
+雛形のステージに `split: true` があり、計画に `units` があれば、`next` は単位ごとの作業指示を返す。`devkit-worker` は devkit が用意する `.devkit/worktrees/<単位の指示 ID>/` で作業し、終了ブロックを最終メッセージで返す。すべての単位の結果を受理したら、devkit がツリーを SHA で固定し、作業ブランチへコミットしないマージで合流する。合流後のツリーと、単位の終了ブロックをまとめた作業者の終了ブロックを通常のステージのラウンドとして判定する。ぶつかった場合の修正、記録と再開、中断・終了時の扱いは[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。作業者数は `[parallel] max_workers`(既定3、1以上)で制限する。既定の雛形は分割を使わない。
+
+ループ自体は別の worktree で新しいセッションを開いて並行して回せる。作業中のチェックアウトでの2つ目の `start` は拒否する。再計画で完了済みのステージを残りの計画に含めないことは雛形からの逸脱に数えない。
 
 人の依頼でエージェントが呼ぶ、または人が直接実行する `devkit pause`・`devkit resume` の条件と、Stop の継続上限は[中断](architecture/guarantees.md#中断)に従う。
 

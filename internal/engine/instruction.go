@@ -383,6 +383,8 @@ func (e *Engine) readInstructionFacts(id string) (instructionData, error) {
 			i.Text = "Launch the planner with: devkit-instruction " + id
 		case form.InstructionWork:
 			i.Text = "Perform the work described in the brief, then run devkit submit."
+		case form.InstructionUnitWork:
+			i.Text = "Launch the worker with: devkit-instruction " + id
 		case form.InstructionJudgment, form.InstructionPlanCheck:
 			i.Text = "Launch the assigned judge with: devkit-instruction " + id
 		case form.InstructionDetectionTest:
@@ -439,7 +441,7 @@ func (e *Engine) regenerateBrief(ctx context.Context, meta ledger.Instruction, d
 			return brief.Brief{}, err
 		}
 		return e.plannerBrief(ctx, state, template, source, meta.PlanVersion, data.Origin, data.Reference, &meta)
-	case form.InstructionWork:
+	case form.InstructionWork, form.InstructionUnitWork:
 		p, ok, err := e.boundPlan(meta.PlanVersion)
 		if err != nil {
 			return brief.Brief{}, err
@@ -602,7 +604,11 @@ func (e *Engine) workInstruction(ctx context.Context, state *ledger.State, p pla
 
 func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, round *ledger.Round, meta *ledger.Instruction) (brief.Brief, error) {
 	ref := roundReference(round)
-	template, err := e.asset(ctx, ref, "templates/brief/work.md.tmpl")
+	name := "templates/brief/work.md.tmpl"
+	if meta.Unit != nil {
+		name = "templates/brief/unit.md.tmpl"
+	}
+	template, err := e.asset(ctx, ref, name)
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -632,6 +638,7 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 		return brief.Brief{}, err
 	}
 	input := brief.WorkInput{RequestTemplate: string(template), InstructionID: meta.ID, Stage: stage, StageDefinition: string(definition), Plan: p, Purpose: p.Task, Repository: facts, Norms: docs, NormPaths: paths, PreviousOutputs: outputs, PreviousFindings: state.UnresolvedBlocking(round.StageRunID), OutputSchema: string(outputSchema)}
+	input.Unit, input.WorktreePath = meta.Unit, e.unitPath(meta.ID)
 	for _, condition := range p.CompletionConditions {
 		input.Verification = append(input.Verification, condition.ID+": "+condition.Description)
 	}
@@ -705,6 +712,7 @@ func (e *Engine) table(ctx context.Context, ref string) (router.Table, error) {
 	table.ConfirmationRules[config.MetaLoopEdit] = mode
 	return table, nil
 }
+
 // question builds a devkit-generated question. Devkit has no grounds to recommend an answer, so the recommendation is left empty.
 func (e *Engine) question(target form.ApprovalTarget, category, text, stage string) form.Question {
 	return form.Question{ID: ulidString(), Text: text, ApprovalTarget: target, Options: []string{"approve", "reject", "defer"}, Recommendation: "", StopCategory: category, NextStage: stage, StoppedStage: stage, StopReason: text, Evidence: []form.Reference{}}

@@ -64,13 +64,14 @@ type StartRequest struct {
 // Result is a short response. Instruction bodies are written to Brief files.
 // A paused response deliberately has no instruction.
 type Result struct {
-	WorkID      string            `json:"work_id"`
-	Status      ledger.WorkStatus `json:"status"`
-	Paused      bool              `json:"paused"`
-	Message     string            `json:"message,omitempty"`
-	Warning     string            `json:"warning,omitempty"`
-	Instruction *form.Instruction `json:"instruction,omitempty"`
-	External    *external.Result  `json:"external,omitempty"`
+	WorkID       string             `json:"work_id"`
+	Status       ledger.WorkStatus  `json:"status"`
+	Paused       bool               `json:"paused"`
+	Message      string             `json:"message,omitempty"`
+	Warning      string             `json:"warning,omitempty"`
+	Instruction  *form.Instruction  `json:"instruction,omitempty"`
+	Instructions []form.Instruction `json:"instructions,omitempty"`
+	External     *external.Result   `json:"external,omitempty"`
 }
 
 // Status includes the full ledger-derived current position and pending instructions.

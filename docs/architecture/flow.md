@@ -8,11 +8,15 @@
 
 `start` はブランチ作成や記録などの副作用より前に、HEAD の存在と、作業ツリーに存在する設定済みの規範のパス・`devkit.toml`・サブエージェント定義のディレクトリがすべてコミット済みで変更されていないことを確かめる。不成立なら対象パスの一覧と「devkit init の変更を先にコミットする」という直し方を返して拒否する。
 
+作業中のチェックアウトでの2つ目の `start` は拒否する。別の worktree で新しいセッションを開けば、チェックアウトごとに独立したループを並行して回せる。それぞれが自分の `.devkit/run/` に記録を持つ。
+
 人は通常どおりセッションを開き、kit の skill で課題を伝える。エージェントは `devkit start --plan <name> <課題>` で[ループの雛形](data.md#ループの雛形-plantemplate)(再利用するループの定義)を指定する。開始の条件は [hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)にも従う。雛形の解決先は既定 `.devkit/plans/` であり、`devkit.toml` の `[paths] plans` で変更できる。`--plan` の省略時は `default_plan` の値(既定 `"default"`)を使う。[engine](modules.md#engine)(進行を担うモジュール)は作業 ID と作業ブランチを作ってチェックアウトを切り替え、基点コミットと `kit_version` を記録して[セッションを束縛](data.md#セッションとブランチ)する。ブランチ名は `[git] branch` の既定 `"devkit/{work_id}"` に従い、設定値には `{work_id}` を必ず含める。返すのは計画者への指示 ID と、`.devkit/run/work/<作業 ID>/` 内の `brief/<指示 ID>.md` のパスである。実行の記録と生成物の場所 `.devkit/run/` は固定である。
 
 [UserPromptSubmit](hooks.md#userpromptsubmit)は、束縛前のセッションでも人の最新の入力をセッションごとに1件保持する。`start` はその原文を作業に結び付け、観測がなければ原文なしと記録する。計画者の brief には原文と `start` に渡された課題の両方を載せる。
 
 既定の雛形は次の構成であり、check の判定者には `init` が配る `devkit-judge` を使う。
+
+既定の雛形は分割を使わない。作業を分けるステージは、リポジトリが雛形の `split` で選び、計画者が計画の `units` に単位を記入する。完了済みのステージを再計画の残りに含めないことは、雛形からの逸脱に数えない。
 
 - `default`: purpose → scope → structure → contract → steps → implement → retrospective。候補は research と prototype、scope にゲートを置く。implement の check は必須の `command:test` と観点 `test`・`diff` である。不要なステージは外せるが、外したことは逸脱として承認の問いに載せる。
 - `fix`: implement → retrospective。候補は research と prototype、implement の check は必須の `command:test` と観点 `test`・`diff` である。
@@ -57,6 +61,22 @@ engine は [brief の責務](modules.md#brief)で定める入力を解決して 
 requirements はリポジトリが満たすべき要件の正本であり、既定 `.devkit/requirements.md` に置く。purpose が承認された完了条件と既存の要件を照らして更新する。structure は構造のステージが既定 `.devkit/structure.json` に記録する。複数の作業で守る変更困難な決定は既定 `.devkit/rules.md` に置き、ループ自身の変更として[確認の設定と時点](guarantees.md#人への確認対象)に従う。これらの場所は `[paths] requirements`・`structure`・`rules` で変更できる。実行の記録は git 管理しない。各ステージは後の作業に効かせる決定を requirements・structure・rules のいずれかに残す。
 
 エージェントはセッション内で作業し、他の skill や plugin も使える。途中の決定や調査結果は `devkit note`、作業の[終了ブロック](data.md#進捗-progress)(作業結果を固定形式で返す JSON)は `devkit submit <ファイル>` で渡す。教訓も `note` で渡し、記録は [engine の責務](modules.md#engine)に従う。入力 JSON の場所と受理の条件は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。コミットは[完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に委ねる。
+
+### 分割した作業と合流
+
+`split: true` のステージに `units` があれば、`next` は単位ごとの作業指示を返す。単位がなければ通常のステージとして作業する。セッションのエージェントは、単位ごとに `devkit-worker` を、1行の `devkit-instruction <指示 ID>` で起動する。`init` は両ホストの作業者定義を配る。作業者は判定者用の書き込み禁止 `[deny] judge` の対象外であり、判定者・計画者への禁止は維持する。
+
+devkit は `git worktree add` で、ラウンド開始時のスナップショットのコミットを起点に、detached の作業場所を `.devkit/worktrees/<単位の指示 ID>/` に作る。ブランチは作らず、物理的な名前には計画者の単位 ID を使わない。作業場所は ignore し、記録の `.devkit/run/` と分けて記録の deny に重ならないようにする。Codex のサブエージェントには作業場所を指定する引数がないため、brief に絶対パスを載せ、そこだけを編集させる。
+
+同時に動かす作業者数は `[parallel] max_workers` で制限する。既定は3、1以上を必須とする。1でも同じ作業場所と合流の手順で単位を1つずつ進める。単位の作業者は、最終メッセージに `schemas/progress.json` の終了ブロックを返し、SubagentStop が保存する。単位ごとの判定はしない。結果を待つ間は Stop が停止を許す。
+
+すべての単位の結果を受理したら、devkit は各作業場所のツリーをブランチには含めないコミットオブジェクトにして、SHA で固定して記録する。作業ブランチのチェックアウトで、その固定した SHA を順に、コミットしないマージで合流する。合流の記録には開始時の HEAD、入力の SHA、結果を持たせる。中断からの再開では、合流の記録と git のマージの状態を照合して続ける。
+
+マージがぶつかったら、セッションの作業者への修正ラウンドにする。brief にぶつかったファイルと単位を載せる。合流後は、単位の終了ブロックをまとめた作業者の終了ブロックを通常のステージのラウンドとして受理し、マージ後のツリーを返却後の対象にする。判定依頼はステージ開始時点からの累積差分とし、単位の変更とマージの結果を含める。判定・ゲート・ループ自身の変更の確認・上限・戻り・再計画・問いはステージのラウンド1つで扱い、依存の変更の分類と完了時のコミットも通常どおり行う。
+
+中断中は新しい単位の指示と合流を始めず、作業場所を保持する。起動済みの作業者の結果は、受理条件を満たせば記録してよい。中止・作業完了時は、変更のない単位の worktree を削除する。変更の残る worktree は削除せず場所を知らせ、破棄は人が git で行う。
+
+同じ runner の未受理の指示が複数あり、指示 ID のない不正な最終メッセージをどの指示にも結び付けられなければ、観測を残し、人に問う。
 
 ## 作業結果の提出
 

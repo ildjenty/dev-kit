@@ -18,7 +18,8 @@
         "question",
         "external",
         "completed",
-        "aborted"
+        "aborted",
+        "unit_work"
       ]
     },
     "target_key": {
@@ -64,7 +65,8 @@
           "kind": {
             "enum": [
               "work",
-              "plan"
+              "plan",
+              "unit_work"
             ]
           }
         }
@@ -82,7 +84,8 @@
             "enum": [
               "judgment",
               "plan_check",
-              "detection_test"
+              "detection_test",
+              "unit_work"
             ]
           }
         }

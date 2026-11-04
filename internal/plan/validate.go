@@ -75,6 +75,18 @@ func (v *Validator) ParsePlan(data []byte) (Plan, error) {
 		return Plan{}, err
 	}
 	conditions := make(map[string]bool)
+	units := make(map[string]bool)
+	for _, stage := range plan.Stages {
+		if len(stage.Units) > 0 && (!stage.Split || stage.Assignee != Worker) {
+			return Plan{}, fmt.Errorf("%s: units require a split worker stage", stage.ID)
+		}
+		for _, unit := range stage.Units {
+			if units[unit.ID] {
+				return Plan{}, fmt.Errorf("duplicate unit ID: %q", unit.ID)
+			}
+			units[unit.ID] = true
+		}
+	}
 	for _, condition := range plan.CompletionConditions {
 		if conditions[condition.ID] {
 			return Plan{}, fmt.Errorf("duplicate completion condition ID: %q", condition.ID)

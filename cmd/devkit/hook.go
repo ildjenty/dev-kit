@@ -82,7 +82,7 @@ func processHook(ctx context.Context, e event.Event) (event.Result, error) {
 			return event.Result{}, err
 		}
 	}
-	w, err := workspace.Open(ctx, cwd)
+	w, err := hookWorkspace(ctx, cwd)
 	if err != nil {
 		return event.Result{}, err
 	}
@@ -143,6 +143,17 @@ func processHook(ctx context.Context, e event.Event) (event.Result, error) {
 		return runtime.InstructionRunner(instruction)
 	}
 	return h.Process(e)
+}
+
+func hookWorkspace(ctx context.Context, cwd string) (*workspace.Workspace, error) {
+	w, err := workspace.Open(ctx, cwd)
+	if err != nil {
+		return nil, err
+	}
+	if filepath.Base(filepath.Dir(w.Root())) == "worktrees" && filepath.Base(filepath.Dir(filepath.Dir(w.Root()))) == ".devkit" {
+		return workspace.Open(ctx, filepath.Dir(filepath.Dir(filepath.Dir(w.Root()))))
+	}
+	return w, nil
 }
 
 func localName(name string) bool {

@@ -30,7 +30,7 @@ func (h Handler) preToolUse(e event.Event, state *ledger.State) (event.Result, e
 			return denied("Operation matches deny rule: " + rule), nil
 		}
 	}
-	if e.AgentID != "" && strings.HasPrefix(e.AgentType, "devkit-") {
+	if e.AgentID != "" && strings.HasPrefix(e.AgentType, "devkit-") && e.AgentType != "devkit-worker" {
 		for _, tool := range settings.Deny.Judge {
 			if e.ToolName == tool {
 				return denied("Operation matches judge deny tool: " + tool), nil

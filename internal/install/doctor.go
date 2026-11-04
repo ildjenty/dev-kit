@@ -78,7 +78,9 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 	for _, name := range []string{
 		".agents/skills/devkit/SKILL.md",
 		".claude/agents/devkit-judge.md", ".claude/agents/devkit-planner.md",
+		".claude/agents/devkit-worker.md",
 		".codex/agents/devkit-judge.toml", ".codex/agents/devkit-planner.toml",
+		".codex/agents/devkit-worker.toml",
 	} {
 		r.add(name, "File is present.", requireFile(filepath.Join(r.Root, name)))
 	}

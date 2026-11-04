@@ -122,7 +122,11 @@ func writeConfig(path string, data []byte) error {
 }
 
 func runtimeIgnored(ctx context.Context, root string) (bool, error) {
-	cmd := exec.CommandContext(ctx, "git", "-C", root, "check-ignore", "--quiet", "--", ".devkit/run/")
+	return pathIgnored(ctx, root, ".devkit/run/")
+}
+
+func pathIgnored(ctx context.Context, root, path string) (bool, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", root, "check-ignore", "--quiet", "--", path)
 	output, err := cmd.CombinedOutput()
 	if err == nil {
 		return true, nil
@@ -312,6 +316,15 @@ func (r *Result) addHostSettings(ctx context.Context) error {
 		}
 		after = append(after, ".devkit/run/\n"...)
 	}
+	ignored, err = pathIgnored(ctx, r.Root, ".devkit/worktrees/")
+	if err != nil {
+		return err
+	}
+	updated := appendLines(after, []byte(".devkit/worktrees/\n"))
+	if !ignored && bytes.Equal(after, updated) {
+		updated = append(updated, ".devkit/worktrees/\n"...)
+	}
+	after = updated
 	r.addChange(".gitignore", before, after)
 	return nil
 }

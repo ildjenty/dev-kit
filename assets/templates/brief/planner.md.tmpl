@@ -66,6 +66,7 @@ If a requirement is ambiguous or cannot be decided from the inputs, do not fill 
 Remove unrelated stages and select any necessary research or prototyping from the template candidates. Specify each check's target and completion condition IDs. Give each completion condition a way to verify it: a check run by a verification command, a judge, or a judgment command, or a human gate. Checks are not necessarily mechanical.
 Fill in task-specific irreversible decisions and declarations of required external operations. Use values confirmed in the inputs for each external operation's kind, target, input hash, registration definition hash, and executable content hash.
 Report removal of template stages, additions of stages outside the candidates, removal of gates, changes to transitions, and removal of required checks as deviations.
+For a split worker stage, you may supply units with unique plan-wide IDs, descriptions, and nonoverlapping scopes. Adding or removing split is a deviation. Already completed stages omitted by replanning are not removed-stage deviations. Only work is split; checks, gates, loop-edit confirmation, limits, back/replan, and questions stay at stage level.
 Human-approved completion conditions define completion of the work.
 For a revised proposal, incorporate human revision instructions and check findings. For replanning, rebuild the supplied remaining work.
 
