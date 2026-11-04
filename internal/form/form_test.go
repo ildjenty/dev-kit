@@ -241,7 +241,6 @@ func TestTemplates(t *testing.T) {
 		want  []string
 	}{
 		{"skill", SkillTemplate{Name: "devkit", Description: "Advance development", Purpose: "Purpose", Steps: "Steps"}, []string{"name: \"devkit\"", "description: \"Advance development\"", "## Steps"}},
-		{"aspect", AspectTemplate{ID: "wording", Checks: "Save button display", Blocking: "The label differs"}, []string{"# wording", "- Checks:", "- blocking:", "- Do not report:", "- Output format:", "instruction_id"}},
 		{"pr", PRTemplate{PlanSummary: "Label change plan", Decisions: "Use the existing operation", Verification: "Open and check the save button"}, []string{"Label change plan", "Use the existing operation", "Open and check the save button"}},
 		{"design", DesignTemplate{Title: "Save screen", Irreversible: "Reference to the plan list"}, []string{"# Save screen", "Reference to the plan list"}},
 	}

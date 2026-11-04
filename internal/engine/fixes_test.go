@@ -132,7 +132,7 @@ func TestGateQuestionContainsRecordedEvidence(t *testing.T) {
 	e, ctx := fixture(t)
 	configureStage(t, e, func(s *plan.Stage) {
 		s.Gate = plan.Gate{Required: true, Reason: "Confirm the published documentation scope"}
-		s.Checks = []plan.Check{{Aspect: "wording", Runner: "devkit-judge"}}
+		s.Checks = []plan.Check{judgeCheck("wording", false)}
 	})
 	work := working(t, e, ctx)
 	// An optional aspect needs no detection pass.
@@ -431,7 +431,7 @@ func TestEmbeddedSchemasAreSelfContained(t *testing.T) {
 
 func TestConfiguredProductsAndMissingRules(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v2'\n[approval]\nplan = 'deviation'\n[paths]\nrequirements = 'docs/accepted-requirements.md'\nstructure = 'docs/system-structure.json'\n[detection]\nrequired = false\n")
+	write(t, e.Root(), "devkit.toml", "kit_version = 'v2'\n[approval]\nplan = 'deviation'\n[sources.requirements]\npath = 'docs/accepted-requirements.md'\n[sources.structure]\npath = 'docs/system-structure.json'\n[detection]\nrequired = false\n")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure product paths")
 	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})

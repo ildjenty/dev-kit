@@ -2,13 +2,13 @@
 
 ## 責務
 
-check は固定した[規範](../architecture/modules.md#check)(評価に用いる規則)と[観点ファイル](../architecture/modules.md#check)(判定の基準)を基に判定依頼の内容を決め、結果の解析・受理・集約と[適用除外](../architecture/guarantees.md#判定結果の受理)(特定の要求を外す条件)の主張と根拠の照合を担う。外部入出力の扱いは[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従う。公開する型と操作、規範の束ね方、必須 check と[検出試験](../architecture/guarantees.md#検出試験)(観点ファイルの試験)の照合、他の部品との境界は [check のモジュール契約](../architecture/modules.md#check)に従い、依頼文の組み立ては [brief](../architecture/modules.md#brief)(依頼文を組み立てる部品)に委ねる。
+check は固定した[規範](../architecture/modules.md#check)(評価に用いる規則)と check の `criteria` で選んだ基準の文書を基に判定依頼の内容を決め、結果の解析・受理・集約と[適用除外](../architecture/guarantees.md#判定結果の受理)(特定の要求を外す条件)の主張と根拠の照合を担う。外部入出力の扱いは[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従う。公開する型と操作、規範の束ね方、必須 check と[検出試験](../architecture/guarantees.md#検出試験)(check の判定能力の試験)の照合、他の部品との境界は [check のモジュール契約](../architecture/modules.md#check)に従い、依頼文の組み立ては [brief](../architecture/modules.md#brief)(依頼文を組み立てる部品)に委ねる。
 
 ## 入力と出力
 
 ### 入力
 
-評価対象と[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(評価対象の識別値)・場所、固定した規範と観点、依頼と結果の照合に必要な資料を受け取る。[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)の[終了ブロック](../architecture/data.md#進捗-progress)(作業結果の記録)や修正時の[指摘の参照](../architecture/data.md#指摘-finding)を含む入力の構成は[判定依頼の公開契約](../architecture/modules.md#check)、観点「差分」の入力は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+評価対象と[対象のバージョン](../architecture/data.md#対象のバージョン-targetversion)(評価対象の識別値)・場所、固定した規範と選んだ基準の文書、依頼と結果の照合に必要な資料を受け取る。[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)の[終了ブロック](../architecture/data.md#進捗-progress)(作業結果の記録)や修正時の[指摘の参照](../architecture/data.md#指摘-finding)を含む入力の構成は[判定依頼の公開契約](../architecture/modules.md#check)、観点「差分」の入力は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
 規範の入力は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。
 
@@ -28,11 +28,11 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 ### 観点と判定
 
-観点ファイルの形式は [form](../architecture/modules.md#form) のテンプレート、解析の責務は [check のモジュール契約](../architecture/modules.md#check)、配置と最小の例は[観点と検出試験の例](../architecture/examples.md#観点と検出試験)に従う。
+check の `aspect` は判定の名前、`criteria` は基準の選び方、`examples` は検出試験の例の選び方である。基準は規範のソースから選ぶ。必須の基準の選び方が0件なら判定を始めず止める。基準の本文の構造は解析せず、参照する別の文書が必要なら選び方に明示する。選び方は check の約束であり、雛形と違う場合は逸脱として承認の問いに差分を示す。
 
 判定の値と結果・指摘の構成は [Judgment](../architecture/data.md#check-の結果-judgment)と [Finding](../architecture/data.md#指摘-finding)、適用除外と集約は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
-失敗のシナリオを示せない指摘は返さず、重大度は付けない。[blocking](../architecture/modules.md#check)(修正を求める条件)ではない指摘は修正を求めず、参考情報として残す。指摘数に上限は設けず、報告する範囲は観点ファイルの blocking の定義と「報告しない事項」で調整する。
+判定の共通規則は判定依頼テンプレートに集約する。`NOT ASSESSED` の使い方、失敗のシナリオを示せない指摘を返さないこと、重大度を付けないこと、blocking でない指摘を参考情報として残すこと、指摘数に上限を設けないことを定める。判定の範囲・確認事項・blocking・報告しない事項・適用除外は原則のソースの用途別文書で定める。
 
 評価対象や外部の文書の扱いは [assets/principles/context.md](../../assets/principles/context.md) の原則3に従う。
 
@@ -56,11 +56,11 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 ### 検出試験
 
-検出試験の対象・実行時期・合格記録の再利用・原則の適用除外は[検出試験の保証](../architecture/guarantees.md#検出試験)、合格記録の同一性は [DetectionTest](../architecture/data.md#検出試験の記録-detectiontest)(観点ファイルの試験記録)に従う。
+検出試験の対象・実行時期・合格記録の再利用・原則の適用除外は[検出試験の保証](../architecture/guarantees.md#検出試験)、合格記録の同一性は [DetectionTest](../architecture/data.md#検出試験の記録-detectiontest)(check の試験記録)に従う。
 
-判定者への依頼には例の本文だけを渡し、種別(違反・適合・許容)と期待判定は渡さない。devkit が結果と期待を照合する。
+判定者への依頼には、基準の文書、匿名の例の本文、出力の約束だけを渡す。試験仕様・期待判定・対応表と、それらを含む作業履歴や参照先を渡さず、devkit が結果と期待を照合する。
 
-合格の識別には、観点・試験仕様・担当の定義に加え、観点が参照する原則ファイルと規則ファイルの内容ハッシュを含める。原則や規則を変更した場合、それを参照する観点を既定では次に必須として使うラウンドの前に再試験する。観点を更新するときは検出試験の例も更新する。合格の索引は既定 `.devkit/detect.json`、観点と例は既定 `.devkit/checks/` に置き、`[paths] detect` と `checks` で変更できる。
+合格の識別には、担当の定義、判定規則を含む判定依頼テンプレート、実際に渡した基準の文書の集合と内容ハッシュ、例の文書の内容ハッシュを含める。基準を変えた check は次に必須として使うラウンドの前に再試験する。基準を更新するときは検出試験の例も更新し、既存の期待判定を保つことを確かめる。例と仕様は `examples` ソース(既定 `.devkit/examples/`)、基準は `principles` ソース(既定 `.devkit/principles/`)に置き、ソース設定で変更できる。合格の索引は `[state] detect`(既定 `.devkit/detect.json`)に置く。
 
 ### 集約と遷移の境界
 

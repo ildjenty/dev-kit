@@ -20,10 +20,10 @@ None.
 
 ## Artifacts
 
-An explanation of how the purpose corresponds to the proposed completion conditions (`checks/purpose.md`), the agreed proposal with IDs and grounds, and `requirements.md` updated with requirements clarified with the human. Preserve decisions needed by future tasks following `stages/README.md#decisions-for-later-work`.
+An explanation of how the purpose corresponds to the proposed completion conditions (`principles/review/purpose.md`), the agreed proposal with IDs and grounds, and `requirements.md` updated with requirements clarified with the human. Preserve decisions needed by future tasks following `stages/README.md#decisions-for-later-work`.
 
 ## Completion conditions
 
 Explain the relationship between the purpose and proposed completion conditions in users' words so completion can be judged, confirm the requirements and proposal with the human, and reflect the agreed repository requirements in `requirements.md`. If the plan's `done` transition for this stage is `replan`, the planner rebuilds the remaining plan after this stage completes. Changes to completion conditions require human approval following `plans/README.md`; do not treat the proposal as the active plan.
 
-All required checks valid for the returned target and norms are `PASS`, the detection requirements in `checks/README.md#detection-tests` are satisfied, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.
+All required checks valid for the returned target and norms are `PASS`, the detection requirements in `examples/README.md` are satisfied, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.

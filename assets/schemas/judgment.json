@@ -87,6 +87,10 @@
             "tree": {
               "type": "string",
               "minLength": 1
+            },
+            "sources": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "required": [

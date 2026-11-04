@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/engine"
@@ -18,6 +19,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
+	"github.com/ildjenty/dev-kit/internal/source"
 	"github.com/ildjenty/dev-kit/internal/view"
 	"github.com/ildjenty/dev-kit/internal/workspace"
 )
@@ -109,22 +111,22 @@ func inspect(ctx context.Context, e *engine.Engine, name string, f *flag.FlagSet
 	if err != nil {
 		return err
 	}
-	norms, err := engine.NormativeReferences(ctx, w, tree)
+	current, norms, err := e.CurrentIdentity(ctx, tree)
 	if err != nil {
 		return err
 	}
-	targets := []form.TargetVersion{{Kind: form.TargetTree, Tree: tree}}
+	targets := []form.TargetVersion{current}
 	if status.Position.Plan != nil {
 		targets = append(targets, form.TargetVersion{Kind: form.TargetPlan, Plan: status.Position.Plan.Plan.Version})
 	}
-	structure, revisions, err := viewStructures(ctx, w, e.Root(), tree)
+	structure, text, revisions, err := viewStructures(ctx, w, e.Root(), tree)
 	if err != nil {
 		return err
 	}
 	if structure != nil {
 		targets = append(targets, form.TargetVersion{Kind: form.TargetStructure, Structure: structure.Version})
 	}
-	html, err := view.Generate(view.Input{Ledger: state, Records: records, Decisions: decisions, Targets: targets, Norms: norms, Structure: structure, StructureHistory: revisions})
+	html, err := view.Generate(view.Input{Ledger: state, Records: records, Decisions: decisions, Targets: targets, Norms: norms, Structure: structure, StructureText: text, StructureHistory: revisions})
 	if err != nil {
 		return err
 	}
@@ -140,48 +142,80 @@ func inspect(ctx context.Context, e *engine.Engine, name string, f *flag.FlagSet
 	return err
 }
 
-func parseStructure(data []byte, version string) (*view.Structure, error) {
+// parseStructure returns a drawable structure, or nil when the body does not follow the structure JSON.
+func parseStructure(data []byte, version string) *view.Structure {
 	var structure view.Structure
 	if err := json.Unmarshal(data, &structure); err != nil {
-		return nil, err
+		return nil
 	}
 	structure.Version = version
-	return &structure, nil
+	if len(structure.Modules) == 0 || view.StructureMermaid(structure) == "" {
+		return nil
+	}
+	return &structure
 }
 
-func viewStructures(ctx context.Context, w *workspace.Workspace, root, tree string) (*view.Structure, []view.StructureRevision, error) {
-	var structure *view.Structure
-	source, err := w.ReadFile(ctx, tree, "devkit.toml")
+// viewStructures reads the structure source from the working checkout or its outside location.
+// A body that is not a drawable structure JSON is shown as text.
+func viewStructures(ctx context.Context, w *workspace.Workspace, root, tree string) (*view.Structure, *view.StructureText, []view.StructureRevision, error) {
+	data, err := w.ReadFile(ctx, tree, "devkit.toml")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	settings, err := config.Parse(source)
+	settings, err := config.Parse(data)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	data, err := os.ReadFile(filepath.Join(root, settings.RepositoryPaths().Structure))
-	if err == nil {
-		structure, err = parseStructure(data, fmt.Sprintf("%x", sha256.Sum256(data)))
-	} else if errors.Is(err, os.ErrNotExist) {
-		err = nil
-	}
+	item := settings.KnowledgeSources()["structure"]
+	adapter, err := source.NewFiles(root, item.Path, os.DirFS(root), "", false)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	history, err := w.StructureHistory(ctx, "HEAD", settings.RepositoryPaths().Structure)
+	documents, err := adapter.Select("")
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+	structure, text := currentStructure(documents)
+	location, err := filepath.Rel(root, filepath.Join(root, filepath.FromSlash(item.Path)))
+	if filepath.IsAbs(filepath.FromSlash(item.Path)) {
+		location, err = filepath.Rel(root, filepath.FromSlash(item.Path))
+	}
+	if err != nil || !filepath.IsLocal(location) {
+		return structure, text, nil, nil
+	}
+	history, err := w.StructureHistory(ctx, "HEAD", filepath.ToSlash(location))
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	var revisions []view.StructureRevision
-	for _, item := range history {
-		revision := view.StructureRevision{Commit: item.Commit}
-		if !item.Deleted {
-			revision.Structure, err = parseStructure(item.Content, fmt.Sprintf("%x", sha256.Sum256(item.Content)))
-			if err != nil {
-				return nil, nil, err
+	for _, entry := range history {
+		revision := view.StructureRevision{Commit: entry.Commit}
+		if !entry.Deleted {
+			if revision.Structure = parseStructure(entry.Content, fmt.Sprintf("%x", sha256.Sum256(entry.Content))); revision.Structure == nil {
+				continue
 			}
 		}
 		revisions = append(revisions, revision)
 	}
-	return structure, revisions, nil
+	return structure, text, revisions, nil
+}
+
+func currentStructure(documents []source.Document) (*view.Structure, *view.StructureText) {
+	if len(documents) == 0 {
+		return nil, nil
+	}
+	var body strings.Builder
+	for _, document := range documents {
+		if len(documents) > 1 {
+			fmt.Fprintf(&body, "## %s\n\n", document.ID)
+		}
+		body.WriteString(document.Body)
+	}
+	version := fmt.Sprintf("%x", sha256.Sum256([]byte(body.String())))
+	if len(documents) == 1 {
+		if structure := parseStructure([]byte(documents[0].Body), version); structure != nil {
+			return structure, nil
+		}
+	}
+	return nil, &view.StructureText{Version: version, Body: body.String()}
 }

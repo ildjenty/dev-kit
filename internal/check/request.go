@@ -37,6 +37,7 @@ type RequestInput struct {
 	InstructionID          string
 	Runner                 string
 	Aspect                 Aspect
+	Criteria               []Criterion
 	TargetVersion          form.TargetVersion
 	TargetPath             string
 	Norms                  []Norm

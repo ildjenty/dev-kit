@@ -7,18 +7,6 @@ import (
 	"testing"
 )
 
-func TestAspectReferences(t *testing.T) {
-	source := "Use `principles/testing.md`, `rules.md`, and `principles/designing.md`.\n" +
-		"Read `rules.md#screens` and `principles/anchored.md#test-cases`.\n" +
-		"Repeat `principles/testing.md#coverage` and `rules.md#another-section`.\n" +
-		"Repeat `principles/testing.md`; ignore principles/working.md and `checks/test.md`.\n" +
-		"Ignore `principles/../secret.md` and `principles/bad\\name.md`."
-	want := []string{"principles/anchored.md", "principles/designing.md", "principles/testing.md", "rules.md"}
-	if got := AspectReferences(source); !slices.Equal(got, want) {
-		t.Fatalf("references: %v; want: %v", got, want)
-	}
-}
-
 func TestDetectionExamplesHideExpectations(t *testing.T) {
 	spec, err := ParseDetectionSpec(asset(t, "examples/purpose/spec.json"))
 	if err != nil {
@@ -61,8 +49,7 @@ func TestDetectionExamplesHideExpectations(t *testing.T) {
 	}
 }
 
-func TestDetectionIdentityIncludesReferencedNorms(t *testing.T) {
-	aspect := []byte("Read `principles/testing.md#coverage` and `rules.md#screens`.")
+func TestDetectionIdentityIncludesCriteriaTemplateAndRunner(t *testing.T) {
 	source := asset(t, "examples/purpose/spec.json")
 	spec, err := ParseDetectionSpec(source)
 	if err != nil {
@@ -72,38 +59,49 @@ func TestDetectionIdentityIncludesReferencedNorms(t *testing.T) {
 	for _, example := range spec.Cases {
 		examples[example.File] = []byte("Example body")
 	}
-	norms := map[string][]byte{"principles/testing.md": []byte("Testing principle"), "rules.md": []byte("Repository rules")}
-	identity, err := NewDetectionIdentity(aspect, source, []byte("runner"), examples, norms)
+	criteria := []Criterion{{Source: "principles", ID: "review/purpose.md", ContentHash: "one"}, {Source: "principles", ID: "testing.md", ContentHash: "two"}}
+	identity, err := NewDetectionIdentity([]byte("runner"), []byte("template"), criteria, source, examples)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"principles/testing.md", "rules.md"} {
-		original := norms[name]
-		norms[name] = append(slices.Clone(original), '\n')
-		changed, err := NewDetectionIdentity(aspect, source, []byte("runner"), examples, norms)
+	reordered, err := NewDetectionIdentity([]byte("runner"), []byte("template"), []Criterion{criteria[1], criteria[0]}, source, examples)
+	if err != nil || reordered != identity {
+		t.Fatalf("criteria order changed the identity: %+v, %v", reordered, err)
+	}
+	changes := map[string]func() (DetectionIdentity, error){
+		"criteria document": func() (DetectionIdentity, error) {
+			changed := slices.Clone(criteria)
+			changed[1].ContentHash = "changed"
+			return NewDetectionIdentity([]byte("runner"), []byte("template"), changed, source, examples)
+		},
+		"criteria set": func() (DetectionIdentity, error) {
+			return NewDetectionIdentity([]byte("runner"), []byte("template"), criteria[:1], source, examples)
+		},
+		"template": func() (DetectionIdentity, error) {
+			return NewDetectionIdentity([]byte("runner"), []byte("template\n"), criteria, source, examples)
+		},
+		"runner": func() (DetectionIdentity, error) {
+			return NewDetectionIdentity([]byte("runner\n"), []byte("template"), criteria, source, examples)
+		},
+	}
+	for name, change := range changes {
+		changed, err := change()
 		if err != nil {
 			t.Fatal(err)
 		}
 		required := []DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: changed}}
 		records := []DetectionTest{{Aspect: "purpose", Runner: "review", Identity: identity, Passed: true}}
-		if changed.NormsHash == identity.NormsHash || len(MissingDetection(required, records)) != 1 {
-			t.Fatalf("changing %s did not invalidate detection", name)
+		if changed == identity || len(MissingDetection(required, records)) != 1 {
+			t.Fatalf("changing the %s did not invalidate detection", name)
 		}
-		norms[name] = original
 	}
-	norms["principles/unreferenced.md"] = []byte("Unrelated principle")
-	unchanged, err := NewDetectionIdentity(aspect, source, []byte("runner"), examples, norms)
-	if err != nil || unchanged != identity {
-		t.Fatalf("unreferenced norm changed detection identity: %+v, %v", unchanged, err)
-	}
-	delete(norms, "rules.md")
-	if _, err := NewDetectionIdentity(aspect, source, []byte("runner"), examples, norms); err == nil {
-		t.Fatal("accepted missing referenced rules")
+	if _, err := NewDetectionIdentity([]byte("runner"), []byte("template"), nil, source, examples); err == nil {
+		t.Fatal("accepted a detection identity without criteria")
 	}
 	legacy := identity
-	legacy.NormsHash = ""
+	legacy.CriteriaHash = ""
 	if len(MissingDetection([]DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}}, []DetectionTest{{Aspect: "purpose", Runner: "review", Identity: legacy, Passed: true}})) != 1 {
-		t.Fatal("reused a passing record without norm hashes")
+		t.Fatal("reused a passing record without criteria hashes")
 	}
 }
 

@@ -171,7 +171,7 @@ func TestCompletion(t *testing.T) {
 	}}
 	target := form.TargetVersion{Kind: form.TargetTree, Tree: "tree"}
 	norms := []form.NormReference{{Path: "AGENTS.md", BlobID: "blob"}}
-	identity := check.DetectionIdentity{AspectHash: "aspect", SpecHash: "spec", RunnerHash: "runner", NormsHash: "norms"}
+	identity := check.DetectionIdentity{RunnerHash: "runner", TemplateHash: "template", CriteriaHash: "criteria", ExamplesHash: "examples"}
 	input := CompletionInput{
 		Rule: stage.CompletionRule(), TargetVersion: target, Norms: norms,
 		Detection:      []check.DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}},

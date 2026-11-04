@@ -50,22 +50,18 @@ func TestDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPaths := Paths{
-		Principles: ".devkit/principles", Stages: ".devkit/stages", Checks: ".devkit/checks",
-		Plans: ".devkit/plans", Templates: ".devkit/templates", Rules: ".devkit/rules.md",
-		Requirements: ".devkit/requirements.md", Structure: ".devkit/structure.json", Detect: ".devkit/detect.json",
-	}
+	wantSources := (Config{}).KnowledgeSources()
 	wantDependencies := []string{"go.mod", "go.sum", "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "uv.lock", "composer.json", "composer.lock"}
 	wantConfirmation := []string{DependencyChanged, TargetChangedAgain}
 	wantDestinations := []string{"hook_lint_type", "plan_template", "aspect", "principle", "skill"}
-	if c.DefaultPlan != "default" || c.Paths != wantPaths || c.Approval != (Approval{Plan: "requirements", MetaLoopEdit: "confirm"}) || c.Git.Branch != "devkit/{work_id}" || c.Git.CommitMessage != "devkit: {stage} ({work_id})" || c.Git.AllowEmptyCommit == nil || !*c.Git.AllowEmptyCommit || c.Limits.StopContinuation != 3 {
+	if c.DefaultPlan != "default" || !reflect.DeepEqual(c.Sources, wantSources) || c.Approval != (Approval{Plan: "requirements", MetaLoopEdit: "confirm"}) || c.Git.Branch != "devkit/{work_id}" || c.Git.CommitMessage != "devkit: {stage} ({work_id})" || c.Git.AllowEmptyCommit == nil || !*c.Git.AllowEmptyCommit || c.Limits.StopContinuation != 3 {
 		t.Fatalf("parsed defaults do not match: %+v", c)
 	}
 	if !slices.Equal(c.Classification.DependencyFiles, wantDependencies) || !slices.Equal(c.Router.HumanConfirmation, wantConfirmation) || !slices.Equal(c.Lessons.Destinations, wantDestinations) {
 		t.Fatalf("parsed list defaults do not match: %+v", c)
 	}
 	for _, settings := range []Config{{}, c} {
-		if settings.DefaultPlanName() != "default" || settings.RepositoryPaths() != wantPaths || settings.PlanApproval() != "requirements" || settings.MetaLoopEditApproval() != "confirm" || !settings.AllowEmptyCommit() || settings.StopContinuation() != 3 {
+		if settings.DefaultPlanName() != "default" || !reflect.DeepEqual(settings.KnowledgeSources(), wantSources) || settings.PlanApproval() != "requirements" || settings.MetaLoopEditApproval() != "confirm" || !settings.AllowEmptyCommit() || settings.StopContinuation() != 3 {
 			t.Fatalf("effective defaults do not match: %+v", settings)
 		}
 		if !slices.Equal(settings.DependencyFiles(), wantDependencies) || !slices.Equal(settings.HumanConfirmation(), wantConfirmation) || !slices.Equal(settings.LessonDestinations(), wantDestinations) {
@@ -89,16 +85,14 @@ func TestDefaults(t *testing.T) {
 func TestOverrides(t *testing.T) {
 	c, err := Parse([]byte(`kit_version = "v1"
 default_plan = "fix"
-[paths]
-principles = "norms/principles"
-stages = "norms/stages"
-checks = "norms/checks"
-plans = "norms/plans"
-templates = "norms/templates"
-rules = "norms/rules.md"
-requirements = "docs/requirements.md"
-structure = "docs/structure.json"
-detect = "norms/detect.json"
+[sources.principles]
+path = "norms/principles"
+[sources.rules]
+path = "norms/rules.md"
+[sources.requirements]
+path = "docs/requirements.md"
+[state]
+detect = "state/detect.json"
 [approval]
 plan = "always"
 meta_loop_edit = "allow"
@@ -118,12 +112,13 @@ destinations = ["skill", "aspect"]
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPaths := Paths{
-		Principles: "norms/principles", Stages: "norms/stages", Checks: "norms/checks",
-		Plans: "norms/plans", Templates: "norms/templates", Rules: "norms/rules.md",
-		Requirements: "docs/requirements.md", Structure: "docs/structure.json", Detect: "norms/detect.json",
+	wantSources := (Config{}).KnowledgeSources()
+	for name, location := range map[string]string{"principles": "norms/principles", "rules": "norms/rules.md", "requirements": "docs/requirements.md"} {
+		source := wantSources[name]
+		source.Path = location
+		wantSources[name] = source
 	}
-	if c.DefaultPlanName() != "fix" || c.RepositoryPaths() != wantPaths || c.PlanApproval() != "always" || c.MetaLoopEditApproval() != "allow" || c.AllowEmptyCommit() || c.StopContinuation() != 1 {
+	if c.DefaultPlanName() != "fix" || !reflect.DeepEqual(c.KnowledgeSources(), wantSources) || c.DetectionPath() != "state/detect.json" || c.PlanApproval() != "always" || c.MetaLoopEditApproval() != "allow" || c.AllowEmptyCommit() || c.StopContinuation() != 1 {
 		t.Fatalf("effective settings do not match overrides: %+v", c)
 	}
 	if !slices.Equal(c.HumanConfirmation(), []string{TargetChangedAgain}) || !slices.Equal(c.LessonDestinations(), []string{"skill", "aspect"}) || !slices.Equal(c.DependencyFiles(), []string{"deps/*.lock", "manifest-?.json"}) {
@@ -173,46 +168,6 @@ destinations = []
 	}
 	if c.IsDependencyFile("go.mod") {
 		t.Fatal("an empty dependency list used the default patterns")
-	}
-}
-
-func TestPartialSettings(t *testing.T) {
-	c, err := Parse([]byte(`kit_version = "v1"
-[paths]
-rules = "rules.md"
-[approval]
-plan = "deviation"
-[git]
-allow_empty_commit = true
-`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantPaths := (Config{}).RepositoryPaths()
-	wantPaths.Rules = "rules.md"
-	if c.RepositoryPaths() != wantPaths || c.PlanApproval() != "deviation" || c.MetaLoopEditApproval() != "confirm" || !c.AllowEmptyCommit() {
-		t.Fatalf("partial settings lost defaults or overrides: %+v", c)
-	}
-	if got := (Config{Paths: Paths{Rules: "rules.md"}}).RepositoryPaths(); got != wantPaths {
-		t.Fatalf("effective partial paths = %+v", got)
-	}
-}
-
-func TestInvalidRepositoryPaths(t *testing.T) {
-	for _, field := range []string{"principles", "stages", "checks", "plans", "templates", "rules", "requirements", "structure", "detect"} {
-		for _, value := range []string{"", ".", "/tmp/norms", "C:/norms", `norms\rules`, "../norms", "norms/../rules", "norms//rules", "./norms", "norms/", ".devkit/run", ".devkit/run/norms"} {
-			t.Run(field+"/"+value, func(t *testing.T) {
-				_, err := Parse([]byte(fmt.Sprintf("kit_version = 'v1'\n[paths]\n%s = '%s'", field, value)))
-				if err == nil || !strings.Contains(err.Error(), "paths."+field) {
-					t.Fatalf("path %q: error = %v", value, err)
-				}
-			})
-		}
-	}
-	for _, value := range []string{"rules.md", ".devkit/runtime/rules", "norms/.devkit/run/rules", "norms with spaces/rules"} {
-		if _, err := Parse([]byte(fmt.Sprintf("kit_version = 'v1'\n[paths]\nrules = '%s'", value))); err != nil {
-			t.Errorf("valid path %q: %v", value, err)
-		}
 	}
 }
 

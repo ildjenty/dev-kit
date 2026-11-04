@@ -52,17 +52,19 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 ### 検出試験
 
-合格記録の正本との分離、記録の同一性と来歴は [DetectionTest](../architecture/data.md#検出試験の記録-detectiontest)(観点ファイルの判定能力の試験記録)の定義に従う。
+合格記録の正本との分離、記録の同一性と来歴は [DetectionTest](../architecture/data.md#検出試験の記録-detectiontest)(check の判定能力の試験記録)の定義に従う。
 
-合格の識別には、観点・試験仕様・担当の定義に加え、観点が参照する原則と規則の内容ハッシュを含める。索引の既定の場所は `.devkit/detect.json` であり、`[paths] detect` で変更できる。
+合格の識別には、担当の定義、判定規則を含む判定依頼テンプレート、実際に基準として渡した文書の集合と内容ハッシュ、例の文書の内容ハッシュを含める。索引はソースではなく `[state] detect`(既定 `.devkit/detect.json`)で設定する。
 
-索引の読み出し・書き込み・復元は、試験の指示に固定した同じ参照元の設定を使い、未コミットの `[paths] detect` の変更には従わない。合格・不合格の両方の検出試験について、例ごとの判定・指摘・期待判定との照合結果を作業履歴に含める。
+索引の読み出し・書き込み・復元は、試験の指示に固定した同じ参照元の設定を使い、未コミットの `[state] detect` の変更には従わない。合格・不合格の両方の検出試験について、例ごとの判定・指摘・期待判定との照合結果を作業履歴に含める。
 
 ### 外部操作の記録
 
 [外部操作](../architecture/flow.md#外部操作)(リポジトリ外への書き込み)の記録項目は [ExternalOp](../architecture/data.md#外部への書き込み-externalop)(操作の実行記録)、承認との結び付けは[外部操作の承認](../architecture/guarantees.md#外部操作の承認)、再送時の解決は[外部操作の二重適用](../architecture/guarantees.md#外部操作の二重適用)に従う。
 
 ### 成果物
+
+判定・承認・反映・完了の対象は、git のツリーと外部の成果の文書のソース名・ID・内容ハッシュの集合を合わせて識別する。固定した本文と元のバージョンの識別子を来歴として記録する。
 
 生成方法と参照項目は[成果物の記録](../architecture/data.md#成果物-artifact-record)(変更と永続化先の対応)の定義に従う。
 
@@ -82,8 +84,8 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 ### 育てるものとの境界
 
-要件の正本は既定 `.devkit/requirements.md`、構造の記録は `.devkit/structure.json`、規則は `.devkit/rules.md` に置き、`[paths] requirements`・`structure`・`rules` で変更できる。実行の記録 `.devkit/run/` は git 管理せず、後の作業に効かせる決定は要件・構造・規則のいずれかに残す。要件は purpose で承認された完了条件と既存の要件を照らして更新し、purpose で未反映の要件は retrospective で反映する。
+要件の正本は既定 `.devkit/requirements.md`、構造の記録は `.devkit/structure.json`、規則は `.devkit/rules.md` に置き、`[sources.requirements]`・`[sources.structure]`・`[sources.rules]` で変更できる。実行の記録 `.devkit/run/` は git 管理せず、後の作業に効かせる決定は要件・構造・規則のいずれかに残す。要件は purpose で承認された完了条件と既存の要件を照らして更新し、purpose で未反映の要件は retrospective で反映する。
 
-requirements・structure・detect・実行の記録は規範の識別に含めず、変更で判定は失効しない。requirements と structure はループ自身の変更の確認対象に含めず、ステージの判定で確認する。規則の変更はループ自身の変更として確認する。
+成果のソース・検出試験の索引・実行の記録は規範の識別に含めない。成果の更新は規範の変更による失効を起こさないが、判定対象の識別には含める。requirements と structure はループ自身の変更の確認対象に含めず、ステージの判定で確認する。規則の変更はループ自身の変更として確認する。
 
 [構造](../architecture/data.md#構造の記録-structure)(リポジトリの構造の資産)と[規則と強制手段](../architecture/data.md#規則と強制手段-rules)(設計上の決定と守る手段)の分類は、[育てるもの](../architecture/data.md#所有と生存期間)(リポジトリが git で管理する資産)を定める「所有と生存期間」と各定義に従う。

@@ -397,7 +397,7 @@ func TestEndedWorkAcceptsAnswerCorrections(t *testing.T) {
 func TestDetectionUsesCurrentIndexAndFrozenIdentity(t *testing.T) {
 	e, ctx := fixture(t)
 	configureStage(t, e, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
+		stage.Checks = []plan.Check{judgeCheck("plan", true)}
 	})
 	work := working(t, e, ctx)
 	state, err := e.load()
@@ -412,7 +412,7 @@ func TestDetectionUsesCurrentIndexAndFrozenIdentity(t *testing.T) {
 	if err := os.Remove(filepath.Join(e.Root(), ".devkit/detect.json")); err != nil {
 		t.Fatal(err)
 	}
-	requirements, tests, err := e.detectionContext(ctx, []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}, round.StartTarget.Tree)
+	requirements, tests, err := e.detectionContext(ctx, []plan.Check{judgeCheck("plan", true)}, round.StartTarget.Tree)
 	if err != nil || len(check.MissingDetection(requirements, tests)) != 1 {
 		t.Fatalf("current index was not consulted: %v", err)
 	}
@@ -556,7 +556,7 @@ func TestAuthorizationsIncludeDecisionsAndDelegation(t *testing.T) {
 		}
 	}
 	round, _ := state.OpenRound()
-	_, data, _, err := e.judgmentInstruction(ctx, state, plan.Check{Aspect: "plan", Runner: "devkit-judge"}, form.InstructionPlanCheck, "authorization-test", round.StartTarget.Tree, form.TargetVersion{Kind: form.TargetPlan, Plan: 1}, e.Root(), nil, 1)
+	_, data, _, err := e.judgmentInstruction(ctx, state, judgeCheck("plan", false), form.InstructionPlanCheck, "authorization-test", round.StartTarget.Tree, form.TargetVersion{Kind: form.TargetPlan, Plan: 1}, e.Root(), nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -673,7 +673,7 @@ func TestDetectionResultSchema(t *testing.T) {
 func TestRoundOpeningTestsUncommittedAspect(t *testing.T) {
 	e, ctx := fixture(t)
 	configureStage(t, e, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
+		stage.Checks = []plan.Check{judgeCheck("plan", true)}
 	})
 	working(t, e, ctx)
 	state, err := e.load()
@@ -685,7 +685,7 @@ func TestRoundOpeningTestsUncommittedAspect(t *testing.T) {
 	if err := e.closeRound(state, run, round, router.Decision{Action: plan.Fix, Reason: "Revise the aspect before the next round"}); err != nil {
 		t.Fatal(err)
 	}
-	path := ".devkit/checks/plan.md"
+	path := ".devkit/principles/review/plan.md"
 	aspect, err := os.ReadFile(filepath.Join(e.Root(), path))
 	if err != nil {
 		t.Fatal(err)
@@ -864,7 +864,7 @@ func TestCommitRefreshWaitsForJudgeAndApproval(t *testing.T) {
 	e, ctx := fixture(t)
 	configureStage(t, e, func(stage *plan.Stage) {
 		stage.Gate.Required = true
-		stage.Checks = []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
+		stage.Checks = []plan.Check{judgeCheck("plan", true)}
 	})
 	work := working(t, e, ctx)
 	write(t, e.Root(), "README.md", "# Submitted target\n")
@@ -949,7 +949,7 @@ func TestOptionalCommandMutationStopsBeforeJudge(t *testing.T) {
 	}
 	write(t, e.Root(), "devkit.toml", string(settings)+"\n[commands.verify]\nexecutable = '/bin/sh'\nargs = ['-c', \"printf 'Changed target\\\\n' > README.md\"]\ntimeout_seconds = 5\n")
 	configureStage(t, e, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "command:verify", Runner: "command:verify"}, {Aspect: "plan", Runner: "devkit-judge"}}
+		stage.Checks = []plan.Check{{Aspect: "command:verify", Runner: "command:verify"}, judgeCheck("plan", false)}
 	})
 	work := working(t, e, ctx)
 	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
@@ -1182,7 +1182,7 @@ func TestDetectionPassRestoresMissingIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	checks := []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
+	checks := []plan.Check{judgeCheck("plan", true)}
 	result, pending, err := e.ensureDetection(ctx, state, checks, tree)
 	if err != nil || !pending || result.Instruction != nil {
 		t.Fatalf("accepted detection pass was not restored: %+v, %v", result, err)

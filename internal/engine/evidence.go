@@ -108,7 +108,7 @@ func (e *Engine) loopEditText(ctx context.Context, before, after, reason string)
 			return "", err
 		}
 		for _, path := range paths {
-			if path == hook || slices.Contains(differenceCategories([]string{path}, settings), config.MetaLoopEdit) {
+			if path == hook || slices.Contains(differenceCategories(e.Root(), []string{path}, settings), config.MetaLoopEdit) {
 				selected[path] = true
 			}
 		}
@@ -120,6 +120,11 @@ func (e *Engine) loopEditText(ctx context.Context, before, after, reason string)
 			fmt.Fprintf(&text, "- %s\n", path)
 		}
 	}
+	sources, err := e.sourceChangeText(ctx, before, after)
+	if err != nil {
+		return "", err
+	}
+	text.WriteString(sources)
 	comparison, err := e.comparison(ctx, before, after)
 	if err != nil {
 		return "", err

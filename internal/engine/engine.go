@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -20,6 +21,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 	"github.com/ildjenty/dev-kit/internal/plan"
+	"github.com/ildjenty/dev-kit/internal/source"
 	"github.com/ildjenty/dev-kit/internal/workspace"
 )
 
@@ -37,6 +39,7 @@ type Engine struct {
 	runDir         string
 	workDir        string
 	newWork        func() (string, string)
+	trees          map[string]fs.FS
 	schemasForWork func() (map[string][]byte, error)
 	readConfig     func(context.Context, string) (config.Config, error)
 }
@@ -751,10 +754,74 @@ func (e *Engine) settings(ctx context.Context, ref string) (config.Config, error
 	return e.readConfig(ctx, ref)
 }
 func (e *Engine) norms(ctx context.Context, ref string) ([]form.NormReference, error) {
-	return NormativeReferences(ctx, e.workspace, ref)
+	norms, err := NormativeReferences(ctx, e.workspace, ref)
+	if err != nil {
+		return nil, err
+	}
+	external, err := e.externalSources(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	for name, item := range external {
+		if !item.Norm {
+			continue
+		}
+		manifest, err := e.fixedManifest(ctx, ref, name, item)
+		if err != nil {
+			return nil, err
+		}
+		norms = append(norms, form.NormReference{Path: "source:" + name, TreeID: manifestHash(manifest)})
+	}
+	slices.SortFunc(norms, func(a, b form.NormReference) int { return strings.Compare(a.Path, b.Path) })
+	return norms, nil
 }
 
-// NormativeReferences returns sorted norm identities, distinguishing trees from blobs.
+// fixedManifest returns the manifest of an outside source fixed for ref. Before work exists,
+// it reads the current documents without fixing them.
+func (e *Engine) fixedManifest(ctx context.Context, ref, name string, item config.Source) (sourceManifest, error) {
+	if e.workRoot() == "" {
+		adapter, err := source.NewFiles(e.Root(), item.Path, nil, "", false)
+		if err != nil {
+			return nil, err
+		}
+		documents, err := adapter.Select("")
+		manifest := sourceManifest{}
+		for _, document := range documents {
+			manifest[document.ID] = source.ContentHash(document.Body)
+		}
+		return manifest, err
+	}
+	pin, err := e.pin(ctx, ref, false)
+	return pin[name], err
+}
+
+// repositoryNorms returns the repository paths of norms: every norm source inside the checkout,
+// devkit.toml, subagent definitions, and instruction files.
+func repositoryNorms(root string, settings config.Config) []string {
+	paths := []string{}
+	for _, item := range settings.KnowledgeSources() {
+		if location, inside := sourcePath(root, item.Path); inside && item.Norm {
+			paths = append(paths, location)
+		}
+	}
+	slices.Sort(paths)
+	return append(paths, "devkit.toml", ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md")
+}
+
+func sourcePath(root, location string) (string, bool) {
+	native := filepath.FromSlash(location)
+	if !filepath.IsAbs(native) {
+		return filepath.ToSlash(filepath.Clean(native)), true
+	}
+	rel, err := filepath.Rel(root, native)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return filepath.ToSlash(rel), true
+}
+
+// NormativeReferences returns sorted identities of norms inside the repository, distinguishing
+// trees from blobs. Each norm source is identified as a whole by its git tree or blob.
 func NormativeReferences(ctx context.Context, w *workspace.Workspace, ref string) ([]form.NormReference, error) {
 	source, err := w.ReadFile(ctx, ref, "devkit.toml")
 	if err != nil {
@@ -764,23 +831,20 @@ func NormativeReferences(ctx context.Context, w *workspace.Workspace, ref string
 	if err != nil {
 		return nil, err
 	}
-	p := settings.RepositoryPaths()
-	ids, err := w.NormativeIDs(ctx, ref, p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, "devkit.toml", ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md")
+	objects, err := w.TreeObjects(ctx, ref, repositoryNorms(w.Root(), settings)...)
 	if err != nil {
 		return nil, err
 	}
-	paths := make([]string, 0, len(ids))
-	for path := range ids {
+	paths := make([]string, 0, len(objects))
+	for path := range objects {
 		paths = append(paths, path)
 	}
 	slices.Sort(paths)
 	norms := []form.NormReference{}
 	for _, path := range paths {
-		norm := form.NormReference{Path: path}
-		if slices.Contains([]string{p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, ".claude/agents", ".codex/agents"}, path) {
-			norm.TreeID = ids[path]
-		} else {
-			norm.BlobID = ids[path]
+		norm := form.NormReference{Path: path, BlobID: objects[path].ID}
+		if objects[path].Type == "tree" {
+			norm.TreeID, norm.BlobID = norm.BlobID, ""
 		}
 		norms = append(norms, norm)
 	}
@@ -805,9 +869,9 @@ func (e *Engine) bundledSchema(source []byte) ([]byte, error) {
 }
 
 func (e *Engine) requireStartNorms(ctx context.Context, head string, settings config.Config) error {
-	p := settings.RepositoryPaths()
 	paths := []string{"devkit.toml"}
-	roots := []string{p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md"}
+	roots := repositoryNorms(e.Root(), settings)
+	roots = slices.DeleteFunc(roots, func(path string) bool { return path == "devkit.toml" })
 	committed, err := e.workspace.NormativeIDs(ctx, head, roots...)
 	if err != nil {
 		return err
@@ -823,8 +887,8 @@ func (e *Engine) requireStartNorms(ctx context.Context, head string, settings co
 	if err := e.workspace.RequireCommitted(ctx, paths...); err != nil {
 		return err
 	}
-	if _, err := e.workspace.ReadFile(ctx, head, p.Rules); err != nil {
-		return fmt.Errorf("required rules file %s: %w", p.Rules, err)
+	if _, err := e.logicalAsset(ctx, head, "rules.md"); err != nil {
+		return fmt.Errorf("required rules file %s: %w", settings.KnowledgeSources()["rules"].Path, err)
 	}
 	return nil
 }

@@ -1,6 +1,6 @@
 # principles
 
-The repository owns and develops the principles introduced by `devkit init`. The check perspective files use these principles as evaluation criteria. Do not turn rules that machines can judge deterministically into principles. Address matters concerning the loop mechanism in the mechanism's definitions; put rules concerning the target code and documents, along with their enforcement mechanisms, in `rules.md`. Leave mechanisms marked as "not implemented" until they are implemented.
+The repository owns and develops the principles introduced by `devkit init`. Checks select these principles and the review documents in `principles/review/` as their judgment criteria. Do not turn rules that machines can judge deterministically into principles. Address matters concerning the loop mechanism in the mechanism's definitions; put rules concerning the target code and documents, along with their enforcement mechanisms, in `rules.md`. Leave mechanisms marked as "not implemented" until they are implemented.
 
 - **`principles/engineering.md`**: When writing code
 - **`principles/designing.md`**: When deciding how to approach design
@@ -10,7 +10,7 @@ The repository owns and develops the principles introduced by `devkit init`. The
 - **`principles/verification.md`**: When making statements about tools, APIs, versions, causes, or measurements
 - **`principles/working.md`**: When deciding how to work
 - **`principles/context.md`**: When handling context and records
-- **`principles/harness.md`**: When reviewing the loop mechanism (parts, assembly, and plans) in a retrospective, or running a check from the `harness` perspective
+- **`principles/harness.md`**: When reviewing the loop mechanism (parts, assembly, and plans) in a retrospective, or running a check that selects `principles/review/harness.md`
 - **`principles/ui.md`**: When designing or building screens
 - **`principles/writing.md`**: When writing text for people to read (reports, PR descriptions, and documents)
 
@@ -39,4 +39,4 @@ In responses, agents must state which principle changed which decision. Merely n
 
 ## How to update principles
 
-Add or change only a small number of principles at a time. Do not record individual incidents verbatim; express them in a form that applies to other situations. If a principle overlaps with an existing one, add to the existing entry instead of creating another. In the retrospective in `stages/retrospective.md`, use the problems, oversights, and gaps or burdens in norms encountered during the work to check which perspectives and templates use each principle, whether any principles are unused, and whether any cost more than they are worth; consider organizing and reducing them. Review the entire set of norms only when a need becomes apparent. Treat changes to principles as changes to the loop itself and, by default, obtain human review before they first take effect.
+Add or change only a small number of principles at a time. Do not record individual incidents verbatim; express them in a form that applies to other situations. If a principle overlaps with an existing one, add to the existing entry instead of creating another. In the retrospective in `stages/retrospective.md`, use the problems, oversights, and gaps or burdens in norms encountered during the work to check which checks and templates select each principle, whether any principles are unused, and whether any cost more than they are worth; consider organizing and reducing them. Review the entire set of norms only when a need becomes apparent. Treat changes to principles as changes to the loop itself and, by default, obtain human review before they first take effect.

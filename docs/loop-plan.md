@@ -4,7 +4,7 @@
 
 kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開始)と、1[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から結果に対する判断までの往復)の進め方を固定し、利用者は雛形の構成を定める。
 
-雛形はリポジトリが所有し、既定の `.devkit/plans/<name>.json` を `devkit.toml` の `[paths] plans` で変更できる。計画は作業ごとの実行の記録であり、固定の `.devkit/run/` に保存して git 管理しない。後の作業にも効かせる決定は、要件・構造・規則に残す。
+雛形はリポジトリが所有し、既定の `.devkit/plans/<name>.json` を `devkit.toml` の `[sources.plans]` で変更できる。計画は作業ごとの実行の記録であり、固定の `.devkit/run/` に保存して git 管理しない。後の作業にも効かせる決定は、要件・構造・規則に残す。
 
 ## フォーマット
 
@@ -18,6 +18,10 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 
 計画には、要求のうち計画者が決められなかった点を任意の `open_questions`(文字列の配列)として記入する。曖昧な要求を推測で埋めない。完了条件の書き方と条件ごとの確認手段は[計画](architecture/data.md#計画-plan)に従う。
 
+判定者の check は `aspect` を判定の名前として持ち、基準は `criteria`、検出試験の例と仕様は `examples` のソース名と選び方で指定する。`criteria` と `examples` は check の約束の一部であり、雛形と異なる選び方は逸脱として承認の問いに差分を載せる。基準は規範のソースから選び、必須の基準の選び方が0件なら判定を始めず止める。`[detection] required = true` のとき、例を持たない判定者の check は必須にできない。
+
+雛形は計画者・作業者・判定者それぞれの `inputs` に入力の選び方を書ける。要件と規則を渡す既定値を持ち、ステージ定義そのものも `stages` ソースから選ぶ。本文の参照を解析して基準や入力を補わず、必要な文書は選び方に明示する。
+
 ステージの遷移 `done` には、次のステージ ID、作業の終了を表す `null`、残りの計画の作り直しを表す `"replan"` を書ける。`"replan"` では、そのステージの完了後に既存の再計画の経路で計画者が残りを作り直す。作り直した計画にも計画の check と承認の条件を適用する。要件定義を先に行って再計画するかは雛形の組み方で決まり、kit は要件定義を特別扱いしない。
 
 計画の検証では、`done` をたどって同じステージを再び通る循環を拒否する。`"replan"` または `null` で遷移の連鎖を終える。
@@ -30,7 +34,7 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 - **`fix`**: `implement → retrospective`。候補は `research` と `prototype` である。`implement` に必須の `command:test` と、観点 `test`・`diff` の check を置く。
 - **`docs`**: `implement → retrospective`。`implement` に観点 `wording` の check を置く。
 
-`default` は `purpose` の遷移 `done` を `"replan"` にする。最初の計画には、要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md` に書き、完了条件の案を作る。置き場所は `[paths] requirements` で変更できる。`purpose` の完了後、計画者が合意した完了条件で残りの計画を作り直し、人が承認する。`fix` と `docs` はこの形を使わない。
+`default` は `purpose` の遷移 `done` を `"replan"` にする。最初の計画には、要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md` に書き、完了条件の案を作る。置き場所は `[sources.requirements]` で変更できる。`purpose` の完了後、計画者が合意した完了条件で残りの計画を作り直し、人が承認する。`fix` と `docs` はこの形を使わない。
 
 すべての既定の雛形の `retrospective` は作業者が担当する。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけを置く。観点の判定者(runner)は、`init` が配る `devkit-judge` である。`--plan` の省略時は `default_plan` の値を使い、既定は `"default"` である。計画者は不要なステージを外してよく、外したステージは逸脱として承認の問いに載せる。
 
@@ -60,13 +64,13 @@ check とゲート(人の承認を待つ関門)は、次の規則で組む。
 - 画面・データ・外部との通信を変えるステージには、観点[「動作検証」](checks.md#動作検証)の check を置く。
 - 人によるレビューゲートの理由の書き方は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。人に確認する条件は[人への確認対象](architecture/guarantees.md#人への確認対象)で定める。
 - 画面のデザインを始める前のレビューゲートの承認対象は、[問いの定義](architecture/data.md#問い-question)に従う。
-- check の追加・必須化の判断は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-choose-mechanisms-based-on-the-failures-they-prevent-and-their-operational-burden)に従う。[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は、[検出試験](architecture/guarantees.md#検出試験)(観点ファイルが期待する判定を出せるかの試験)に従う。
+- check の追加・必須化の判断は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-choose-mechanisms-based-on-the-failures-they-prevent-and-their-operational-burden)に従う。[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は、[検出試験](architecture/guarantees.md#検出試験)(選んだ基準で期待する判定を出せるかの試験)に従う。
 
 ステージ間の前提と戻り先の設計は [`assets/principles/harness.md` の原則3](../assets/principles/harness.md#3-define-which-stage-to-return-to-when-assumptions-fail)に従う。戻り先の表現は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)、入力の組み立ては[作業の指示](architecture/flow.md#作業の指示)、再計画は[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
 
 ### 計画を作る規則
 
-計画への入力は、雛形、人の要求の原文、`start` に渡した課題、要件の正本、リポジトリの事実である。要件の正本は `.devkit/requirements.md` であり、`[paths] requirements` で変更できる。原文を観測できていなければ原文なしと記録する。brief の「元に戻せないもの」に渡す範囲は[規則と強制手段](architecture/data.md#規則と強制手段-rules)に従う。
+計画への入力は、雛形、人の要求の原文、`start` に渡した課題、要件の正本、リポジトリの事実である。要件の正本は `.devkit/requirements.md` であり、`[sources.requirements]` で変更できる。原文を観測できていなければ原文なしと記録する。brief の「元に戻せないもの」に渡す範囲は[規則と強制手段](architecture/data.md#規則と強制手段-rules)に従う。
 
 課題ごとの雛形の選択と計画者による取捨の範囲は[作業の開始](architecture/flow.md#作業の開始)に従い、開始ステージの変更を含む逸脱の判定は[計画](architecture/data.md#計画-plan)で定める。
 
@@ -89,7 +93,7 @@ check とゲート(人の承認を待つ関門)は、次の規則で組む。
 - 人の要求の原文と `start` の課題。
 - ID 付きの完了条件。
 - 採用したステージと外したステージ、雛形からの逸脱の明示。
-- 各ステージの必須 check。
+- 各ステージの必須 check と、雛形から変えた `criteria`・`examples` の選び方の差分。
 - 課題固有の元に戻せないものと、宣言した外部操作。
 - `open_questions` に記入した未決事項。
 

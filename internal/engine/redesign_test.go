@@ -407,7 +407,7 @@ func TestRejectedMetaLoopEditUsesConfirmedNorms(t *testing.T) {
 }
 
 func TestStartRequiresCommittedInitialization(t *testing.T) {
-	for _, pending := range []string{"HEAD", "devkit.toml", ".devkit/plans/test.json", ".devkit/plans/untracked.json", ".devkit/rules.md", ".devkit/checks/plan.md", ".devkit/templates/brief/work.md.tmpl", ".devkit/principles/harness.md", ".devkit/stages/implement.md", ".claude/agents/devkit-judge.md", ".codex/agents/devkit-judge.toml", "AGENTS.md", "CLAUDE.md"} {
+	for _, pending := range []string{"HEAD", "devkit.toml", ".devkit/plans/test.json", ".devkit/plans/untracked.json", ".devkit/rules.md", ".devkit/principles/review/plan.md", ".devkit/templates/brief/work.md.tmpl", ".devkit/principles/harness.md", ".devkit/stages/implement.md", ".claude/agents/devkit-judge.md", ".codex/agents/devkit-judge.toml", "AGENTS.md", "CLAUDE.md"} {
 		t.Run(pending, func(t *testing.T) {
 			e, ctx := fixture(t)
 			if pending == "HEAD" {

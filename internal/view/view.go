@@ -19,6 +19,7 @@ import (
 // records used to load Ledger; Decisions must come from its ResolveDecisions query.
 // Targets and Norms identify the current comparison context supplied by the caller.
 // No files, git commands, or validity callbacks are accessed during generation.
+// StructureText is the structure record body shown when it is not a drawable structure JSON.
 type Input struct {
 	Ledger           *ledger.State
 	Records          []ledger.Record
@@ -26,7 +27,14 @@ type Input struct {
 	Targets          []form.TargetVersion
 	Norms            []form.NormReference
 	Structure        *Structure
+	StructureText    *StructureText
 	StructureHistory []StructureRevision
+}
+
+// StructureText is a structure record body and its content hash.
+type StructureText struct {
+	Version string
+	Body    string
 }
 
 type link struct {
@@ -68,6 +76,7 @@ type diagram struct {
 	Changes   []string
 	Modules   []Module
 	Mermaid   string
+	Text      string
 	Reference link
 }
 
@@ -418,6 +427,8 @@ func structureDiagrams(input Input) ([]diagram, []diagram) {
 			}
 		}
 		diagrams = append(diagrams, current)
+	} else if input.StructureText != nil {
+		diagrams = append(diagrams, diagram{ID: anchor("structure", input.StructureText.Version), Title: "Current structure record", Version: input.StructureText.Version, Text: input.StructureText.Body})
 	}
 	for _, revision := range input.StructureHistory {
 		entry := diagram{Title: "Structure at commit " + revision.Commit}

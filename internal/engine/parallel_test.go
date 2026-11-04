@@ -27,7 +27,7 @@ func splitWork(t *testing.T, maxWorkers int, extraUnits ...plan.Unit) (*Engine, 
 		t.Fatal(err)
 	}
 	template.Stages[0].Split = true
-	template.Stages[0].Checks = []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
+	template.Stages[0].Checks = []plan.Check{judgeCheck("plan", true)}
 	write(t, e.Root(), ".devkit/plans/test.json", string(marshal(t, template)))
 	settings, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
 	if err != nil {

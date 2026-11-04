@@ -8,7 +8,7 @@ import (
 	"io/fs"
 )
 
-//go:embed checks examples hosts plans principles router rules schemas skills stages templates
+//go:embed examples hosts plans principles router rules schemas skills stages templates
 var files embed.FS
 
 // FS returns the embedded assets.

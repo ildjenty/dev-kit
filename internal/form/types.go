@@ -49,9 +49,12 @@ const (
 )
 
 // TargetVersion identifies the target using the field corresponding to Kind.
+// For a tree, Sources hashes the set of source names, document IDs, and content hashes of
+// documents edited through copies outside the repository; it is empty when there are none.
 type TargetVersion struct {
 	Kind      TargetKind `json:"kind"`
 	Tree      string     `json:"tree,omitempty"`
+	Sources   string     `json:"sources,omitempty"`
 	Plan      int        `json:"plan,omitempty"`
 	Structure string     `json:"structure,omitempty"`
 }
@@ -140,9 +143,11 @@ const (
 )
 
 // ApprovalTarget identifies the approval target using the field corresponding to Kind.
+// A tree approval carries the same Sources identity as the approved target version.
 type ApprovalTarget struct {
 	Kind       ApprovalTargetKind       `json:"kind"`
 	Tree       string                   `json:"tree,omitempty"`
+	Sources    string                   `json:"sources,omitempty"`
 	Plan       int                      `json:"plan,omitempty"`
 	External   *ExternalOperationTarget `json:"external,omitempty"`
 	DecisionID string                   `json:"decision_id,omitempty"`

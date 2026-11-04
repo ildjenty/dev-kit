@@ -10,16 +10,23 @@
 // Callers supply JSON bytes for submitted files and agent interpretations for
 // observed human answers. Result points to generated briefs and target paths.
 // InstructionRunner supplies the runner resolver used by hook collection.
-// NormativeReferences shares sorted tree/blob identities with CLI display.
+// NormativeReferences shares sorted tree/blob identities of norms inside the
+// repository; CurrentIdentity adds sources outside it for CLI display.
 //
-// Plan checks use the configured aspect and runner (plan and devkit-judge by default). Detection instructions ask
+// Knowledge comes from the sources configured in devkit.toml. Sources inside the
+// repository are read from the fixed git tree. Sources outside it are copied under
+// the run directory when a round opens or an out-of-round instruction is issued;
+// workers edit a separate copy, and approved edits are written through the adapter
+// with the expected content hash and recorded as ledger.SourceWrite records.
+//
+// Plan checks use the configured aspect, runner, criteria, and examples ([plan_check]). Detection instructions ask
 // the same runner as the required check for form.DetectionResult.
 // Options defers forward-asset loading so pause, resume, and status can use the
 // embedded schemas while configuration is being edited.
 // Instruction records retain issuance facts for rebuilding deleted briefs.
 // Commit recovery records the starting HEAD in a commit_base artifact before
 // committing, then compares the current HEAD tree with the evaluated target. The passing
-// index at .devkit/detect.json is a JSON array of check.DetectionTest values.
+// index at [state] detect (.devkit/detect.json by default) is a JSON array of check.DetectionTest values.
 // Registered judgment commands receive the JSON request on standard input;
 // detection commands receive the request and detection examples together.
 //

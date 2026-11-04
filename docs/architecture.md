@@ -34,14 +34,14 @@ graph LR
 
 1. `devkit init` が導入したファイルをコミットしたリポジトリで、`devkit start --plan <name> <課題>` により[作業を開始](architecture/flow.md#作業の開始)する。`--plan` の省略時は `default_plan` の値(既定 `default`)を使う。計画者は要求の原文、`start` の課題、既存の要件から計画を作る。UserPromptSubmit は束縛のないセッションでも人の最新の入力を1件保持し、`start` が作業に結び付ける。観測がなければ原文なしと記録する。
 2. 計画の check を通す。完了条件ごとの確認手段と、その妥当性・網羅性の判断は[計画](architecture/data.md#計画-plan)に従う。既定では最初の計画、承認済みの完了条件の ID または文面が変わる計画、雛形から逸脱する計画、外部操作を宣言する計画を人が承認する。人が承認した完了条件を作業の完了基準とする。`open_questions` が空でない計画は承認方針によらず人が承認する。未決事項と再計画の扱いは[計画の check と人によるレビュー](loop-plan.md#計画の-check-と人によるレビュー)に従う。
-3. `devkit next` が[作業の指示](architecture/flow.md#作業の指示)としてステージ(作業を区切る単位)の brief を返す。規範はラウンド開始時に固定する。既定の `[approval] meta_loop_edit = "confirm"` では、未確認のループ自身の変更があれば、効力を持つラウンドを開く前に人へ問いを出して止まる。
+3. `devkit next` が[作業の指示](architecture/flow.md#作業の指示)としてステージ(作業を区切る単位)の brief を返す。規範はソース全体をラウンド開始時に固定し、成果は選んだ本文を固定する。判定対象には git のツリーと外部の成果の文書のソース名・ID・内容ハッシュの集合を含める。既定の `[approval] meta_loop_edit = "confirm"` では、未確認のループ自身の変更があれば、効力を持つラウンドを開く前に人へ問いを出して止まる。
 4. エージェントが作業し、終了ブロックを `devkit submit` で[提出する](architecture/flow.md#作業結果の提出)。目的のステージでは要件、構造のステージでは構造の記録を更新する。
 5. 判定待ちでは `devkit` が判定者に先立って `command:` の check を実行する。未登録のコマンドは修正可能な `FAIL` とし、作業者が検証の手段と登録を用意する。判定者サブエージェントの結果は[作業結果の判定](architecture/flow.md#作業結果の判定)に従って受理する。
 6. 判定後は [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)が判断し、[判断後の処理](architecture/flow.md#router-の判断)へ進む。ステージの遷移が `done: "replan"` なら、完了後に既存の再計画の経路で計画者が残りを作り直し、計画の check と承認の条件を適用する。問いへの回答は[人の回答](architecture/flow.md#人の回答と再開)、ステージの完了の確定は[完了条件](architecture/guarantees.md#完了条件)に従う。
-7. 最後の[振り返り](stages.md#振り返り)で、すべての判定・指摘と人の回答を見直し、再発防止をリポジトリの検査と規範に反映する。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけで確認する。規範を変えた場合は、既定では効力を持つ前、最後のラウンドなら完了時のコミット前に人が確認する。変えなければループ自身の変更に対する確認は不要である。
+7. 最後の[振り返り](stages.md#振り返り)で、すべての判定・指摘と人の回答を見直し、再発防止をリポジトリの検査と書き込めるソースの規範に反映する。読み取り専用のソースへの改善は教訓として管理者へ引き継ぐ。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけで確認する。規範を変えた場合は、既定では効力を持つ前、最後のラウンドなら完了時のコミット前に人が確認する。変えなければループ自身の変更に対する確認は不要である。
 8. セッションをまたぐ再開は、[人の回答と再開](architecture/flow.md#人の回答と再開)に従う。
 
-既定の `default` は `purpose` の遷移 `done` を `"replan"` とし、最初の計画に要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md`(`[paths] requirements` で変更可能)に書き、完了条件の案を作る。`purpose` の完了後、合意した完了条件で残りを再計画し、人が承認する。`fix` と `docs` はこの形を使わない。kit は要件定義を特別扱いせず、雛形の遷移に従う。
+既定の `default` は `purpose` の遷移 `done` を `"replan"` とし、最初の計画に要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md`(`[sources.requirements]` で変更可能)に書き、完了条件の案を作る。`purpose` の完了後、合意した完了条件で残りを再計画し、人が承認する。`fix` と `docs` はこの形を使わない。kit は要件定義を特別扱いせず、雛形の遷移に従う。
 
 [ラウンド](architecture/data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)の判定待ちでは、[Judgment](architecture/data.md#check-の結果-judgment)(`command:` の check を含む判定結果)を受理して次の行動を決める。
 
@@ -53,10 +53,10 @@ graph LR
 
 ## 利用者が組むもの
 
-利用者は `init` が配る既定を起点に、リポジトリが所有する規範と検査を育てる。資産のパスは `devkit.toml` の `[paths]` で変更できる。
+利用者は `init` が配る既定を起点に、リポジトリが所有する規範と検査を育てる。知識の接続先と配置は `devkit.toml` の `[sources.<名前>]` で変更できる。必須の「選ぶ」と任意の「書く」を持つアダプタで接続し、規範はソース全体を固定する。既定は `files` である。検出試験の索引は `[state] detect`(既定 `.devkit/detect.json`)で設定する。
 
 1. **雛形**: `.devkit/plans/<name>.json` を編集する。既定は `default`・`fix`・`docs` であり、[既定の雛形](loop-plan.md#既定の雛形)から選ぶ。
-2. **観点と原則**: `.devkit/checks/<観点ID>.md`、`.devkit/checks/<観点ID>/` の検出試験の例、`.devkit/principles/` を育てる。[検出試験](architecture/guarantees.md#検出試験)で観点の判定能力を確かめる。
+2. **判定の基準と例**: `.devkit/principles/` の原則と用途別文書、`.devkit/examples/<観点ID>/` の検出試験の例と仕様を育てる。check は `criteria` と `examples` で文書を明示して選ぶ。[検出試験](architecture/guarantees.md#検出試験)で観点の判定能力を確かめる。
 3. **検証コマンド(`[commands.<name>]`)**: 雛形の `command:<name>` の check(終了コードによる検証)から使う。テストのないリポジトリでも、必須の `command:test` の指摘を受けて作業の中で仕組みと登録を作る。期限は登録ごとに必須である。
 4. **pre-commit**: リポジトリで有効な pre-commit にテストと lint を書く。既存の hook の扱いと実行は[完了条件](architecture/guarantees.md#完了条件)に従う([例](architecture/examples.md#pre-commit))。
 5. **ステージ・テンプレート・規則**: `.devkit/stages/`、`.devkit/templates/`、`.devkit/rules.md` を育てる。作業をまたぐ要件は `.devkit/requirements.md`、構造は `.devkit/structure.json` に残す。規範と成果の区別は[リポジトリ側の構成](repository.md#リポジトリ側の構成)に従う。

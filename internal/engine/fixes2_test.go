@@ -23,7 +23,7 @@ func TestDetectionIndexUsesInstructionReferenceOnAcceptAndRestore(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, e.Root(), "devkit.toml", string(settings)+"\n[paths]\ndetect = '.devkit/fixed-detect.json'\n")
+	write(t, e.Root(), "devkit.toml", string(settings)+"\n[state]\ndetect = '.devkit/fixed-detect.json'\n")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure detection index path")
 	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
@@ -210,7 +210,7 @@ func TestDetectionHistoryIncludesPassedAndFailedCases(t *testing.T) {
 func TestFixRoundDiffAndClassificationAreCumulative(t *testing.T) {
 	e, ctx := fixture(t)
 	configureStage(t, e, func(s *plan.Stage) {
-		s.Checks = []plan.Check{{Aspect: "diff", Runner: "devkit-judge"}}
+		s.Checks = []plan.Check{judgeCheck("diff", false)}
 	})
 	work := working(t, e, ctx)
 	write(t, e.Root(), "go.mod", "module example.invalid/cumulative\n")
@@ -427,7 +427,7 @@ func TestMalformedJudgeAndDetectionResultsReissue(t *testing.T) {
 		t.Run(string(kind), func(t *testing.T) {
 			e, ctx := fixture(t)
 			configureStage(t, e, func(s *plan.Stage) {
-				s.Checks = []plan.Check{{Aspect: "wording", Runner: "devkit-judge"}}
+				s.Checks = []plan.Check{judgeCheck("wording", false)}
 			})
 			start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
 			if err != nil {
@@ -483,7 +483,11 @@ func TestMalformedJudgeAndDetectionResultsReissue(t *testing.T) {
 			for i := range before.Request.Norms {
 				before.Request.Norms[i].Content = strings.ReplaceAll(before.Request.Norms[i].Content, result.Instruction.ID+"-history.md", reissued.Instruction.ID+"-history.md")
 			}
-			if before.Context.WorkHistory != after.Context.WorkHistory {
+			if kind == form.InstructionDetectionTest {
+				if before.Context != nil && before.Context.WorkHistory != "" || after.Context != nil && after.Context.WorkHistory != "" {
+					t.Fatal("detection request received a work history")
+				}
+			} else if before.Context.WorkHistory != after.Context.WorkHistory {
 				t.Fatal("reissued request changed fixed history contents")
 			}
 			if !reflect.DeepEqual(before.Request, after.Request) || before.Reference != after.Reference || !reflect.DeepEqual(before.Detection, after.Detection) {

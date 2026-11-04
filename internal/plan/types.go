@@ -75,16 +75,30 @@ type Runner string
 
 func (r Runner) IsCommand() bool { return strings.HasPrefix(string(r), "command:") }
 
+// Selection names a knowledge source and an adapter-specific selector.
+type Selection struct {
+	Source string `json:"source"`
+	Select string `json:"select"`
+}
+
+// DefaultInputs returns the knowledge always supplied to planners, workers, and judges.
+func DefaultInputs() []Selection {
+	return []Selection{{Source: "requirements", Select: ""}, {Source: "rules", Select: ""}}
+}
+
 // The caller resolves judge subagent names and judgment command names.
 type Check struct {
-	Aspect                 string   `json:"aspect"`
-	Runner                 Runner   `json:"runner"`
-	Required               bool     `json:"required"`
-	CompletionConditionIDs []string `json:"completion_condition_ids,omitempty"`
-	Target                 string   `json:"target,omitempty"`
+	Criteria               []Selection `json:"criteria,omitempty"`
+	Examples               *Selection  `json:"examples,omitempty"`
+	Aspect                 string      `json:"aspect"`
+	Runner                 Runner      `json:"runner"`
+	Required               bool        `json:"required"`
+	CompletionConditionIDs []string    `json:"completion_condition_ids,omitempty"`
+	Target                 string      `json:"target,omitempty"`
 }
 
 type Stage struct {
+	Inputs      []Selection `json:"inputs,omitempty"`
 	ID          string      `json:"id"`
 	Split       bool        `json:"split,omitempty"`
 	Units       []Unit      `json:"units,omitempty"`
@@ -194,12 +208,29 @@ func (p Plan) Declares(operation ExternalOperation) bool {
 	return slices.Contains(p.ExternalOperations, operation)
 }
 
+// WorkerInputs returns the always-supplied inputs followed by stage-specific inputs.
+func (s Stage) WorkerInputs() []Selection {
+	inputs := DefaultInputs()
+	for _, input := range s.Inputs {
+		if !slices.Contains(inputs, input) {
+			inputs = append(inputs, input)
+		}
+	}
+	return inputs
+}
+
 func cloneCheck(c Check) Check {
+	c.Criteria = slices.Clone(c.Criteria)
+	if c.Examples != nil {
+		examples := *c.Examples
+		c.Examples = &examples
+	}
 	c.CompletionConditionIDs = slices.Clone(c.CompletionConditionIDs)
 	return c
 }
 
 func cloneStage(s Stage) Stage {
+	s.Inputs = slices.Clone(s.Inputs)
 	s.Units = slices.Clone(s.Units)
 	s.Checks = slices.Clone(s.Checks)
 	for i := range s.Checks {

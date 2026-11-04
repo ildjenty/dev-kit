@@ -30,15 +30,6 @@ type SkillTemplate struct {
 	References  string
 }
 
-// AspectTemplate is the input to an aspect file template.
-type AspectTemplate struct {
-	ID           string
-	Checks       string
-	Blocking     string
-	DoNotReport  string
-	OutputFormat string
-}
-
 // PRTemplate is the input to a PR body template.
 type PRTemplate struct {
 	Summary      string

@@ -9,7 +9,21 @@
         {
           "aspect": "wording",
           "runner": "devkit-judge",
-          "required": true
+          "required": true,
+          "criteria": [
+            {
+              "source": "principles",
+              "select": "review/wording.md"
+            },
+            {
+              "source": "principles",
+              "select": "writing.md"
+            }
+          ],
+          "examples": {
+            "source": "examples",
+            "select": "wording/spec.json"
+          }
         }
       ],
       "gate": {
@@ -34,7 +48,49 @@
         {
           "aspect": "harness",
           "runner": "devkit-judge",
-          "required": true
+          "required": true,
+          "criteria": [
+            {
+              "source": "principles",
+              "select": "review/harness.md"
+            },
+            {
+              "source": "principles",
+              "select": "harness.md"
+            },
+            {
+              "source": "principles",
+              "select": "working.md"
+            },
+            {
+              "source": "principles",
+              "select": "review/README.md"
+            },
+            {
+              "source": "stages",
+              "select": "README.md"
+            },
+            {
+              "source": "stages",
+              "select": "retrospective.md"
+            },
+            {
+              "source": "plans",
+              "select": "README.md"
+            },
+            {
+              "source": "examples",
+              "select": "README.md"
+            },
+            {
+              "source": "templates",
+              "select": "brief/judgment.md.tmpl"
+            }
+          ],
+          "examples": {
+            "source": "examples",
+            "select": "harness/spec.json"
+          }
         }
       ],
       "gate": {
@@ -80,7 +136,25 @@
         {
           "aspect": "contract",
           "runner": "devkit-judge",
-          "required": true
+          "required": true,
+          "criteria": [
+            {
+              "source": "principles",
+              "select": "review/contract.md"
+            },
+            {
+              "source": "principles",
+              "select": "data.md"
+            },
+            {
+              "source": "principles",
+              "select": "engineering.md"
+            }
+          ],
+          "examples": {
+            "source": "examples",
+            "select": "contract/spec.json"
+          }
         }
       ],
       "gate": {

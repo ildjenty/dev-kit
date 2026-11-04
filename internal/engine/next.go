@@ -249,7 +249,11 @@ func (e *Engine) recordSubmission(ctx context.Context, state *ledger.State, run 
 		if err != nil {
 			return err
 		}
-		artifact = &ledger.Artifact{Before: round.StartTarget, After: form.TargetVersion{Kind: form.TargetTree, Tree: snapshot.Tree}, CompletionConditionIDs: []string{}, ChangeKind: "submission", Decisions: []form.Reference{}}
+		after, err := e.treeTarget(snapshot.Tree)
+		if err != nil {
+			return err
+		}
+		artifact = &ledger.Artifact{Before: round.StartTarget, After: after, CompletionConditionIDs: []string{}, ChangeKind: "submission", Decisions: []form.Reference{}}
 		if _, err = e.append(artifact); err != nil {
 			return err
 		}
@@ -305,7 +309,7 @@ func (e *Engine) saveWorkerConfirmation(state *ledger.State, run *ledger.StageRu
 	if text == "" {
 		text = "The worker stopped to request confirmation."
 	}
-	q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}, "worker_confirmation", text, run.StageID)
+	q := e.question(approvalTree(target), "worker_confirmation", text, run.StageID)
 	q.NextStage = *next
 	if source := unitResultRound(state, run.ID); source != nil {
 		q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
@@ -401,7 +405,10 @@ func (e *Engine) refreshTarget(ctx context.Context, state *ledger.State, run *le
 	if err != nil {
 		return Result{}, err
 	}
-	target := form.TargetVersion{Kind: form.TargetTree, Tree: snapshot.Tree}
+	target, err := e.treeTarget(snapshot.Tree)
+	if err != nil {
+		return Result{}, err
+	}
 	if _, err = e.append(&ledger.Artifact{Before: round.StartTarget, After: target, ChangeKind: "target_refresh", CompletionConditionIDs: []string{}, Decisions: []form.Reference{}, Commit: commit}); err != nil {
 		return Result{}, err
 	}
@@ -425,10 +432,9 @@ func (e *Engine) refreshTarget(ctx context.Context, state *ledger.State, run *le
 	return e.judgeRound(ctx, state, p, stage, run, &copy)
 }
 
-func differenceCategories(paths []string, settings config.Config) []string {
+func differenceCategories(root string, paths []string, settings config.Config) []string {
 	categories := []string{}
-	p := settings.RepositoryPaths()
-	roots := []string{p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, "devkit.toml", ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md", ".claude/settings.json", ".codex/hooks.json", ".codex/config.toml", ".codex/rules", ".agents/skills", ".husky", ".pre-commit-config.yaml"}
+	roots := append(repositoryNorms(root, settings), ".claude/settings.json", ".codex/hooks.json", ".codex/config.toml", ".codex/rules", ".agents/skills", ".husky", ".pre-commit-config.yaml")
 	for _, path := range paths {
 		if settings.IsDependencyFile(path) {
 			categories = append(categories, config.DependencyChanged)
@@ -454,12 +460,23 @@ func (e *Engine) metaLoopChanged(ctx context.Context, before, after string) (boo
 		if err != nil {
 			return false, err
 		}
-		if slices.Contains(differenceCategories(paths, settings), config.MetaLoopEdit) {
+		if slices.Contains(differenceCategories(e.Root(), paths, settings), config.MetaLoopEdit) {
 			return true, nil
 		}
 	}
 	hookPath, err := e.workspace.PreCommitPath(ctx)
 	return slices.Contains(paths, hookPath), err
+}
+
+// startNormsChanged reports loop edits before a round: changes to norms inside the repository
+// and changes to the fixed documents of norm sources outside it.
+func (e *Engine) startNormsChanged(ctx context.Context, before, after string) (bool, error) {
+	changed, err := e.metaLoopChanged(ctx, before, after)
+	if err != nil || changed {
+		return changed, err
+	}
+	changes, err := e.externalNormChanges(ctx, before, after)
+	return len(changes) > 0, err
 }
 
 // confirmedLoopEdits returns the tree whose loop edits a human last approved (the work's base
@@ -502,15 +519,18 @@ func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run
 	if err != nil {
 		return "", nil, err
 	}
+	if err := e.refreshSources(ctx, tree); err != nil {
+		return "", nil, err
+	}
 	if settings.MetaLoopEditApproval() == "allow" {
 		return tree, nil, nil
 	}
-	changed, err := e.metaLoopChanged(ctx, base, tree)
+	changed, err := e.startNormsChanged(ctx, base, tree)
 	if err != nil || !changed {
 		return tree, nil, err
 	}
 	if rejected != nil {
-		changed, err := e.metaLoopChanged(ctx, rejected.ApprovalTarget.Tree, tree)
+		changed, err := e.startNormsChanged(ctx, rejected.ApprovalTarget.Tree, tree)
 		if err != nil {
 			return "", nil, err
 		}
@@ -558,9 +578,42 @@ func (e *Engine) planApprovalText(state *ledger.State, template plan.PlanTemplat
 		}
 	}
 	deviations := plan.Deviations(template, p)
-	fmt.Fprintf(&text, "\nDeviations:\n%s\n\nIrreversible items:\n%s\n\nExternal operations:\n%s\n\nOpen questions (answer with revision instructions):\n%s",
-		approvalJSON(deviations, len(deviations)), approvalList(p.IrreversibleDecisions), approvalJSON(p.ExternalOperations, len(p.ExternalOperations)), approvalList(p.OpenQuestions))
+	fmt.Fprintf(&text, "\nDeviations:\n%s\n%s\nIrreversible items:\n%s\n\nExternal operations:\n%s\n\nOpen questions (answer with revision instructions):\n%s",
+		approvalJSON(deviations, len(deviations)), selectionDifferences(template, p, deviations), approvalList(p.IrreversibleDecisions), approvalJSON(p.ExternalOperations, len(p.ExternalOperations)), approvalList(p.OpenQuestions))
 	return text.String(), nil
+}
+
+// selectionDifferences shows the template and plan selections of checks whose criteria or
+// examples deviate from the template.
+func selectionDifferences(template plan.PlanTemplate, p plan.Plan, deviations []plan.Deviation) string {
+	var text strings.Builder
+	for _, deviation := range deviations {
+		if deviation.Kind != plan.ChangedCriteria && deviation.Kind != plan.ChangedExamples {
+			continue
+		}
+		before, after := stageCheck(append(slices.Clone(template.Stages), template.OptionalStages...), deviation), stageCheck(p.Stages, deviation)
+		fmt.Fprintf(&text, "\n%s of %s (%s) in %s:\n- Template: %s\n- Plan: %s\n", deviation.Kind, deviation.Aspect, deviation.Runner, deviation.StageID,
+			approvalJSON(selectionsOf(before, deviation.Kind), 1), approvalJSON(selectionsOf(after, deviation.Kind), 1))
+	}
+	return text.String()
+}
+
+func stageCheck(stages []plan.Stage, deviation plan.Deviation) plan.Check {
+	for _, stage := range stages {
+		for _, item := range stage.Checks {
+			if stage.ID == deviation.StageID && item.Aspect == deviation.Aspect && item.Runner == deviation.Runner {
+				return item
+			}
+		}
+	}
+	return plan.Check{}
+}
+
+func selectionsOf(item plan.Check, kind plan.DeviationKind) any {
+	if kind == plan.ChangedCriteria {
+		return item.Criteria
+	}
+	return item.Examples
 }
 
 // approvalList renders strings as a bulleted list, or "None" when empty.
@@ -650,11 +703,8 @@ func (e *Engine) recoverCommit(ctx context.Context, state *ledger.State, run *le
 }
 
 func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round) (Result, error) {
-	if err := e.active(); err != nil {
-		return Result{}, err
-	}
-	if err := e.checkCommitSession(ctx, state); err != nil {
-		return Result{}, err
+	if r, handled, err := e.prepareCommit(ctx, state, p, stage, run, round); handled || err != nil {
+		return r, err
 	}
 	head, err := e.workspace.Head(ctx)
 	if err != nil {
@@ -710,6 +760,17 @@ func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.P
 		return e.refreshTarget(ctx, state, run, round, commit.Commit)
 	}
 	return e.recordStageCommit(p, stage, run, round, commit)
+}
+
+// prepareCommit checks the session and writes approved edits of outside sources before commit.
+func (e *Engine) prepareCommit(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round) (Result, bool, error) {
+	if err := e.active(); err != nil {
+		return Result{}, false, err
+	}
+	if err := e.checkCommitSession(ctx, state); err != nil {
+		return Result{}, false, err
+	}
+	return e.applySourceWrites(ctx, state, p, stage, run, round)
 }
 
 // RecoverExternal queries an interrupted external operation without repeating its write.
@@ -791,7 +852,10 @@ func (e *Engine) replaceQuestionTarget(ctx context.Context, round *ledger.Round,
 	if snapshot.Tree != tree {
 		return errors.New("the question target changed while it was being captured")
 	}
-	target := form.TargetVersion{Kind: form.TargetTree, Tree: tree}
+	target, err := e.treeTarget(tree)
+	if err != nil {
+		return err
+	}
 	if _, err = e.append(&ledger.Artifact{Before: round.StartTarget, After: target, ChangeKind: "question_target_change", CompletionConditionIDs: []string{}, Decisions: []form.Reference{}}); err != nil {
 		return err
 	}
@@ -1177,6 +1241,9 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 		r, err := e.issueQuestion(state, *question)
 		return r, true, err
 	}
+	if err := e.prepareEditCopies(ctx, startRef); err != nil {
+		return Result{}, false, err
+	}
 	if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), startRef, run.ID); err != nil || pending {
 		if err != nil || r.Instruction != nil || r.Paused {
 			return r, true, err
@@ -1187,7 +1254,11 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 	if err != nil {
 		return Result{}, false, err
 	}
-	round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: snapshot.Tree}, NormReference: startRef, Norms: norms}
+	start, err := e.treeTarget(snapshot.Tree)
+	if err != nil {
+		return Result{}, false, err
+	}
+	round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: start, NormReference: startRef, Norms: norms}
 	if stage.Split && len(stage.Units) > 0 {
 		head, err := e.workspace.Head(ctx)
 		if err != nil {

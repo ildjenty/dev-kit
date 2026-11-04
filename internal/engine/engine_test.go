@@ -411,7 +411,7 @@ func TestRequiredCommandFailsBeforeJudgeAndStopsAtLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	template.Stages[0].Checks = []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: false}, {Aspect: "command:fail", Runner: "command:fail", Required: true}}
+	template.Stages[0].Checks = []plan.Check{judgeCheck("plan", false), {Aspect: "command:fail", Runner: "command:fail", Required: true}}
 	template.Stages[0].Limits = plan.Limits{MaxRounds: 1, MaxNoProgress: 1}
 	write(t, e.Root(), ".devkit/plans/test.json", string(marshal(t, template)))
 	git(t, e.Root(), "add", ".")
@@ -587,7 +587,7 @@ func TestJudgeAcceptanceUsesFirstCollectedResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	template.Stages[0].Checks = []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
+	template.Stages[0].Checks = []plan.Check{judgeCheck("plan", true)}
 	write(t, e.Root(), ".devkit/plans/test.json", string(marshal(t, template)))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Require independent judgment")

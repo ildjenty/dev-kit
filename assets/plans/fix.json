@@ -14,12 +14,64 @@
         {
           "aspect": "test",
           "runner": "devkit-judge",
-          "required": true
+          "required": true,
+          "criteria": [
+            {
+              "source": "principles",
+              "select": "review/test.md"
+            },
+            {
+              "source": "principles",
+              "select": "testing.md"
+            }
+          ],
+          "examples": {
+            "source": "examples",
+            "select": "test/spec.json"
+          }
         },
         {
           "aspect": "diff",
           "runner": "devkit-judge",
-          "required": true
+          "required": true,
+          "criteria": [
+            {
+              "source": "principles",
+              "select": "review/diff.md"
+            },
+            {
+              "source": "principles",
+              "select": "engineering.md"
+            },
+            {
+              "source": "principles",
+              "select": "working.md"
+            },
+            {
+              "source": "principles",
+              "select": "designing.md"
+            },
+            {
+              "source": "principles",
+              "select": "writing.md"
+            },
+            {
+              "source": "principles",
+              "select": "verification.md"
+            },
+            {
+              "source": "templates",
+              "select": "pr.md.tmpl"
+            },
+            {
+              "source": "rules",
+              "select": ""
+            }
+          ],
+          "examples": {
+            "source": "examples",
+            "select": "diff/spec.json"
+          }
         }
       ],
       "gate": {
@@ -49,12 +101,68 @@
         {
           "aspect": "test",
           "runner": "devkit-judge",
-          "required": true
+          "required": true,
+          "criteria": [
+            {
+              "source": "principles",
+              "select": "review/test.md"
+            },
+            {
+              "source": "principles",
+              "select": "testing.md"
+            }
+          ],
+          "examples": {
+            "source": "examples",
+            "select": "test/spec.json"
+          }
         },
         {
           "aspect": "harness",
           "runner": "devkit-judge",
-          "required": true
+          "required": true,
+          "criteria": [
+            {
+              "source": "principles",
+              "select": "review/harness.md"
+            },
+            {
+              "source": "principles",
+              "select": "harness.md"
+            },
+            {
+              "source": "principles",
+              "select": "working.md"
+            },
+            {
+              "source": "principles",
+              "select": "review/README.md"
+            },
+            {
+              "source": "stages",
+              "select": "README.md"
+            },
+            {
+              "source": "stages",
+              "select": "retrospective.md"
+            },
+            {
+              "source": "plans",
+              "select": "README.md"
+            },
+            {
+              "source": "examples",
+              "select": "README.md"
+            },
+            {
+              "source": "templates",
+              "select": "brief/judgment.md.tmpl"
+            }
+          ],
+          "examples": {
+            "source": "examples",
+            "select": "harness/spec.json"
+          }
         }
       ],
       "gate": {
@@ -100,7 +208,25 @@
         {
           "aspect": "contract",
           "runner": "devkit-judge",
-          "required": true
+          "required": true,
+          "criteria": [
+            {
+              "source": "principles",
+              "select": "review/contract.md"
+            },
+            {
+              "source": "principles",
+              "select": "data.md"
+            },
+            {
+              "source": "principles",
+              "select": "engineering.md"
+            }
+          ],
+          "examples": {
+            "source": "examples",
+            "select": "contract/spec.json"
+          }
         }
       ],
       "gate": {

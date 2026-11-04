@@ -197,6 +197,12 @@
             ],
             "additionalProperties": false
           }
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/selection"
+          }
         }
       },
       "required": [
@@ -235,12 +241,38 @@
         "target": {
           "type": "string",
           "minLength": 1
+        },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/selection"
+          }
+        },
+        "examples": {
+          "$ref": "#/$defs/selection"
         }
       },
       "required": [
         "aspect",
         "runner",
         "required"
+      ],
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+        },
+        "select": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "select"
       ],
       "additionalProperties": false
     }

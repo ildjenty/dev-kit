@@ -2,6 +2,27 @@ Plan templates are JSON files named `<name>.json` in `plans/`, maintained by the
 
 Templates follow `schemas/plan-template.json`; task-specific plans follow `schemas/plan.json`, and planner responses follow `schemas/planner-result.json`. Templates define stages, assignees, checks and runners, gates with reasons, limits, and transitions. Gate reasons are free text; use the applicable classification name from `devkit.toml` or its defaults.
 
+## Checks
+
+Each check has a name (`aspect`), a runner, and a required status. A judge-run check also selects its review criteria and its detection examples from knowledge sources:
+
+```json
+{
+  "aspect": "test",
+  "runner": "devkit-judge",
+  "required": true,
+  "criteria": [
+    {"source": "principles", "select": "review/test.md"},
+    {"source": "principles", "select": "testing.md"}
+  ],
+  "examples": {"source": "examples", "select": "test/spec.json"}
+}
+```
+
+`criteria` lists the review document from `principles/review/` and every document that review names as part of its criteria; see `principles/review/README.md`. `examples` selects the detection specification; see `examples/README.md`.
+
+A `command:<name>` check runs the registered verification command and has no criteria or examples. If `command:<name>` is absent from the round-start `devkit.toml`, the check returns `FAIL` with an `auto-fixable` finding: "Verification command `<name>` is not registered. Create a verification method and register it in `[commands.<name>]` in `devkit.toml`." Registration is a loop edit, follows the human confirmation policy, and takes effect from the next round's snapshot. If a command changes the tree, its finding also instructs the worker to add generated output paths to the repository's Git ignore rules.
+
 The `transitions.done` value is a stage ID to continue, `null` to finish, or `"replan"` to have the planner rebuild the remaining plan after that stage completes. Remaining work follows the completed stage run's bound plan and its transition order, including when a revised proposal is resubmitted. The name `replan` is reserved and cannot be a stage ID.
 
 - `default`: purpose → scope → structure → contract → steps → implement → retrospective, with a gate at scope. Optional candidates are research and prototype. Implement requires `command:test`, `test`, and `diff`.
@@ -12,9 +33,9 @@ In `default`, the first plan's completion conditions concern agreement on requir
 
 Retrospective requires `command:test`, `test`, and `harness` in `default` and `fix`, and only `harness` in `docs`. Judge-run checks use `devkit-judge`; the `command:test` check uses the registered `command:test` runner. Each stage is assigned to the worker.
 
-Build the smallest plan for what changes. Remove unrelated stages, select needed optional stages, write completion conditions in prose with IDs, and assign each check a target and completion condition IDs. Give each completion condition a way to verify it: a check run by a verification command, a judge, or a judgment command, or a human gate. Checks are not necessarily mechanical. Verify conditions during requirements definition through judges and human gates. The plan judge assesses the suitability and coverage of verification, and the human reviews it during plan approval; devkit does not enforce a formal assignment of verification to every condition. Preserve task-specific irreversible decisions in the plan; shared decisions and their enforcement and grounds belong in `rules.md`. Use `requirements.md` as the repository's requirements source. Stages changing UI, data, or external communication need behavior checks. Required judge-run aspects follow `checks/README.md` for detection tests. If requirements are ambiguous, list unresolved points in the optional `open_questions` string array instead of guessing.
+Build the smallest plan for what changes. Remove unrelated stages, select needed optional stages, write completion conditions in prose with IDs, and assign each check a target and completion condition IDs. Give each completion condition a way to verify it: a check run by a verification command, a judge, or a judgment command, or a human gate. Checks are not necessarily mechanical. Verify conditions during requirements definition through judges and human gates. The plan judge assesses the suitability and coverage of verification, and the human reviews it during plan approval; devkit does not enforce a formal assignment of verification to every condition. Preserve task-specific irreversible decisions in the plan; shared decisions and their enforcement and grounds belong in `rules.md`. Use `requirements.md` as the repository's requirements source. Stages changing UI, data, or external communication need behavior checks. Required judge-run checks follow `examples/README.md` for detection tests. If requirements are ambiguous, list unresolved points in the optional `open_questions` string array instead of guessing.
 
-Removing stages, including initial stages, adding stages outside the template candidates, removing gates, changing transitions, or removing required checks are deviations; mark applicable findings `needs-decision` using `schemas/finding.json`. Declared external operations require human approval even without deviations; declarations identify kind, target, input hash, definition hash, and executable content hash. Propose replanning when completion conditions or premises need changing; do not silently treat a proposal as the active plan.
+Removing stages, including initial stages, adding stages outside the template candidates, removing gates, changing transitions, removing required checks, or changing a check's `criteria` or `examples` selections are deviations; mark applicable findings `needs-decision` using `schemas/finding.json`. Declared external operations require human approval even without deviations; declarations identify kind, target, input hash, definition hash, and executable content hash. Propose replanning when completion conditions or premises need changing; do not silently treat a proposal as the active plan.
 
 With the default `[approval] plan = "requirements"`, human approval is required for the first plan, any plan whose completion condition IDs or wording differ from the last human-approved version, any deviation, and any declared external operation. Replanning with identical completion conditions and no deviations, external operations, or open questions stays within the approved agreement and needs no repeated approval. `always` requires approval for every version; `deviation` requires it for deviations or declared external operations. A nonempty `open_questions` array always requires human approval, regardless of policy. Human-approved completion conditions define completion. Answers to `open_questions` return to the planner as rejection and replanning instructions, with no limit on reproposals.
 

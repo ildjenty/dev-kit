@@ -1,16 +1,14 @@
-# check の観点
+<a id="check-の観点"></a>
 
-[check](architecture/modules.md#check)(観点やコマンドによる確認)は、観点(確認の切り口)ごとの確認事項と [blocking](architecture/data.md#指摘-finding)(進行を止める指摘の条件)で対象を照合する。観点ファイルの配置は [kit と利用側の配置](architecture/layout.md)、形式は [check](architecture/modules.md#check)と[観点と検出試験の例](architecture/examples.md#観点と検出試験)に従う。
+# レビューの観点の候補
 
-各観点を使うステージ(作業を区切る単位)と実行主体(runner)、必須かどうかは[ループの雛形](architecture/data.md#ループの雛形-plantemplate)で定め、起動・操作を要する check は[操作の禁止とサブエージェントの制限](architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。各リポジトリでは、繰り返し発生する失敗を新たな観点として追加できる。
+レビューの観点は判定の切り口であり、check の `aspect` は判定の名前である。判定の基準は原則のソースの用途別文書として育て、雛形の check の `criteria` で明示して選ぶ。用途別文書には確認事項だけでなく、判定の範囲、blocking、報告しない事項、適用除外も含める。知識の本文の形式は自由であり、devkit は解析しない。
 
-観点はリポジトリが所有する `.devkit/checks/<観点ID>.md` に、検出試験の違反例・適合例・許容例は `.devkit/checks/<観点ID>/` に置く。原則は `.devkit/principles/`、規則は `.devkit/rules.md`、検出試験の合格の索引は `.devkit/detect.json` に置く。配置は `devkit.toml` の `[paths]` で変更できる。
+原則のソースの既定の場所は `.devkit/principles/` である。例えばテストのレビュー用の文書は `review/test.md` とし、`criteria` に `{"source": "principles", "select": "review/test.md"}` と、必要な `testing.md` などを明示する。用途別文書から参照する原則や規則も、基準として必要なら選び方に含める。利用側の接続先と配置は `devkit.toml` の `[sources.<名前>]` で変更できる。`assets/principles/` は原則の既定の供給元である。
 
-判定に適用する原則はリポジトリが所有するものであり、`assets/principles/` は既定の供給元である。
+各見出しは用途別文書の候補である。使うステージ、実行主体、必須かどうか、`criteria` と `examples` の選び方は[雛形](architecture/data.md#ループの雛形-plantemplate)で定める。選び方を雛形と変える計画は、逸脱として承認の問いに差分を示す。出力の形式、`NOT ASSESSED` の使い方、失敗のシナリオを伴う指摘などの共通規則は判定依頼テンプレートに一度だけ記す。
 
-検出試験の判定者には例の本文だけを渡し、種別と期待判定は渡さない。期待との照合は `devkit` が行う。合格の識別には、観点ファイルが参照する `principles/<名前>.md` と規則ファイルの内容ハッシュを含める。原則や規則が変われば、それを参照する観点の合格記録は再利用できない。観点を変えた場合は例も更新する。試験を必須とする設定と実行時期は[検出試験](architecture/guarantees.md#検出試験)に従う。
-
-観点ファイル内の `principles/…`・`checks/…`・`stages/…`・`templates/…`・`rules.md` はリポジトリ側の資産の論理名であり、brief が論理名と実際のパスの対応を示す。`schemas/…` の本文はバイナリが出力スキーマとして渡す。判定依頼には、該当するステージ定義と観点、その観点が参照する原則、規則、要件、関係する構造の記録を本文で入れる。他の規範はスナップショットの `snap/` に展開したパスの一覧で渡す。
+検出試験の例と `spec.json` は `examples` ソース(既定 `.devkit/examples/`)から選ぶ。合格の索引は `[state] detect`(既定 `.devkit/detect.json`)で設定する。試験には基準の文書、匿名の例の本文、出力の約束だけを渡し、仕様・期待判定・対応表と、それらを含む履歴や参照先は渡さない。合格の識別と実行時期は[検出試験](architecture/guarantees.md#検出試験)に従う。用途別の判定基準は、違反例・適合例・許容例の期待判定を保つことを確かめる。
 
 ## 目的
 
@@ -95,7 +93,7 @@
 - **確認事項**:
   - 要求: 判定依頼の固定入力である要求の原文と `start` の課題に照らし、完了条件と `open_questions` が原文の要求を漏らさず扱い、要求を追加していないか。
   - ゲート: [ループの雛形](architecture/data.md#ループの雛形-plantemplate)の理由の書き方に従い、理由を示しているか。人への確認の判定は[人への確認対象](architecture/guarantees.md#人への確認対象)に従っているか。
-  - 逸脱: [計画の雛形からの逸脱](architecture/data.md#計画-plan)を確認し、該当する指摘に [`needs-decision`](architecture/data.md#指摘-finding)(人の判断が必要な指摘)を付けているか。
+  - 逸脱: [計画の雛形からの逸脱](architecture/data.md#計画-plan)を確認し、`criteria` と `examples` の選び方の差分を含め、該当する指摘に [`needs-decision`](architecture/data.md#指摘-finding)(人の判断が必要な指摘)を付けているか。
   - 分割: `split` の追加・削除を逸脱として扱っているか。`units` の担当する範囲が重なっていないか。範囲の重なりは機械では検査しない。再計画で完了済みのステージを残りに含めないことは逸脱に数えない。
   - 規模: ステージを減らせないか。
   - 完了条件: [計画](architecture/data.md#計画-plan)に従い、ID 付きの文章と、条件ごとの確認手段の妥当性・網羅性を確かめているか。
@@ -108,12 +106,12 @@
 
 - **確認事項**:
   - 原則と契約: [`assets/principles/harness.md`](../assets/principles/harness.md) の各原則と[モジュールごとの契約](architecture/modules.md#モジュールごとの契約)に従う。
-  - check の必須化: 仕組みの選定は同原則5、[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は[検出試験](architecture/guarantees.md#検出試験)(観点ファイルが期待する判定を出せるかの試験)に従う。
+  - check の必須化: 仕組みの選定は同原則5、[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は[検出試験](architecture/guarantees.md#検出試験)(選んだ基準で期待する判定を出せるかの試験)に従う。
   - skill: [`description`](https://agentskills.io/specification#description-field)(skill の説明項目)の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`assets/principles/working.md` の原則5](../assets/principles/working.md#5-turn-routine-processing-into-commands-and-call-them-from-procedures)に従う。
   - 判定: [check の結果](architecture/data.md#check-の結果-judgment)に従い、`NOT ASSESSED`(未評価)を返せるか。
-  - 原則の内容: 適用条件・要求・例外・blocking の意味を判断できるか。
+  - 原則の内容: 適用条件・要求・例外・blocking の意味を判断できるか。用途別文書に判定の範囲、報告しない事項、適用除外も含まれるか。
   - 問題の捕捉: brief が参照する作業履歴ファイルから、作業全体の判定・指摘(blocking でないものも含む)、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、`FAIL`・`NOT ASSESSED` の経緯、ラウンド数、人の却下・訂正・作り直しの指示、`note` で伝えられた見逃しを確かめ、各問題をどこで捕まえるべきだったかを判断しているか。
-  - 再発防止: 機械の検査、雛形、観点、原則、skill の順(設定 `[lessons] destinations` で変更可能)で反映先を選び、リポジトリの規範へ反映しているか。反映しない理由があるか。観点を変えたら検出試験の例も更新しているか。規則の「手段: 未実装」と繰り返す違反を、テスト・lint・型・pre-commit・検証コマンドへ移す候補にしているか。
+  - 再発防止: 機械の検査、雛形、用途別の判定基準、原則、skill の順(設定 `[lessons] destinations` で変更可能)で反映先を選び、書き込めるソースの規範へ反映しているか。読み取り専用のソースへの改善は教訓に記録して管理者へ引き継いでいるか。反映しない理由があるか。用途別の判定基準を変えたら検出試験の例も更新しているか。規則の「手段: 未実装」と繰り返す違反を、テスト・lint・型・pre-commit・検証コマンドへ移す候補にしているか。
   - 規範の働き: どの原則がどの観点・雛形で使われるか、使われない仕組みや負担に見合わない仕組みがないか。その作業で見えた問題・不足・負担を扱い、規範全体の棚卸しは必要が見えたときだけ行っているか。
   - 単純さ: 部品・原則・記録・観点の数と形式に、より単純な対案があるか。比較と blocking の条件は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-choose-mechanisms-based-on-the-failures-they-prevent-and-their-operational-burden)に従う。
   - 新しいセッションによる確認: リポジトリと実行の記録を読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるか。

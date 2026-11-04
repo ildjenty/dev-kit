@@ -38,6 +38,7 @@ const (
 	KindArtifact      Kind = "artifact"
 	KindUnitResult    Kind = "unit_result"
 	KindMerge         Kind = "merge"
+	KindSourceWrite   Kind = "source_write"
 )
 
 const KindResultRejection Kind = "result_rejection"
@@ -284,7 +285,9 @@ type Instruction struct {
 }
 
 // InstructionDetection preserves the inputs used to accept a detection result.
+// Check keeps the criteria and examples selections that produced the identity.
 type InstructionDetection struct {
+	Check    plan.Check              `json:"check"`
 	Spec     check.DetectionSpec     `json:"spec"`
 	Identity check.DetectionIdentity `json:"identity"`
 	Examples map[string]string       `json:"examples"`
@@ -353,3 +356,30 @@ func (*Artifact) recordKind() Kind      { return KindArtifact }
 func (*ResultRejection) recordKind() Kind { return KindResultRejection }
 func (*UnitResult) recordKind() Kind      { return KindUnitResult }
 func (*Merge) recordKind() Kind           { return KindMerge }
+func (*SourceWrite) recordKind() Kind     { return KindSourceWrite }
+
+// SourceWriteStatus is the state of one write to a knowledge source outside the repository.
+type SourceWriteStatus string
+
+const (
+	SourceWriteRunning  SourceWriteStatus = "running"
+	SourceWriteApplied  SourceWriteStatus = "applied"
+	SourceWriteConflict SourceWriteStatus = "conflict"
+)
+
+// SourceWrite records a write of an approved document change through a source adapter.
+// A running record precedes the write; a later record with the same operation ID gives its
+// outcome. ExpectedHash is empty when the document must not exist, and ContentHash is empty
+// for a deletion. ApprovalID refers to the answer that approved the target, when one exists.
+type SourceWrite struct {
+	OperationID  string             `json:"operation_id"`
+	RoundID      string             `json:"round_id"`
+	Source       string             `json:"source"`
+	Document     string             `json:"document"`
+	ExpectedHash string             `json:"expected_hash"`
+	ContentHash  string             `json:"content_hash"`
+	Target       form.TargetVersion `json:"target"`
+	ApprovalID   string             `json:"approval_id,omitempty"`
+	Status       SourceWriteStatus  `json:"status"`
+	BeforeID     string             `json:"before_id,omitempty"`
+}

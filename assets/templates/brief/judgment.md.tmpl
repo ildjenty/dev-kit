@@ -4,8 +4,28 @@ Instruction ID: {{.InstructionID}}
 
 {{.Content}}
 
-For a round judgment, inspect the supplied expanded round-start comparison base and the changed-file list and patch to the returned target. Use the work-history file referenced by this request as required by the aspect; the file is fixed at instruction issue time.
+## Selected criteria
+{{range .Criteria}}
+Reference: {{.Path}}
 
+{{.Content}}
+{{end}}
+## Judgment rules
+
+Judge the target against the criteria documents supplied in this request. Each criteria document says what to check, which other documents are part of its criteria, what blocks, and what not to report. Every document it names as part of its criteria is supplied in this request; read them from here, not from the working tree.
+
+- **Output**: Return the judgment using `schemas/judgment.json` and findings using `schemas/finding.json`, or the output schema supplied in this request. Use the requested instruction ID, check name (`aspect`), target version, frozen norms, and completion condition IDs.
+- **Validity**: A judgment is valid only for its matching target version and norms. The target version identifies a tree snapshot, plan version, or structure content hash; use the supplied value rather than substituting the current working tree. Read norms from the supplied copies, not from norms being edited in the working tree. Round judgments use round-start norms; plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time.
+- **Inputs**: For a round judgment, inspect the expanded round-start comparison base, the changed-file list, and the patch to the returned target. Use the work-history file referenced by this request, fixed at instruction issue time, as required by the criteria.
+- **Independence**: The author's report does not replace independent judgment.
+- **NOT ASSESSED**: Return `NOT ASSESSED` when necessary criteria or required verification are unavailable. Record the checked and unchecked scope, method, and environment.
+- **Findings**: Every finding needs a failure scenario. Do not return findings without one, and do not assign severity. Use `auto-fixable` for findings that need no human decision and `needs-decision` for those that do.
+- **Scope**: Do not report items outside the checks of the supplied criteria.
+- **Nonblocking findings**: Retain all findings. Nonblocking findings are reference information and do not require fixes.
+- **Exemptions**: Compare each exemption claim with its grounds, and waive only the requirements covered by the exemption. The rest of the requirements and blocking conditions still apply.
+- **Aggregation**: Aggregate results in the order `FAIL`, `NOT ASSESSED`, then `PASS`.
+
+{{if not .Detection}}
 ## Repository requirements
 
 Reference: requirements.md -> {{.Repository.Requirements.Path}} ({{if .Repository.Requirements.Exists}}exists{{else}}not created yet{{end}})
@@ -39,7 +59,9 @@ Read additional norms only when needed, using these paths into the fixed snapsho
 - Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}
 
-For detection tests, evaluate each supplied example body independently against the aspect and return its actual judgment and grounds. Case kinds and expected judgments are not inputs to the evaluation; devkit compares the results with expectations.
+{{else}}
+For detection tests, evaluate each supplied anonymous example body independently against the selected criteria and return its actual judgment and grounds. Only criteria, opaque example IDs and bodies, and the output contract are supplied. The specification, case kinds, file names, expected judgments, mapping, and any history or reference containing them are withheld; devkit compares the results with expectations.
+{{end}}
 
 ## Returning the result
 

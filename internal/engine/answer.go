@@ -222,10 +222,18 @@ func (e *Engine) validateAnswerTree(ctx context.Context, state *ledger.State, qu
 		if err != nil {
 			return err
 		}
-		if actual != question.ApprovalTarget.Tree {
+		sources, err := e.sourceIdentity()
+		if err != nil {
+			return err
+		}
+		// Only targets that include edited outside documents are bound to their identity.
+		if question.ApprovalTarget.Sources == "" {
+			sources = ""
+		}
+		if actual != question.ApprovalTarget.Tree || sources != question.ApprovalTarget.Sources {
 			replacement := *question
 			replacement.ID = ulidString()
-			replacement.ApprovalTarget.Tree = actual
+			replacement.ApprovalTarget.Tree, replacement.ApprovalTarget.Sources = actual, sources
 			if err := e.refreshQuestionEvidence(ctx, state, &replacement); err != nil {
 				return err
 			}

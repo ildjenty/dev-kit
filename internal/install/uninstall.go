@@ -34,7 +34,7 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 	}
 	result := Result{Root: w.Root(), Guidance: []string{uninstallGuidance}}
 	files := kit.FS()
-	paths := config.Config{}.RepositoryPaths()
+	sources := config.Config{}.KnowledgeSources()
 	configuration, err := readOptional(filepath.Join(result.Root, "devkit.toml"))
 	if err != nil {
 		return result, err
@@ -44,7 +44,10 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 		if err != nil {
 			return result, err
 		}
-		paths = c.RepositoryPaths()
+		if err := c.ValidateSourcePaths(result.Root); err != nil {
+			return result, err
+		}
+		sources = c.KnowledgeSources()
 	}
 	if err := result.removeConfig(files); err != nil {
 		return result, err
@@ -64,7 +67,11 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		if err := result.removeFile(normPath(paths, name), norms[name]); err != nil {
+		target, local := localNormPath(result.Root, sources, name)
+		if !local {
+			continue
+		}
+		if err := result.removeFile(target, norms[name]); err != nil {
 			return result, err
 		}
 	}

@@ -125,6 +125,8 @@ func (v *Validator) validateRaw(payload Payload, data []byte) error {
 		requiredFields = []string{"round_id", "unit_id", "agent_id", "result_path"}
 	case *Merge:
 		requiredFields = []string{"round_id", "head", "inputs", "applied", "current", "before_tree", "status"}
+	case *SourceWrite:
+		requiredFields = []string{"operation_id", "round_id", "source", "document", "expected_hash", "content_hash", "target", "status"}
 	case *Judgment:
 		requiredFields = []string{"runner", "provenance"}
 	case *ResultRejection:
@@ -273,6 +275,8 @@ func (v *Validator) validatePayload(payload Payload) error {
 		return v.check("progress", p.Progress)
 	case *Merge:
 		return validateMerge(p)
+	case *SourceWrite:
+		return v.validateSourceWrite(p)
 	case *Judgment:
 		return v.judgment(*p)
 	case *ResultRejection:
@@ -329,7 +333,7 @@ func (v *Validator) validateExternalOperation(p *ExternalOp) error {
 }
 
 func (v *Validator) validateDetectionTest(p *DetectionTest) error {
-	if err := required(p.InstructionID, p.Aspect, p.Runner, p.Identity.AspectHash, p.Identity.SpecHash, p.Identity.RunnerHash); err != nil {
+	if err := required(p.InstructionID, p.Aspect, p.Runner, p.Identity.RunnerHash, p.Identity.TemplateHash, p.Identity.CriteriaHash, p.Identity.ExamplesHash); err != nil {
 		return err
 	}
 	if len(p.Cases) == 0 {
@@ -379,6 +383,25 @@ func (v *Validator) validateRound(p *Round) error {
 		default:
 			return fmt.Errorf("unknown round action: %q", p.Decision.Action)
 		}
+	}
+	return nil
+}
+
+func (v *Validator) validateSourceWrite(p *SourceWrite) error {
+	if err := required(p.OperationID, p.RoundID, p.Source, p.Document); err != nil {
+		return err
+	}
+	if err := v.check("target_version", p.Target); err != nil {
+		return err
+	}
+	switch p.Status {
+	case SourceWriteRunning:
+	case SourceWriteApplied, SourceWriteConflict:
+		if p.BeforeID == "" {
+			return fmt.Errorf("source write result requires its before record")
+		}
+	default:
+		return fmt.Errorf("unknown source write status: %q", p.Status)
 	}
 	return nil
 }

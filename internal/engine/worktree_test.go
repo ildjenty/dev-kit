@@ -165,7 +165,7 @@ func TestParallelWorktreeLoops(t *testing.T) {
 	main, ctx := fixture(t)
 	write(t, main.Root(), "devkit.toml", "kit_version = 'v2'\n")
 	configureStage(t, main, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
+		stage.Checks = []plan.Check{judgeCheck("plan", true)}
 	})
 	base := git(t, main.Root(), "rev-parse", "HEAD")
 	linkedRoot := filepath.Join(t.TempDir(), "linked")

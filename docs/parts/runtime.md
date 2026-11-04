@@ -17,7 +17,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 
 ファイルの分類と所有者、更新と生存期間は[所有と生存期間](../architecture/data.md#所有と生存期間)、設定で変更できる配置と git 管理の範囲は[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。
 
-規範は `[paths]` で変更できる場所にリポジトリが所有する。requirements は既定 `.devkit/requirements.md`、structure は `.devkit/structure.json`、detect は `.devkit/detect.json` であり、これらと実行の記録は規範の識別に含めない。実行の記録と生成物 `.devkit/run/` は固定であり、git 管理しない。
+知識は `[sources.<名前>]` のアダプタで取得し、規範はソース全体、成果は選んだ範囲を固定する。requirements は既定 `.devkit/requirements.md`、structure は `.devkit/structure.json` であり、成果として規範の識別に含めない。合格の索引はソースではなく `[state] detect`(既定 `.devkit/detect.json`)に置く。実行の記録と生成物 `.devkit/run/` は固定であり、git 管理しない。
 
 ## 入力と出力
 
@@ -39,7 +39,9 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 
 ラウンド開始時に未登録の検証コマンドは、`auto-fixable` の指摘を伴う check の `FAIL` とする。作業者が検証の手段を作って登録し、既定では人の確認を経た次のラウンドから使う。
 
-既定の雛形は `default`・`fix`・`docs` であり、最後に作業者の retrospective を置く。すべての作業の brief と判定依頼が指示発行時点の作業履歴ファイルを参照し、振り返りはそこからすべての判定と指摘、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、人の回答や note の見逃しを確認する。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。規範を変えた場合はループ自身の変更として確認する。
+既定の雛形は `default`・`fix`・`docs` であり、最後に作業者の retrospective を置く。検出試験を除くすべての作業の brief と判定依頼が指示発行時点の作業履歴ファイルを参照し、振り返りはそこからすべての判定と指摘、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、人の回答や note の見逃しを確認する。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。規範を変えた場合はループ自身の変更として確認する。
+
+ソースへの書き込みは任意の能力であり、`writable = true` のソースに限る。外部は編集用の写しから差分を求め、規範の確認後に外部操作の経路で反映する。元の内容ハッシュが一致するときだけ比較と更新を一体で行い、不一致なら取り直して見直す。リポジトリ内のファイルは直接編集して完了時のコミットで反映する。判定・承認・反映・完了は git のツリーと外部の成果の文書を合わせた同じ識別を指す。
 
 ### ホストの差分と共通の仕組み
 
@@ -49,7 +51,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 
 ## 保証
 
-- **完了条件**: 完了の主張の受理と確定は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)・[完了条件](../architecture/guarantees.md#完了条件)に従う。[検出試験](../architecture/guarantees.md#検出試験)(観点ファイルの判定能力の試験)の対象は同節、判定コマンドと `command:` の check の実行は [engine](../architecture/modules.md#engine)、判定者による check の起動と結果の受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+- **完了条件**: 完了の主張の受理と確定は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)・[完了条件](../architecture/guarantees.md#完了条件)に従う。[検出試験](../architecture/guarantees.md#検出試験)(check の判定能力の試験)の対象は同節、判定コマンドと `command:` の check の実行は [engine](../architecture/modules.md#engine)、判定者による check の起動と結果の受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 - **対象と規範**: 判定の対象への結び付けと有効性は [Judgment](../architecture/data.md#check-の結果-judgment)(観点ごとの判定結果)、規範の固定は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。判定対象の展開と commit 直前の照合は、[展開と永続化](../architecture/guarantees.md#判定対象の展開と完了時の永続化)・[対象の照合](../architecture/guarantees.md#commit-直前の対象の照合)に従う。
 - **実行の記録と観測**: [実行の記録](../architecture/data.md#所有と生存期間)(作業が所有する履歴)の書き手の境界と公開方法は[記録の書き込みと排他](../architecture/data.md#記録の書き込みと排他)、排他は[作業の排他制御](../architecture/data.md#作業の排他制御)に従う。網羅性(成果物を記録した範囲)の表示は [view](../architecture/modules.md#view)に従う。
 - **再開**: 作業の特定は[セッションとブランチ](../architecture/data.md#セッションとブランチ)、受理時に必要な観測の照合は[再開と hook の稼働確認](../architecture/guarantees.md#再開と-hook-の稼働確認)、注入する現在地の組み立ては [checkpoint](../architecture/data.md#checkpoint)に従う。

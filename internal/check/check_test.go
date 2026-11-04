@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/fs"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/ildjenty/dev-kit/assets"
@@ -19,42 +20,36 @@ func asset(t *testing.T, path string) []byte {
 	return data
 }
 
-func TestKitAspects(t *testing.T) {
-	paths, err := fs.Glob(assets.FS(), "checks/*.md")
+func TestKitExamplesHaveSpecifications(t *testing.T) {
+	paths, err := fs.Glob(assets.FS(), "examples/*/spec.json")
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(paths) == 0 {
+		t.Fatal("no detection specifications are distributed")
+	}
 	for _, path := range paths {
-		if path == "checks/README.md" {
-			continue
-		}
-		aspect, err := ParseAspect(string(asset(t, path)))
-		if err != nil || aspect.Blocking == "" || aspect.OutputFormat == "" {
-			t.Fatalf("%s: %+v, %v", path, aspect, err)
-		}
-		if _, err := ParseDetectionSpec(asset(t, "examples/"+aspect.ID+"/spec.json")); err != nil {
-			t.Fatalf("%s detection test: %v", aspect.ID, err)
+		if _, err := ParseDetectionSpec(asset(t, path)); err != nil {
+			t.Fatalf("%s: %v", path, err)
 		}
 	}
-	if _, err := ParseAspect("# incomplete\n- blocking: condition"); err == nil {
-		t.Fatal("accepted an incomplete aspect")
+	if _, err := fs.Stat(assets.FS(), "checks"); err == nil {
+		t.Fatal("aspect files are still distributed")
 	}
 }
 
-func TestAspectTemplateAndExistingKeys(t *testing.T) {
-	want := Aspect{ID: "example", Checks: "checks", Blocking: "condition", DoNotReport: "outside scope", OutputFormat: "JSON"}
-	rendered, err := form.ApplyTemplate(string(asset(t, "templates/aspect.md.tmpl")), want)
-	if err != nil {
-		t.Fatal(err)
+func TestResolveCriteriaStopsOnEmptySelection(t *testing.T) {
+	selected := []CriteriaSelection{
+		{Source: "principles", Select: "review/test.md", Documents: []Criterion{{Source: "principles", ID: "review/test.md", ContentHash: "a"}}},
+		{Source: "principles", Select: "review/*.md", Documents: []Criterion{{Source: "principles", ID: "review/test.md", ContentHash: "a"}, {Source: "principles", ID: "review/diff.md", ContentHash: "b"}}},
 	}
-	for _, source := range []string{
-		rendered,
-		"# example\n- \u78ba\u8a8d\u4e8b\u9805: checks\n- blocking: condition\n- \u5831\u544a\u3057\u306a\u3044\u4e8b\u9805: outside scope\n- \u51fa\u529b\u5f62\u5f0f: JSON",
-	} {
-		aspect, err := ParseAspect(source)
-		if err != nil || aspect.ID != want.ID || aspect.Checks != want.Checks || aspect.Blocking != want.Blocking || aspect.DoNotReport != want.DoNotReport || aspect.OutputFormat == "" {
-			t.Fatalf("parsed aspect: %+v, %v", aspect, err)
-		}
+	criteria, err := ResolveCriteria(selected)
+	if err != nil || len(criteria) != 2 || criteria[1].ID != "review/diff.md" {
+		t.Fatalf("criteria were not combined in order without duplicates: %+v, %v", criteria, err)
+	}
+	selected = append(selected, CriteriaSelection{Source: "principles", Select: "review/missing.md"})
+	if _, err := ResolveCriteria(selected); err == nil || !strings.Contains(err.Error(), "review/missing.md") {
+		t.Fatalf("an empty criteria selection did not stop the judgment: %v", err)
 	}
 }
 
@@ -230,11 +225,8 @@ func TestDetection(t *testing.T) {
 			Reason: "compared the intended condition and result",
 		})
 	}
-	references := map[string][]byte{}
-	for _, name := range AspectReferences(string(asset(t, "checks/purpose.md"))) {
-		references[name] = []byte("fixed norm content")
-	}
-	identity, err := NewDetectionIdentity(asset(t, "checks/purpose.md"), source, []byte("runner definition"), examples, references)
+	criteria := []Criterion{{Source: "principles", ID: "review/purpose.md", ContentHash: "criteria-hash"}}
+	identity, err := NewDetectionIdentity([]byte("runner definition"), []byte("template"), criteria, source, examples)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +244,7 @@ func TestDetection(t *testing.T) {
 		t.Fatal("could not reuse a passing record for identical content")
 	}
 	examples["allowed.md"] = append(examples["allowed.md"], '\n')
-	changed, err := NewDetectionIdentity(asset(t, "checks/purpose.md"), source, []byte("runner definition"), examples, references)
+	changed, err := NewDetectionIdentity([]byte("runner definition"), []byte("template"), criteria, source, examples)
 	if err != nil {
 		t.Fatal(err)
 	}

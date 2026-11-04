@@ -22,6 +22,7 @@ components:
   fsstore: { in: internal/ledger/fsstore }
   plan: { in: internal/plan }
   router: { in: internal/router }
+  source: { in: internal/source }
   view: { in: internal/view }
   workspace: { in: internal/workspace }
 deps:
@@ -30,7 +31,7 @@ deps:
   install:
     mayDependOn: [config, kit, ledger, fsstore, workspace]
   engine:
-    mayDependOn: [plan, brief, check, router, ledger, form, workspace, external, fsstore, config, hook, kit]
+    mayDependOn: [plan, brief, check, router, ledger, form, workspace, external, fsstore, config, hook, kit, source]
   external:
     mayDependOn: [config, form, ledger, fsstore, plan]
   hook:

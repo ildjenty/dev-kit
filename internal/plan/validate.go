@@ -169,9 +169,13 @@ func validateStageChecks(stage Stage, conditions map[string]bool) error {
 	for i, check := range stage.Checks {
 		if slices.ContainsFunc(stage.Checks[:i], func(previous Check) bool {
 			return previous.Aspect == check.Aspect && previous.Runner == check.Runner &&
-				(previous.Target != check.Target || !slices.Equal(previous.CompletionConditionIDs, check.CompletionConditionIDs))
+				(previous.Target != check.Target || !slices.Equal(previous.CompletionConditionIDs, check.CompletionConditionIDs) ||
+					!slices.Equal(previous.Criteria, check.Criteria) || !equalSelection(previous.Examples, check.Examples))
 		}) {
 			return fmt.Errorf("%s: conflicting check mappings for aspect %q and runner %q", stage.ID, check.Aspect, check.Runner)
+		}
+		if check.Runner.IsCommand() && (len(check.Criteria) > 0 || check.Examples != nil) {
+			return fmt.Errorf("%s: command checks must not select criteria or examples", stage.ID)
 		}
 		if check.Runner == "command:" {
 			return fmt.Errorf("%s: command name is missing", stage.ID)
@@ -222,4 +226,11 @@ func ValidateBackTargets(template PlanTemplate, p Plan) error {
 		}
 	}
 	return nil
+}
+
+func equalSelection(a, b *Selection) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }

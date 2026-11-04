@@ -55,11 +55,11 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error, options
 		return Result{}, err
 	}
 	result := Result{Root: w.Root(), Guidance: []string{trustGuidance, commandGuidance}}
-	paths, err := result.addConfiguration()
+	sources, err := result.addConfiguration()
 	if err != nil {
 		return result, err
 	}
-	if err := result.addNorms(paths); err != nil {
+	if err := result.addNorms(sources); err != nil {
 		return result, err
 	}
 	for _, pair := range [][2]string{
@@ -196,23 +196,41 @@ func readOptional(path string) ([]byte, error) {
 	return data, err
 }
 
-func normPath(paths config.Paths, name string) string {
+func normPath(sources map[string]config.Source, name string) string {
 	root, rest, _ := strings.Cut(name, "/")
-	base := map[string]string{
-		"principles": paths.Principles,
-		"stages":     paths.Stages,
-		"checks":     paths.Checks,
-		"plans":      paths.Plans,
-		"templates":  paths.Templates,
-		"rules.md":   paths.Rules,
-	}[root]
+	if root == "rules.md" {
+		root = "rules"
+	}
+	base := sources[root].Path
 	if rest == "" {
 		return base
 	}
 	return base + "/" + rest
 }
 
-func (r *Result) addNorms(paths config.Paths) error {
+func sourceLocation(root, name string) string {
+	if filepath.IsAbs(name) {
+		return filepath.FromSlash(name)
+	}
+	return filepath.Join(root, filepath.FromSlash(name))
+}
+
+func localNormPath(root string, sources map[string]config.Source, name string) (string, bool) {
+	source, _, _ := strings.Cut(name, "/")
+	if source == "rules.md" {
+		source = "rules"
+	}
+	if !sources[source].CanWrite() {
+		return "", false
+	}
+	rel, err := filepath.Rel(root, sourceLocation(root, normPath(sources, name)))
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return filepath.ToSlash(rel), true
+}
+
+func (r *Result) addNorms(sources map[string]config.Source) error {
 	files, err := kit.Norms()
 	if err != nil {
 		return err
@@ -223,7 +241,11 @@ func (r *Result) addNorms(paths config.Paths) error {
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		if err := r.addFile(normPath(paths, name), files[name]); err != nil {
+		target, local := localNormPath(r.Root, sources, name)
+		if !local {
+			continue
+		}
+		if err := r.addFile(target, files[name]); err != nil {
 			return err
 		}
 	}
@@ -254,34 +276,37 @@ func runGit(ctx context.Context, root string, args ...string) ([]byte, error) {
 	return output, nil
 }
 
-func (r *Result) addConfiguration() (config.Paths, error) {
+func (r *Result) addConfiguration() (map[string]config.Source, error) {
 	configuration := []byte(fmt.Sprintf("kit_version = %q\n", kit.Version))
 	existing, err := os.ReadFile(filepath.Join(r.Root, "devkit.toml"))
 	if err == nil {
 		configuration = existing
 	} else if !errors.Is(err, fs.ErrNotExist) {
-		return config.Paths{}, err
+		return nil, err
 	}
 	c, err := config.Parse(configuration)
 	if err != nil {
-		return config.Paths{}, err
+		return nil, err
+	}
+	if err := c.ValidateSourcePaths(r.Root); err != nil {
+		return nil, err
 	}
 	if c.KitVersion != kit.Version {
-		return config.Paths{}, fmt.Errorf("kit version mismatch: binary %q, devkit.toml %q", kit.Version, c.KitVersion)
+		return nil, fmt.Errorf("kit version mismatch: binary %q, devkit.toml %q", kit.Version, c.KitVersion)
 	}
 	deny, err := kit.HostFragment("deny.toml")
 	if err != nil {
-		return config.Paths{}, err
+		return nil, err
 	}
 	configuration, err = mergeTOML(configuration, deny)
 	if err != nil {
-		return config.Paths{}, err
+		return nil, err
 	}
 	if _, err := config.Parse(configuration); err != nil {
-		return config.Paths{}, err
+		return nil, err
 	}
 	r.addChange("devkit.toml", existing, configuration)
-	return c.RepositoryPaths(), nil
+	return c.KnowledgeSources(), nil
 }
 
 func (r *Result) addHostSettings(ctx context.Context) error {

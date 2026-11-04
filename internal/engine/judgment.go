@@ -22,23 +22,6 @@ import (
 	"github.com/ildjenty/dev-kit/internal/router"
 )
 
-func (e *Engine) aspect(ctx context.Context, ref, id string) (check.Aspect, error) {
-	if !localName(id) {
-		return check.Aspect{}, errors.New("invalid aspect ID")
-	}
-	data, err := e.asset(ctx, ref, "checks/"+id+".md")
-	if err != nil {
-		return check.Aspect{}, err
-	}
-	aspect, err := check.ParseAspect(string(data))
-	if err != nil {
-		return aspect, err
-	}
-	if aspect.ID != id {
-		return aspect, errors.New("aspect ID does not match its file name")
-	}
-	return aspect, nil
-}
 func normRefs(norms []check.Norm) []form.NormReference {
 	refs := []form.NormReference{}
 	for _, n := range norms {
@@ -106,13 +89,13 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 	if round != nil {
 		productRef = target.Tree
 	}
-	if err := e.requestNorms(ctx, ref, item, norms, productRef); err != nil {
+	if err := e.requestNorms(ctx, ref, norms, productRef); err != nil {
 		return meta, instructionData{}, false, err
 	}
 	aspect := check.Aspect{ID: item.Aspect}
+	criteria := []check.Criterion{}
 	if !item.Runner.IsCommand() {
-		aspect, err = e.aspect(ctx, ref, item.Aspect)
-		if err != nil {
+		if criteria, err = e.criteria(ctx, ref, item.Criteria); err != nil {
 			return meta, instructionData{}, false, err
 		}
 	}
@@ -147,7 +130,7 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 	if len(norms) > 0 {
 		norms[0].Content += "\n" + evidence
 	}
-	input := check.RequestInput{Kind: requestKind, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: aspect, TargetVersion: target, TargetPath: path, Norms: norms, OutputSchema: schema, CompletionConditionIDs: append([]string{}, item.CompletionConditionIDs...), Progress: progress, PreviousFindings: findings, Authorizations: []check.Authorization{}}
+	input := check.RequestInput{Kind: requestKind, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: aspect, Criteria: criteria, TargetVersion: target, TargetPath: path, Norms: norms, OutputSchema: schema, CompletionConditionIDs: append([]string{}, item.CompletionConditionIDs...), Progress: progress, PreviousFindings: findings, Authorizations: []check.Authorization{}}
 	input.Authorizations = judgmentAuthorizations(state, target, version)
 	if requestKind == check.PlanRequest {
 		if err := e.planRequestInputs(state, &input); err != nil {
@@ -193,20 +176,12 @@ func (e *Engine) roundNorms(ctx context.Context, state *ledger.State, roundID st
 	return nil
 }
 
-func (e *Engine) requestNorms(ctx context.Context, ref string, item plan.Check, norms []check.Norm, productRef ...string) error {
-	docs, err := e.aspectDocuments(ctx, ref, []plan.Check{item})
-	if err != nil {
-		return err
-	}
+func (e *Engine) requestNorms(ctx context.Context, ref string, norms []check.Norm, productRef ...string) error {
 	facts, err := e.repository(ctx, ref, productRef...)
 	if err != nil {
 		return err
 	}
-	docs = append(docs, facts.Rules)
-	if item.Target != "detection" {
-		docs = append(docs, facts.Requirements)
-		docs = append(docs, facts.LayoutGuides...)
-	}
+	docs := append([]brief.Document{facts.Rules, facts.Requirements}, facts.LayoutGuides...)
 	if len(norms) > 0 {
 		for _, doc := range docs {
 			norms[0].Content += "\nReference: " + doc.Path + "\n\n" + doc.Content + "\n"
@@ -216,22 +191,18 @@ func (e *Engine) requestNorms(ctx context.Context, ref string, item plan.Check, 
 }
 
 func (e *Engine) hydrateRequest(ctx context.Context, data instructionData) error {
-	if data.Request == nil || len(data.Request.Norms) == 0 || data.Request.Norms[0].Content != "" {
+	if data.Request == nil || data.Request.Kind == check.DetectionRequest || len(data.Request.Norms) == 0 || data.Request.Norms[0].Content != "" {
 		return nil
 	}
 	norms, _, err := e.normDocuments(ctx, data.Reference)
 	if err != nil {
 		return err
 	}
-	item := plan.Check{Aspect: data.Request.Aspect.ID, Runner: plan.Runner(data.Request.Runner)}
-	if data.Request.Kind == check.DetectionRequest {
-		item.Target = "detection"
-	}
 	productRef := data.Reference
 	if data.Request.Kind == check.RoundRequest {
 		productRef = data.Request.TargetVersion.Tree
 	}
-	if err := e.requestNorms(ctx, data.Reference, item, norms, productRef); err != nil {
+	if err := e.requestNorms(ctx, data.Reference, norms, productRef); err != nil {
 		return err
 	}
 	if data.Request.Kind == check.RoundRequest {
@@ -295,7 +266,7 @@ func (e *Engine) judgmentBrief(ctx context.Context, data instructionData) (brief
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	docs, err := e.aspectDocuments(ctx, data.Reference, []plan.Check{{Aspect: data.Request.Aspect.ID, Runner: plan.Runner(data.Request.Runner)}})
+	criteria, err := e.criteriaDocuments(ctx, data.Reference, data.Request.Criteria)
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -311,7 +282,7 @@ func (e *Engine) judgmentBrief(ctx context.Context, data instructionData) (brief
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: "```json\n" + string(content) + "\n```", Repository: facts, Norms: docs, NormPaths: paths, OutputSchema: string(schema)})
+	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: "```json\n" + string(content) + "\n```", Criteria: criteria, Repository: facts, Norms: []brief.Document{}, NormPaths: paths, OutputSchema: string(schema)})
 }
 
 func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan) (Result, error) {
@@ -324,7 +295,13 @@ func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan
 		return Result{}, err
 	}
 	selected := settings.PlanCheckSettings()
-	item := plan.Check{Aspect: selected.Aspect, Runner: plan.Runner(selected.Runner), Required: true}
+	item := plan.Check{Aspect: selected.Aspect, Runner: plan.Runner(selected.Runner), Required: true, Criteria: planSelections(selected.Criteria)}
+	if selected.Examples != nil {
+		item.Examples = &plan.Selection{Source: selected.Examples.Source, Select: selected.Examples.Select}
+	}
+	if err := e.refreshSources(ctx, ref); err != nil {
+		return Result{}, err
+	}
 	if r, pending, err := e.ensureDetection(ctx, state, []plan.Check{item}, ref); pending || err != nil {
 		return r, err
 	}
@@ -873,7 +850,7 @@ func (e *Engine) pendingRequestCurrent(ctx context.Context, state *ledger.State,
 		ref = confirmed
 	}
 	if request.Detection != nil {
-		current, err := e.detectionInput(ctx, ref, plan.Check{Aspect: request.Request.Aspect.ID, Runner: plan.Runner(request.Request.Runner)})
+		current, _, err := e.detectionInput(ctx, ref, request.Detection.Check)
 		if err != nil {
 			return false, false, err
 		}
@@ -1064,7 +1041,7 @@ func (e *Engine) judgeCommandCheck(ctx context.Context, state *ledger.State, p p
 
 func (e *Engine) askRoundApproval(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, decision router.Decision, table router.Table, categories []string, summary check.Summary, completion router.Completion, termination form.TerminationKind) (Result, error) {
 	target := *round.ReturnedTarget
-	approvalTarget := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}
+	approvalTarget := approvalTree(target)
 	category := "stage_confirmation"
 	if table.ClassifyConfirmation(router.ConfirmationInput{Categories: []string{config.MetaLoopEdit}}).Required && slices.Contains(categories, config.MetaLoopEdit) {
 		category = config.MetaLoopEdit
@@ -1118,8 +1095,13 @@ func (e *Engine) roundConfirmationCategories(ctx context.Context, state *ledger.
 	if err != nil {
 		return nil, err
 	}
-	categories := differenceCategories(paths, settings)
+	categories := differenceCategories(e.Root(), paths, settings)
 	categories = slices.DeleteFunc(categories, func(category string) bool { return category == config.MetaLoopEdit })
+	if edits, err := e.sourceChanges(ctx, roundReference(round), true); err != nil {
+		return nil, err
+	} else if len(edits) > 0 {
+		categories = append(categories, config.MetaLoopEdit)
+	}
 	// Loop edits a human already approved before this round need no second confirmation.
 	work, _ := state.Work()
 	if confirmed, _ := confirmedLoopEdits(state); confirmed != work.BaseCommit {
@@ -1155,6 +1137,9 @@ func (e *Engine) decideRound(ctx context.Context, p plan.Plan, stage plan.Stage,
 	if err != nil {
 		return Result{}, err
 	}
+	if r, blocked, err := e.rejectReadOnlyEdits(ctx, state, p, stage, run, round, settings); blocked || err != nil {
+		return r, err
+	}
 	rule := stage.CompletionRule()
 	rule.RequireDetectionTests = settings.DetectionRequired()
 	completion := router.CheckCompletion(router.CompletionInput{Rule: rule, TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments, Detection: requirements, DetectionTests: tests})
@@ -1163,7 +1148,7 @@ func (e *Engine) decideRound(ctx context.Context, p plan.Plan, stage plan.Stage,
 	if err != nil {
 		return Result{}, err
 	}
-	approvalTarget := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}
+	approvalTarget := approvalTree(target)
 	if gateApproved(state, run, round, approvalTarget) {
 		categories = nil
 	}
@@ -1215,4 +1200,23 @@ func (e *Engine) planRequestInputs(state *ledger.State, input *check.RequestInpu
 	input.OriginalRequest = work.OriginalRequest
 	input.StartTask = string(task)
 	return nil
+}
+
+// rejectReadOnlyEdits returns the round for a fix when it changed a read-only source.
+func (e *Engine) rejectReadOnlyEdits(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, settings config.Config) (Result, bool, error) {
+	base, err := e.stageDiffBase(round)
+	if err != nil {
+		return Result{}, false, err
+	}
+	paths, err := e.workspace.ChangedFiles(ctx, base, round.ReturnedTarget.Tree)
+	if err != nil {
+		return Result{}, false, err
+	}
+	blocked := e.readOnlyChanges(settings, paths)
+	if len(blocked) == 0 {
+		return Result{}, false, nil
+	}
+	reason := "Read-only sources were edited: " + strings.Join(blocked, ", ") + ". Undo these edits and record each improvement as a lesson with devkit note lesson so that the source maintainers can apply it."
+	r, err := e.fixRound(ctx, state, p, stage, run, round, reason)
+	return r, true, err
 }

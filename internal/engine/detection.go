@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/brief"
 	"github.com/ildjenty/dev-kit/internal/check"
@@ -15,81 +17,100 @@ import (
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 	"github.com/ildjenty/dev-kit/internal/plan"
+	"github.com/ildjenty/dev-kit/internal/source"
 )
 
 type detectionInput = ledger.InstructionDetection
 
-func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check) (detectionInput, error) {
-	settings, err := e.settings(ctx, ref)
-	if err != nil {
-		return detectionInput{}, err
+// detectionInput reads the specification and examples selected by the check, resolves its
+// criteria, and derives the pass identity from them, the runner, and the request template.
+func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check) (detectionInput, []check.Criterion, error) {
+	if item.Examples == nil {
+		return detectionInput{}, nil, fmt.Errorf("judge-run check %q selects no detection examples; select examples or make the check not required", item.Aspect)
 	}
-	base := settings.RepositoryPaths().Checks + "/" + item.Aspect
-	specPath := base + "/spec.json"
-	aspect, err := e.asset(ctx, ref, "checks/"+item.Aspect+".md")
+	spec, specDocument, examples, err := e.detectionExamples(ctx, ref, *item.Examples)
 	if err != nil {
-		return detectionInput{}, err
-	}
-	specSource, err := e.workspace.ReadFile(ctx, ref, specPath)
-	if err != nil {
-		return detectionInput{}, err
-	}
-	spec, err := check.ParseDetectionSpec(specSource)
-	if err != nil {
-		return detectionInput{}, err
+		return detectionInput{}, nil, err
 	}
 	if spec.Aspect != item.Aspect {
-		return detectionInput{}, errors.New("detection specification aspect does not match")
+		return detectionInput{}, nil, errors.New("detection specification aspect does not match")
+	}
+	criteria, err := e.criteria(ctx, ref, item.Criteria)
+	if err != nil {
+		return detectionInput{}, nil, err
+	}
+	runner, err := e.runnerDefinition(ctx, ref, item.Runner)
+	if err != nil {
+		return detectionInput{}, nil, err
+	}
+	template, err := e.asset(ctx, ref, "templates/brief/judgment.md.tmpl")
+	if err != nil {
+		return detectionInput{}, nil, err
+	}
+	texts := map[string]string{}
+	for file, body := range examples {
+		texts[file] = string(body)
+	}
+	identity, err := check.NewDetectionIdentity(runner, template, criteria, []byte(specDocument.Body), examples)
+	return detectionInput{Check: item, Spec: spec, Identity: identity, Examples: texts}, criteria, err
+}
+
+// detectionExamples reads the selected specification and the example documents it names,
+// relative to the specification, from the same source.
+func (e *Engine) detectionExamples(ctx context.Context, ref string, selection plan.Selection) (check.DetectionSpec, source.Document, map[string][]byte, error) {
+	specs, err := e.selectDocuments(ctx, ref, selection.Source, selection.Select)
+	if err != nil {
+		return check.DetectionSpec{}, source.Document{}, nil, err
+	}
+	if len(specs) != 1 {
+		return check.DetectionSpec{}, source.Document{}, nil, fmt.Errorf("examples selection %q from source %q must select one specification; it selected %d", selection.Select, selection.Source, len(specs))
+	}
+	spec, err := check.ParseDetectionSpec([]byte(specs[0].Body))
+	if err != nil {
+		return check.DetectionSpec{}, source.Document{}, nil, err
 	}
 	examples := map[string][]byte{}
-	texts := map[string]string{}
 	for _, example := range spec.Cases {
-		if !filepath.IsLocal(example.File) {
-			return detectionInput{}, errors.New("detection example path must be relative")
+		if !filepath.IsLocal(example.File) || strings.Contains(example.File, "\\") {
+			return check.DetectionSpec{}, source.Document{}, nil, errors.New("detection example path must be relative")
 		}
-		data, err := e.workspace.ReadFile(ctx, ref, filepath.ToSlash(filepath.Join(filepath.Dir(specPath), example.File)))
+		document, err := e.document(ctx, ref, selection.Source, path.Join(path.Dir(specs[0].ID), example.File))
 		if err != nil {
-			return detectionInput{}, err
+			return check.DetectionSpec{}, source.Document{}, nil, err
 		}
-		examples[example.File] = data
-		texts[example.File] = string(data)
+		examples[example.File] = []byte(document.Body)
 	}
-	var runner []byte
-	if command, ok := settings.Judges[string(item.Runner)]; ok {
-		runner, err = json.Marshal(command)
-	} else {
-		obs, obsErr := hook.ReadSession(e.runRoot(), e.sessionID)
-		if obsErr != nil {
-			return detectionInput{}, obsErr
-		}
-		if obs == nil {
-			return detectionInput{}, errors.New("session observation is required for detection tests")
-		}
-		path := ".claude/agents/" + string(item.Runner) + ".md"
-		if obs.Host == "codex" {
-			path = ".codex/agents/" + string(item.Runner) + ".toml"
-		}
-		runner, err = e.workspace.ReadFile(ctx, ref, path)
-	}
-	if err != nil {
-		return detectionInput{}, err
-	}
-	references := map[string][]byte{}
-	for _, name := range check.AspectReferences(string(aspect)) {
-		references[name], err = e.asset(ctx, ref, name)
-		if err != nil {
-			return detectionInput{}, err
-		}
-	}
-	identity, err := check.NewDetectionIdentity(aspect, specSource, runner, examples, references)
-	return detectionInput{Spec: spec, Identity: identity, Examples: texts}, err
+	return spec, specs[0], examples, nil
 }
+
+func (e *Engine) runnerDefinition(ctx context.Context, ref string, runner plan.Runner) ([]byte, error) {
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	if command, ok := settings.Judges[string(runner)]; ok {
+		return json.Marshal(command)
+	}
+	obs, err := hook.ReadSession(e.runRoot(), e.sessionID)
+	if err != nil {
+		return nil, err
+	}
+	if obs == nil {
+		return nil, errors.New("session observation is required for detection tests")
+	}
+	name := ".claude/agents/" + string(runner) + ".md"
+	if obs.Host == "codex" {
+		name = ".codex/agents/" + string(runner) + ".toml"
+	}
+	return e.workspace.ReadFile(ctx, ref, name)
+}
+
 func (e *Engine) detectionRecords(ctx context.Context, ref string) ([]check.DetectionTest, error) {
 	settings, err := e.settings(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(filepath.Join(e.Root(), settings.RepositoryPaths().Detect))
+	data, err := os.ReadFile(filepath.Join(e.Root(), filepath.FromSlash(settings.DetectionPath())))
 	if errors.Is(err, os.ErrNotExist) {
 		return []check.DetectionTest{}, nil
 	}
@@ -115,7 +136,7 @@ func (e *Engine) detectionContext(ctx context.Context, items []plan.Check, ref s
 		if item.Runner.IsCommand() {
 			continue
 		}
-		input, err := e.detectionInput(ctx, ref, item)
+		input, _, err := e.detectionInput(ctx, ref, item)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -125,22 +146,37 @@ func (e *Engine) detectionContext(ctx context.Context, items []plan.Check, ref s
 	return requirements, records, err
 }
 func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items []plan.Check, ref string, stageRunID ...string) (Result, bool, error) {
-	requirements, records, err := e.detectionContext(ctx, items, ref)
+	settings, err := e.settings(ctx, ref)
+	if err != nil || !settings.DetectionRequired() {
+		return Result{}, false, err
+	}
+	records, err := e.detectionRecords(ctx, ref)
 	if err != nil {
 		return Result{}, false, err
 	}
-	missing := check.MissingDetection(requirements, records)
-	if len(missing) == 0 {
-		return Result{}, false, nil
+	for _, item := range items {
+		if item.Runner.IsCommand() {
+			continue
+		}
+		input, criteria, err := e.detectionInput(ctx, ref, item)
+		if err != nil {
+			return Result{}, false, err
+		}
+		requirement := []check.DetectionRequirement{{Aspect: item.Aspect, Runner: string(item.Runner), Identity: input.Identity}}
+		if len(check.MissingDetection(requirement, records)) == 0 {
+			continue
+		}
+		return e.issueDetection(ctx, state, input, criteria, ref, stageRunID...)
 	}
-	requirement := missing[0]
-	item := plan.Check{Aspect: requirement.Aspect, Runner: plan.Runner(requirement.Runner), Required: true}
-	input, err := e.detectionInput(ctx, ref, item)
-	if err != nil {
-		return Result{}, false, err
-	}
+	return Result{}, false, nil
+}
+
+// issueDetection requests a detection test. The request holds only the criteria, the anonymous
+// example bodies, and the output contract; it carries no norms, work history, or specification.
+func (e *Engine) issueDetection(ctx context.Context, state *ledger.State, input detectionInput, criteria []check.Criterion, ref string, stageRunID ...string) (Result, bool, error) {
+	item := input.Check
 	identity, _ := json.Marshal(input.Identity)
-	key := requirement.Aspect + ":" + requirement.Runner + ":" + hash(identity)
+	key := item.Aspect + ":" + string(item.Runner) + ":" + hash(identity)
 	meta, fresh, err := e.issuance(form.InstructionDetectionTest, key, nil, 0, "")
 	if err != nil {
 		return Result{}, false, err
@@ -151,34 +187,16 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 	if !fresh {
 		return e.resumeDetection(ctx, state, meta)
 	}
-	aspect, err := e.aspect(ctx, ref, item.Aspect)
-	if err != nil {
-		return Result{}, false, err
-	}
-	norms, _, err := e.normDocuments(ctx, ref)
-	if err != nil {
-		return Result{}, false, err
-	}
 	path := filepath.Join(e.workRoot(), "brief", meta.ID+".md")
 	tree, err := e.workspace.CommitTree(ctx, ref)
 	if err != nil {
 		tree = ref
 	}
-	if err := e.requestNorms(ctx, ref, plan.Check{Aspect: item.Aspect, Runner: item.Runner, Target: "detection"}, norms); err != nil {
-		return Result{}, false, err
-	}
 	output, err := e.bundledSchema(e.schemas["detection-result"])
 	if err != nil {
 		return Result{}, false, err
 	}
-	evidence, err := e.judgmentEvidence(ctx, &meta, state, nil)
-	if err != nil {
-		return Result{}, false, err
-	}
-	if len(norms) > 0 {
-		norms[0].Content += "\n" + evidence
-	}
-	request, err := check.PrepareRequest(check.RequestInput{Kind: check.DetectionRequest, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: aspect, TargetVersion: form.TargetVersion{Kind: form.TargetTree, Tree: tree}, TargetPath: path, Norms: norms, OutputSchema: output, CompletionConditionIDs: []string{}})
+	request, err := check.PrepareRequest(check.RequestInput{Kind: check.DetectionRequest, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: check.Aspect{ID: item.Aspect}, Criteria: criteria, TargetVersion: form.TargetVersion{Kind: form.TargetTree, Tree: tree}, TargetPath: path, Norms: []check.Norm{}, OutputSchema: output, CompletionConditionIDs: []string{}})
 	if err != nil {
 		return Result{}, false, err
 	}
@@ -193,10 +211,10 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 	}
 	return e.executeDetection(ctx, state, meta, data, r)
 }
+
+// detectionBrief gives the judge only the criteria documents, the anonymous example bodies,
+// and the output contract.
 func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brief.Brief, error) {
-	if err := e.hydrateRequest(ctx, data); err != nil {
-		return brief.Brief{}, err
-	}
 	template, err := e.asset(ctx, data.Reference, "templates/brief/judgment.md.tmpl")
 	if err != nil {
 		return brief.Brief{}, err
@@ -214,24 +232,11 @@ func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brie
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	facts, err := e.repository(ctx, data.Reference)
+	criteria, err := e.criteriaDocuments(ctx, data.Reference, request.Criteria)
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	docs, err := e.aspectDocuments(ctx, data.Reference, []plan.Check{{Aspect: request.Aspect.ID, Runner: plan.Runner(request.Runner)}})
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	paths, err := e.normPaths(ctx, data.Reference)
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	// Detection inputs contain only the aspect and its referenced principles and rules.
-	facts.LayoutGuides = nil
-	if facts.Requirements.Exists {
-		facts.Requirements.Content = ""
-	}
-	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, OutputSchema: string(schema), Repository: facts, Norms: docs, NormPaths: paths})
+	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, Criteria: criteria, Detection: true, OutputSchema: string(schema), Repository: brief.RepositoryFacts{LayoutGuides: []brief.Document{}}, Norms: []brief.Document{}, NormPaths: []brief.NormPath{}})
 }
 
 func detectionRequest(data instructionData) (check.Request, error) {
@@ -246,9 +251,6 @@ func (e *Engine) executeDetection(ctx context.Context, state *ledger.State, meta
 		return Result{}, false, err
 	}
 	if command, ok := settings.Judges[data.Instruction.Runner]; ok {
-		if err := e.hydrateRequest(ctx, data); err != nil {
-			return Result{}, false, err
-		}
 		expected, err := e.workspace.SnapshotTree(ctx)
 		if err != nil {
 			return Result{}, false, err
@@ -352,7 +354,7 @@ func (e *Engine) publishDetection(ctx context.Context, ref string, test check.De
 	if err != nil {
 		return err
 	}
-	return fsstore.New(e.Root()).Publish(settings.RepositoryPaths().Detect, append(encoded, '\n'))
+	return fsstore.New(e.Root()).Publish(filepath.FromSlash(settings.DetectionPath()), append(encoded, '\n'))
 }
 
 func (e *Engine) resumeDetection(ctx context.Context, state *ledger.State, meta ledger.Instruction) (Result, bool, error) {
@@ -404,7 +406,7 @@ func (e *Engine) restoreDetection(ctx context.Context, state *ledger.State, meta
 }
 
 func detectionFailureText(meta ledger.Instruction) string {
-	text := "The detection test failed. Revise the aspect or examples."
+	text := "The detection test failed. Revise the check's criteria or examples."
 	if meta.StageRunID == "" {
 		text += " The human must commit the fix before continuing because out-of-round judgments read committed norms."
 	}

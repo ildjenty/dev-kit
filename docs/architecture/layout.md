@@ -1,6 +1,6 @@
 # ディレクトリ構成
 
-実装と埋め込み元は dev-kit のリポジトリに置き、利用側には設定などの[育てるもの](data.md#所有と生存期間)(利用側で更新する git 管理の資産)、作業ごとの実行の記録と生成物を置く。利用側の規範の置き場所は `devkit.toml` の `[paths]` で変更でき、実行の記録と生成物は `.devkit/run/` に固定する。
+実装と埋め込み元は dev-kit のリポジトリに置き、利用側には設定などの[育てるもの](data.md#所有と生存期間)(利用側で更新する git 管理の資産)、作業ごとの実行の記録と生成物を置く。利用側の規範の置き場所は `devkit.toml` の `[sources.<名前>]` で変更でき、実行の記録と生成物は `.devkit/run/` に固定する。
 
 ## dev-kit のリポジトリ
 
@@ -10,7 +10,7 @@ dev-kit/
   internal/
     plan/                計画の意味論
     brief/               brief と判定依頼の組み立て
-    check/               観点ファイル、判定、集約、適用除外、検出試験の仕様
+    check/               選んだ基準による判定、集約、適用除外、検出試験の仕様
     router/              分類表と判断
     form/                固定フォーマットのスキーマと描画
     ledger/              記録の型と問い合わせ
@@ -28,7 +28,6 @@ dev-kit/
     embed.go             固定物の埋め込みと公開(package assets)
     plans/               既定の雛形: default、fix、docs
     stages/              ステージ定義
-    checks/              観点ファイル
     templates/           brief と form のテンプレート
     router/              分類表の既定
     rules/               規則の既定
@@ -49,7 +48,7 @@ dev-kit/
 
 ## 利用側のリポジトリ
 
-規範と作業の成果の置き場所は `[paths]` の既定値である。principles・stages・checks・plans・templates・rules・requirements・structure・detect は設定で変更できる。
+規範と成果のソースの既定の置き場所である。接続先と配置は `[sources.<名前>]`、検出試験の索引は `[state] detect` で変更できる。既定の規範のソースは principles・stages・plans・rules・examples・templates、成果は requirements・structure である。
 
 ```text
 <repo>/
@@ -62,16 +61,16 @@ dev-kit/
   .codex/rules/devkit.rules  devkit を sandbox の外で動かす allow。git 管理
   .codex/agents/devkit-*.toml 作業者・判定者・計画者のサブエージェント定義。git 管理
   .agents/skills/devkit/     skill の正本。Codex の置き場所
-  .devkit/                   git 管理(run/・worktrees/ を除く)
-    principles/              原則。init が初期内容をコピーし、リポジトリが所有
+  .devkit/                   既定の files ソースと状態。git 管理(run/・worktrees/ を除く)
+    principles/              原則と review/test.md などの用途別の判定基準。principles ソース
     stages/                  ステージ定義。init が初期内容をコピー
     plans/<name>.json        ループの雛形。init が既定の default・fix・docs をコピー
-    checks/<観点ID>.md        観点ファイル。違反例・適合例・許容例は checks/<観点ID>/ の下
+    examples/<観点ID>/       検出試験の例と spec.json。examples ソース
     templates/               brief と form のテンプレート
     rules.md                 規則と強制手段
     requirements.md          リポジトリが満たすべき要件の正本
     detect.json              検出試験の合格記録の索引
-    structure.json           構造ステージを使うときだけ
+    structure.json           構造の知識。形式は自由であり、所定の JSON のときだけ図を描く
     worktrees/<単位の指示ID>/  単位ごとの detached の作業場所。.gitignore で除外
     run/                     実行の記録と生成物。.gitignore で除外
       sessions/<session_id>/<時刻>-<イベント>.json   セッションの観測。作業の外にチェックアウトごとに置く
@@ -82,16 +81,18 @@ dev-kit/
         prompts/             人の入力の観測(UserPromptSubmit が書く)
         stops/<ULID>.json    作業単位の継続回数と上限到達時の問い(Stop が書く)
         brief/               next が書く brief、判定依頼、差分ファイル
-        snap/<対象のバージョン>/   判定対象と固定した規範の展開(read-tree と checkout-index --prefix)
+        snap/<対象のバージョン>/   git の判定対象と固定した規範・成果の写し
         results/<指示ID>-<agent_id>.json   作業者・判定者・計画者のサブエージェントの結果(SubagentStop が書く)
         view.html
 ```
 
 UserPromptSubmit は束縛の有無によらず、人の入力ごとにセッションの最新入力1件を更新し、束縛後は作業ごとの観測も残す。タスクの完了通知は入力に含めない。`start` はその原文を作業に結び付け、観測がなければ原文なしと記録する。
 
-作業履歴ファイルは指示発行時点の内容で固定した作業の生成物であり、すべての作業の brief と判定依頼がそのパスを参照する。
+作業履歴ファイルは指示発行時点の内容で固定した作業の生成物であり、検出試験を除くすべての作業の brief と判定依頼がそのパスを参照する。
 
 入力ファイルの場所と内容の保存は[状態遷移と受理条件](data.md#状態遷移と受理条件)、記録 ID の形式は[記録の範囲](data.md#記録の範囲)、停止の観測の保持条件は[停止の観測](data.md#停止の観測-stopobservation)に従う。
+
+外部のソースは固定した本文と編集用の写しを `.devkit/run/` の実行の記録の下に置く。判定者には読み取り用の写し、作業者には固定した本文と編集先を渡し、原本への反映は[書き込みの流れ](data.md#書き込みの流れ)に従う。
 
 配置ガイドは各ディレクトリの README に置き、[brief の入力](modules.md#brief)に使う。
 
@@ -99,7 +100,7 @@ UserPromptSubmit は束縛の有無によらず、人の入力ごとにセッシ
 
 単位の作業場所 `.devkit/worktrees/<単位の指示 ID>/` も ignore し、記録を守る deny の対象と重ならないよう `.devkit/run/` の外に置く。devkit がラウンド開始時のスナップショットのコミットから detached で作り、物理的な名前には計画者の単位 ID を使わない。中断中は保持する。中止・作業完了時は変更のない worktree だけを削除し、変更の残るものは保持して場所を知らせる。破棄は人が git で行う。
 
-規範の識別には principles・stages・checks・plans・templates・rules・`devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md を含める。requirements・structure・detect・`.devkit/run/` は含めず、これらを変えても判定は失効しない。JSON Schema、分類表とロールの既定値、ホスト設定の断片はバイナリが供給する。規範内のコード書式の参照は論理名であり、brief が論理名と `snap/` 内のパスの対応を渡す。`schemas/…` は出力スキーマの本文として渡す。
+規範の識別には `norm = true` のソースの全文書と、ソースの外の `devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md を含める。requirements・structure は成果であり、索引と実行の記録とともに規範の識別には含めない。成果の更新は規範の変更による失効を起こさないが、対象の識別では git のツリーに外部の成果の文書のソース名・ID・内容ハッシュの集合を加える。brief は固定した写しのパスを示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
 
 `init` は導入するファイルを人が確認したあとコミットする。`--no-commit` を指定した場合は手動でコミットする。HEAD がない場合、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合、`start` は理由と直し方を返して拒否する。
 

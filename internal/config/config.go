@@ -23,7 +23,8 @@ type Config struct {
 	Router         Router                       `toml:"router"`
 	PlanCheck      PlanCheck                    `toml:"plan_check"`
 	DefaultPlan    string                       `toml:"default_plan"`
-	Paths          Paths                        `toml:"paths"`
+	Sources        map[string]Source            `toml:"sources"`
+	State          State                        `toml:"state"`
 	Approval       Approval                     `toml:"approval"`
 	Git            Git                          `toml:"git"`
 	Classification Classification               `toml:"classification"`
@@ -46,29 +47,18 @@ func (c Config) MaxWorkers() int {
 	return c.Parallel.MaxWorkers
 }
 
-// Paths holds repository-relative locations for repository-owned files.
-type Paths struct {
-	Principles   string `toml:"principles"`
-	Stages       string `toml:"stages"`
-	Checks       string `toml:"checks"`
-	Plans        string `toml:"plans"`
-	Templates    string `toml:"templates"`
-	Rules        string `toml:"rules"`
-	Requirements string `toml:"requirements"`
-	Structure    string `toml:"structure"`
-	Detect       string `toml:"detect"`
-}
-
 // Approval controls when plans and edits to the development loop require approval.
 type Approval struct {
 	Plan         string `toml:"plan"`
 	MetaLoopEdit string `toml:"meta_loop_edit"`
 }
 
-// PlanCheck selects the aspect and runner for plan judgments.
+// PlanCheck selects the name, runner, criteria, and detection specification for plan judgments.
 type PlanCheck struct {
-	Aspect string `toml:"aspect"`
-	Runner string `toml:"runner"`
+	Aspect   string      `toml:"aspect"`
+	Runner   string      `toml:"runner"`
+	Criteria []Selection `toml:"criteria"`
+	Examples *Selection  `toml:"examples"`
 }
 
 // PlanCheckSettings returns the effective plan judgment settings.
@@ -79,6 +69,17 @@ func (c Config) PlanCheckSettings() PlanCheck {
 	}
 	if settings.Runner == "" {
 		settings.Runner = "devkit-judge"
+	}
+	if settings.Criteria == nil {
+		settings.Criteria = []Selection{{Source: "principles", Select: "review/plan.md"}}
+	} else {
+		settings.Criteria = slices.Clone(settings.Criteria)
+	}
+	if settings.Examples == nil {
+		settings.Examples = &Selection{Source: "examples", Select: "plan/spec.json"}
+	} else {
+		examples := *settings.Examples
+		settings.Examples = &examples
 	}
 	return settings
 }
@@ -128,30 +129,6 @@ func (c Config) DefaultPlanName() string {
 		return "default"
 	}
 	return c.DefaultPlan
-}
-
-// RepositoryPaths returns effective repository-owned file locations.
-func (c Config) RepositoryPaths() Paths {
-	p := c.Paths
-	for _, field := range []struct {
-		value    *string
-		fallback string
-	}{
-		{&p.Principles, ".devkit/principles"},
-		{&p.Stages, ".devkit/stages"},
-		{&p.Checks, ".devkit/checks"},
-		{&p.Plans, ".devkit/plans"},
-		{&p.Templates, ".devkit/templates"},
-		{&p.Rules, ".devkit/rules.md"},
-		{&p.Requirements, ".devkit/requirements.md"},
-		{&p.Structure, ".devkit/structure.json"},
-		{&p.Detect, ".devkit/detect.json"},
-	} {
-		if *field.value == "" {
-			*field.value = field.fallback
-		}
-	}
-	return p
 }
 
 // PlanApproval returns the effective plan approval policy.
@@ -289,7 +266,7 @@ type Router struct {
 func Parse(data []byte) (Config, error) {
 	c := Config{}
 	c.DefaultPlan = c.DefaultPlanName()
-	c.Paths = c.RepositoryPaths()
+	c.State.Detect = c.DetectionPath()
 	c.Approval = Approval{Plan: c.PlanApproval(), MetaLoopEdit: c.MetaLoopEditApproval()}
 	allowEmpty := c.AllowEmptyCommit()
 	c.Git = Git{Branch: c.branchPattern(), CommitMessage: c.commitMessagePattern(), AllowEmptyCommit: &allowEmpty}
@@ -306,6 +283,7 @@ func Parse(data []byte) (Config, error) {
 	if keys := metadata.Undecoded(); len(keys) != 0 {
 		return Config{}, fmt.Errorf("unknown configuration key: %s", keys[0])
 	}
+	c.applySourceDefaults(metadata)
 	if err := c.Validate(); err != nil {
 		return Config{}, err
 	}
@@ -338,7 +316,7 @@ func (c Config) Validate() error {
 	if err := c.validatePlanSettings(); err != nil {
 		return err
 	}
-	if err := c.validatePaths(); err != nil {
+	if err := c.validateSources(); err != nil {
 		return err
 	}
 	if err := c.validateApproval(); err != nil {
@@ -432,39 +410,12 @@ func (c Config) validatePlanSettings() error {
 	if strings.TrimSpace(c.DefaultPlan) == "" {
 		return fmt.Errorf("default_plan must not be empty")
 	}
-	return nil
-}
-
-func (c Config) validatePaths() error {
-	paths := []struct {
-		name  string
-		value string
-	}{
-		{"principles", c.Paths.Principles},
-		{"stages", c.Paths.Stages},
-		{"checks", c.Paths.Checks},
-		{"plans", c.Paths.Plans},
-		{"templates", c.Paths.Templates},
-		{"rules", c.Paths.Rules},
-		{"requirements", c.Paths.Requirements},
-		{"structure", c.Paths.Structure},
-		{"detect", c.Paths.Detect},
+	if err := c.ValidateCriteria(c.PlanCheck.Criteria); err != nil {
+		return fmt.Errorf("plan_check.criteria: %w", err)
 	}
-	for _, field := range paths {
-		if !validRepositoryPath(field.value) {
-			return fmt.Errorf("paths.%s must be a clean repository-relative slash path outside .devkit/run: %q", field.name, field.value)
-		}
-	}
-	for i, norm := range paths[:6] {
-		for _, other := range paths[i+1 : 6] {
-			if norm.value == other.value || strings.HasPrefix(norm.value, other.value+"/") || strings.HasPrefix(other.value, norm.value+"/") {
-				return fmt.Errorf("paths.%s and paths.%s must not overlap", norm.name, other.name)
-			}
-		}
-		for _, product := range paths[6:] {
-			if product.value == norm.value || strings.HasPrefix(product.value, norm.value+"/") {
-				return fmt.Errorf("paths.%s must not be inside or equal to paths.%s", product.name, norm.name)
-			}
+	if c.PlanCheck.Examples != nil {
+		if err := c.ValidateSelection(*c.PlanCheck.Examples); err != nil {
+			return fmt.Errorf("plan_check.examples: %w", err)
 		}
 	}
 	return nil

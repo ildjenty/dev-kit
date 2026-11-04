@@ -114,6 +114,8 @@ const (
 	ChangedStartStage    DeviationKind = "changed_start_stage"
 	ChangedSplit         DeviationKind = "changed_split"
 	RemovedRequiredCheck DeviationKind = "removed_required_check"
+	ChangedCriteria      DeviationKind = "changed_criteria"
+	ChangedExamples      DeviationKind = "changed_examples"
 )
 
 type Deviation struct {
@@ -237,6 +239,19 @@ func stageDeviations(original, stage Stage) []Deviation {
 			return c.Required && c.Aspect == required.Aspect && c.Runner == required.Runner
 		}) {
 			result = append(result, Deviation{Kind: RemovedRequiredCheck, StageID: stage.ID, Aspect: required.Aspect, Runner: required.Runner})
+		}
+	}
+	for _, before := range original.Checks {
+		for _, after := range stage.Checks {
+			if before.Aspect != after.Aspect || before.Runner != after.Runner {
+				continue
+			}
+			if !slices.Equal(before.Criteria, after.Criteria) {
+				result = append(result, Deviation{Kind: ChangedCriteria, StageID: stage.ID, Aspect: before.Aspect, Runner: before.Runner})
+			}
+			if !reflect.DeepEqual(before.Examples, after.Examples) {
+				result = append(result, Deviation{Kind: ChangedExamples, StageID: stage.ID, Aspect: before.Aspect, Runner: before.Runner})
+			}
 		}
 	}
 	return result

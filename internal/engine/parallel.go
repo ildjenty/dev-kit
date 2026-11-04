@@ -269,7 +269,10 @@ func (e *Engine) recordMergeStep(ctx context.Context, merge *ledger.Merge) error
 func (e *Engine) mergeConflict(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, merge *ledger.Merge) (Result, error) {
 	// Preserve the conflicted tree as the returned target so the usual round limits apply.
 	copy := *round
-	target := form.TargetVersion{Kind: form.TargetTree, Tree: merge.ResultTree}
+	target, err := e.treeTarget(merge.ResultTree)
+	if err != nil {
+		return Result{}, err
+	}
 	copy.ReturnedTarget = &target
 	if _, err := e.append(&copy); err != nil {
 		return Result{}, err

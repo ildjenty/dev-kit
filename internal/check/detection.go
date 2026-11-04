@@ -80,18 +80,24 @@ func PrepareDetectionExamples(spec DetectionSpec, examples map[string]string) ([
 	return result, nil
 }
 
-// DetectionIdentity identifies content for reusing a passing detection test.
+// DetectionIdentity identifies content for reusing a passing detection test: the runner
+// definition, the judgment request template with its rules, the criteria documents actually
+// supplied, and the specification with its example documents.
 type DetectionIdentity struct {
-	AspectHash string `json:"aspect_hash"`
-	SpecHash   string `json:"spec_hash"`
-	RunnerHash string `json:"runner_hash"`
-	NormsHash  string `json:"norms_hash"`
+	RunnerHash   string `json:"runner_hash"`
+	TemplateHash string `json:"template_hash"`
+	CriteriaHash string `json:"criteria_hash"`
+	ExamplesHash string `json:"examples_hash"`
 }
 
-// NewDetectionIdentity hashes the original specification, example contents, and expected judgments.
-// examples maps file names relative to the specification to their contents.
-// references maps logical names from AspectReferences to their resolved contents.
-func NewDetectionIdentity(aspect, specSource, runner []byte, examples, references map[string][]byte) (DetectionIdentity, error) {
+// Complete reports whether every identity component is present.
+func (i DetectionIdentity) Complete() bool {
+	return i.RunnerHash != "" && i.TemplateHash != "" && i.CriteriaHash != "" && i.ExamplesHash != ""
+}
+
+// NewDetectionIdentity hashes the runner definition, request template, supplied criteria,
+// the original specification, and the example contents keyed by file names relative to it.
+func NewDetectionIdentity(runner, template []byte, criteria []Criterion, specSource []byte, examples map[string][]byte) (DetectionIdentity, error) {
 	spec, err := ParseDetectionSpec(specSource)
 	if err != nil {
 		return DetectionIdentity{}, err
@@ -109,19 +115,22 @@ func NewDetectionIdentity(aspect, specSource, runner []byte, examples, reference
 	if err != nil {
 		return DetectionIdentity{}, err
 	}
-	normHashes := make(map[string]string)
-	for _, name := range AspectReferences(string(aspect)) {
-		content, ok := references[name]
-		if !ok {
-			return DetectionIdentity{}, fmt.Errorf("referenced norm content not found: %q", name)
-		}
-		normHashes[name] = contentHash(content)
+	if len(criteria) == 0 {
+		return DetectionIdentity{}, fmt.Errorf("detection test requires criteria documents")
 	}
-	norms, err := json.Marshal(normHashes)
+	documents := make([]string, 0, len(criteria))
+	for _, criterion := range criteria {
+		if criterion.ContentHash == "" {
+			return DetectionIdentity{}, fmt.Errorf("criteria document hash is missing: %s/%s", criterion.Source, criterion.ID)
+		}
+		documents = append(documents, criterion.Source+"\x00"+criterion.ID+"\x00"+criterion.ContentHash)
+	}
+	slices.Sort(documents)
+	set, err := json.Marshal(documents)
 	if err != nil {
 		return DetectionIdentity{}, err
 	}
-	return DetectionIdentity{AspectHash: contentHash(aspect), SpecHash: contentHash(data), RunnerHash: contentHash(runner), NormsHash: contentHash(norms)}, nil
+	return DetectionIdentity{RunnerHash: contentHash(runner), TemplateHash: contentHash(template), CriteriaHash: contentHash(set), ExamplesHash: contentHash(data)}, nil
 }
 
 func contentHash(data []byte) string { return fmt.Sprintf("%x", sha256.Sum256(data)) }
@@ -153,7 +162,7 @@ func AssessDetection(spec DetectionSpec, runner string, identity DetectionIdenti
 	if runner == "" || strings.HasPrefix(runner, "command:") {
 		return DetectionTest{}, fmt.Errorf("detection test requires a judge runner")
 	}
-	if identity.AspectHash == "" || identity.SpecHash == "" || identity.RunnerHash == "" || identity.NormsHash == "" {
+	if !identity.Complete() {
 		return DetectionTest{}, fmt.Errorf("detection test content hashes are required")
 	}
 	byFile := make(map[string]DetectionObservation)
@@ -195,7 +204,7 @@ type DetectionRequirement struct {
 	Identity DetectionIdentity
 }
 
-// MissingDetection looks for passing records matching the current aspect, specification, and runner contents.
+// MissingDetection looks for passing records matching the current runner, template, criteria, and examples.
 // Command checks do not require detection tests.
 func MissingDetection(required []DetectionRequirement, records []DetectionTest) []DetectionRequirement {
 	missing := []DetectionRequirement{}
@@ -203,7 +212,7 @@ func MissingDetection(required []DetectionRequirement, records []DetectionTest) 
 		if strings.HasPrefix(requirement.Runner, "command:") {
 			continue
 		}
-		if requirement.Identity.AspectHash == "" || requirement.Identity.SpecHash == "" || requirement.Identity.RunnerHash == "" || requirement.Identity.NormsHash == "" {
+		if !requirement.Identity.Complete() {
 			missing = append(missing, requirement)
 			continue
 		}

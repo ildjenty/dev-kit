@@ -225,7 +225,11 @@ func (e *Engine) checkMergedSubmission(ctx context.Context, state *ledger.State,
 	stage, _ := p.Stage(run.StageID)
 	copy := *round
 	copy.MergeFix = true
-	copy.ReturnedTarget = &form.TargetVersion{Kind: form.TargetTree, Tree: merge.ResultTree}
+	target, err := e.treeTarget(merge.ResultTree)
+	if err != nil {
+		return true, err
+	}
+	copy.ReturnedTarget = &target
 	if _, err := e.append(&copy); err != nil {
 		return true, err
 	}

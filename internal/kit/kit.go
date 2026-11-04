@@ -17,23 +17,16 @@ func FS() fs.FS {
 }
 
 // Norms returns distributable repository norms keyed by logical path.
-// Detection examples are merged into checks/<aspect>/ alongside aspect files.
 func Norms() (map[string][]byte, error) {
 	files := make(map[string][]byte)
-	for _, root := range []string{"principles", "stages", "checks", "plans", "templates", "examples"} {
+	for _, root := range []string{"principles", "stages", "plans", "templates", "examples"} {
 		if err := fs.WalkDir(FS(), root, func(name string, entry fs.DirEntry, err error) error {
 			if err != nil || entry.IsDir() {
 				return err
 			}
-			if name == "examples/README.md" {
-				return nil
-			}
 			data, err := fs.ReadFile(FS(), name)
 			if err != nil {
 				return err
-			}
-			if root == "examples" {
-				name = "checks/" + strings.TrimPrefix(name, "examples/")
 			}
 			files[name] = data
 			return nil

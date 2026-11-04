@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io/fs"
-	"strings"
 	"testing"
 
 	"github.com/ildjenty/dev-kit/assets"
@@ -16,15 +15,13 @@ func TestNormsLayoutAndContents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, root := range []string{"principles", "stages", "checks", "plans", "templates", "examples", "rules"} {
+	for _, root := range []string{"principles", "stages", "plans", "templates", "examples", "rules"} {
 		if err := fs.WalkDir(assets.FS(), root, func(name string, entry fs.DirEntry, err error) error {
-			if err != nil || entry.IsDir() || name == "examples/README.md" || name == "rules/README.md" {
+			if err != nil || entry.IsDir() || name == "rules/README.md" {
 				return err
 			}
 			target := name
-			if root == "examples" {
-				target = "checks/" + strings.TrimPrefix(name, "examples/")
-			} else if root == "rules" {
+			if root == "rules" {
 				target = "rules.md"
 			}
 			want, err := fs.ReadFile(assets.FS(), name)

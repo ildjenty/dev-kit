@@ -298,12 +298,28 @@ func (w *Workspace) StructureHistory(ctx context.Context, ref, path string) ([]S
 }
 
 func (w *Workspace) treeEntries(ctx context.Context, ref string, paths ...string) (map[string]string, error) {
+	objects, err := w.TreeObjects(ctx, ref, paths...)
+	entries := make(map[string]string, len(objects))
+	for path, object := range objects {
+		entries[path] = object.ID
+	}
+	return entries, err
+}
+
+// TreeObject is the object type and ID of a tree entry.
+type TreeObject struct {
+	Type string
+	ID   string
+}
+
+// TreeObjects returns the tree entries for paths in ref, omitting missing paths.
+func (w *Workspace) TreeObjects(ctx context.Context, ref string, paths ...string) (map[string]TreeObject, error) {
 	args := append([]string{"ls-tree", "-z", ref, "--"}, paths...)
 	output, err := w.run(ctx, nil, args...)
 	if err != nil {
 		return nil, err
 	}
-	entries := make(map[string]string)
+	entries := make(map[string]TreeObject)
 	for _, entry := range bytes.Split(output, []byte{0}) {
 		if len(entry) == 0 {
 			continue
@@ -313,7 +329,7 @@ func (w *Workspace) treeEntries(ctx context.Context, ref string, paths ...string
 		if !ok || len(fields) != 3 {
 			return nil, fmt.Errorf("invalid git ls-tree output: %q", entry)
 		}
-		entries[path] = fields[2]
+		entries[path] = TreeObject{Type: fields[1], ID: fields[2]}
 	}
 	return entries, nil
 }

@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -56,6 +57,9 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 	var c config.Config
 	if err == nil {
 		c, err = config.Parse(data)
+		if err == nil {
+			err = c.ValidateSourcePaths(r.Root)
+		}
 	}
 	r.add("devkit.toml", "Configuration is valid.", err)
 	if err == nil {
@@ -66,15 +70,21 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 		r.add("kit_version", "Binary and configuration kit versions match.", versionErr)
 	}
 	r.checkHostFiles()
-	paths := c.RepositoryPaths()
-	for _, name := range []string{paths.Principles, paths.Stages, paths.Checks, paths.Plans, paths.Templates} {
-		info, err := os.Stat(filepath.Join(r.Root, filepath.FromSlash(name)))
-		if err == nil && !info.IsDir() {
-			err = fmt.Errorf("expected a directory: %s", name)
-		}
-		r.add(name, "Norm directory is present.", err)
+	sources := c.KnowledgeSources()
+	names := make([]string, 0, len(sources))
+	for name := range sources {
+		names = append(names, name)
 	}
-	r.add(paths.Rules, "Rules file is present.", requireFile(filepath.Join(r.Root, filepath.FromSlash(paths.Rules))))
+	slices.Sort(names)
+	for _, name := range names {
+		// Products such as requirements and structure are created by work, not by init.
+		if !sources[name].Norm {
+			continue
+		}
+		location := sources[name].Path
+		_, err := os.Stat(sourceLocation(r.Root, location))
+		r.add(location, "Knowledge source path is present.", err)
+	}
 	for _, name := range []string{
 		".agents/skills/devkit/SKILL.md",
 		".claude/agents/devkit-judge.md", ".claude/agents/devkit-planner.md",
@@ -110,9 +120,14 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 		headErr = fmt.Errorf("HEAD is unavailable; commit the installed initialization files before starting work: %w", headErr)
 	}
 	r.add("HEAD", "HEAD exists.", headErr)
-	status, statusErr := runGit(ctx, r.Root, "status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching", "--", "devkit.toml", paths.Plans)
+	committed := []string{"devkit.toml"}
+	plans, pathErr := filepath.Rel(r.Root, sourceLocation(r.Root, sources["plans"].Path))
+	if pathErr == nil && plans != ".." && !strings.HasPrefix(plans, ".."+string(filepath.Separator)) {
+		committed = append(committed, filepath.ToSlash(plans))
+	}
+	status, statusErr := runGit(ctx, r.Root, append([]string{"status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching", "--"}, committed...)...)
 	if statusErr == nil && len(status) != 0 {
-		statusErr = fmt.Errorf("initialization files are uncommitted; commit devkit.toml and %s before starting work:\n%s", paths.Plans, status)
+		statusErr = fmt.Errorf("initialization files are uncommitted; commit %s before starting work:\n%s", strings.Join(committed, " and "), status)
 	}
 	r.add("init_committed", "Configuration and plans are committed.", statusErr)
 	r.checkWorkVersions(c.KitVersion)

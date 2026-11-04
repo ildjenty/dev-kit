@@ -43,7 +43,7 @@
   - (In a design proposal) The first step is organized by layer and cannot be verified from the entry point of use to the result.
   - Extending the structure of the first working feature to features with different assumptions without verification.
 - **Before and after**: "Complete conversion and output processing separately, then call them from the CLI at the end" → "First read a small input through the CLI and run it through until the converted result reaches standard output, then expand the supported inputs."
-- **blocking**: None (the `steps` perspective checks whether each step can be verified independently).
+- **blocking**: None (the `steps` review in `principles/review/steps.md` checks whether each step can be verified independently).
 - **Evidence**: How to verify the current connection independently at each step, the entry point of use and observed results, resolved unverified matters, the feature used as an example, and why its assumptions are shared. If any layers were excluded from verification, identify them and the reasons.
 
 ## 4. Finish migrations that can safely switch all at once without leaving compatibility layers

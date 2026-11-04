@@ -20,6 +20,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/plan"
 	"github.com/ildjenty/dev-kit/internal/router"
+	"github.com/ildjenty/dev-kit/internal/source"
 )
 
 // instructionData is a regenerable request artifact, never a ledger record.
@@ -34,25 +35,6 @@ type instructionData struct {
 	Context      *ledger.InstructionContext `json:"context,omitempty"`
 }
 
-func (e *Engine) assetPath(ctx context.Context, ref, name string) (string, error) {
-	settings, err := e.settings(ctx, ref)
-	if err != nil {
-		return "", err
-	}
-	p := settings.RepositoryPaths()
-	for _, mapping := range []struct{ logical, actual string }{
-		{"principles", p.Principles}, {"stages", p.Stages}, {"checks", p.Checks}, {"plans", p.Plans}, {"templates", p.Templates},
-		{"rules.md", p.Rules}, {"requirements.md", p.Requirements}, {"structure.json", p.Structure},
-	} {
-		if name == mapping.logical {
-			return mapping.actual, nil
-		}
-		if strings.HasPrefix(name, mapping.logical+"/") {
-			return mapping.actual + strings.TrimPrefix(name, mapping.logical), nil
-		}
-	}
-	return "", fmt.Errorf("unknown logical norm: %s", name)
-}
 func (e *Engine) asset(ctx context.Context, ref, name string) ([]byte, error) {
 	if strings.HasPrefix(name, "schemas/") {
 		source, err := kit.Schema(strings.TrimSuffix(strings.TrimPrefix(name, "schemas/"), ".json"))
@@ -61,11 +43,7 @@ func (e *Engine) asset(ctx context.Context, ref, name string) ([]byte, error) {
 		}
 		return e.bundledSchema(source)
 	}
-	path, err := e.assetPath(ctx, ref, name)
-	if err != nil {
-		return nil, err
-	}
-	return e.workspace.ReadFile(ctx, ref, path)
+	return e.logicalAsset(ctx, ref, name)
 }
 func (e *Engine) expanded(ctx context.Context, ref string) (string, error) {
 	tree, err := e.workspace.CommitTree(ctx, ref)
@@ -132,6 +110,8 @@ func (e *Engine) normDocuments(ctx context.Context, ref string) ([]check.Norm, [
 	return norms, nil, nil
 }
 
+// normPaths lists every fixed norm that is not supplied in full: each norm source with the
+// location of its fixed copy, and the norms outside the sources in the expanded snapshot.
 func (e *Engine) normPaths(ctx context.Context, ref string) ([]brief.NormPath, error) {
 	refs, err := e.norms(ctx, ref)
 	if err != nil {
@@ -141,92 +121,139 @@ func (e *Engine) normPaths(ctx context.Context, ref string) ([]brief.NormPath, e
 	if err != nil {
 		return nil, err
 	}
-	settings, err := e.settings(ctx, ref)
+	sources, err := e.knowledgeSources(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	p := settings.RepositoryPaths()
-	logical := map[string]string{p.Principles: "principles/", p.Stages: "stages/", p.Checks: "checks/", p.Plans: "plans/", p.Templates: "templates/", p.Rules: "rules.md"}
+	labels := map[string]string{}
+	for name, item := range sources {
+		if location, inside := e.repositoryLocation(item); inside {
+			labels[location] = "source " + name + " (" + location + ")"
+		}
+	}
 	paths := []brief.NormPath{}
 	for _, norm := range refs {
-		name := logical[norm.Path]
-		if name == "" {
-			name = norm.Path
+		if name, ok := strings.CutPrefix(norm.Path, "source:"); ok {
+			pin, err := e.pin(ctx, ref, false)
+			if err != nil {
+				return nil, err
+			}
+			directory, err := e.fixedDirectory(name, pin[name])
+			if err != nil {
+				return nil, err
+			}
+			paths = append(paths, brief.NormPath{Path: "source " + name + " (" + sources[name].Path + ")", SnapshotPath: directory})
+			continue
 		}
-		paths = append(paths, brief.NormPath{Path: name, SnapshotPath: filepath.Join(expanded, filepath.FromSlash(norm.Path))})
+		label := labels[norm.Path]
+		if label == "" {
+			label = norm.Path
+		}
+		paths = append(paths, brief.NormPath{Path: label, SnapshotPath: filepath.Join(expanded, filepath.FromSlash(norm.Path))})
 	}
 	return paths, nil
 }
 
-func (e *Engine) aspectDocuments(ctx context.Context, ref string, items []plan.Check) ([]brief.Document, error) {
+// selectionDocuments resolves selections into documents for a brief. Norm sources are read
+// from the snapshot fixed for ref and products from productRef, or from their editable copy.
+func (e *Engine) selectionDocuments(ctx context.Context, ref, productRef string, selections []plan.Selection) ([]brief.Document, error) {
+	sources, err := e.knowledgeSources(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
 	docs := []brief.Document{}
 	seen := map[string]bool{}
-	for _, item := range items {
-		if item.Runner.IsCommand() {
-			continue
-		}
-		name := "checks/" + item.Aspect + ".md"
-		source, err := e.asset(ctx, ref, name)
+	for _, selection := range selections {
+		documents, err := e.productDocuments(ctx, ref, productRef, selection, sources[selection.Source])
 		if err != nil {
 			return nil, err
 		}
-		names := append([]string{name}, check.AspectReferences(string(source))...)
-		for _, name := range names {
-			if name == "rules.md" || seen[name] {
-				continue
+		for _, document := range documents {
+			key := selection.Source + "/" + document.ID
+			if !seen[key] {
+				seen[key] = true
+				docs = append(docs, brief.Document{Path: key, Content: document.Body, Exists: true})
 			}
-			data, err := e.asset(ctx, ref, name)
-			if err != nil {
-				return nil, err
-			}
-			docs = append(docs, brief.Document{Path: name, Content: string(data)})
-			seen[name] = true
 		}
 	}
 	return docs, nil
 }
 
-func (e *Engine) repository(ctx context.Context, ref string, productRef ...string) (brief.RepositoryFacts, error) {
-	settings, err := e.settings(ctx, ref)
-	if err != nil {
-		return brief.RepositoryFacts{}, err
+func (e *Engine) productDocuments(ctx context.Context, ref, productRef string, selection plan.Selection, item config.Source) ([]source.Document, error) {
+	if item.Norm {
+		return e.selectDocuments(ctx, ref, selection.Source, selection.Select)
 	}
-	expanded, err := e.expanded(ctx, ref)
-	if err != nil {
-		return brief.RepositoryFacts{}, err
-	}
-	p := settings.RepositoryPaths()
-	facts := brief.RepositoryFacts{LayoutGuides: []brief.Document{}, AvailableChecks: []plan.Check{}}
-	data, err := os.ReadFile(filepath.Join(expanded, filepath.FromSlash(p.Rules)))
-	if err != nil {
-		return facts, fmt.Errorf("required rules file %s: %w", p.Rules, err)
-	}
-	facts.Rules = brief.Document{Path: p.Rules, Content: string(data), Exists: true}
-	if len(productRef) > 0 {
-		expanded, err = e.expanded(ctx, productRef[0])
+	if _, err := os.Stat(e.editBasePath(selection.Source)); err == nil && e.workRoot() != "" {
+		directory := e.editDirectory(selection.Source)
+		adapter, err := source.NewFiles(directory, ".", os.DirFS(directory), "", false)
 		if err != nil {
-			return facts, err
+			return nil, err
 		}
+		return adapter.Select(selection.Select)
+	}
+	return e.selectFrom(ctx, ref, productRef, selection.Source, selection.Select)
+}
+
+// workerInputs resolves the stage inputs other than the requirements and rules, which the
+// repository facts already supply.
+func (e *Engine) workerInputs(ctx context.Context, ref, productRef string, stage plan.Stage) ([]brief.Document, error) {
+	selections := slices.DeleteFunc(stage.WorkerInputs(), func(selection plan.Selection) bool {
+		return slices.Contains(plan.DefaultInputs(), selection)
+	})
+	return e.selectionDocuments(ctx, ref, productRef, selections)
+}
+
+func (e *Engine) repository(ctx context.Context, ref string, productRef ...string) (brief.RepositoryFacts, error) {
+	sources, err := e.knowledgeSources(ctx, ref)
+	if err != nil {
+		return brief.RepositoryFacts{}, err
+	}
+	facts := brief.RepositoryFacts{LayoutGuides: []brief.Document{}, AvailableChecks: []plan.Check{}}
+	rules, exists, err := e.sourceText(ctx, ref, "rules")
+	if err == nil && !exists {
+		err = fs.ErrNotExist
+	}
+	if err != nil {
+		return facts, fmt.Errorf("required rules source %s: %w", sources["rules"].Path, err)
+	}
+	facts.Rules = brief.Document{Path: sources["rules"].Path, Content: rules, Exists: true}
+	products := ref
+	if len(productRef) > 0 {
+		products = productRef[0]
 	}
 	for _, item := range []struct {
-		path   string
+		name   string
 		target *brief.Document
-	}{{p.Requirements, &facts.Requirements}, {p.Structure, &facts.Structure}} {
-		data, err := os.ReadFile(filepath.Join(expanded, filepath.FromSlash(item.path)))
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
+	}{{"requirements", &facts.Requirements}, {"structure", &facts.Structure}} {
+		if *item.target, err = e.productFact(ctx, ref, products, item.name, sources[item.name]); err != nil {
 			return facts, err
-		}
-		*item.target = brief.Document{Path: item.path, Content: string(data), Exists: err == nil}
-		if err != nil {
-			item.target.Content = "not created yet; create it at " + item.path
 		}
 	}
 	if facts.Structure.Exists {
 		facts.LayoutGuides = append(facts.LayoutGuides, facts.Structure)
 	}
 	// Shared decisions are already included in the rules body.
-	facts.IrreversibleDecisions = []string{"See the Shared difficult-to-change decisions section in " + p.Rules + "."}
+	facts.IrreversibleDecisions = []string{"See the Shared difficult-to-change decisions section in " + facts.Rules.Path + "."}
 	return facts, nil
+}
+
+func (e *Engine) productFact(ctx context.Context, ref, productRef, name string, item config.Source) (brief.Document, error) {
+	location := e.editLocation(name, item.Path)
+	documents, err := e.productDocuments(ctx, ref, productRef, plan.Selection{Source: name}, item)
+	if err != nil {
+		return brief.Document{}, err
+	}
+	if len(documents) == 0 {
+		return brief.Document{Path: location, Content: "not created yet; create it at " + location}, nil
+	}
+	if len(documents) == 1 {
+		return brief.Document{Path: location, Content: documents[0].Body, Exists: true}, nil
+	}
+	var text strings.Builder
+	for _, document := range documents {
+		fmt.Fprintf(&text, "## %s/%s\n\n%s\n\n", name, document.ID, document.Body)
+	}
+	return brief.Document{Path: location, Content: text.String(), Exists: true}, nil
 }
 func (e *Engine) outputs(state *ledger.State) ([]brief.StageOutput, error) {
 	records, err := e.records()
@@ -336,7 +363,10 @@ func (e *Engine) publishInstruction(meta ledger.Instruction, fresh bool, data in
 	if data.Context != nil {
 		meta.Context = data.Context
 	}
-	body, err := json.Marshal(data)
+	// The detection specification and mapping stay in the ledger, not next to the brief.
+	published := data
+	published.Detection = nil
+	body, err := json.Marshal(published)
 	if err != nil {
 		return Result{}, err
 	}
@@ -506,6 +536,9 @@ func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte
 		}
 		return e.publishInstruction(meta, false, old, "")
 	}
+	if err := e.refreshSources(ctx, ref); err != nil {
+		return Result{}, err
+	}
 	b, err := e.plannerBrief(ctx, state, t, source, version, origin, ref, &meta)
 	if err != nil {
 		return Result{}, err
@@ -625,7 +658,7 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 		return brief.Brief{}, err
 	}
 	facts.AvailableChecks = stage.Checks
-	docs, err := e.aspectDocuments(ctx, ref, stage.Checks)
+	docs, err := e.workerInputs(ctx, ref, round.StartTarget.Tree, stage)
 	if err != nil {
 		return brief.Brief{}, err
 	}

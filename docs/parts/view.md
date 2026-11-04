@@ -8,7 +8,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 ### 入力
 
-対象の作業の ledger を受け取り、[構造ステージ](../stages.md#2-構造)(責務・配置・依存を決める段階)を使う場合は構造の記録(既定 `.devkit/structure.json`、`[paths] structure` で変更可能)の解析済みの値と、その構造の git の履歴も受け取る。履歴の取得と受け渡しは [view の契約](../architecture/modules.md#view)に従う。
+対象の作業の ledger と、構造のソースの固定した本文を受け取る。既定の `.devkit/structure.json` は `[sources.structure]` で接続先と配置を変更できる。元のバージョンの識別子を取得できれば来歴も受け取る。リポジトリ内のファイルは git の履歴を使う。取得と受け渡しは [view の契約](../architecture/modules.md#view)に従う。
 
 ### 出力
 
@@ -48,7 +48,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 #### 構造図
 
-構造図の入力は[構造の記録](../architecture/data.md#構造の記録-structure)、生成形式は [view の契約](../architecture/modules.md#view)に従う。図の描き方は [`assets/principles/writing.md` の原則8](../../assets/principles/writing.md#8-define-a-diagrams-purpose-and-show-relationship-kinds-and-directions)に従い、入力に関係の種類がなければ依存関係の図までにとどめる。
+構造の本文は自由な形式の知識である。`schemas/structure.json` に従う JSON のときだけ構造図を描き、それ以外は本文を表示する。構造図の入力は[構造の記録](../architecture/data.md#構造の記録-structure)、生成形式は [view の契約](../architecture/modules.md#view)に従う。図の描き方は [`assets/principles/writing.md` の原則8](../../assets/principles/writing.md#8-define-a-diagrams-purpose-and-show-relationship-kinds-and-directions)に従い、入力に関係の種類がなければ依存関係の図までにとどめる。
 
 ## 保証
 

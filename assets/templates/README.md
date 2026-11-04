@@ -1,7 +1,6 @@
-These repository-owned Markdown templates use Go `text/template` syntax to format skills, aspects, PR bodies, and design proposals. Devkit uses `templates/brief/` for work, judgment, and planning requests.
+These repository-owned Markdown templates use Go `text/template` syntax to format skills, PR bodies, and design proposals. Devkit uses `templates/brief/` for work, judgment, and planning requests.
 
 - `templates/skill.md.tmpl`: Composes a skill from its purpose, inputs, steps, outputs, and references.
-- `templates/aspect.md.tmpl`: Composes an aspect file from checks, blocking conditions, items not to report, and the output format.
 - `templates/pr.md.tmpl`: Includes the change scope, plan summary, decisions, what was verified and how, unconfirmed items and risks, and references.
 - `templates/design.md.tmpl`: Includes the proposal, constraints, irreversible decisions, alternatives considered, and verification method.
 

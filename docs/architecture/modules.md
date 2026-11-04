@@ -1,13 +1,13 @@
 # モジュール
 
-plan・brief・check・router・form がドメインの核を担い、engine が記録と各実装を組み合わせてループを進める。git、ホスト、ファイル、外部操作はそれぞれの境界で扱う。組み立ては cmd/devkit に集める。runtime は engine・hook・host/event・workspace・external・config・install・kit・ledger/fsstore・cmd/devkit からなる。
+plan・brief・check・router・form がドメインの核を担い、engine が記録と各実装を組み合わせてループを進める。知識のソース、git、ホスト、ファイル、外部操作はそれぞれの境界で扱う。組み立ては cmd/devkit に集める。runtime は engine・hook・host/event・workspace・external・config・install・kit・ledger/fsstore・cmd/devkit からなる。
 
 ## モジュール境界と入出力の集約
 
 - **下位モジュール**: plan、form、kit、config、workspace は上位モジュールの名前を知らない。
 - **ポート**: interface は置かない。Workspace と External は具体型として利用し、試験では関数値を差し替える。判定者・計画者のサブエージェントの起動の抽象化は、[ホストに任せる範囲](guarantees.md#ホストgit-と-kit-の責務分担)に含める。
 - **外部型の変換**: host/event はホストの JSON、workspace は git の出力、config は TOML、ledger/fsstore はファイル形式、external は外部コマンドの入出力を境界で内部の型に変換する。外部の型を公開契約・記録・ドメイン(plan・ledger・check など)に持ち込まない。[assets/principles/structure.md](../../assets/principles/structure.md) の原則5に従う。
-- **共通の通過点**: ledger の書き込みは[記録の書き込みと排他](data.md#記録の書き込みと排他)、外部書き込みは [external](#external)、バイナリが供給する資産は [kit](#kit)に集める。ホストの設定はホスト自身が読む。
+- **共通の通過点**: 知識の取得・固定・変化の検出と反映は[ソースの契約](data.md#知識のソース)に集める。ledger の書き込みは[記録の書き込みと排他](data.md#記録の書き込みと排他)、外部書き込みは [external](#external)、バイナリが供給する資産は [kit](#kit)に集める。ホストの設定はホスト自身が読む。
 
 モジュールの内部構造、view の見た目、ledger/fsstore の最適化は、後から変更できる。
 
@@ -22,7 +22,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 雛形と計画は[データ形式](data.md#データ形式)に従い、キーは英語とする。
 
 - **責務**: ループ計画の意味論を扱う。雛形と計画の JSON Schema による検証、[計画の雛形からの逸脱](data.md#計画-plan)の計算、router の分類から次のステージを選ぶ遷移、計数の上限の判定、現在のバージョンと残りの計画から新しいバージョンを作成する操作、およびその差分、実行可能なバージョンの判定、計画の承認で足りる外部操作の宣言の照合を扱う。遷移 `done` は次のステージ ID、作業の終了を表す `null`、ステージの完了後に残りを作り直す `"replan"` を扱う。
-- **持つデータ**: `PlanTemplate`、`Plan`、`Stage`、`Assignee`、`Gate`、`Transition`、`Limits` の型、ステージの `split`、ID・説明・担当する範囲を持つ単位の一覧 `units`、ID 付きの完了条件、観点と完了条件の対応、check の実行主体、必須 check、任意の文字列配列 `open_questions`、宣言した外部操作、router が使うステージの完了条件の規則を持つ。
+- **持つデータ**: `PlanTemplate`、`Plan`、`Stage`、`Assignee`、`Gate`、`Transition`、`Limits` の型、ステージの `split`、ID・説明・担当する範囲を持つ単位の一覧 `units`、ID 付きの完了条件、観点と完了条件の対応、check の `criteria`・`examples` とロール別の `inputs`、check の実行主体、必須 check、任意の文字列配列 `open_questions`、宣言した外部操作、router が使うステージの完了条件の規則を持つ。
 - **公開する契約**: 雛形と計画の型と、検証・逸脱の計算・遷移・上限判定・作り直し・実行可能なバージョンの判定を公開する。
 - **依存**: form を含む他のモジュールに依存しない。
 - **置くもの・置かないもの**: 入出力を伴わない計画の意味論を置く。保存は ledger に、進行は engine に置く。
@@ -35,7 +35,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### brief
 
-- **責務**: ステージ定義、計画(ID 付きの完了条件と上限)、前のステージの出力、要件の正本(既定 `.devkit/requirements.md`)、リポジトリの事実(変更対象のディレクトリの README([配置ガイド](layout.md#利用側のリポジトリ))、[`rules.md` と計画の元に戻せないもの](data.md#規則と強制手段-rules)、利用可能な check)から brief を組み立てる。修正ラウンドでは前回の指摘と指摘 ID、必須の `command:` の check の出力、pre-commit の出力を取り込む。判定者・計画者のサブエージェントに渡す依頼文も brief の一種として組み立てる。判定依頼は [check が決めた内容](#check)を受け取り、依頼文に組み立てる。本文に含める規範は、そのステージ定義、判定の観点と参照する原則、rules、requirements、関係する構造の記録とする。計画者・作業者・判定者の brief には requirements の本文、未作成なら作成先の案内を必ず入れる。その他の規範は論理名と `snap/` 内の実際のパスの一覧で渡す。パスはラウンド開始時のスナップショット、ラウンド外の判定では指示を出す時点の作業ブランチの `HEAD` を展開した場所を指す。JSON Schema はバイナリから受け取り、すべての参照先を同梱した出力スキーマとして渡す。requirements と structure は設定済みの作業ツリー上のパスと存在の有無も示し、requirements が未作成なら作成先を案内する。作業の brief は note の種別と同梱済みスキーマを含める。配置の既定値と変更方法は [paths](#config)に従う。
+- **責務**: `stages` ソースから選んだステージ定義、計画(ID 付きの完了条件と上限)、前のステージの出力、雛形の `inputs` で選んだ知識、リポジトリの事実から依頼文を組み立てる。雛形は計画者・作業者・判定者それぞれの入力の選び方を持ち、既定で要件と規則を渡す。判定依頼には check の `criteria` で明示した基準の文書を含める。修正ラウンドには前回の指摘と ID、検証コマンドと pre-commit の出力を取り込む。規範は全体を固定するが、本文で渡す知識は選び方で絞る。その他の規範は固定した写しのソース名・ID・パスの一覧で渡し、編集中の原本を読ませない。成果も固定した本文と作成・編集先を示し、要件が未作成なら作成先を案内する。JSON Schema はバイナリから受け取り、参照先を同梱する。作業の brief は note の種別とスキーマを含める。検出試験の資料は[検出試験](guarantees.md#検出試験)の制限に従う。配置の既定値は[所有と生存期間](data.md#所有と生存期間)に従う。
 - **持つデータ**: brief の型を持つ。
 - **公開する契約**: brief の型と、brief を組み立てる関数を公開する。
 - **依存**: ステージの型を持つ plan と、テンプレートを持つ form に依存する。
@@ -49,17 +49,17 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### check
 
-- **責務**: 観点ファイルを解析し、blocking の定義、確認事項、報告しない事項、出力形式を扱う。指示ファイル、リポジトリが所有する原則・ステージ定義・観点などの規範、バイナリが供給する JSON Schema、[規則と強制手段 (Rules)](data.md#規則と強制手段-rules)、brief、計画、観点ファイルを判定の入力として束ね、判定依頼の内容を決める。依頼文への組み立ては brief が担う。[判定結果の受理と集約](guarantees.md#判定結果の受理)、必須 check の網羅状況、[検出試験](guarantees.md#検出試験)の照合を担う。`command:` の check の実行結果も同じ受理境界で [Judgment](data.md#check-の結果-judgment) にする。ラウンド開始時の設定に検証コマンドが登録されていなければ、その check を `FAIL` とし、`auto-fixable` の指摘「検証コマンド `<name>` が登録されていない。検証の手段を作り `devkit.toml` の `[commands.<name>]` に登録する」を返す。コマンドがツリーを変更した場合の指摘には、出力先を ignore する案内を含める。
-- **持つデータ**: [Judgment](data.md#check-の結果-judgment) と [Finding](data.md#指摘-finding)の型、解析した観点ファイル、判定依頼と解析結果、検出試験の仕様と結果を持つ。
-- **公開する契約**: 規範・観点ファイル・対象のバージョンと場所・出力スキーマを受け取り、判定依頼の内容を返す操作を公開する。ラウンドや観点に応じた追加入力は[判定結果の受理](guarantees.md#判定結果の受理)、修正ラウンドの追加入力は[指摘 ID の引き継ぎ](data.md#指摘-finding)に従う。結果ファイルまたはコマンド実行結果を受け取り、`Judgment` を解析して返す操作も公開する。適用除外、集約、必須 check と検出試験の照合も公開する。
-- **依存**: 観点ファイルの形式と `Judgment` のスキーマを扱う form に依存する。
+- **責務**: check の `criteria` で選んで固定した基準の文書と対象、指示ファイル、計画、brief、出力スキーマを束ね、判定依頼の内容を決める。`aspect` は判定の名前である。知識の本文の構造は解析しない。判定の範囲・確認事項・blocking・報告しない事項・適用除外は、原則のソースの用途別文書で定める。判定の出力形式と共通規則は判定依頼テンプレートに集約する。依頼文の組み立ては brief が担う。[判定結果の受理と集約](guarantees.md#判定結果の受理)、必須 check の網羅状況、[検出試験](guarantees.md#検出試験)の照合を担う。基準は規範のソースから選び、必須の基準の選び方が0件なら判定を始めず止める。`command:` の結果も同じ受理境界で Judgment にする。未登録なら `FAIL` とし、検証の手段を作って `[commands.<name>]` に登録するよう `auto-fixable` の指摘を返す。コマンドが対象を変えた指摘には出力先を ignore する案内を含める。
+- **持つデータ**: [Judgment](data.md#check-の結果-judgment) と [Finding](data.md#指摘-finding)の型、基準の文書の集合、判定依頼と解析結果、検出試験の仕様と結果を持つ。
+- **公開する契約**: 固定した規範・選んだ基準の文書・対象のバージョンと場所・出力スキーマを受け取り、判定依頼の内容を返す操作を公開する。ラウンドや観点に応じた追加入力は[判定結果の受理](guarantees.md#判定結果の受理)、修正ラウンドの追加入力は[指摘 ID の引き継ぎ](data.md#指摘-finding)に従う。結果ファイルまたはコマンド実行結果を受け取り、`Judgment` を解析して返す操作も公開する。適用除外、集約、必須 check と検出試験の照合も公開する。
+- **依存**: 判定依頼テンプレートと `Judgment` のスキーマを扱う form に依存する。
 - **置くもの・置かないもの**: 入出力を伴わない判定の意味論、依頼の内容の決定、結果の解析・受理、検出試験の仕様を置く。判定者サブエージェントの起動と hook による結果の受け取りは[判定結果の受理](guarantees.md#判定結果の受理)、判定コマンドの実行は [engine](#engine)に従う。結果の保存は ledger に、次の行動の判断は router に置く。
 
-検出試験の依頼には例の本文を渡し、種別と期待判定は渡さない。期待との照合は check が行う。合格の識別には、観点・試験仕様・担当の定義に加え、観点が参照する原則ファイルと規則ファイルの内容ハッシュを含める。原則や規則が変われば、それを参照する観点を既定では次に必須として使うラウンドの前に再試験する。
+検出試験には、`criteria` で選んだ基準の文書、`examples` で選んだ匿名の例の本文、出力の約束だけを渡す。試験仕様・期待判定・対応表と、それらを含む作業履歴や参照先は渡さない。照合は check が行う。合格の識別には担当の定義、判定規則を含む判定依頼テンプレート、実際に渡した基準の文書の集合と内容ハッシュ、例の文書の内容ハッシュを含める。
 
 観点 `test` は、完了条件ごとの具体的なテスト、登録済みコマンドからの実行、利用者から見える入口での契約の確認、実装をなぞっていないことを `principles/testing.md` に照らして判定する。観点 `harness` は、振り返りでの問題の捕捉先と再発防止、どの原則がどの観点・雛形で使われているか、使われない仕組みや負担に見合わない仕組み、前提の確認を扱う。
 
-観点中のコード書式の参照はアンカーを除いて原則・規則のファイルを特定する。`rules.md#screens` は `rules.md`、`principles/x.md#anchor` は `principles/x.md` として読み、合格の識別に内容ハッシュを含める。
+基準の文書が別の文書を必要とする場合は、その文書も `criteria` に明示する。文中の参照を解析して文書を補わない。`criteria` と `examples` は check の約束の一部であり、雛形と異なる選び方は逸脱として承認の問いに差分を出す。
 
 ### router
 
@@ -74,9 +74,9 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 ### form
 
 - **責務**: 固定フォーマットの定義を持ち、スキーマの型、テンプレートの適用機能、人向けの Markdown の描画機能を提供する。
-- **持つデータ**: [終了ブロック](data.md#進捗-progress)、判定者サブエージェントの結果(最終メッセージの形式)、問い([回答の案内](data.md#問い-question)を含む)、`next` の指示、決定と証拠の JSON Schema の型を持つ。終了ブロックの項目と必須項目は[進捗](data.md#進捗-progress)、Finding の項目は[指摘](data.md#指摘-finding)に従う。skill の構成、観点ファイル、PR 本文、設計案のテンプレートを受け取って扱う。PR 本文には計画の要約・決定・検証内容(何をどう確認したか)を含め、見出しはリポジトリの既存テンプレートに合わせる。雛形と計画の JSON Schema による検証は [plan](#plan)が担う。
+- **持つデータ**: [終了ブロック](data.md#進捗-progress)、判定者サブエージェントの結果(最終メッセージの形式)、問い([回答の案内](data.md#問い-question)を含む)、`next` の指示、決定と証拠の JSON Schema の型を持つ。終了ブロックの項目と必須項目は[進捗](data.md#進捗-progress)、Finding の項目は[指摘](data.md#指摘-finding)に従う。skill の構成、判定依頼、PR 本文、設計案のテンプレートを受け取って扱う。PR 本文には計画の要約・決定・検証内容(何をどう確認したか)を含め、見出しはリポジトリの既存テンプレートに合わせる。雛形と計画の JSON Schema による検証は [plan](#plan)が担う。
 - **公開する契約**: 固定フォーマットの定義と、受け取ったスキーマ・テンプレートの適用、Markdown の描画を公開する。
-- **依存**: 他のモジュールに依存しない。スキーマは kit がバイナリから供給し、テンプレートはリポジトリが所有する。テンプレートの既定の置き場所は `.devkit/templates/` であり、`[paths] templates` で変更できる。form は供給された値を使う。
+- **依存**: 他のモジュールに依存しない。スキーマは kit がバイナリから供給し、テンプレートはリポジトリが所有する。テンプレートの既定の置き場所は `.devkit/templates/` であり、`[sources.templates]` で変更できる。form は供給された値を使う。
 - **置くもの・置かないもの**: 入出力を伴わない形式の定義と描画を置く。スキーマの供給は kit に、リポジトリのテンプレートの読み出しは cmd/devkit に、計画や判定の意味論は plan と check に、HTML の生成は view に置く。
 
 ### ledger
@@ -121,13 +121,15 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ステージの完了が確定し、遷移 `done` が `"replan"` なら、既存の再計画の経路で計画者へ残りの計画の作り直しを依頼する。作り直した計画にも計画の check と承認の条件を適用する。要件定義を先に行って再計画するかは雛形が決め、engine は要件定義を特別扱いしない。
 
-規範は principles・stages・checks・plans・templates・rules・`devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md であり、ラウンド開始時に固定する。requirements・structure・detect・`.devkit/run/` は規範の識別に含めず、これらの変更で判定を失効させない。
+規範は `norm = true` の全ソースの全文書と、ソースの外の `devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md であり、ラウンド開始時に固定する。成果のソース、検出試験の索引、実行の記録は規範の識別に含めない。成果の更新は規範の変更による失効を起こさないが、判定対象の識別には含める。
 
 ループ自身の変更は、規範・ホスト設定・skill・リポジトリ内で git が追跡する有効な pre-commit の設定の変更である。`[approval] meta_loop_edit = "confirm"` では、作業の基点または直前に確認した時点からの未確認の変更を、それが効く最初のラウンドを開く前に問いとして起票して止める。最後のラウンドの変更は、判定後、完了時のコミット前に確認する。確認済みの範囲は確認したスナップショットの規範の識別で表す。却下時は作業者に戻して変更を取り消させる。requirements と structure の変更はステージの判定で確認する。
 
+ソースの取得と全規範の固定、成果を含む対象の識別、編集用の写しからの差分と比較して更新する処理は[知識のソース](data.md#知識のソース)に従う。外部のソースへの反映は external に委ね、判定・承認・反映・完了を同じ識別に結び付ける。
+
 未登録の `command:` は check の `FAIL` として作業者に返し、検証の手段と登録を作らせる。`devkit.toml` の登録はループ自身の変更として `[approval] meta_loop_edit` に従い確認し、次のラウンド開始時のスナップショットから使う。
 
-すべての作業の brief と判定依頼は、指示発行時点で固定した作業履歴ファイルを参照する。全判定と指摘、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、FAIL と NOT ASSESSED の経緯、ラウンド数、人の却下・訂正・作り直しの指示、note の教訓で伝えた見逃しを devkit が履歴にまとめ、規範の一覧とともに渡す。振り返りのステージ定義と観点 `harness` がこの履歴を使う。再発防止の反映先は `[lessons] destinations` の優先順に従い、反映しない理由も残す。`rules` の強制手段が未実装の項目と繰り返す違反は、機械の検査に移す候補とする。規範全体の棚卸しは必要が見えた場合に行う。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。
+検出試験を除くすべての作業の brief と判定依頼は、指示発行時点で固定した作業履歴ファイルを参照する。全判定と指摘、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、FAIL と NOT ASSESSED の経緯、ラウンド数、人の却下・訂正・作り直しの指示、note の教訓で伝えた見逃しを devkit が履歴にまとめ、規範の一覧とともに渡す。振り返りのステージ定義と観点 `harness` がこの履歴を使う。再発防止の反映先は `[lessons] destinations` の優先順に従い、反映しない理由も残す。`rules` の強制手段が未実装の項目と繰り返す違反は、機械の検査に移す候補とする。規範全体の棚卸しは必要が見えた場合に行う。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。
 
 ### external
 
@@ -164,7 +166,7 @@ SubagentStop は単位の作業者 `devkit-worker` の終了ブロックも保�
   - 単位のツリーをブランチには含めないコミットオブジェクトにして SHA で固定する操作、作業ブランチのチェックアウトへの固定した SHA の順次のコミットしないマージ、ぶつかったファイルと git のマージの状態の取得。
   - 対象のバージョンとなるスナップショットとコミットオブジェクトの作成、コミットのツリーハッシュの取得、`git show` による読み出し、一時インデックスからの `git read-tree` と `git checkout-index --prefix` による展開。
   - [完了条件](guarantees.md#完了条件)に従う返却後のスナップショットと同じ index での `git commit`(hook を有効にして)。
-  - 変更ファイルの一覧と構造の記録(既定 `.devkit/structure.json`、`[paths] structure` で変更可能)の履歴の取得、cwd のブランチ名の取得、チェックアウトのルートの解決。
+  - 変更ファイルの一覧と構造の記録(既定 `.devkit/structure.json`、`[sources.structure]` で変更可能)の履歴の取得、cwd のブランチ名の取得、チェックアウトのルートの解決。
 - **持つデータ**: 基点コミット、ブランチ、ツリーとコミットオブジェクト、一時インデックス、refs、git から取得したリポジトリ情報を扱う。
 - **公開する契約**: 具体型 `Workspace` として、責務に挙げた git 操作を公開する。[対象のバージョン](data.md#対象のバージョン-targetversion)と[展開・永続化](guarantees.md#判定対象の展開と完了時の永続化)の契約に従う。
 - **依存**: 他のモジュールに依存しない。外部の git CLI を使う。
@@ -174,7 +176,7 @@ SubagentStop は単位の作業者 `devkit-worker` の終了ブロックも保�
 
 設定ファイルは `devkit.toml` とし、TOML で記述する。
 
-- **責務**: 渡された TOML の解析と検証を行う。記録形式とバイナリの互換性を識別する `kit_version`、`default_plan`、`[paths]`、`[approval]`、`[git]`、`[classification]`、`[limits]`、`[parallel]`、`[lessons]`、`[detection]`、`[plan_check]`、`[judges]` の判定コマンド(名前・実行ファイル・固定引数・期限・出力スキーマの指定)、`[commands]` の検証コマンド(名前・実行ファイル・固定引数・期限)、外部操作の登録、`[deny]`、`[router] human_confirmation` の上書き・追加・削除を扱う。分類表の追加・削除に未知の分類名があれば設定エラーとする。配置は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に従う。
+- **責務**: 渡された TOML の解析と検証を行う。記録形式とバイナリの互換性を識別する `kit_version`、`default_plan`、`[sources.<名前>]`、`[state] detect`、`[approval]`、`[git]`、`[classification]`、`[limits]`、`[parallel]`、`[lessons]`、`[detection]`、`[plan_check]`、`[judges]` の判定コマンド(名前・実行ファイル・固定引数・期限・出力スキーマの指定)、`[commands]` の検証コマンド(名前・実行ファイル・固定引数・期限)、外部操作の登録、`[deny]`、`[router] human_confirmation` の上書き・追加・削除を扱う。分類表の追加・削除に未知の分類名があれば設定エラーとする。配置は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に従う。
 - **持つデータ**: 解析・検証した設定値と、各コマンドの登録定義を持つ。
 - **公開する契約**: 設定の解析・検証と内部の型への変換を公開する。
 - **依存**: 他のモジュールに依存しない。
@@ -184,9 +186,10 @@ SubagentStop は単位の作業者 `devkit-worker` の終了ブロックも保�
 
 - `default_plan = "default"` は `--plan` を省略したときの雛形名である。
 - `kit_version = "v2"` は記録形式とバイナリの互換性を識別する。`init` はこの値を書く。
-- `[plan_check] aspect = "plan"`・`runner = "devkit-judge"` は計画の check の観点と実行主体である。登録済みの判定コマンドなら devkit が実行し、それ以外はサブエージェントの指示を出す。
+- `[plan_check] aspect = "plan"`・`runner = "devkit-judge"` は計画の check の名前と実行主体である。`criteria` と `examples` に基準と例の選び方も持つ。登録済みの判定コマンドなら devkit が実行し、それ以外はサブエージェントの指示を出す。
 - `[router] human_confirmation` は `dependency_changed` と `target_changed_again` の分類だけを変更できる。check の結果から次の行動への対応とロールは固定である。ループ自身の変更の確認は `[approval] meta_loop_edit` だけで決まる。
-- `[paths]` は `principles = ".devkit/principles"`、`stages = ".devkit/stages"`、`checks = ".devkit/checks"`、`plans = ".devkit/plans"`、`templates = ".devkit/templates"`、`rules = ".devkit/rules.md"`、`requirements = ".devkit/requirements.md"`、`structure = ".devkit/structure.json"`、`detect = ".devkit/detect.json"` を既定とする。実行の記録と生成物の `.devkit/run/` は固定である。
+- `[sources.<名前>]` は名前付きの知識の接続先を定める。`adapter = "files"`、`path`、`norm`、書き込み能力 `writable` を持つ。既定は[所有と生存期間](data.md#所有と生存期間)に従い、principles・stages・plans・rules・examples・templates を規範、requirements・structure を成果とする。規範は空の選び方で全体を列挙できなければならない。
+- `[state] detect = ".devkit/detect.json"` は検出試験の合格の索引の保存先であり、ソースではない。実行の記録と生成物の `.devkit/run/` は固定である。
 - `[approval] plan = "requirements"` は最初の計画、完了条件が変わる計画、逸脱または外部操作の宣言がある計画を確認する。`"always"` は計画のバージョンごとに確認し、`"deviation"` は逸脱または外部操作の宣言がある場合に確認する。`open_questions` が空でなければ、この設定によらず人の承認を必須とする。
 - `[approval] meta_loop_edit = "confirm"` はどのステージでもループ自身の変更を確認する。`"allow"` も指定できる。
 - `[git] branch = "devkit/{work_id}"` は `{work_id}` を必須とする。`commit_message = "devkit: {stage} ({work_id})"` は `{stage}`・`{work_id}`・`{task}` を使える。`allow_empty_commit = true` は変更のないステージも空のコミットを作る。false ならコミットせず、その時点の HEAD で完了を記録する。
@@ -194,23 +197,23 @@ SubagentStop は単位の作業者 `devkit-worker` の終了ブロックも保�
 - `[limits] stop_continuation = 3` は Stop の継続上限であり、1以上で無効にはできない。計画の判定のやり直しとラウンドの上限は雛形が持ち、計画の判定のやり直しは既定3である。
 - `[parallel] max_workers = 3` は同時に動かす単位の作業者数の上限であり、1以上を必須とする。1でも単位を1つずつ同じ worktree と合流の手順で進める。
 - `[detection] required = true` は判定者が担当する必須 check に検出試験の合格を課す。`false` なら検出試験を指示せず、合格記録なしで判定を受理する。
-- `[lessons] destinations` の既定の優先順は、機械の検査(hook・lint・型・検証コマンド) → 雛形 → 観点 → 原則 → skill である。反映先はリポジトリの資産である。
+- `[lessons] destinations` の既定の優先順は、機械の検査(hook・lint・型・検証コマンド) → 雛形 → 用途別の判定基準 → 原則 → skill である。反映先はリポジトリの資産である。ソースへの改善は書き込めるものに限り、読み取り専用のソースへの改善は教訓として管理者へ引き継ぐ。
 
-判定コマンドと検証コマンドの期限は登録ごとに必須である。
+判定コマンドと検証コマンドの期限は登録ごとに必須である。ソースの外部コマンドの JSON の口は[アダプタの口](data.md#アダプタの口)に従う。
 
-`[paths]` では、requirements・structure・detect の成果のパスが principles・stages・checks・plans・templates・rules の規範のパスと同じ、またはその配下になる設定を拒否する。規範のパス同士の重なりも拒否する。人による中断、ループの有限性、JSON Schema、判定結果の受理境界、外部操作の承認と二重適用の防止は設定で無効にできない。
+リポジトリ内の `files` のソースでは、規範のパス同士の重なりと、成果または検出試験の索引のパスが規範のパスと同じか配下になる設定を拒否する。人による中断、ループの有限性、JSON Schema、判定結果の受理境界、外部操作の承認と二重適用の防止は設定で無効にできない。
 
 ### install
 
 当面はこのリポジトリをクローンして `install.sh` を実行し、利用者の環境に Go を必要とする。`install.sh` は Go で `devkit` をビルドし、PATH の通った場所に配置する。正式な配布方法は後で決める。
 
-- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、`[paths]` で指定した場所に置く原則・ステージ定義・観点と検出試験の例・雛形・テンプレート・規則の初期内容、ignore、ホスト設定、既定の作業者 `devkit-worker`・判定者・計画者のサブエージェント定義、skill とリンクを用意する。単位の作業場所 `.devkit/worktrees/` も ignore する。文章の規範は assets からコピーし、リポジトリが所有する。`init` は変更を人に確認したあと、導入したファイルをコミットする。`--no-commit` でコミットを省略できる。`uninstall` は `init` の逆を行う。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
+- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、ソース設定の既定のリポジトリ内の場所に置く原則と用途別の判定基準・ステージ定義・検出試験の例と仕様・雛形・テンプレート・規則の初期内容、ignore、ホスト設定、既定の作業者 `devkit-worker`・判定者・計画者のサブエージェント定義、skill とリンクを用意する。単位の作業場所 `.devkit/worktrees/` も ignore する。文章の規範は assets からコピーし、リポジトリが所有する。`init` は変更を人に確認したあと、導入したファイルをコミットする。`--no-commit` でコミットを省略できる。`uninstall` は `init` の逆を行う。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
 - **持つデータ**: 導入する固定物と設定の断片、導入先との差分、doctor の照合結果を扱う。
 - **公開する契約**: `init`・`uninstall`・`doctor` に対応する導入・削除・照合の操作を公開する。`devkit uninstall [--yes]` は変更の一覧を示して人の確認を待ち、`--yes` で確認を省略する。doctor の項目は[doctor の確認項目](#doctor-の確認項目)に従う。
 - **依存**: config、kit、ledger、ledger/fsstore、workspace に依存する。
 - **置くもの・置かないもの**: 導入先の構成と登録・削除・照合を置く。
 
-`uninstall` はスナップショット展開先のディレクトリに書き込み権限を戻してから、実行の記録 `.devkit/run/` と skill のリンクを削除する。`init` が `[paths]` の場所に置いた原則・ステージ定義・観点と検出試験の例・雛形・テンプレート・規則、および skill・サブエージェント定義は、配布した初期内容と一致するものを削除する。ホスト設定(`.claude/settings.json`・`.codex/hooks.json`・`.codex/config.toml`・`.codex/rules/devkit.rules`)、`devkit.toml`、`.gitignore` から kit の断片を取り除き、空になったファイルとディレクトリを削除する。利用者が書き換えたファイルと、利用者の設定が残る `devkit.toml` は削除せず、一覧で知らせる。処理は冪等であり、git hook とバイナリは扱わない。
+`uninstall` はスナップショット展開先のディレクトリに書き込み権限を戻してから、実行の記録 `.devkit/run/` と skill のリンクを削除する。`init` が既定のソースのリポジトリ内の場所に置いた原則と用途別の判定基準・ステージ定義・検出試験の例と仕様・雛形・テンプレート・規則、および skill・サブエージェント定義は、配布した初期内容と一致するものを削除する。ホスト設定(`.claude/settings.json`・`.codex/hooks.json`・`.codex/config.toml`・`.codex/rules/devkit.rules`)、`devkit.toml`、`.gitignore` から kit の断片を取り除き、空になったファイルとディレクトリを削除する。利用者が書き換えたファイルと、利用者の設定が残る `devkit.toml` は削除せず、一覧で知らせる。処理は冪等であり、git hook とバイナリは扱わない。
 
 導入時の案内は、`default` と `fix` が `command:test` を必須とし、未登録なら最初の作業がテストと検証コマンドを作って登録し、人が登録を確認することを伝える。
 
@@ -218,16 +221,16 @@ SubagentStop は単位の作業者 `devkit-worker` の終了ブロックも保�
 
 kit は [assets パッケージ](#assets-パッケージ)がバイナリに埋め込む配布物を供給する。JSON Schema、分類表とロールの既定値、ホスト設定の断片はバイナリから供給する。JSON Schema は記録とバイナリの約束であり、リポジトリで育てる対象にはしない。人への確認の分類は `devkit.toml` の `[router] human_confirmation` で上書き・追加・削除できる。check の結果から次の行動への対応とロールは固定である。
 
-原則・ステージ定義・観点と検出試験の例・雛形・テンプレート・規則の初期内容は `init` に渡す。コピーは install が `[paths]` の置き場所へ行い、以後はリポジトリが所有する規範として育てる。skill とサブエージェント定義もリポジトリに置く。規則の既定は、どのリポジトリにも当てはまるものだけとする。`docs/` とリポジトリ直下の `README.md` は配布しない。
+原則と用途別の判定基準・ステージ定義・検出試験の例と仕様・雛形・テンプレート・規則の初期内容は `init` に渡す。コピーは install が既定のソースのリポジトリ内の置き場所へ行い、以後はリポジトリが所有する規範として育てる。skill とサブエージェント定義もリポジトリに置く。規則の既定は、どのリポジトリにも当てはまるものだけとする。`docs/` とリポジトリ直下の `README.md` は配布しない。
 
-規範内の `principles/…`・`stages/…`・`checks/…`・`templates/…`・`rules.md` はリポジトリ側の置き場所の論理名である。brief には論理名とスナップショット内の実際のパスの対応を渡し、`schemas/…` はバイナリから出力スキーマの本文として渡す。設計文書や部品の契約を読むことは前提にしない。
+規範内の `principles/…`・`stages/…`・`templates/…`・`rules.md` はリポジトリ側の置き場所の論理名である。brief には論理名とスナップショット内の実際のパスの対応を渡し、`schemas/…` はバイナリから出力スキーマの本文として渡す。設計文書や部品の契約を読むことは前提にしない。
 
 配布物とバイナリが持つ定義の供給を公開する。他の処理モジュールには依存せず、埋め込みの供給源を assets パッケージから読む。リポジトリの規範と埋め込みの一致は照合しない。`kit_version` は記録形式とバイナリの互換性の識別であり、[Work](data.md#作業-work) に記録する。状態機械の進行やドメインの判断は持たない。
 
 ### view
 
-- **責務**: 1作業(1課題)を表示するため、ledger と、構造ステージを使う場合の構造の記録(既定 `.devkit/structure.json`、`[paths] structure` で変更可能)から静的 HTML を生成する。[表示の構成](#view-の表示構成)に従い、冒頭、主表示、判断対象ごとの表示、確認範囲の地図(完了条件ごとの対象のバージョン・方法・確認した範囲・未確認の範囲の一覧)、構造の図を描く。網羅性は「`submit` が成果物を記録した範囲」とする。図は Mermaid のテキストとする。構造の履歴は cmd/devkit が workspace で取得し、解析済みの値を渡す。問いの表示と停止は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
-- **持つデータ**: 記録と構造の解析済みの値、表示用の派生値、生成する HTML を扱う。新着は人が最後に回答・承認した時点より後に追加された記録とする。
+- **責務**: 1作業(1課題)を表示するため、ledger と、構造ステージを使う場合の構造の記録(既定 `.devkit/structure.json`、`[sources.structure]` で変更可能)から静的 HTML を生成する。[表示の構成](#view-の表示構成)に従い、冒頭、主表示、判断対象ごとの表示、確認範囲の地図(完了条件ごとの対象のバージョン・方法・確認した範囲・未確認の範囲の一覧)、構造の図を描く。網羅性は「`submit` が成果物を記録した範囲」とする。図は Mermaid のテキストとする。構造の本文と取得できる元のバージョンの識別子は、cmd/devkit がソースから取得して渡す。`schemas/structure.json` に従う JSON のときだけ構造図を描き、それ以外は本文を表示する。問いの表示と停止は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
+- **持つデータ**: 記録と構造の本文、描画できる場合の解析済みの値、表示用の派生値、生成する HTML を扱う。新着は人が最後に回答・承認した時点より後に追加された記録とする。
 - **公開する契約**: `devkit view` で静的 HTML を生成する。
 - **依存**: ledger、問いを描画する form、ステージ名を持つ plan に依存する。
 - **置くもの・置かないもの**: 人向けの表示を置く。サーバは持たない。状態変更は HTML から行わず、[決定と証拠](data.md#決定と証拠-decision--evidence)の経路で記録する。
@@ -251,7 +254,7 @@ kit は [assets パッケージ](#assets-パッケージ)がバイナリに埋�
 
 ### cmd/devkit
 
-- **責務**: サブコマンドを定義し、各実装を接続する。cwd をもとに workspace でルートとブランチ名を解決し、[セッションと作業](data.md#セッションとブランチ)を特定する。チェックアウトのルートと[固定配置](layout.md#利用側のリポジトリ)から記録ルートを解決し、ledger/fsstore に渡す。設定の読み出し元を解決して config に TOML を渡し、解析した設定、`[paths]` から読み出したリポジトリの規範、kit が供給するスキーマと既定値を各モジュールへ渡す。hook には[規範の参照元](guarantees.md#規範の固定)から `devkit.toml` を読む関数値を渡し、[上限に応じた出力](guarantees.md#性能と出力の上限)を行う。
+- **責務**: サブコマンドを定義し、各実装を接続する。cwd をもとに workspace でルートとブランチ名を解決し、[セッションと作業](data.md#セッションとブランチ)を特定する。チェックアウトのルートと[固定配置](layout.md#利用側のリポジトリ)から記録ルートを解決し、ledger/fsstore に渡す。設定の読み出し元を解決して config に TOML を渡し、解析した設定、`[sources.<名前>]` のアダプタで取得して固定した知識、kit が供給するスキーマと既定値を各モジュールへ渡す。hook には[規範の参照元](guarantees.md#規範の固定)から `devkit.toml` を読む関数値を渡し、[上限に応じた出力](guarantees.md#性能と出力の上限)を行う。
 - **持つデータ**: 解決したルート・ブランチ・セッション・作業、設定、リポジトリの規範、kit が供給するスキーマと既定値、各モジュールの実装を扱う。
 - **公開する契約**: エージェントが呼ぶのは `start`、`next`、`submit`、`plan`、`answer`、`external`、`note`、`status`、`view`、`pause`、`resume`、`abort`。人が呼ぶのは `init`、`uninstall`、`doctor`、`version`、`pause`、`resume`。ホストが呼ぶのは `hook <event>`。`pause`・`resume` の呼び出しと作業の特定は[中断](guarantees.md#中断)と[セッションとブランチ](data.md#セッションとブランチ)に従う。`status` は記録の照会も担う。
 - **依存**: すべての実装パッケージに依存する。
@@ -276,6 +279,7 @@ graph TD
   cmd --> external
   cmd --> config
   cmd --> kit
+  cmd --> source[知識のソース]
   install --> config
   install --> kit
   install --> ledger
@@ -293,6 +297,7 @@ graph TD
   engine -- max_workersを含む設定 --> config
   engine --> hook
   engine --> kit
+  engine --> source
   external --> ledger
   external --> config
   external --> form
