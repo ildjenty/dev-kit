@@ -14,7 +14,7 @@ cd /path/to/your-repository
 /path/to/dev-kit/install.sh
 ```
 
-The script builds `devkit`, installs it in `~/.local/bin`, and runs `devkit init` in the current checkout. Pass a different directory on `PATH` as its optional argument. Existing repository settings and assets are preserved; missing kit settings, including deny defaults, are merged.
+Usage: `/path/to/dev-kit/install.sh [--bin DIR] [REPO]`. `--bin DIR` sets the directory for `devkit` (default: `$HOME/.local/bin`); it must be on `PATH`. `REPO` sets the repository where `devkit init` runs (default: the current directory). The script builds and installs `devkit`, then runs `devkit init`. Existing repository settings and assets are preserved; missing kit settings, including deny defaults, are merged.
 
 In Codex, trust the project interactively and trust each project hook through `/hooks`. In Claude Code, accept workspace trust. Start a new host session and run `devkit doctor`, then use `/devkit` to begin. Run `devkit help` for command arguments. See [install](docs/architecture/modules.md#install) and [doctor](docs/architecture/modules.md#doctor-の確認項目) for the design.
 

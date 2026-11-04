@@ -1,15 +1,39 @@
 #!/bin/sh
 set -efu
 
-if [ "$#" -gt 1 ] || [ "${1-}" = "--help" ] || [ "${1-}" = "-h" ]; then
-    printf '%s\n' 'Usage: /path/to/dev-kit/install.sh [bin-directory]' 'Run from the repository to initialize. The bin directory must be on PATH.'
-    [ "$#" -le 1 ] && exit 0
-    exit 1
-fi
+usage() {
+    printf '%s\n' 'Usage: /path/to/dev-kit/install.sh [--bin DIR] [REPO]' \
+        'Builds devkit into DIR (default: $HOME/.local/bin, which must be on PATH)' \
+        'and runs devkit init in REPO (default: the current directory).'
+}
+
+bin_dir="$HOME/.local/bin"
+repo=
+while [ "$#" -gt 0 ]; do
+    case $1 in
+        -h|--help) usage; exit 0 ;;
+        --bin)
+            [ "$#" -ge 2 ] || { usage >&2; exit 1; }
+            bin_dir=$2; shift 2 ;;
+        --bin=*) bin_dir=${1#--bin=}; shift ;;
+        -*) usage >&2; exit 1 ;;
+        *)
+            [ -z "$repo" ] || { usage >&2; exit 1; }
+            repo=$1; shift ;;
+    esac
+done
 
 source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
-target_dir=$(pwd -P)
-bin_dir=${1:-"$HOME/.local/bin"}
+if [ -n "$repo" ]; then
+    [ -d "$repo" ] || { printf 'Repository directory not found: %s\n' "$repo" >&2; exit 1; }
+    target_dir=$(CDPATH= cd -- "$repo" && pwd -P)
+else
+    target_dir=$(pwd -P)
+fi
+if ! git -C "$target_dir" rev-parse --show-toplevel >/dev/null 2>&1; then
+    printf 'Not a git repository: %s\n' "$target_dir" >&2
+    exit 1
+fi
 mkdir -p -- "$bin_dir"
 bin_dir=$(CDPATH= cd -- "$bin_dir" && pwd -P)
 on_path=false
