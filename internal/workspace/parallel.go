@@ -75,8 +75,10 @@ func (w *Workspace) AddWorktree(ctx context.Context, path, commit string) (*Work
 	return unit, nil
 }
 
-// RemoveWorktree removes only an unchanged unit checkout. False means it was retained.
-func (w *Workspace) RemoveWorktree(ctx context.Context, path, base string) (bool, error) {
+// RemoveWorktree removes a unit checkout whose contents are already kept elsewhere: unchanged
+// from base, or, when captured is set, still identical to that frozen and merged tree.
+// False means it was retained.
+func (w *Workspace) RemoveWorktree(ctx context.Context, path, base, captured string) (bool, error) {
 	if _, err := os.Lstat(path); errors.Is(err, os.ErrNotExist) {
 		return true, nil
 	} else if err != nil {
@@ -86,19 +88,36 @@ func (w *Workspace) RemoveWorktree(ctx context.Context, path, base string) (bool
 	if err != nil {
 		return false, err
 	}
-	head, err := unit.Head(ctx)
+	removable, err := unit.unchangedFrom(ctx, base)
 	if err != nil {
 		return false, err
 	}
-	status, err := unit.run(ctx, nil, "status", "--porcelain", "--untracked-files=all")
-	if err != nil || len(status) > 0 || head != base {
-		return false, err
+	if !removable && captured != "" {
+		tree, err := unit.SnapshotTree(ctx)
+		if err != nil {
+			return false, err
+		}
+		removable = tree == captured
 	}
-	_, err = w.run(ctx, nil, "worktree", "remove", "--", path)
+	if !removable {
+		return false, nil
+	}
+	_, err = w.run(ctx, nil, "worktree", "remove", "--force", "--", path)
 	return err == nil, err
 }
 
-// PreviewMerge fixes the expected merge tree before changing the checkout.
+func (w *Workspace) unchangedFrom(ctx context.Context, base string) (bool, error) {
+	head, err := w.Head(ctx)
+	if err != nil {
+		return false, err
+	}
+	status, err := w.run(ctx, nil, "status", "--porcelain", "--untracked-files=all")
+	if err != nil {
+		return false, err
+	}
+	return len(status) == 0 && head == base, nil
+}
+
 func (w *Workspace) PreviewMerge(ctx context.Context, ours, theirs string) (MergeResult, error) {
 	output, err := w.run(ctx, nil, "merge-tree", "--write-tree", "--name-only", "-z", ours, theirs)
 	var exit *exec.ExitError

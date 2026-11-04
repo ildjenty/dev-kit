@@ -35,7 +35,7 @@ func splitWork(t *testing.T, maxWorkers int, extraUnits ...plan.Unit) (*Engine, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	extra := "\n[detection]\nrequired = false\n[roles.session]\nkind = 'work'\nagent = ''\n"
+	extra := "\n[roles.session]\nkind = 'work'\nagent = ''\n"
 	if maxWorkers == 1 {
 		extra += "\n[parallel]\nmax_concurrent = 1\n"
 	}
@@ -166,6 +166,10 @@ func TestSplitStageEntrypointMergesAndJudgesOneRound(t *testing.T) {
 	}
 	if git(t, e.Root(), "show", "HEAD:first.md") != "First unit output" || !strings.Contains(done.Warning, work.Instructions[0].TargetPath) {
 		t.Fatal("completion did not use the fixed merged tree or report retained worktrees")
+	}
+	// A merged unit checkout still identical to its fixed tree holds nothing new and is removed.
+	if _, err := os.Stat(work.Instructions[1].TargetPath); !os.IsNotExist(err) || strings.Contains(done.Warning, work.Instructions[1].TargetPath) {
+		t.Fatalf("completion retained a merged, unchanged worktree: %v", err)
 	}
 	state, err = e.load()
 	if err != nil {

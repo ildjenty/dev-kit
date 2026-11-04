@@ -373,7 +373,11 @@ func (e *Engine) cleanupUnits(ctx context.Context, state *ledger.State) ([]strin
 			if round.ID != i.RoundID {
 				continue
 			}
-			removed, err := e.workspace.RemoveWorktree(ctx, i.TargetPath, round.StartCommit)
+			captured, err := e.mergedUnitTree(ctx, state, round.ID, i.ID)
+			if err != nil {
+				return nil, err
+			}
+			removed, err := e.workspace.RemoveWorktree(ctx, i.TargetPath, round.StartCommit, captured)
 			if err != nil {
 				return nil, err
 			}
@@ -382,7 +386,25 @@ func (e *Engine) cleanupUnits(ctx context.Context, state *ledger.State) ([]strin
 			}
 		}
 	}
-	return retained, nil
+	// A reissued instruction shares its checkout; report only checkouts that still exist.
+	return slices.DeleteFunc(retained, func(path string) bool {
+		_, err := os.Lstat(path)
+		return errors.Is(err, os.ErrNotExist)
+	}), nil
+}
+
+// mergedUnitTree returns the frozen tree of a unit already merged into the work checkout, or "".
+func (e *Engine) mergedUnitTree(ctx context.Context, state *ledger.State, roundID, instructionID string) (string, error) {
+	merge, ok := state.RoundMerge(roundID)
+	if !ok {
+		return "", nil
+	}
+	for index, input := range merge.Inputs {
+		if input.InstructionID == instructionID && index < merge.Applied {
+			return e.workspace.CommitTree(ctx, input.Commit)
+		}
+	}
+	return "", nil
 }
 
 func (e *Engine) acceptAmbiguous(state *ledger.State) (bool, error) {
