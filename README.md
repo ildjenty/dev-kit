@@ -6,15 +6,23 @@ dev-kit はこのリポジトリ、kit は提供物の総称、`devkit` はバ�
 
 ## Installation
 
-Install Go (the version required by `go.mod`) and Git, then clone this repository. Run the script from the repository you want to initialize:
+Install Go (the version required by `go.mod`) and Git, then clone this repository and run the installer. It builds `devkit` and places it in a directory on `PATH`:
 
 ```sh
 export PATH="$HOME/.local/bin:$PATH"
-cd /path/to/your-repository
 /path/to/dev-kit/install.sh
 ```
 
-Usage: `/path/to/dev-kit/install.sh [--bin DIR] [REPO]`. `--bin DIR` sets the directory for `devkit` (default: `$HOME/.local/bin`); it must be on `PATH`. `REPO` sets the repository where `devkit init` runs (default: the current directory). The script builds and installs `devkit`, then runs `devkit init`. Existing repository settings and assets are preserved; missing kit settings, including deny defaults, are merged.
+Usage: `/path/to/dev-kit/install.sh [--bin DIR]`. `--bin DIR` sets the directory for `devkit` (default: `$HOME/.local/bin`); it must be on `PATH`.
+
+Then run `devkit init` in each repository that uses devkit:
+
+```sh
+cd /path/to/your-repository
+devkit init
+```
+
+`devkit init` preserves existing repository settings and assets and merges missing kit settings, including deny defaults.
 
 In Codex, trust the project interactively and trust each project hook through `/hooks`. In Claude Code, accept workspace trust. Start a new host session and run `devkit doctor`, then use `/devkit` to begin. Run `devkit help` for command arguments. See [install](docs/architecture/modules.md#install) and [doctor](docs/architecture/modules.md#doctor-の確認項目) for the design.
 
