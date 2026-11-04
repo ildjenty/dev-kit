@@ -140,15 +140,17 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 当面はこのリポジトリをクローンして `install.sh` を実行し、利用者の環境に Go を必要とする。`install.sh` は Go で `devkit` をビルドし、PATH の通った場所に配置する。正式な配布方法は後で決める。
 
-- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、kit のコピー、既定の雛形のコピー、観点ファイルと rules.md の初期内容、ignore、ホスト設定、既定のサブエージェント定義、skill とリンクを用意する。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
+- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、kit のコピー、既定の雛形のコピー、観点ファイルと rules.md の初期内容、ignore、ホスト設定、既定のサブエージェント定義、skill とリンクを用意する。`uninstall` は `init` の逆を行う。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
 - **持つデータ**: 導入する固定物と設定の断片、導入先との差分、doctor の照合結果を扱う。
-- **公開する契約**: `init` と `doctor` に対応する導入・照合の操作を公開する。doctor の項目は[doctor の確認項目](#doctor-の確認項目)に従う。
+- **公開する契約**: `init`・`uninstall`・`doctor` に対応する導入・削除・照合の操作を公開する。`devkit uninstall [--yes]` は変更の一覧を示して人の確認を待ち、`--yes` で確認を省略する。doctor の項目は[doctor の確認項目](#doctor-の確認項目)に従う。
 - **依存**: config、kit、ledger、workspace に依存する。
-- **置くもの・置かないもの**: 導入先の構成と登録・照合を置く。
+- **置くもの・置かないもの**: 導入先の構成と登録・削除・照合を置く。
+
+`uninstall` は kit のコピー `.devkit/kit/`、実行の記録 `.devkit/run/`、skill のリンクを削除する。`init` が置いた雛形・観点ファイル・rules.md・skill・サブエージェント定義は、kit の内容と一致するものを削除する。ホスト設定(`.claude/settings.json`・`.codex/hooks.json`・`.codex/config.toml`・`.codex/rules/devkit.rules`)、`devkit.toml`、`.gitignore` から kit の断片を取り除き、空になったファイルとディレクトリを削除する。利用者が書き換えたファイルと、利用者の設定が残る `devkit.toml` は削除せず、一覧で知らせる。処理は冪等であり、git hook とバイナリは扱わない。
 
 ### kit
 
-- **責務**: バージョンを持つ固定物を提供する。供給源はリポジトリ内のコピー `.devkit/kit/<バージョン>/` の1つに限定する。埋め込みは `init` のコピーの書き出しと `doctor` の一致の照合にだけ使う。[ルートパッケージ](#ルートパッケージ)が埋め込む固定物のうち、`docs/` と `principles/` はリポジトリのルートからの相対パスを保ち、`kit/` の内容はバージョンディレクトリの直下にコピーする。契約からの相対リンクはコピー内で解決する。brief と判定依頼が参照する kit 提供の principles・部品の契約とその参照文書・観点ファイル・テンプレートはすべてコピーにある。利用側の観点ファイルは `.devkit/checks/` にも置く。[Work](data.md#作業-work)(1課題のループ)の kit のバージョンと一致しないコピーは拒否する。
+- **責務**: バージョンを持つ固定物を提供する。供給源はリポジトリ内のコピー `.devkit/kit/<バージョン>/` の1つに限定する。埋め込みは `init` のコピーの書き出し、`uninstall` の削除対象の照合と設定の断片の除去、`doctor` の一致の照合にだけ使う。[ルートパッケージ](#ルートパッケージ)が埋め込む固定物のうち、`docs/` と `principles/` はリポジトリのルートからの相対パスを保ち、`kit/` の内容はバージョンディレクトリの直下にコピーする。契約からの相対リンクはコピー内で解決する。brief と判定依頼が参照する kit 提供の principles・部品の契約とその参照文書・観点ファイル・テンプレートはすべてコピーにある。利用側の観点ファイルは `.devkit/checks/` にも置く。[Work](data.md#作業-work)(1課題のループ)の kit のバージョンと一致しないコピーは拒否する。
 - **持つデータ**: 既定の雛形、ステージ定義、kit 提供の観点ファイル、テンプレート、router の分類表の既定、規則の既定、JSON Schema、skill、ホスト設定・サブエージェント定義・rules の断片、部品の契約とその参照文書、principles、検出試験の違反例・適合例・許容例を持つ。
 - **公開する契約**: 固定物の供給、埋め込みからのコピー、一致の照合を公開する。
 - **依存**: 他の処理モジュールに依存しない。埋め込みの供給源はルートパッケージから読む。
@@ -183,7 +185,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 - **責務**: サブコマンドを定義し、各実装を接続する。cwd をもとに workspace でルートとブランチ名を解決し、[セッションと作業](data.md#セッションとブランチ)を特定する。チェックアウトのルートと[固定配置](layout.md#利用側のリポジトリ)から記録ルートを解決し、ledger/fsstore に渡す。設定の読み出し元を解決して config に TOML を渡し、解析した設定と kit の値を各モジュールへ渡す。hook には[規範の参照元](guarantees.md#規範の固定)から `devkit.toml` を読む関数値を渡し、[上限に応じた出力](guarantees.md#性能と出力の上限)を行う。
 - **持つデータ**: 解決したルート・ブランチ・セッション・作業、設定、kit のコピー、各モジュールの実装を扱う。
-- **公開する契約**: エージェントが呼ぶのは `start`、`next`、`submit`、`plan`、`answer`、`external`、`note`、`status`、`view`、`pause`、`resume`、`abort`。人が呼ぶのは `init`、`doctor`、`version`、`pause`、`resume`。ホストが呼ぶのは `hook <event>`。`pause`・`resume` の呼び出しと作業の特定は[中断](guarantees.md#中断)と[セッションとブランチ](data.md#セッションとブランチ)に従う。`status` は記録の照会も担う。
+- **公開する契約**: エージェントが呼ぶのは `start`、`next`、`submit`、`plan`、`answer`、`external`、`note`、`status`、`view`、`pause`、`resume`、`abort`。人が呼ぶのは `init`、`uninstall`、`doctor`、`version`、`pause`、`resume`。ホストが呼ぶのは `hook <event>`。`pause`・`resume` の呼び出しと作業の特定は[中断](guarantees.md#中断)と[セッションとブランチ](data.md#セッションとブランチ)に従う。`status` は記録の照会も担う。
 - **依存**: すべての実装パッケージに依存する。
 - **置くもの・置かないもの**: コマンドの定義と配線を置く。計画・判定・記録の意味論は各モジュールへ渡す。
 

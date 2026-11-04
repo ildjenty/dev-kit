@@ -24,6 +24,8 @@ devkit init
 
 `devkit init` preserves existing repository settings and assets and merges missing kit settings, including deny defaults.
 
+To remove devkit from a repository, run `devkit uninstall` there. It shows the changes and asks for confirmation (`--yes` skips it), then removes the kit copy, runtime state, the skill link and installed files that still match the kit, and strips the kit settings from host settings, `devkit.toml` and `.gitignore`. Files you changed are left in place and listed. To remove the binary, delete `devkit` from the `--bin` directory.
+
 In Codex, trust the project interactively and trust each project hook through `/hooks`. In Claude Code, accept workspace trust. Start a new host session and run `devkit doctor`, then use `/devkit` to begin. Run `devkit help` for command arguments. See [install](docs/architecture/modules.md#install) and [doctor](docs/architecture/modules.md#doctor-の確認項目) for the design.
 
 ## Reading order

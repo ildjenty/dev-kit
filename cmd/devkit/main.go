@@ -39,6 +39,7 @@ const usage = `Usage: devkit <command> [arguments]
   status [--records | --record <id>]
   view
   init [--yes]
+  uninstall [--yes]
   doctor
   version
   hook <event> [--host claude-code|codex]
@@ -100,9 +101,9 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	if err != nil {
 		return err
 	}
-	if name == "init" || name == "doctor" {
+	if name == "init" || name == "uninstall" || name == "doctor" {
 		yes := false
-		if name == "init" {
+		if name == "init" || name == "uninstall" {
 			f.BoolVar(&yes, "yes", false, "Apply changes without confirmation")
 		}
 		if err := parse(f, args, 0, 0); err != nil {
@@ -120,6 +121,15 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 				return err
 			}
 			return writeOutput(output, filepath.Join(result.Root, ".devkit/run"), "init.json", result)
+		}
+		if name == "uninstall" {
+			result, err := install.Uninstall(ctx, cwd, func(changes []install.Change) error {
+				return confirmUninstall(changes, input, output, yes)
+			})
+			if err != nil {
+				return err
+			}
+			return writeUninstalled(output, result)
 		}
 		report, err := install.Doctor(ctx, cwd, sessionID())
 		if err != nil {
@@ -281,6 +291,85 @@ func confirmInit(changes []install.Change, root string, input io.Reader, output 
 		return err
 	}
 	return errors.New("initialization canceled")
+}
+
+// confirmUninstall lists the removals and shows the edits to settings files.
+// Paths under the kit copy and runtime state are summarized per directory.
+func confirmUninstall(changes []install.Change, input io.Reader, output io.Writer, yes bool) error {
+	var text strings.Builder
+	summarized := map[string]int{}
+	for _, change := range changes {
+		if dir, ok := summarizedDirectory(change.Path); ok {
+			summarized[dir]++
+			continue
+		}
+		if change.Remove {
+			fmt.Fprintf(&text, "remove %s\n", change.Path)
+			continue
+		}
+		fmt.Fprintf(&text, "--- %s (before)\n+++ %s (after)\n", change.Path, change.Path)
+		fmt.Fprintln(&text, "-"+strings.ReplaceAll(strings.TrimSuffix(string(change.Before), "\n"), "\n", "\n-"))
+		if len(change.After) != 0 {
+			fmt.Fprintln(&text, "+"+strings.ReplaceAll(strings.TrimSuffix(string(change.After), "\n"), "\n", "\n+"))
+		}
+	}
+	for _, dir := range []string{".devkit/kit/", ".devkit/run/"} {
+		if n := summarized[dir]; n != 0 {
+			fmt.Fprintf(&text, "remove %s (%d files)\n", dir, n)
+		}
+	}
+	if _, err := io.WriteString(output, text.String()); err != nil {
+		return err
+	}
+	if yes {
+		return nil
+	}
+	if _, err := fmt.Fprint(output, "Apply uninstall changes? [y/N] "); err != nil {
+		return err
+	}
+	scanner := bufio.NewScanner(input)
+	if scanner.Scan() {
+		answer := strings.TrimSpace(scanner.Text())
+		if strings.EqualFold(answer, "y") || strings.EqualFold(answer, "yes") {
+			return nil
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+	return errors.New("uninstall canceled")
+}
+
+func summarizedDirectory(path string) (string, bool) {
+	for _, dir := range []string{".devkit/kit/", ".devkit/run/"} {
+		if strings.HasPrefix(path, dir) {
+			return dir, true
+		}
+	}
+	return "", false
+}
+
+// writeUninstalled prints a plain summary because the runtime directory no longer exists.
+func writeUninstalled(output io.Writer, result install.Result) error {
+	if _, err := fmt.Fprintf(output, "Uninstalled devkit from %s (%d changes).\n", result.Root, len(result.Changes)); err != nil {
+		return err
+	}
+	if len(result.Preserved) != 0 {
+		if _, err := fmt.Fprintln(output, "Left in place because they differ from the kit or hold your settings:"); err != nil {
+			return err
+		}
+		for _, path := range result.Preserved {
+			if _, err := fmt.Fprintln(output, "  "+path); err != nil {
+				return err
+			}
+		}
+	}
+	for _, guidance := range result.Guidance {
+		if _, err := fmt.Fprintln(output, guidance); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func writeOutput(output io.Writer, root string, name string, value any) error {

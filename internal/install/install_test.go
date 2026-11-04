@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -481,5 +482,71 @@ func TestInitMergesDenyDefaults(t *testing.T) {
 				t.Fatal("repeated init changed settings")
 			}
 		})
+	}
+}
+
+func TestUninstallReversesInit(t *testing.T) {
+	root := repository(t)
+	settings := "{\"model\":\"x\",\"permissions\":{\"allow\":[\"Bash(ls)\"]}}\n"
+	writeFile(t, root, ".claude/settings.json", settings)
+	writeFile(t, root, ".gitignore", "node_modules/\n")
+	if _, err := Init(context.Background(), root, nil); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, ".devkit/rules.md", "# My rules\n")
+	confirmed := false
+	result, err := Uninstall(context.Background(), root, func([]Change) error {
+		confirmed = true
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !confirmed || len(result.Changes) == 0 {
+		t.Fatalf("uninstall did not confirm its changes: %+v", result)
+	}
+	if !slices.Equal(result.Preserved, []string{".devkit/rules.md"}) {
+		t.Fatalf("preserved = %v", result.Preserved)
+	}
+	var got, want map[string]any
+	if err := json.Unmarshal(readFile(t, root, ".claude/settings.json"), &got); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(settings), &want); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("settings were not restored: %v", got)
+	}
+	if got := string(readFile(t, root, ".gitignore")); got != "node_modules/\n" {
+		t.Fatalf(".gitignore = %q", got)
+	}
+	for _, name := range []string{"devkit.toml", ".devkit/kit", ".devkit/run", ".devkit/plans", ".agents", ".codex", ".claude/skills", ".claude/agents"} {
+		if _, err := os.Lstat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("%s remains after uninstall: %v", name, err)
+		}
+	}
+	again, err := Uninstall(context.Background(), root, nil)
+	if err != nil || len(again.Changes) != 0 {
+		t.Fatalf("second uninstall is not idempotent: %+v, %v", again.Changes, err)
+	}
+}
+
+func TestUninstallKeepsUserConfig(t *testing.T) {
+	root := repository(t)
+	if _, err := Init(context.Background(), root, nil); err != nil {
+		t.Fatal(err)
+	}
+	config := string(readFile(t, root, "devkit.toml"))
+	writeFile(t, root, "devkit.toml", config+"\n[router]\nhuman_confirmation = [\"release\"]\n")
+	result, err := Uninstall(context.Background(), root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(result.Preserved, "devkit.toml") {
+		t.Fatalf("devkit.toml with user settings was not preserved: %v", result.Preserved)
+	}
+	if _, err := os.Stat(filepath.Join(root, "devkit.toml")); err != nil {
+		t.Fatal(err)
 	}
 }

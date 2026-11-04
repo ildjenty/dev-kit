@@ -16,13 +16,15 @@ import (
 	"github.com/ildjenty/dev-kit/internal/workspace"
 )
 
-// Change describes a repository-relative file addition or configuration merge.
+// Change describes a repository-relative file addition, configuration edit, or removal.
 // For a symbolic link, After contains its relative target and Symlink is true.
+// Remove is set when the path is deleted.
 type Change struct {
 	Path    string
 	Before  []byte
 	After   []byte
 	Symlink bool
+	Remove  bool `json:",omitempty"`
 }
 
 // Result describes the installation changes and existing files left in place.

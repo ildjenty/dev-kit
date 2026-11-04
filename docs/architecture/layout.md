@@ -21,7 +21,7 @@ dev-kit/
     host/event/          イベント JSON の変換と出力の整形
     workspace/           git の操作
     config/              渡された TOML の解析と検証
-    install/             導入と doctor
+    install/             導入・削除と doctor
     kit/                 固定物の供給・コピー・照合の実装
     view/                HTML の生成
   kit/                   固定物の埋め込み元
