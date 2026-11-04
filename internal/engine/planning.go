@@ -97,7 +97,7 @@ func (e *Engine) validateProposal(ctx context.Context, state *ledger.State, p pl
 	if err != nil {
 		return err
 	}
-	if err := plan.ValidateReferences(p, checkCatalog(settings), settings.DetectionRequired(), resolve); err != nil {
+	if err := plan.ValidateReferences(p, checkCatalog(settings), resolve); err != nil {
 		return err
 	}
 	if err := e.validateInstanceIDs(state, p); err != nil {

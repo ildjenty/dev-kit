@@ -160,14 +160,8 @@ func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan
 	}
 	selected := settings.PlanCheckSettings()
 	item := catalogCheck{plan.Check{Aspect: selected.Aspect, Required: true}, plan.CheckDefinition{Runner: plan.Runner(selected.Runner), Criteria: planSelections(selected.Criteria), Schemas: selected.Schemas}}
-	if selected.Examples != nil {
-		item.Examples = &plan.Selection{Source: selected.Examples.Source, Select: selected.Examples.Select}
-	}
 	if ref, err = e.refreshSources(ctx, ref); err != nil {
 		return Result{}, err
-	}
-	if r, pending, err := e.ensureDetection(ctx, state, []catalogCheck{item}, ref); pending || err != nil {
-		return r, err
 	}
 	// A plan check is tied to the proposal and the norms at issuance.
 	key := fmt.Sprintf("%d:%s:%s", p.Version, item.Aspect, item.Runner)
@@ -215,15 +209,15 @@ func (e *Engine) acceptPending(ctx context.Context, state *ledger.State) (bool, 
 		return false, err
 	}
 	for _, instruction := range state.UnacceptedInstructions() {
-		if instruction.Kind != form.InstructionPlan && instruction.Kind != form.InstructionJudgment && instruction.Kind != form.InstructionPlanCheck && instruction.Kind != form.InstructionDetectionTest && instruction.Kind != form.InstructionUnitWork && instruction.Kind != form.InstructionJudgmentBrief {
+		if instruction.Kind != form.InstructionPlan && instruction.Kind != form.InstructionJudgment && instruction.Kind != form.InstructionPlanCheck && instruction.Kind != form.InstructionUnitWork && instruction.Kind != form.InstructionJudgmentBrief {
 			continue
 		}
 		request, err := e.readInstruction(instruction.ID)
 		if err != nil {
 			return false, err
 		}
-		current, blocked, err := e.pendingRequestCurrent(ctx, state, instruction, request)
-		if err != nil || blocked {
+		current, err := e.pendingRequestCurrent(ctx, instruction, request)
+		if err != nil {
 			return false, err
 		}
 		if !current {
@@ -689,55 +683,25 @@ func (e *Engine) pendingObservations(state *ledger.State) ([]observedResult, err
 	return observations, nil
 }
 
-func (e *Engine) pendingRequestCurrent(ctx context.Context, state *ledger.State, instruction ledger.Instruction, request instructionData) (bool, bool, error) {
-	if instruction.Kind != form.InstructionPlanCheck && instruction.Kind != form.InstructionDetectionTest {
-		return true, false, nil
+// pendingRequestCurrent reports whether a pending plan check still matches the current norms.
+func (e *Engine) pendingRequestCurrent(ctx context.Context, instruction ledger.Instruction, request instructionData) (bool, error) {
+	if instruction.Kind != form.InstructionPlanCheck {
+		return true, nil
 	}
 	ref, err := e.workspace.Head(ctx)
 	if err != nil {
-		return false, false, err
-	}
-	if instruction.Kind == form.InstructionDetectionTest && instruction.StageRunID != "" {
-		tree, err := e.workspace.SnapshotTree(ctx)
-		if err != nil {
-			return false, false, err
-		}
-		run, ok := state.LatestStageRun()
-		if !ok || run.ID != instruction.StageRunID {
-			return false, false, nil
-		}
-		confirmed, question, err := e.roundStartNorms(ctx, state, run, tree)
-		if err != nil {
-			return false, false, err
-		}
-		if question != nil {
-			return false, true, nil
-		}
-		ref = confirmed
+		return false, err
 	}
 	ref, err = e.refreshSources(ctx, ref)
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
-	if request.Detection != nil {
-		current, _, err := e.detectionInput(ctx, ref, catalogCheck{request.Detection.Check, request.Detection.Definition})
-		if err != nil {
-			return false, false, err
-		}
-		if current.Identity != request.Detection.Identity {
-			return false, false, nil
-		}
-	} else {
-		norms, err := e.norms(ctx, ref)
-		if err != nil {
-			return false, false, err
-		}
-		previous := check.Judgment{JudgmentResult: form.JudgmentResult{TargetVersion: request.Request.TargetVersion, Norms: normRefs(request.Request.Norms)}}
-		if !previous.ValidFor(request.Request.TargetVersion, norms) {
-			return false, false, nil
-		}
+	norms, err := e.norms(ctx, ref)
+	if err != nil {
+		return false, err
 	}
-	return true, false, nil
+	previous := check.Judgment{JudgmentResult: form.JudgmentResult{TargetVersion: request.Request.TargetVersion, Norms: normRefs(request.Request.Norms)}}
+	return previous.ValidFor(request.Request.TargetVersion, norms), nil
 }
 
 func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, instruction ledger.Instruction, request instructionData, obs observedResult) (bool, error) {
@@ -761,13 +725,6 @@ func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, 
 		return false, errors.New("judgment request is missing")
 	}
 	provenance := check.Provenance{Source: check.SubagentResult, InstructionID: instruction.ID, Runner: request.Request.Runner, AgentID: result.AgentID, Effort: result.Effort, Model: result.Model, ResultPath: obs.path}
-	if request.Detection != nil {
-		test, err := e.validateDetection(instruction, request, result.Content, provenance)
-		if err != nil {
-			return e.rejectResult(instruction, obs, err)
-		}
-		return true, e.recordDetection(ctx, state, instruction, request, test)
-	}
 	_, schema, err := e.outputSchema(ctx, request.Reference, request.Request.Runner)
 	if err != nil {
 		return false, err
@@ -1063,16 +1020,10 @@ func (e *Engine) decideRound(ctx context.Context, p plan.Plan, stage plan.Stage,
 	if err != nil {
 		return Result{}, err
 	}
-	requirements, tests, err := e.detectionContext(ctx, required, roundReference(round))
-	if err != nil {
-		return Result{}, err
-	}
 	if r, blocked, err := e.rejectReadOnlyEdits(ctx, state, p, stage, run, round, settings); blocked || err != nil {
 		return r, err
 	}
-	rule := stage.CompletionRule()
-	rule.RequireDetectionTests = settings.DetectionRequired()
-	completion := router.CheckCompletion(router.CompletionInput{Rule: rule, Runners: checkRunners(required), TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments, Detection: requirements, DetectionTests: tests})
+	completion := router.CheckCompletion(router.CompletionInput{Rule: stage.CompletionRule(), Runners: checkRunners(required), TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments})
 	summary := check.Aggregate(judgments)
 	categories, err := e.roundConfirmationCategories(ctx, state, round, settings)
 	if err != nil {
@@ -1183,13 +1134,7 @@ func (e *Engine) judgeInputs(ctx context.Context, state *ledger.State, ref strin
 // judgmentCommandInput keeps recorded document identities separate from runtime bodies.
 // The rendered brief carries the same fixed judgment rules and output contract as a subagent.
 func (e *Engine) judgmentCommandInput(ctx context.Context, data instructionData, request check.Request) ([]byte, error) {
-	var body brief.Brief
-	var err error
-	if request.Kind == check.DetectionRequest {
-		body, err = e.detectionBrief(ctx, data)
-	} else {
-		body, err = e.judgmentBrief(ctx, data)
-	}
+	body, err := e.judgmentBrief(ctx, data)
 	if err != nil {
 		return nil, err
 	}

@@ -28,13 +28,11 @@ type Config struct {
 	PlanCheck      PlanCheck                    `toml:"plan_check"`
 	DefaultPlan    string                       `toml:"default_plan"`
 	Sources        map[string]Source            `toml:"sources"`
-	State          State                        `toml:"state"`
 	Approval       Approval                     `toml:"approval"`
 	Git            Git                          `toml:"git"`
 	Classification Classification               `toml:"classification"`
 	Limits         Limits                       `toml:"limits"`
 	Lessons        Lessons                      `toml:"lessons"`
-	Detection      Detection                    `toml:"detection"`
 	Parallel       Parallel                     `toml:"parallel"`
 	Briefs         Briefs                       `toml:"briefs"`
 }
@@ -71,13 +69,12 @@ type Approval struct {
 	MetaLoopEdit string `toml:"meta_loop_edit"`
 }
 
-// PlanCheck selects the name, runner, criteria, and detection specification for plan judgments.
+// PlanCheck selects the name, runner, criteria, and input schemas for plan judgments.
 type PlanCheck struct {
 	Inputs   []Selection `toml:"inputs"`
 	Aspect   string      `toml:"aspect"`
 	Runner   string      `toml:"runner"`
 	Criteria []Selection `toml:"criteria"`
-	Examples *Selection  `toml:"examples"`
 	Schemas  []string    `toml:"schemas"`
 }
 
@@ -95,12 +92,6 @@ func (c Config) PlanCheckSettings() PlanCheck {
 		settings.Criteria = []Selection{{Source: "principles", Select: "review/plan.md"}, {Source: "plans", Select: "README.md"}}
 	} else {
 		settings.Criteria = slices.Clone(settings.Criteria)
-	}
-	if settings.Examples == nil {
-		settings.Examples = &Selection{Source: "examples", Select: "plan/spec.json"}
-	} else {
-		examples := *settings.Examples
-		settings.Examples = &examples
 	}
 	if settings.Schemas == nil {
 		settings.Schemas = []string{"plan", "plan-template", "finding"}
@@ -132,16 +123,6 @@ type Limits struct {
 // Lessons holds the priority order of repository lesson destinations.
 type Lessons struct {
 	Destinations []string `toml:"destinations"`
-}
-
-// Detection controls whether required judge checks need passing detection tests.
-type Detection struct {
-	Required *bool `toml:"required"`
-}
-
-// DetectionRequired returns whether required judge checks need detection tests.
-func (c Config) DetectionRequired() bool {
-	return c.Detection.Required == nil || *c.Detection.Required
 }
 
 // Classification names identify changes that may require human confirmation.
@@ -278,7 +259,6 @@ type Router struct {
 func Parse(data []byte) (Config, error) {
 	c := Config{}
 	c.DefaultPlan = c.DefaultPlanName()
-	c.State.Detect = c.DetectionPath()
 	c.Approval = Approval{Plan: c.PlanApproval(), MetaLoopEdit: c.MetaLoopEditApproval()}
 	allowEmpty := c.AllowEmptyCommit()
 	c.Git = Git{CommitMessage: c.commitMessagePattern(), AllowEmptyCommit: &allowEmpty}
@@ -443,11 +423,6 @@ func (c Config) validatePlanSettings() error {
 	}
 	if err := c.ValidateCriteria(c.PlanCheck.Criteria); err != nil {
 		return fmt.Errorf("plan_check.criteria: %w", err)
-	}
-	if c.PlanCheck.Examples != nil {
-		if err := c.ValidateSelection(*c.PlanCheck.Examples); err != nil {
-			return fmt.Errorf("plan_check.examples: %w", err)
-		}
 	}
 	for _, name := range c.PlanCheck.Schemas {
 		if !sourceName.MatchString(name) {

@@ -415,7 +415,7 @@ func TestNormativeReference(t *testing.T) {
 }
 
 func TestSubagentResultCollection(t *testing.T) {
-	for _, kind := range []form.InstructionKind{form.InstructionJudgment, form.InstructionPlanCheck, form.InstructionDetectionTest, form.InstructionPlan} {
+	for _, kind := range []form.InstructionKind{form.InstructionJudgment, form.InstructionPlanCheck, form.InstructionPlan} {
 		t.Run(string(kind), func(t *testing.T) {
 			h := newHandler(t)
 			appendPayload(t, h, &ledger.Instruction{ID: "issued", Kind: kind, TargetKey: "target", SessionID: "session"})
@@ -564,7 +564,7 @@ func TestStopLimitPersistsAcrossSessionsAndOnlyRecordsResetIt(t *testing.T) {
 }
 
 func TestStopWaitAndPause(t *testing.T) {
-	for _, kind := range []form.InstructionKind{form.InstructionQuestion, form.InstructionExternal, form.InstructionJudgmentWait, form.InstructionJudgment, form.InstructionPlanCheck, form.InstructionDetectionTest} {
+	for _, kind := range []form.InstructionKind{form.InstructionQuestion, form.InstructionExternal, form.InstructionJudgmentWait, form.InstructionJudgment, form.InstructionPlanCheck} {
 		t.Run(string(kind), func(t *testing.T) {
 			h := newHandler(t)
 			appendPayload(t, h, &ledger.Instruction{ID: "issued", Kind: kind, TargetKey: "target", SessionID: "session"})

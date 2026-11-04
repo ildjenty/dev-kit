@@ -25,7 +25,7 @@ None registered. When adding a decision, include its enforcement mechanism and g
 
 A test ID uniquely identifies a test within the repository as the pair of its repository-relative test file path and its identifier in the test framework.
 
-Checking a test's detection ability means deliberately breaking its subject and confirming that the test fails. This differs from detection tests of check criteria (`examples/README.md`).
+Checking a test's detection ability means deliberately breaking its subject and confirming that the test fails.
 
 - **Confirm that tests, including regression tests, fail once before implementation. Record the test ID, target version (`schemas/judgment.json#/$defs/target_version`, the state under verification), and execution result. If this cannot be checked before implementation, use the test detection ability check in the next rule instead**. Principle 4 of `principles/testing.md`. Enforcement: Not implemented.
 - **For tests whose failure could not be confirmed before implementation and tests of security-related processing, deliberately break the subject with the smallest necessary diff and record the failure-inducing diff and execution result linked to the test ID**. Principle 4 of `principles/testing.md`. Enforcement: Not implemented.

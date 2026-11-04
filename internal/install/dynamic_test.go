@@ -23,7 +23,7 @@ func TestInitWritesDynamicDefaults(t *testing.T) {
 	if c.Limits.MaxRoundsCeiling != 3 || c.Limits.MaxNoProgressCeiling != 2 || c.Limits.MaxTotalRounds == nil || *c.Limits.MaxTotalRounds != 40 {
 		t.Fatal("init omitted round ceilings")
 	}
-	if c.Checks["command:test"].Runner != "command:test" || c.Checks["test"].Runner != "judge" || c.Checks["behavior"].Examples == nil {
+	if c.Checks["command:test"].Runner != "command:test" || c.Checks["test"].Runner != "judge" || len(c.Checks["behavior"].Criteria) == 0 {
 		t.Fatal("init omitted check definitions")
 	}
 	if len(c.Loop.Stage) != 3 || len(c.Loop.Path) != 2 {

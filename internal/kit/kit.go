@@ -19,7 +19,7 @@ func FS() fs.FS {
 // Norms returns distributable repository norms keyed by logical path.
 func Norms() (map[string][]byte, error) {
 	files := make(map[string][]byte)
-	for _, root := range []string{"principles", "stages", "plans", "templates", "examples"} {
+	for _, root := range []string{"principles", "stages", "plans", "templates"} {
 		if err := fs.WalkDir(FS(), root, func(name string, entry fs.DirEntry, err error) error {
 			if err != nil || entry.IsDir() {
 				return err

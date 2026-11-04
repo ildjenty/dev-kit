@@ -147,8 +147,6 @@ func readRecord(raw fsstore.Record, validator *Validator) (Record, error) {
 		payload = &JudgmentBrief{}
 	case KindJudgment:
 		payload = &Judgment{}
-	case KindDetectionTest:
-		payload = &DetectionTest{}
 	case KindResultRejection:
 		payload = &ResultRejection{}
 	case KindStageRun:

@@ -50,12 +50,16 @@ func TestMainInstructionsReachOnlyMatchingPlannerAndWorkerBriefs(t *testing.T) {
 				t.Fatal("a new instruction changed the outstanding planner brief")
 			}
 			planResult(t, e, start)
-			detection := nextResult(t, e, ctx)
-			if detection.Instruction == nil || detection.Instruction.Kind != form.InstructionDetectionTest {
-				t.Fatalf("expected detection: %+v", detection)
+			review := nextResult(t, e, ctx)
+			if review.Instruction == nil || review.Instruction.Kind != form.InstructionPlanCheck {
+				t.Fatalf("expected plan check: %+v", review)
 			}
-			assertNoMainInstructions(t, briefText(t, detection.Instruction), instructions)
-			acceptDetectionResult(t, e, detection.Instruction)
+			assertNoMainInstructions(t, briefText(t, review.Instruction), instructions)
+			data, err := e.readInstruction(review.Instruction.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			collect(t, e, review.Instruction, pass(*data.Request))
 			work := roleNext(t, e)
 			worker := work.Instruction
 			if !session {
@@ -130,7 +134,7 @@ func assertNoMainInstructions(t *testing.T, body string, instructions []ledger.M
 	t.Helper()
 	for _, instruction := range instructions {
 		if strings.Contains(body, instruction.Text) {
-			t.Fatalf("judge or detection request received main instruction %q", instruction.Text)
+			t.Fatalf("judge request received main instruction %q", instruction.Text)
 		}
 	}
 }

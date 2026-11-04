@@ -43,7 +43,7 @@
 
 - **Applicability**: When a fix fails a check.
 - **Exemptions**: None.
-- **Principle**: If fixes based on the same assumptions repeatedly fail the same checks, do not continue fixing under those assumptions. Write down the assumptions and follow principle 3 of `principles/verification.md` for hypothesis testing. During progressive refinement, follow principle 3 of `principles/harness.md` to decide whether to return to the stage that decided the assumption or fix it in the current stage.
+- **Principle**: If fixes based on the same assumptions repeatedly fail the same checks, do not continue fixing under those assumptions. Write down the assumptions and follow principle 3 of `principles/verification.md` for hypothesis testing. During progressive refinement, follow principle 2 of `principles/harness.md` to decide whether to return to the stage that decided the assumption or fix it in the current stage.
 - **Violations and signs**:
   - Repeated fixes make small changes to the same place.
   - Fixes begin with "This time for sure."

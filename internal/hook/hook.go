@@ -174,7 +174,7 @@ func (h Handler) subagentStop(e event.Event, state *ledger.State, now time.Time)
 
 func subagentInstruction(kind form.InstructionKind) bool {
 	switch kind {
-	case form.InstructionJudgment, form.InstructionPlanCheck, form.InstructionDetectionTest, form.InstructionPlan, form.InstructionUnitWork, form.InstructionJudgmentBrief:
+	case form.InstructionJudgment, form.InstructionPlanCheck, form.InstructionPlan, form.InstructionUnitWork, form.InstructionJudgmentBrief:
 		return true
 	}
 	return false
@@ -257,7 +257,7 @@ func stopAllowed(state *ledger.State) bool {
 		switch instruction.Kind {
 		case form.InstructionQuestion, form.InstructionExternal, form.InstructionCompleted,
 			form.InstructionAborted, form.InstructionJudgmentWait, form.InstructionJudgment,
-			form.InstructionPlanCheck, form.InstructionDetectionTest, form.InstructionPlan, form.InstructionJudgmentBrief:
+			form.InstructionPlanCheck, form.InstructionPlan, form.InstructionJudgmentBrief:
 			return true
 		case form.InstructionUnitWork:
 			return true

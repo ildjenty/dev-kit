@@ -10,7 +10,7 @@ dev-kit/
   internal/
     plan/                計画の意味論
     brief/               brief と判定依頼の組み立て
-    check/               選んだ基準による判定、集約、適用除外、検出試験の仕様
+    check/               選んだ基準による判定、集約、適用除外
     router/              分類表と判断
     form/                固定フォーマットのスキーマと描画
     ledger/              記録の型と問い合わせ
@@ -34,7 +34,6 @@ dev-kit/
     schemas/             JSON Schema
     skills/              skill の正本(devkit の進め方)
     hosts/               ホスト設定、サブエージェント定義、rules の断片
-    examples/            検出試験の違反例・適合例・許容例
     principles/          既存の原則
   docs/                  既存の設計書
     parts/               部品の契約
@@ -48,7 +47,7 @@ dev-kit/
 
 ## 利用側のリポジトリ
 
-規範と成果のソースの既定の置き場所である。接続先と配置は `[sources.<名前>]`、検出試験の索引は `[state] detect` で変更できる。既定の規範のソースは principles・stages・plans・rules・git・examples・templates、成果は requirements・structure である。
+規範と成果のソースの既定の置き場所である。接続先と配置は `[sources.<名前>]` で変更できる。既定の規範のソースは principles・stages・plans・rules・git・templates、成果は requirements・structure である。
 
 ```text
 <repo>/
@@ -65,12 +64,10 @@ dev-kit/
     principles/              原則と review/test.md などの用途別の判定基準。principles ソース
     stages/                  ステージ定義。init が初期内容をコピー
     plans/<name>.json        ループのパターン。init が既定の default・fix・docs をコピー
-    checks/<観点ID>/         検出試験の例と spec.json。examples ソース
     templates/               brief と form のテンプレート
     rules.md                 規則と強制手段
     git.md                   ブランチ・worktree・PR・統合の散文の規則。git ソース
     requirements.md          リポジトリが満たすべき要件の正本
-    detect.json              検出試験の合格記録の索引
     structure.json           構造の知識。形式は自由であり、所定の JSON のときだけ図を描く
     worktrees/<単位の指示ID>/  単位ごとの detached の作業場所。.gitignore で除外
     run/                     実行の記録と生成物。.gitignore で除外
@@ -101,7 +98,7 @@ UserPromptSubmit は束縛された作業の回答と訂正の入力を観測す
 
 単位の作業場所 `.devkit/worktrees/<単位の指示 ID>/` も ignore し、記録を守る deny の対象と重ならないよう `.devkit/run/` の外に置く。devkit がラウンド開始時のスナップショットのコミットから detached で作り、物理的な名前には計画者の単位 ID を使わない。中断中は保持する。中止・作業完了時は変更のない worktree だけを削除し、変更の残るものは保持して場所を知らせる。破棄は人が git で行う。
 
-規範の識別には `norm = true` のソースの全文書と、ソースの外の `devkit.toml`(`[roles]` を含む)・サブエージェント定義・AGENTS.md・CLAUDE.md を含める。requirements・structure は成果であり、索引と実行の記録とともに規範の識別には含めない。成果の更新は規範の変更による失効を起こさないが、対象の識別では git のツリーに外部の成果の文書のソース名・ID・内容ハッシュの集合を加える。brief は固定した写しのパスを示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
+規範の識別には `norm = true` のソースの全文書と、ソースの外の `devkit.toml`(`[roles]` を含む)・サブエージェント定義・AGENTS.md・CLAUDE.md を含める。requirements・structure は成果であり、実行の記録とともに規範の識別には含めない。成果の更新は規範の変更による失効を起こさないが、対象の識別では git のツリーに外部の成果の文書のソース名・ID・内容ハッシュの集合を加える。brief は固定した写しのパスを示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
 
 `init` は導入するファイルを人が確認したあとコミットする。`--no-commit` を指定した場合は手動でコミットする。HEAD がない場合、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合、`start` は理由と直し方を返して拒否する。
 

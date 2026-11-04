@@ -426,19 +426,18 @@ type StopCount struct {
 type Metrics struct {
 	Stages          []StageMetrics      `json:"stages"`
 	Definitions     []DefinitionMetrics `json:"definitions"`
-	TotalRounds     int            `json:"total_rounds"`
-	HumanStops      int            `json:"human_stops"`
-	StopReasons     []StopCount    `json:"stop_reasons"`
-	AssigneeChanges int            `json:"assignee_changes"`
-	DetectionTests  int            `json:"detection_tests"`
-	Briefs          int            `json:"briefs"`
-	BriefBytes      int            `json:"brief_bytes"`
-	LargestBrief    int            `json:"largest_brief"`
-	BriefOverflows  int            `json:"brief_overflows"`
+	TotalRounds     int                 `json:"total_rounds"`
+	HumanStops      int                 `json:"human_stops"`
+	StopReasons     []StopCount         `json:"stop_reasons"`
+	AssigneeChanges int                 `json:"assignee_changes"`
+	Briefs          int                 `json:"briefs"`
+	BriefBytes      int                 `json:"brief_bytes"`
+	LargestBrief    int                 `json:"largest_brief"`
+	BriefOverflows  int                 `json:"brief_overflows"`
 }
 
 // Metrics counts per-work rounds by stage, human stops and their reasons, assignee changes,
-// detection tests, and request sizes. Counts never decrease after backs or replans.
+// and request sizes. Counts never decrease after backs or replans.
 func (s *State) Metrics() Metrics {
 	m := Metrics{Stages: []StageMetrics{}, Definitions: []DefinitionMetrics{}, StopReasons: []StopCount{}}
 	for _, run := range s.StageRuns() {
@@ -495,19 +494,15 @@ func (s *State) countDefinition(m *Metrics, run *StageRun) {
 
 func (s *State) briefMetrics(m *Metrics) {
 	for _, record := range s.records {
-		switch p := record.Payload.(type) {
-		case *DetectionTest:
-			m.DetectionTests++
-		case *Instruction:
-			if p.Context == nil || p.Context.BriefBytes == 0 {
-				continue
-			}
-			m.Briefs++
-			m.BriefBytes += p.Context.BriefBytes
-			m.LargestBrief = max(m.LargestBrief, p.Context.BriefBytes)
-			if len(p.Context.Overflow) > 0 {
-				m.BriefOverflows++
-			}
+		p, ok := record.Payload.(*Instruction)
+		if !ok || p.Context == nil || p.Context.BriefBytes == 0 {
+			continue
+		}
+		m.Briefs++
+		m.BriefBytes += p.Context.BriefBytes
+		m.LargestBrief = max(m.LargestBrief, p.Context.BriefBytes)
+		if len(p.Context.Overflow) > 0 {
+			m.BriefOverflows++
 		}
 	}
 }

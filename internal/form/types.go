@@ -195,7 +195,6 @@ const (
 	InstructionJudgmentWait  InstructionKind = "judgment_wait"
 	InstructionJudgment      InstructionKind = "judgment"
 	InstructionPlanCheck     InstructionKind = "plan_check"
-	InstructionDetectionTest InstructionKind = "detection_test"
 	InstructionPlan          InstructionKind = "plan"
 	InstructionQuestion      InstructionKind = "question"
 	InstructionExternal      InstructionKind = "external"

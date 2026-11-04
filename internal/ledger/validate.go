@@ -141,8 +141,6 @@ func (v *Validator) validateRaw(payload Payload, data []byte) error {
 		requiredFields = []string{"runner", "provenance"}
 	case *ResultRejection:
 		requiredFields = []string{"instruction_id", "result_path", "reason"}
-	case *DetectionTest:
-		requiredFields = []string{"instruction_id", "aspect", "runner", "identity", "cases", "passed"}
 	case *StageRun:
 		requiredFields = []string{"id", "stage_id", "plan_version", "state"}
 	case *Round:
@@ -298,8 +296,6 @@ func (v *Validator) validatePayload(payload Payload) error {
 		return v.judgment(*p)
 	case *ResultRejection:
 		return required(p.InstructionID, p.ResultPath, p.Reason)
-	case *DetectionTest:
-		return v.validateDetectionTest(p)
 	case *StageRun:
 		return nil
 	case *Round:
@@ -345,34 +341,6 @@ func (v *Validator) validateExternalOperation(p *ExternalOp) error {
 		}
 	default:
 		return fmt.Errorf("unknown external operation status: %q", p.Status)
-	}
-	return nil
-}
-
-func (v *Validator) validateDetectionTest(p *DetectionTest) error {
-	if err := required(p.InstructionID, p.Aspect, p.Runner, p.Identity.RunnerHash, p.Identity.TemplateHash, p.Identity.CriteriaHash, p.Identity.ExamplesHash); err != nil {
-		return err
-	}
-	if len(p.Cases) == 0 {
-		return fmt.Errorf("detection test cases are required")
-	}
-	for _, result := range p.Cases {
-		if err := required(result.File, result.Observation.File, result.Observation.Reason); err != nil {
-			return err
-		}
-		switch result.Kind {
-		case "violation", "conforming", "allowed":
-		default:
-			return fmt.Errorf("unknown detection case kind: %q", result.Kind)
-		}
-		switch result.Expected {
-		case form.Pass, form.Fail, form.NotAssessed:
-		default:
-			return fmt.Errorf("unknown detection case judgment: %q", result.Expected)
-		}
-		if err := v.judgment(Judgment{Judgment: result.Observation.Judgment}); err != nil {
-			return err
-		}
 	}
 	return nil
 }

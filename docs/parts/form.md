@@ -42,7 +42,7 @@ form は固定フォーマットの型と、[スキーマ・テンプレート](
 
 テンプレートの対象と PR 本文に含める情報は [form の定義](../architecture/modules.md#form)に従う。
 
-判定の基準と例の選び方は[観点と検出試験](../architecture/examples.md#観点と検出試験)を参照する。
+判定の基準の選び方は[観点と判定](check.md#観点と判定)に従う。
 
 PR 本文で共有する情報は[資産の更新と共有](../architecture/data.md#資産の更新と共有)、記載内容は [`assets/principles/writing.md` の原則1](../../assets/principles/writing.md#1-put-conclusions-and-information-needed-for-human-decisions-first)に従う。
 

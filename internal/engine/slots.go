@@ -16,7 +16,7 @@ type slots struct {
 
 func subagentKind(kind form.InstructionKind) bool {
 	switch kind {
-	case form.InstructionPlan, form.InstructionJudgment, form.InstructionPlanCheck, form.InstructionDetectionTest,
+	case form.InstructionPlan, form.InstructionJudgment, form.InstructionPlanCheck,
 		form.InstructionUnitWork, form.InstructionJudgmentBrief:
 		return true
 	}

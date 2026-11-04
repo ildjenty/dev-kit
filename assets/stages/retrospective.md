@@ -16,7 +16,7 @@ Reconcile the approved completion conditions with `requirements.md`. Reflect rep
 
 ## Deferred to later stages
 
-Detection tests for checks whose criteria or examples were revised run before the next round that requires those checks. Record reasons for improvements that are rejected or deferred.
+Record reasons for improvements that are rejected or deferred.
 
 ## Irreversible items
 
@@ -24,7 +24,7 @@ Shared difficult-to-change decisions belong in `rules.md` with enforcement and g
 
 ## Artifacts
 
-A record connecting each problem or miss to the point that should have caught it, its prevention destination, and the adopted change or reason for no change. Apply improvements to repository-owned checks, templates, review documents, principles, or skills; update the detection examples of the checks that select a review document whenever it changes. Record lessons with `devkit note`.
+A record connecting each problem or miss to the point that should have caught it, its prevention destination, and the adopted change or reason for no change. Apply improvements to repository-owned checks, templates, review documents, principles, or skills. Record lessons with `devkit note`.
 
 Updated `requirements.md` where needed, and any enduring structural or shared decisions in `structure.json` or `rules.md`, following `stages/README.md#decisions-for-later-work`. Runtime records remain untracked and do not replace these repository records.
 
@@ -36,4 +36,4 @@ Account for the task's findings, failed or unavailable assessments, human correc
 
 Changes made in this stage, including changes to tests and verification methods, are verified by this stage's checks in the plan. If a required verification command is unregistered, create the verification method and register it in `devkit.toml`, following `stages/implement.md`; registration follows loop-edit confirmation and takes effect from the next round's snapshot.
 
-All required checks valid for the returned target and norms are `PASS`, the detection requirements in `examples/README.md` are satisfied, and completion is finalized following `stages/README.md#completion-finalization`.
+All required checks valid for the returned target and norms are `PASS`, and completion is finalized following `stages/README.md#completion-finalization`.

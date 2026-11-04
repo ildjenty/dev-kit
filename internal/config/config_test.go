@@ -86,8 +86,6 @@ path = "norms/principles"
 path = "norms/rules.md"
 [sources.requirements]
 path = "docs/requirements.md"
-[state]
-detect = "state/detect.json"
 [approval]
 plan = "always"
 meta_loop_edit = "allow"
@@ -112,7 +110,7 @@ destinations = ["skill", "aspect"]
 		source.Path = location
 		wantSources[name] = source
 	}
-	if c.DefaultPlanName() != "fix" || !reflect.DeepEqual(c.KnowledgeSources(), wantSources) || c.DetectionPath() != "state/detect.json" || c.PlanApproval() != "always" || c.MetaLoopEditApproval() != "allow" || c.AllowEmptyCommit() || c.StopContinuation() != 1 {
+	if c.DefaultPlanName() != "fix" || !reflect.DeepEqual(c.KnowledgeSources(), wantSources) || c.PlanApproval() != "always" || c.MetaLoopEditApproval() != "allow" || c.AllowEmptyCommit() || c.StopContinuation() != 1 {
 		t.Fatalf("effective settings do not match overrides: %+v", c)
 	}
 	if !slices.Equal(c.HumanConfirmation(), []string{TargetChangedAgain}) || !slices.Equal(c.LessonDestinations(), []string{"skill", "aspect"}) || !slices.Equal(c.DependencyFiles(), []string{"deps/*.lock", "manifest-?.json"}) {

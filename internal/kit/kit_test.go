@@ -16,7 +16,7 @@ func TestNormsLayoutAndContents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, root := range []string{"principles", "stages", "plans", "templates", "examples", "rules"} {
+	for _, root := range []string{"principles", "stages", "plans", "templates", "rules"} {
 		if err := fs.WalkDir(assets.FS(), root, func(name string, entry fs.DirEntry, err error) error {
 			if err != nil || entry.IsDir() || name == "rules/README.md" {
 				return err

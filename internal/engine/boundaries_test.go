@@ -26,7 +26,7 @@ func TestInstructionFactsSurviveDeletedBriefs(t *testing.T) {
 		t.Fatalf("runner depended on a generated file: %q, %v", runner, err)
 	}
 	planResult(t, e, started)
-	detection, err := e.Next(ctx)
+	review, err := e.Next(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,24 +43,18 @@ func TestInstructionFactsSurviveDeletedBriefs(t *testing.T) {
 			}
 		}
 	}
-	original, err := os.ReadFile(detection.Instruction.Brief)
+	original, err := os.ReadFile(review.Instruction.Brief)
 	if err != nil {
 		t.Fatal(err)
 	}
 	removeBriefs()
 	repeated, err := e.Next(ctx)
-	if err != nil || repeated.Instruction == nil || repeated.Instruction.ID != detection.Instruction.ID {
-		t.Fatalf("detection instruction could not be rebuilt: %+v, %v", repeated, err)
+	if err != nil || repeated.Instruction == nil || repeated.Instruction.ID != review.Instruction.ID {
+		t.Fatalf("plan check instruction could not be rebuilt: %+v, %v", repeated, err)
 	}
 	body, err := os.ReadFile(repeated.Instruction.Brief)
 	if err != nil || string(body) != string(original) {
-		t.Fatalf("rebuilt detection brief changed: %v", err)
-	}
-	removeBriefs()
-	acceptDetectionResult(t, e, detection.Instruction)
-	review, err := e.Next(ctx)
-	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("rebuilt plan check brief changed: %v", err)
 	}
 	data, err := e.readInstruction(review.Instruction.ID)
 	if err != nil {

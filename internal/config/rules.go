@@ -7,7 +7,6 @@ type CheckDefinition struct {
 	Description    string      `toml:"description"`
 	Runner         string      `toml:"runner"`
 	Criteria       []Selection `toml:"criteria"`
-	Examples       *Selection  `toml:"examples"`
 	Schemas        []string    `toml:"schemas"`
 	History        string      `toml:"history"`
 	BriefByPlanner bool        `toml:"brief_by_planner"`

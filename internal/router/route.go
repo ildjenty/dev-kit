@@ -75,7 +75,7 @@ func (t Table) Decide(input Input) (Decision, error) {
 	}
 	if action == plan.Done && !input.Completion.ReadyToCommit {
 		action = plan.Ask
-		decision.Reason = "completion conditions for required checks or detection tests are not met"
+		decision.Reason = "completion conditions for required checks are not met"
 	}
 	noProgress := 0
 	if !input.ProgressMade {

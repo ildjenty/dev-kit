@@ -95,8 +95,6 @@ func driveInstruction(t *testing.T, e *Engine, instruction *form.Instruction) bo
 	switch instruction.Kind {
 	case form.InstructionPlan, form.InstructionCompleted:
 		return true
-	case form.InstructionDetectionTest:
-		acceptDetectionResult(t, e, instruction)
 	case form.InstructionPlanCheck, form.InstructionJudgment:
 		data, err := e.readInstruction(instruction.ID)
 		if err != nil {

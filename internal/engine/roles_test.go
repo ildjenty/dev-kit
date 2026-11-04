@@ -19,7 +19,7 @@ import (
 func roleWork(t *testing.T, change func(*plan.Stage)) (*Engine, Result) {
 	t.Helper()
 	e, ctx := fixture(t)
-	configure(t, e, "[detection]\nrequired=false\n[roles.senior]\nkind='work'\nagent=''\n[commands.fail]\nexecutable='/usr/bin/false'\ntimeout_seconds=5\n[limits]\nmax_rounds_ceiling=5\nmax_no_progress_ceiling=5\n")
+	configure(t, e, "[roles.senior]\nkind='work'\nagent=''\n[commands.fail]\nexecutable='/usr/bin/false'\ntimeout_seconds=5\n[limits]\nmax_rounds_ceiling=5\nmax_no_progress_ceiling=5\n")
 	configureStage(t, e, change)
 	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
@@ -294,8 +294,6 @@ func roleNext(t *testing.T, e *Engine) Result {
 			continue
 		}
 		switch result.Instruction.Kind {
-		case form.InstructionDetectionTest:
-			acceptDetectionResult(t, e, result.Instruction)
 		case form.InstructionPlanCheck, form.InstructionJudgment:
 			data, err := e.readInstruction(result.Instruction.ID)
 			if err != nil {

@@ -75,8 +75,8 @@ func (c Config) validateCheckDefinition(name string, check CheckDefinition) erro
 		if runner != name {
 			return fmt.Errorf("command aspect and runner must match")
 		}
-		if len(check.Criteria) > 0 || check.Examples != nil {
-			return fmt.Errorf("command checks must not select criteria or examples")
+		if len(check.Criteria) > 0 {
+			return fmt.Errorf("command checks must not select criteria")
 		}
 	} else {
 		if strings.HasPrefix(check.Runner, "command:") {
@@ -91,11 +91,6 @@ func (c Config) validateCheckDefinition(name string, check CheckDefinition) erro
 	}
 	if err := c.ValidateCriteria(check.Criteria); err != nil {
 		return err
-	}
-	if check.Examples != nil {
-		if err := c.ValidateSelection(*check.Examples); err != nil {
-			return err
-		}
 	}
 	if !validHistory(check.History) {
 		return fmt.Errorf("invalid history")

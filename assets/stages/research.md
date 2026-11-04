@@ -28,4 +28,4 @@ When claiming completion, fill `report` according to this stage's selected repor
 
 Present results about the phenomena, how the system works, and existing similar processing, separating observations from inferences. Distinguish verified scope, unverified scope, and grounds. Leave the choice of fix to the next stage.
 
-All required checks valid for the returned target and norms are `PASS`, the detection requirements in `examples/README.md` are satisfied, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.
+All required checks valid for the returned target and norms are `PASS`, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.

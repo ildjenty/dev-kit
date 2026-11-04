@@ -79,7 +79,7 @@ func TestReadOnlyOutsideProductsIdentifyEveryRound(t *testing.T) {
 	e, ctx := fixture(t)
 	outside := t.TempDir()
 	write(t, outside, "requirements.md", "First read-only requirements.\n")
-	configure(t, e, "[detection]\nrequired = false\n[sources.requirements]\npath = "+strconv.Quote(outside)+"\nwritable = false\n")
+	configure(t, e, "[sources.requirements]\npath = "+strconv.Quote(outside)+"\nwritable = false\n")
 	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +122,7 @@ func TestReadOnlyOutsideProductsIdentifyEveryRound(t *testing.T) {
 
 func TestTemplateRoleInputsReachPlannerWorkerAndJudge(t *testing.T) {
 	e, ctx := fixture(t)
-	configure(t, e, "[detection]\nrequired = false\n[sources.context]\npath = 'context'\nnorm = true\n[planning]\ninputs = [{ source = 'context', select = 'planner.md' }]\n[plan_check]\ninputs = [{ source = 'context', select = 'judge.md' }]\n")
+	configure(t, e, "[sources.context]\npath = 'context'\nnorm = true\n[planning]\ninputs = [{ source = 'context', select = 'planner.md' }]\n[plan_check]\ninputs = [{ source = 'context', select = 'judge.md' }]\n")
 	for _, role := range []string{"planner", "worker", "judge"} {
 		write(t, e.Root(), "context/"+role+".md", "Only the "+role+" receives this context.")
 	}
@@ -201,21 +201,8 @@ func TestR10JudgeCommandProcess(t *testing.T) {
 	if err != nil || os.WriteFile(name, data, 0o644) != nil {
 		os.Exit(3)
 	}
-	if input.Kind == check.DetectionRequest {
-		result := form.DetectionResult{InstructionID: input.InstructionID}
-		for _, example := range input.DetectionExamples {
-			judgment := pass(input.Request)
-			if example.ID == "e1" || example.ID == "e4" || example.ID == "e5" {
-				judgment.Judgment = form.Fail
-				judgment.Findings = []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "The proposed plan violates the fixed requirements"}}
-			}
-			result.Observations = append(result.Observations, observed(example.ID, judgment, "Compared the example against the supplied criteria"))
-		}
-		if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
-			os.Exit(4)
-		}
-	} else if err := json.NewEncoder(os.Stdout).Encode(pass(input.Request)); err != nil {
-		os.Exit(5)
+	if err := json.NewEncoder(os.Stdout).Encode(pass(input.Request)); err != nil {
+		os.Exit(4)
 	}
 	os.Exit(0)
 }
@@ -231,7 +218,7 @@ func TestRegisteredJudgesReceiveFixedBodiesRulesAndContracts(t *testing.T) {
 	const criteriaBody = "Fixed outside criteria body for the registered judgment command."
 	write(t, outside, "criteria.md", criteriaBody)
 	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
-	configure(t, e, "[sources.guides]\npath = "+strconv.Quote(outside)+"\nnorm = true\n[plan_check]\nrunner = 'capture'\ncriteria = [{source='principles',select='review/plan.md'}, {source='plans',select='README.md'}, {source='guides',select='criteria.md'}]\n[judges.capture]\nexecutable = "+strconv.Quote(executable)+"\nargs = ['-test.run=^TestR10JudgeCommandProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n[checks.wording]\nrunner = 'capture'\ncriteria = [{ source = 'principles', select = 'review/wording.md' }, { source = 'guides', select = 'criteria.md' }]\nexamples = { source = 'examples', select = 'wording/spec.json' }\n")
+	configure(t, e, "[sources.guides]\npath = "+strconv.Quote(outside)+"\nnorm = true\n[plan_check]\nrunner = 'capture'\ncriteria = [{source='principles',select='review/plan.md'}, {source='plans',select='README.md'}, {source='guides',select='criteria.md'}]\n[judges.capture]\nexecutable = "+strconv.Quote(executable)+"\nargs = ['-test.run=^TestR10JudgeCommandProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n[checks.wording]\nrunner = 'capture'\ncriteria = [{ source = 'principles', select = 'review/wording.md' }, { source = 'guides', select = 'criteria.md' }]\n")
 	configureStage(t, e, func(stage *plan.Stage) {
 		stage.Checks = []plan.Check{judgeCheck("wording", false)}
 	})
@@ -243,13 +230,13 @@ func TestRegisteredJudgesReceiveFixedBodiesRulesAndContracts(t *testing.T) {
 	work, err := e.Next(ctx)
 	work = approvedNext(t, e, work)
 	if err != nil || work.Instruction == nil || work.Instruction.Kind != form.InstructionWork {
-		t.Fatalf("registered command did not complete detection and plan judgment: %+v, %v", work, err)
+		t.Fatalf("registered command did not complete plan judgment: %+v, %v", work, err)
 	}
 	submitWork(t, e, work)
 	if _, err := e.Next(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for _, kind := range []check.RequestKind{check.DetectionRequest, check.PlanRequest, check.RoundRequest} {
+	for _, kind := range []check.RequestKind{check.PlanRequest, check.RoundRequest} {
 		data, err := os.ReadFile(filepath.Join(e.workRoot(), "captured-"+string(kind)+".json"))
 		if err != nil {
 			t.Fatal(err)
@@ -263,11 +250,6 @@ func TestRegisteredJudgesReceiveFixedBodiesRulesAndContracts(t *testing.T) {
 		}
 		if !strings.Contains(input.Brief, criteriaBody) || !slices.ContainsFunc(input.CriteriaBodies, func(document brief.Document) bool { return document.Content == criteriaBody }) {
 			t.Fatalf("%s command omitted fixed criteria bodies", kind)
-		}
-		if kind == check.DetectionRequest {
-			if len(input.Norms) != 0 || strings.Contains(string(data), `"expected"`) || strings.Contains(input.Brief, "-history.md") {
-				t.Fatal("detection command received private expectations or history")
-			}
 		}
 	}
 	records, err := e.records()
@@ -285,19 +267,19 @@ func TestRegisteredJudgesReceiveFixedBodiesRulesAndContracts(t *testing.T) {
 	}
 }
 
-func TestPlanDetectionIncludesRequiredCriteriaAndBundledSchemas(t *testing.T) {
+func TestPlanCheckIncludesRequiredCriteriaAndBundledSchemas(t *testing.T) {
 	e, ctx := fixture(t)
 	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	planResult(t, e, start)
-	detection, err := e.Next(ctx)
+	review, err := e.Next(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	body := briefText(t, detection.Instruction)
-	data, err := e.readInstruction(detection.Instruction.ID)
+	body := briefText(t, review.Instruction)
+	data, err := e.readInstruction(review.Instruction.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +300,7 @@ func TestPlanDetectionIncludesRequiredCriteriaAndBundledSchemas(t *testing.T) {
 		}
 		selected := slices.Contains([]string{"plan", "plan-template", "finding"}, name)
 		if strings.Contains(body, "### schemas/"+name+".json") != selected {
-			t.Fatalf("detection input contract selection differs for %s", name)
+			t.Fatalf("plan check input contract selection differs for %s", name)
 		}
 	}
 }
@@ -331,7 +313,7 @@ func TestPlannerUsesPinnedOutsideTemplateAtIssuance(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, outside, "test.json", string(marshal(t, template)))
-	configure(t, e, "[sources.plans]\npath = "+strconv.Quote(outside)+"\n[detection]\nrequired = false\n")
+	configure(t, e, "[sources.plans]\npath = "+strconv.Quote(outside)+"\n")
 	newWork := e.newWork
 	e.newWork = func() (string, string) {
 		template.Stages[0].Gate.Reason = "The template fixed at instruction issue time"

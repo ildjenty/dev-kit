@@ -58,8 +58,6 @@ func (s *State) UnacceptedInstructions() []Instruction {
 			accepted[p.InstructionID] = true
 		case *PlanVersion:
 			accepted[p.InstructionID] = true
-		case *DetectionTest:
-			accepted[p.InstructionID] = true
 		case *Answer:
 			accepted[p.InstructionID] = true
 		case *Approval:

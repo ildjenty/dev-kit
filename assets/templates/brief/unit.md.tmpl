@@ -175,7 +175,7 @@ Reference: {{.Path}}
 {{end}}{{define "normPaths"}}
 ## Other fixed norms
 
-Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work checkout HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks use committed norms from the work checkout HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
 {{range .}}
 - Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}

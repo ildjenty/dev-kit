@@ -13,7 +13,6 @@
         "judgment_wait",
         "judgment",
         "plan_check",
-        "detection_test",
         "plan",
         "question",
         "external",
@@ -86,7 +85,6 @@
             "enum": [
               "judgment",
               "plan_check",
-              "detection_test",
               "unit_work"
             ]
           }

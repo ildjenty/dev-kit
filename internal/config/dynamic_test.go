@@ -110,7 +110,6 @@ func TestDynamicRuleShapes(t *testing.T) {
 [checks.test]
 runner = 'judge'
 criteria = [{source = 'rules', select = ''}]
-examples = {source = 'examples', select = 'test/spec.json'}
 [[loop.stage]]
 definition = ['implement', 'edit']
 checks = ['test']
@@ -152,7 +151,6 @@ func TestInvalidDynamicSettings(t *testing.T) {
 		"[checks.test]\nrunner = 'judge'\nhistory = 'other'",
 		"[checks.test]\nrunner = 'judge'\nschemas = ['../plan']",
 		"[checks.test]\nrunner = 'judge'\ncriteria = [{source = 'requirements', select = ''}]",
-		"[checks.test]\nrunner = 'judge'\nexamples = {source = 'missing', select = ''}",
 		"[checks.'command:test']\nrunner = 'command:test'\ncriteria = [{source = 'rules', select = ''}]",
 		"[[loop.rules]]\ntype = 'gate'",
 		"[[loop.stage]]\ndefinition = []",

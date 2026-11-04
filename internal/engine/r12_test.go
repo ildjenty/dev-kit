@@ -167,45 +167,6 @@ func TestCompletedWorkExternalApprovalAndIdempotency(t *testing.T) {
 	}
 }
 
-func TestDetectionRetryKeepsAnonymousIDsAndInputSchemas(t *testing.T) {
-	e, ctx := fixture(t)
-	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	planResult(t, e, start)
-	detection := nextResult(t, e, ctx)
-	body := briefText(t, detection.Instruction)
-	for _, name := range []string{"plan", "plan-template", "finding"} {
-		if !strings.Contains(body, "### schemas/"+name+".json") {
-			t.Fatalf("detection omitted %s input contract", name)
-		}
-	}
-	data, err := e.readInstruction(detection.Instruction.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result := form.DetectionResult{InstructionID: detection.Instruction.ID}
-	for i, example := range data.Detection.Spec.Cases {
-		id := example.ID
-		if i == 0 {
-			id = "mistyped-id"
-		}
-		result.Observations = append(result.Observations, observed(id, pass(*data.Request), "Compared against fixed criteria"))
-	}
-	collect(t, e, detection.Instruction, result)
-	retry := nextResult(t, e, ctx)
-	body = briefText(t, retry.Instruction)
-	if !strings.Contains(body, `result not found: "e1"`) {
-		t.Fatal("retry omitted the anonymous missing ID")
-	}
-	for _, example := range data.Detection.Spec.Cases {
-		if strings.Contains(body, example.File) {
-			t.Fatalf("retry disclosed %s", example.File)
-		}
-	}
-}
-
 func TestPlannerSuppliesPatternHashesAndCheckDescriptions(t *testing.T) {
 	e, ctx := fixture(t)
 	configureCatalogEntry(t, e, "wording", "description = 'Review wording with the configured summary.'")
@@ -298,31 +259,6 @@ func TestEveryRequestKindHonorsByteLimit(t *testing.T) {
 		if !kinds[kind] {
 			t.Fatalf("missing request kind %s", kind)
 		}
-	}
-	// Detection uses the same bound, including criteria, examples, and all schemas.
-	state, err := e.load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	item := catalogJudge("plan", true)
-	item.Schemas = []string{"plan", "plan-template", "finding"}
-	input, criteria, err := e.detectionInput(ctx, "HEAD", item)
-	if err != nil {
-		t.Fatal(err)
-	}
-	detection, _, err := e.issueDetection(ctx, state, input, criteria, "HEAD")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(briefText(t, detection.Instruction)) > 600 {
-		t.Fatal("detection exceeded max_bytes")
-	}
-	if err := os.Remove(detection.Instruction.Brief); err != nil {
-		t.Fatal(err)
-	}
-	regenerated, err := e.instructionBrief(detection.Instruction.ID)
-	if err != nil || len(regenerated) > 600 {
-		t.Fatalf("regenerated detection exceeded limit: %v", err)
 	}
 }
 
@@ -466,21 +402,8 @@ func TestBoundedJudgeCommandProcess(t *testing.T) {
 	if err := os.WriteFile(capture, marshalCommandCapture(size, pointer.RequestPath, string(body)), 0644); err != nil {
 		os.Exit(6)
 	}
-	if input.Kind == check.DetectionRequest {
-		result := form.DetectionResult{InstructionID: input.InstructionID}
-		for _, example := range input.DetectionExamples {
-			judgment := pass(input.Request)
-			if slices.Contains([]string{"e1", "e4", "e5"}, example.ID) {
-				judgment.Judgment = form.Fail
-				judgment.Findings = []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "The example violates a fixed requirement."}}
-			}
-			result.Observations = append(result.Observations, observed(example.ID, judgment, "Compared the example with fixed criteria."))
-		}
-		if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
-			os.Exit(7)
-		}
-	} else if err := json.NewEncoder(os.Stdout).Encode(pass(input.Request)); err != nil {
-		os.Exit(8)
+	if err := json.NewEncoder(os.Stdout).Encode(pass(input.Request)); err != nil {
+		os.Exit(7)
 	}
 	os.Exit(0)
 }
@@ -501,7 +424,7 @@ func TestRegisteredCommandRequestKindsHonorByteLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
-	configure(t, e, "[briefs]\nmax_bytes = 600\n[plan_check]\nrunner = 'capture'\n[judges.capture]\nexecutable = "+strconv.Quote(executable)+"\nargs = ['-test.run=^TestBoundedJudgeCommandProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n[checks.wording]\nrunner = 'capture'\ncriteria = [{source='principles',select='review/wording.md'}]\nexamples = {source='examples',select='wording/spec.json'}\n")
+	configure(t, e, "[briefs]\nmax_bytes = 600\n[plan_check]\nrunner = 'capture'\n[judges.capture]\nexecutable = "+strconv.Quote(executable)+"\nargs = ['-test.run=^TestBoundedJudgeCommandProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n[checks.wording]\nrunner = 'capture'\ncriteria = [{source='principles',select='review/wording.md'}]\n")
 	configureStage(t, e, func(stage *plan.Stage) { stage.Checks = []plan.Check{judgeCheck("wording", false)} })
 	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
@@ -517,7 +440,7 @@ func TestRegisteredCommandRequestKindsHonorByteLimit(t *testing.T) {
 	if done.Status != ledger.WorkCompleted {
 		t.Fatalf("bounded command did not complete: %+v", done)
 	}
-	for _, kind := range []check.RequestKind{check.DetectionRequest, check.PlanRequest, check.RoundRequest} {
+	for _, kind := range []check.RequestKind{check.PlanRequest, check.RoundRequest} {
 		body, err := os.ReadFile(filepath.Join(e.workRoot(), "command-"+string(kind)+".json"))
 		if err != nil {
 			t.Fatal(err)
@@ -531,9 +454,6 @@ func TestRegisteredCommandRequestKindsHonorByteLimit(t *testing.T) {
 		}
 		if capture.Size > 600 || capture.Path == "" || !strings.Contains(capture.Body, "criteria_bodies") || !strings.Contains(capture.Body, "OutputSchema") {
 			t.Fatalf("%s input was not preserved within limit: %+v", kind, capture)
-		}
-		if kind == check.DetectionRequest && strings.Contains(capture.Body, `"expected"`) {
-			t.Fatal("command file leaked expectations")
 		}
 	}
 }
@@ -560,33 +480,5 @@ func TestWorkerWorktreeReturnsBrokenConfigurationForRepairWithinLimit(t *testing
 	}
 	if data.Context == nil || !strings.Contains(data.Context.PreCommitOutput, "Fix devkit.toml") || !strings.Contains(data.Context.PreCommitOutput, "parse configuration") {
 		t.Fatal("worker repair omitted the parse error and file")
-	}
-}
-
-func TestInvalidConfigurationDuringRoundDetectionStillReturnsRepair(t *testing.T) {
-	e, ctx := fixture(t)
-	configureStage(t, e, func(stage *plan.Stage) { stage.Checks = []plan.Check{judgeCheck("wording", true)} })
-	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	planResult(t, e, start)
-	detection := nextResult(t, e, ctx)
-	acceptDetectionResult(t, e, detection.Instruction)
-	review := nextResult(t, e, ctx)
-	data, err := e.readInstruction(review.Instruction.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	collect(t, e, review.Instruction, pass(*data.Request))
-	stageDetection := approvedNext(t, e, nextResult(t, e, ctx))
-	if stageDetection.Instruction == nil || stageDetection.Instruction.Kind != form.InstructionDetectionTest {
-		t.Fatalf("expected round detection: %+v", stageDetection)
-	}
-	write(t, e.Root(), "devkit.toml", "[broken")
-	acceptDetectionResult(t, e, stageDetection.Instruction)
-	fix := nextResult(t, e, ctx)
-	if fix.Instruction == nil || fix.Instruction.Kind != form.InstructionWork || !strings.Contains(briefText(t, fix.Instruction), "Fix devkit.toml") {
-		t.Fatalf("detection blocked configuration repair: %+v", fix)
 	}
 }

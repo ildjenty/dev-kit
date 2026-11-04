@@ -28,4 +28,4 @@ When claiming completion, fill `report` according to this stage's selected repor
 
 Write the description so that a reviewer who has not seen this work's conversation can understand what changed, why, how it was verified, and what remains unconfirmed. Base each statement on the diff and the adopted stage outputs; do not claim verification that those outputs do not show.
 
-All required checks valid for the returned target and norms are `PASS`, the detection requirements in `examples/README.md` are satisfied, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.
+All required checks valid for the returned target and norms are `PASS`, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.

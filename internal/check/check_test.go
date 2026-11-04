@@ -20,19 +20,7 @@ func asset(t *testing.T, path string) []byte {
 	return data
 }
 
-func TestKitExamplesHaveSpecifications(t *testing.T) {
-	paths, err := fs.Glob(assets.FS(), "examples/*/spec.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(paths) == 0 {
-		t.Fatal("no detection specifications are distributed")
-	}
-	for _, path := range paths {
-		if _, err := ParseDetectionSpec(asset(t, path)); err != nil {
-			t.Fatalf("%s: %v", path, err)
-		}
-	}
+func TestKitDoesNotDistributeAspectFiles(t *testing.T) {
 	if _, err := fs.Stat(assets.FS(), "checks"); err == nil {
 		t.Fatal("aspect files are still distributed")
 	}
@@ -203,53 +191,5 @@ func TestCheckRequired(t *testing.T) {
 	}
 	if CheckRequired(required, nil)[0].Judgment != NotAssessed {
 		t.Fatal("marked a required check without results PASS")
-	}
-}
-
-func TestDetection(t *testing.T) {
-	source := asset(t, "examples/purpose/spec.json")
-	spec, err := ParseDetectionSpec(source)
-	if err != nil {
-		t.Fatal(err)
-	}
-	examples := make(map[string][]byte)
-	var observations []DetectionObservation
-	for _, example := range spec.Cases {
-		examples[example.File] = asset(t, "examples/purpose/"+example.File)
-		findings := []Finding{}
-		if example.Kind == Violation {
-			findings = append(findings, Finding{ID: "violation", Blocking: true, Kind: AutoFixable, Scenario: "completion cannot be determined"})
-		}
-		observations = append(observations, DetectionObservation{
-			File: example.ID, Judgment: Judgment{JudgmentResult: form.JudgmentResult{Aspect: "purpose", Judgment: example.Expected, Findings: findings}, Runner: "review"},
-			Reason: "compared the intended condition and result",
-		})
-	}
-	criteria := []Criterion{{Source: "principles", ID: "review/purpose.md", ContentHash: "criteria-hash"}}
-	identity, err := NewDetectionIdentity([]byte("runner definition"), []byte("template"), criteria, source, examples)
-	if err != nil {
-		t.Fatal(err)
-	}
-	record, err := AssessDetection(spec, "review", identity, observations)
-	if err != nil || !record.Passed {
-		t.Fatalf("detection test: %+v, %v", record, err)
-	}
-	observations[0].Reason = ""
-	failed, err := AssessDetection(spec, "review", identity, observations)
-	if err != nil || failed.Passed {
-		t.Fatalf("FAIL without a reason passed: %+v, %v", failed, err)
-	}
-	required := []DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}}
-	if len(MissingDetection(required, []DetectionTest{record})) != 0 {
-		t.Fatal("could not reuse a passing record for identical content")
-	}
-	examples["allowed.md"] = append(examples["allowed.md"], '\n')
-	changed, err := NewDetectionIdentity([]byte("runner definition"), []byte("template"), criteria, source, examples)
-	if err != nil {
-		t.Fatal(err)
-	}
-	required[0].Identity = changed
-	if identity == changed || len(MissingDetection(required, []DetectionTest{record})) != 1 {
-		t.Fatal("changing an example did not invalidate the passing record")
 	}
 }

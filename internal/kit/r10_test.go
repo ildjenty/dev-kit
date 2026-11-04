@@ -69,7 +69,7 @@ func TestBundledCriteriaSelectTheirRequiredDocuments(t *testing.T) {
 			}
 		}
 	}
-	references := regexp.MustCompile("`((?:principles|stages|plans|templates|examples)/[^`]+|rules[.]md)`")
+	references := regexp.MustCompile("`((?:principles|stages|plans|templates)/[^`]+|rules[.]md)`")
 	for aspect, item := range catalog {
 		if strings.HasPrefix(item.Runner, "command:") {
 			continue

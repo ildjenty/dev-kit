@@ -29,26 +29,25 @@ func withCatalog(settings string) string {
 	return settings + "\n" + strings.Join(kept, "")
 }
 
-// judgeEntry configures a judge-run check with the kit review document and examples of aspect
+// judgeEntry configures a judge-run check with the kit review document of aspect
 // and extra settings such as history or brief_by_planner.
 func judgeEntry(aspect, extra string) string {
-	return "\n[checks." + aspect + "]\nrunner = 'judge'\ncriteria = [{ source = 'principles', select = 'review/" + aspect + ".md' }]\nexamples = { source = 'examples', select = '" + aspect + "/spec.json' }\n" + extra + "\n"
+	return "\n[checks." + aspect + "]\nrunner = 'judge'\ncriteria = [{ source = 'principles', select = 'review/" + aspect + ".md' }]\n" + extra + "\n"
 }
 
 // planCatalog configures the plan review as a stage check and the test command checks.
-const planCatalog = "\n\n[checks.plan]\nrunner = 'judge'\ncriteria = [{ source = 'principles', select = 'review/plan.md' }, { source = 'plans', select = 'README.md' }]\nexamples = { source = 'examples', select = 'plan/spec.json' }\n\n[checks.\"command:fail\"]\nrunner = 'command:fail'\n\n[checks.\"command:verify\"]\nrunner = 'command:verify'\n"
+const planCatalog = "\n\n[checks.plan]\nrunner = 'judge'\ncriteria = [{ source = 'principles', select = 'review/plan.md' }, { source = 'plans', select = 'README.md' }]\n\n[checks.\"command:fail\"]\nrunner = 'command:fail'\n\n[checks.\"command:verify\"]\nrunner = 'command:verify'\n"
 
 // judgeCheck returns a plan check that selects the configured judge-run check of aspect.
 func judgeCheck(aspect string, required bool) plan.Check {
 	return plan.Check{Aspect: aspect, Required: required}
 }
 
-// catalogJudge returns judgeCheck resolved with the kit review document and examples of aspect.
+// catalogJudge returns judgeCheck resolved with the kit review document of aspect.
 func catalogJudge(aspect string, required bool) catalogCheck {
 	item := catalogCheck{judgeCheck(aspect, required), plan.CheckDefinition{
 		Runner:   "judge",
 		Criteria: []plan.Selection{{Source: "principles", Select: "review/" + aspect + ".md"}},
-		Examples: &plan.Selection{Source: "examples", Select: aspect + "/spec.json"},
 	}}
 	if aspect == "plan" {
 		item.Criteria = planSelections((config.Config{}).PlanCheckSettings().Criteria)

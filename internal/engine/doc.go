@@ -18,16 +18,13 @@
 // the run directory when a round opens or an out-of-round instruction is issued;
 // outside sources are read-only and never written by devkit.
 //
-// Plan checks use the configured aspect, runner, criteria, and examples ([plan_check]). Detection instructions ask
-// the same runner as the required check for form.DetectionResult.
+// Plan checks use the configured aspect, runner, criteria, and input schemas ([plan_check]).
 // Options defers forward-asset loading so pause, resume, and status can use the
 // embedded schemas while configuration is being edited.
 // Instruction records retain issuance facts for rebuilding deleted briefs.
 // Commit recovery records the starting HEAD in a commit_base artifact before
-// committing, then compares the current HEAD tree with the evaluated target. The passing
-// index at [state] detect (.devkit/detect.json by default) is a JSON array of check.DetectionTest values.
-// Registered judgment commands receive the JSON request on standard input;
-// detection commands receive the request and detection examples together.
+// committing, then compares the current HEAD tree with the evaluated target.
+// Registered judgment commands receive the JSON request on standard input.
 //
 // Source of truth: docs/architecture/modules.md#engine
 package engine

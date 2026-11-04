@@ -5,7 +5,7 @@ The `default.toml` classification table supplies default actions. The binary sup
 - `dependency_changed`: A dependency manifest or lockfile diff.
 - `target_changed_again`: Another target change after refreshing the target once around commit.
 
-Loop-edit confirmation is governed only by `[approval] meta_loop_edit = "confirm" | "allow"` (default `confirm`), both before a round and before a completion commit. It covers norms, `devkit.toml`, host settings, instruction files, skills, and the active pre-commit configuration, excluding requirements, structure records, detection indexes, and runtime records. It cannot be removed through `[router] human_confirmation`.
+Loop-edit confirmation is governed only by `[approval] meta_loop_edit = "confirm" | "allow"` (default `confirm`), both before a round and before a completion commit. It covers norms, `devkit.toml`, host settings, instruction files, skills, and the active pre-commit configuration, excluding requirements, structure records, and runtime records. It cannot be removed through `[router] human_confirmation`.
 
 `[plan_check] aspect = "plan"` and `runner = "judge"` select the plan-check aspect and runner. A registered judgment command runs directly; otherwise devkit issues a subagent instruction.
 

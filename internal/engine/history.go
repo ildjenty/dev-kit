@@ -111,7 +111,7 @@ func historyRecords(state *ledger.State, records []ledger.Record, scope historyS
 func allHistoryRecord(record ledger.Record) bool {
 	switch record.Payload.(type) {
 	case *ledger.Judgment, *ledger.Question, *ledger.Answer, *ledger.Approval, *ledger.Decision, *ledger.Evidence,
-		*ledger.Lesson, *ledger.DetectionTest, *ledger.ResultRejection, *ledger.Progress, *ledger.UnitResult, *ledger.JudgmentBrief:
+		*ledger.Lesson, *ledger.ResultRejection, *ledger.Progress, *ledger.UnitResult, *ledger.JudgmentBrief:
 		return true
 	}
 	return false

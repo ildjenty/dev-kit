@@ -81,14 +81,6 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 	}
 }
 
-func findPlan(versions []plan.VersionEvaluation, n int) (plan.Plan, bool) {
-	for _, v := range versions {
-		if v.Plan.Version == n {
-			return v.Plan, true
-		}
-	}
-	return plan.Plan{}, false
-}
 func (e *Engine) boundPlan(n int) (plan.Plan, bool, error) {
 	records, err := e.records()
 	if err != nil {
@@ -976,7 +968,7 @@ func (e *Engine) advanceQuestion(ctx context.Context, state *ledger.State, q for
 			if err := e.refreshQuestionEvidence(ctx, state, &replacement); err != nil {
 				return Result{}, false, err
 			}
-			if round, ok := state.OpenRound(); ok && round.ReturnedTarget != nil && q.StopCategory != "detection_failed" {
+			if round, ok := state.OpenRound(); ok && round.ReturnedTarget != nil {
 				if err = e.replaceQuestionTarget(ctx, round, tree); err != nil {
 					return Result{}, false, err
 				}
@@ -1332,16 +1324,6 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 	}
 	if r, ready, err := e.checkRoundBudget(ctx, state, startRef, snapshot.Tree); err != nil || ready {
 		return r, ready, err
-	}
-	required, err := e.catalogChecks(ctx, startRef, stage.RequiredChecks())
-	if err != nil {
-		return Result{}, false, err
-	}
-	if r, pending, err := e.ensureDetection(ctx, state, required, startRef, run.ID); err != nil || pending {
-		if err != nil || r.Instruction != nil || r.Paused {
-			return r, true, err
-		}
-		return Result{}, false, nil
 	}
 	norms, err := e.norms(ctx, startRef)
 	if err != nil {

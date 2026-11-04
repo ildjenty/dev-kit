@@ -2,7 +2,7 @@
 
 ## 責務
 
-check は固定した[規範](../architecture/modules.md#check)(評価に用いる規則)と 一覧の check の `criteria` で選んだ基準の文書を基に判定依頼の内容を決め、結果の解析・受理・集約と[適用除外](../architecture/guarantees.md#判定結果の受理)(特定の要求を外す条件)の主張と根拠の照合を担う。外部入出力の扱いは[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従う。公開する型と操作、規範の束ね方、必須 check と[検出試験](../architecture/guarantees.md#検出試験)(check の判定能力の試験)の照合、他の部品との境界は [check のモジュール契約](../architecture/modules.md#check)に従い、依頼文の組み立ては [brief](../architecture/modules.md#brief)(依頼文を組み立てる部品)に委ねる。
+check は固定した[規範](../architecture/modules.md#check)(評価に用いる規則)と 一覧の check の `criteria` で選んだ基準の文書を基に判定依頼の内容を決め、結果の解析・受理・集約と[適用除外](../architecture/guarantees.md#判定結果の受理)(特定の要求を外す条件)の主張と根拠の照合を担う。外部入出力の扱いは[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従う。公開する型と操作、規範の束ね方、必須 check の網羅状況の確認、他の部品との境界は [check のモジュール契約](../architecture/modules.md#check)に従い、依頼文の組み立ては [brief](../architecture/modules.md#brief)(依頼文を組み立てる部品)に委ねる。
 
 ## 入力と出力
 
@@ -26,13 +26,13 @@ check の `schemas` で指定した入力契約と出力スキーマの参照先
 
 ### 出力
 
-判定依頼の内容と、解析・受理した [Judgment](../architecture/data.md#check-の結果-judgment)(観点ごとの判定結果)、集約結果、必須 check と検出試験の照合結果を返す。結果に含める [Finding](../architecture/data.md#指摘-finding)(失敗や判断を要する点)の項目は、その定義に従う。
+判定依頼の内容と、解析・受理した [Judgment](../architecture/data.md#check-の結果-judgment)(観点ごとの判定結果)、集約結果、必須 check の網羅状況を返す。結果に含める [Finding](../architecture/data.md#指摘-finding)(失敗や判断を要する点)の項目は、その定義に従う。
 
 ## 保証
 
 ### 観点と判定
 
-check の `aspect` は判定の名前、`criteria` は基準の選び方、`examples` は検出試験の例の選び方である。基準は規範のソースから選ぶ。必須の基準の選び方が0件なら判定を始めず止める。基準の本文の構造は解析せず、参照する別の文書が必要なら選び方に明示する。選び方と runner は `[checks.<観点>]` の定義であり、計画とパターンは観点名で参照する。
+check の `aspect` は判定の名前、`criteria` は基準の選び方である。基準は規範のソースから選ぶ。必須の基準の選び方が0件なら判定を始めず止める。基準の本文の構造は解析せず、参照する別の文書が必要なら選び方に明示する。選び方と runner は `[checks.<観点>]` の定義であり、計画とパターンは観点名で参照する。
 
 判定の値と結果・指摘の構成は [Judgment](../architecture/data.md#check-の結果-judgment)と [Finding](../architecture/data.md#指摘-finding)、適用除外と集約は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。判定者は、前のステージの前提が崩れたと判断した指摘に任意の `premise_broken` を付けられる。blocking の指摘にこれがあれば、router は戻りを推奨する人への問いにし、判定者の指摘だけでは戻らない。
 
@@ -59,16 +59,6 @@ check の `aspect` は判定の名前、`criteria` は基準の選び方、`exam
 コマンド実行結果の Judgment への変換は[作業結果の判定](../architecture/flow.md#作業結果の判定)と[受理境界](../architecture/guarantees.md#判定結果の受理)に従う。結果の保存の責務は [check のモジュール契約](../architecture/modules.md#check)に従い、判定の有効性は[対象のバージョンと規範の識別](../architecture/data.md#check-の結果-judgment)で照合する。
 
 ラウンド開始時の `devkit.toml` に `command:<name>` が登録されていない場合、その check を `FAIL` とし、`auto-fixable` の指摘「検証コマンド `<name>` が登録されていない。検証の手段を作り `devkit.toml` の `[commands.<name>]` に登録する」を返す。登録はループ自身の変更として `[approval] meta_loop_edit` に従い確認し、次のラウンドのスナップショットから使う。検証コマンドがツリーを変更した場合の指摘には、出力先を ignore する案内を含める。
-
-### 検出試験
-
-検出試験の対象・実行時期・合格記録の再利用・原則の適用除外は[検出試験の保証](../architecture/guarantees.md#検出試験)、合格記録の同一性は [DetectionTest](../architecture/data.md#検出試験の記録-detectiontest)(check の試験記録)に従う。
-
-判定者への依頼には、基準の文書、匿名の例の本文、選択した入力契約のスキーマ、出力の約束を渡す。試験仕様・期待判定・対応表と、それらを含む作業履歴や参照先を渡さず、devkit が結果と期待を照合する。
-
-結果は例 ID ごとの判定値・blocking の指摘・根拠だけの専用の小さい形式とし、共通の識別は1回だけ扱う。agent の定義にあるモデル・推論量の指定を合格の識別に含める。親から引き継ぐ場合は観測できた値を来歴にだけ残し、推測せず、その定義での合格として扱う。
-
-合格の識別には、`[checks.<観点>]` の定義、担当の定義、判定規則を含む判定依頼テンプレート、実際に渡した基準の文書の集合と内容ハッシュ、例の文書の内容ハッシュを含める。基準を変えた check は次に必須として使うラウンドの前に再試験する。基準を更新するときは検出試験の例も更新し、既存の期待判定を保つことを確かめる。例と仕様は `examples` ソース(既定 `.devkit/checks/`)、基準は `principles` ソース(既定 `.devkit/principles/`)に置き、ソース設定で変更できる。合格の索引は `[state] detect`(既定 `.devkit/detect.json`)に置く。
 
 ### 集約と遷移の境界
 

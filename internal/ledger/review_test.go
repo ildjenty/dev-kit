@@ -138,7 +138,7 @@ func TestPayloadValidationAtStorageBoundaries(t *testing.T) {
 	for _, payload := range []Payload{
 		&Work{}, &Pause{}, &Resume{}, &PlanVersion{}, &Withdrawal{}, &Decision{},
 		&Evidence{}, &Lesson{}, &StateChange{}, &Question{}, &Answer{}, &Approval{},
-		&ExternalOp{}, &Progress{}, &Judgment{}, &DetectionTest{}, &StageRun{},
+		&ExternalOp{}, &Progress{}, &Judgment{}, &StageRun{},
 		&Round{}, &Instruction{}, &Artifact{},
 	} {
 		t.Run(string(payload.recordKind()), func(t *testing.T) {

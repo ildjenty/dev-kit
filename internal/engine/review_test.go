@@ -394,136 +394,6 @@ func TestEndedWorkAcceptsAnswerCorrections(t *testing.T) {
 	}
 }
 
-func TestDetectionUsesCurrentIndexAndFrozenIdentity(t *testing.T) {
-	e, ctx := fixture(t)
-	configureStage(t, e, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{judgeCheck("plan", true)}
-	})
-	work := working(t, e, ctx)
-	state, err := e.load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	round, _ := state.OpenRound()
-	index, err := os.ReadFile(filepath.Join(e.Root(), ".devkit/detect.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Remove(filepath.Join(e.Root(), ".devkit/detect.json")); err != nil {
-		t.Fatal(err)
-	}
-	requirements, tests, err := e.detectionContext(ctx, []catalogCheck{catalogJudge("plan", true)}, round.StartTarget.Tree)
-	if err != nil || len(check.MissingDetection(requirements, tests)) != 1 {
-		t.Fatalf("current index was not consulted: %v", err)
-	}
-	write(t, e.Root(), ".devkit/detect.json", string(index))
-	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Remove(filepath.Join(e.Root(), ".devkit/detect.json")); err != nil {
-		t.Fatal(err)
-	}
-	review, err := e.Next(ctx)
-	if err != nil || review.Instruction == nil || review.Instruction.Kind != form.InstructionJudgment {
-		t.Fatalf("expected frozen round judgment: %+v, %v", review, err)
-	}
-	data, err := e.readInstruction(review.Instruction.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	collect(t, e, review.Instruction, pass(*data.Request))
-	write(t, e.Root(), ".devkit/detect.json", string(index))
-	if result, err := e.Next(ctx); err != nil || result.Status != ledger.WorkCompleted {
-		t.Fatalf("open round lost its detection pass: %+v, %v", result, err)
-	}
-}
-
-func TestDetectionCommandRetriesAfterHumanAnswer(t *testing.T) {
-	e, ctx := fixture(t)
-	settings, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	write(t, e.Root(), "judge.sh", "#!/bin/sh\ninput=$(cat)\ncase \"$input\" in\n*'\"Kind\":\"plan\"'*) cat .devkit/run/plan-result.json ;;\n*) printf 'attempt\\n' >> .devkit/run/attempts; if test ! -f .devkit/run/retry; then touch .devkit/run/retry; exit 7; fi; cat .devkit/run/detection-result.json ;;\nesac\n")
-	write(t, e.Root(), "devkit.toml", strings.ReplaceAll(string(settings), `runner = "judge"`, `runner = "devkit-judge"`)+"\n[judges.devkit-judge]\nexecutable = '/bin/sh'\nargs = ['judge.sh']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n")
-	git(t, e.Root(), "add", ".")
-	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
-	git(t, e.Root(), "add", ".")
-	git(t, e.Root(), "commit", "-qm", "Register detection command")
-	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	planResult(t, e, start)
-	asked, err := e.Next(ctx)
-	if err != nil || asked.Instruction == nil || asked.Instruction.Question == nil || asked.Instruction.Question.StopCategory != "detection_command_failed" {
-		t.Fatalf("expected detection failure: %+v, %v", asked, err)
-	}
-	state, err := e.load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var instruction ledger.Instruction
-	for _, pending := range state.UnacceptedInstructions() {
-		if pending.Kind == form.InstructionDetectionTest {
-			instruction = pending
-		}
-	}
-	data, err := e.readInstruction(instruction.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	output := form.DetectionResult{InstructionID: instruction.ID}
-	for _, example := range data.Detection.Spec.Cases {
-		judgment := pass(*data.Request)
-		judgment.Judgment = example.Expected
-		if example.Kind == check.Violation {
-			judgment.Findings = []form.Finding{{ID: "example-violation", Blocking: true, Kind: form.AutoFixable, Scenario: "The example violates the blocking condition"}}
-		}
-		output.Observations = append(output.Observations, observed(example.ID, judgment, "The observation distinguishes the example"))
-	}
-	write(t, e.Root(), ".devkit/run/detection-result.json", string(marshal(t, output)))
-	head, err := e.workspace.Head(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	norms, err := e.norms(ctx, head)
-	if err != nil {
-		t.Fatal(err)
-	}
-	planRequest := check.Request{RequestInput: check.RequestInput{InstructionID: instructionID(e.workID, form.InstructionPlanCheck, "1:plan:devkit-judge", 0), Aspect: check.Aspect{ID: "plan"}, TargetVersion: form.TargetVersion{Kind: form.TargetPlan, Plan: 1}, Norms: []check.Norm{}, CompletionConditionIDs: []string{}}}
-	for _, norm := range norms {
-		planRequest.Norms = append(planRequest.Norms, check.Norm{Reference: norm})
-	}
-	write(t, e.Root(), ".devkit/run/plan-result.json", string(marshal(t, pass(planRequest))))
-	observeAnswer(t, e, "Retry the registered detection command.")
-	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: asked.Instruction.Question.ID, Interpretation: ledger.AnswerText, Text: "Retry detection"}); err != nil {
-		t.Fatal(err)
-	}
-	result, err := e.Next(ctx)
-	result = approvedNext(t, e, result)
-	if err != nil || result.Instruction == nil || result.Instruction.Kind != form.InstructionWork {
-		t.Fatalf("registered command was not retried: %+v, %v", result, err)
-	}
-	attempts, err := os.ReadFile(filepath.Join(e.Root(), ".devkit/run/attempts"))
-	if err != nil || strings.Count(string(attempts), "attempt\n") != 2 {
-		t.Fatalf("expected two command executions: %q, %v", attempts, err)
-	}
-	records, err := e.records()
-	if err != nil {
-		t.Fatal(err)
-	}
-	passed := false
-	for _, record := range records {
-		if test, ok := record.Payload.(*ledger.DetectionTest); ok && test.InstructionID == instruction.ID {
-			passed = test.Passed
-		}
-	}
-	if !passed {
-		t.Fatal("retried command did not record its passing result")
-	}
-}
-
 func TestAuthorizationsIncludeDecisionsAndDelegation(t *testing.T) {
 	e, ctx := fixture(t)
 	working(t, e, ctx)
@@ -650,24 +520,7 @@ func TestSuccessfulVerificationCommand(t *testing.T) {
 	t.Fatal("successful command result was not recorded")
 }
 
-// Keep the response schema demonstrably compatible with form's exported result type.
-func TestDetectionResultSchema(t *testing.T) {
-	e, _ := fixture(t)
-	value := form.DetectionResult{InstructionID: "test", Observations: []form.DetectionObservation{}}
-	if err := e.forms["detection-result"].Validate(marshal(t, value)); err != nil {
-		t.Fatal(err)
-	}
-	var fields map[string]any
-	if err := json.Unmarshal(marshal(t, value), &fields); err != nil {
-		t.Fatal(err)
-	}
-	fields["unexpected"] = true
-	if err := e.forms["detection-result"].Validate(marshal(t, fields)); err == nil {
-		t.Fatal("detection result schema accepted an unknown field")
-	}
-}
-
-func TestRoundOpeningTestsUncommittedAspect(t *testing.T) {
+func TestRoundOpeningConfirmsUncommittedAspect(t *testing.T) {
 	e, ctx := fixture(t)
 	configureStage(t, e, func(stage *plan.Stage) {
 		stage.Checks = []plan.Check{judgeCheck("plan", true)}
@@ -687,7 +540,7 @@ func TestRoundOpeningTestsUncommittedAspect(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, e.Root(), path, string(aspect)+"\nUpdated detection criteria.\n")
+	write(t, e.Root(), path, string(aspect)+"\nUpdated criteria.\n")
 	result, err := e.Next(ctx)
 	if err != nil || result.Instruction == nil || result.Instruction.Question == nil || result.Instruction.Question.StopCategory != config.MetaLoopEdit {
 		t.Fatalf("uncommitted aspect did not require confirmation: %+v, %v", result, err)
@@ -696,29 +549,9 @@ func TestRoundOpeningTestsUncommittedAspect(t *testing.T) {
 	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: result.Instruction.Question.ID, Interpretation: ledger.AnswerApproved}); err != nil {
 		t.Fatal(err)
 	}
-	result, err = e.Next(ctx)
-	if err != nil || result.Instruction == nil || result.Instruction.Kind != form.InstructionDetectionTest {
-		t.Fatalf("uncommitted aspect used an old detection pass: %+v, %v", result, err)
-	}
-	state, err = e.load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, open := state.OpenRound(); open {
-		t.Fatal("round opened before the new aspect passed detection")
-	}
-	data, err := e.readInstruction(result.Instruction.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree, err := e.workspace.SnapshotTree(ctx)
-	if err != nil || data.Reference != tree || data.Request.TargetVersion.Tree != tree {
-		t.Fatalf("detection used a different opening target: %v", err)
-	}
-	acceptDetectionResult(t, e, result.Instruction)
 	opened, err := e.Next(ctx)
 	if err != nil || opened.Instruction == nil || opened.Instruction.Kind != form.InstructionWork {
-		t.Fatalf("approved opening norms did not accept detection: %+v, %v", opened, err)
+		t.Fatalf("approved opening norms did not open the round: %+v, %v", opened, err)
 	}
 }
 
@@ -1012,11 +845,6 @@ func TestHumanStageUsesItsOwnAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	planResult(t, e, start)
-	detection, err := e.Next(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	acceptDetectionResult(t, e, detection.Instruction)
 	review, err := e.Next(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -1163,35 +991,6 @@ func TestDecisionAnswerRetryRestoresStateChange(t *testing.T) {
 				}
 			})
 		}
-	}
-}
-
-func TestDetectionPassRestoresMissingIndex(t *testing.T) {
-	e, ctx := fixture(t)
-	working(t, e, ctx)
-	if err := os.Remove(filepath.Join(e.Root(), ".devkit/detect.json")); err != nil {
-		t.Fatal(err)
-	}
-	state, err := e.load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree, err := e.workspace.SnapshotTree(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	checks := []catalogCheck{catalogJudge("plan", true)}
-	result, pending, err := e.ensureDetection(ctx, state, checks, tree)
-	if err != nil || !pending || result.Instruction != nil {
-		t.Fatalf("accepted detection pass was not restored: %+v, %v", result, err)
-	}
-	tree, err = e.workspace.SnapshotTree(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	requirements, tests, err := e.detectionContext(ctx, checks, tree)
-	if err != nil || len(check.MissingDetection(requirements, tests)) != 0 {
-		t.Fatalf("restored index lacks the accepted pass: %v", err)
 	}
 }
 

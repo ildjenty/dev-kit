@@ -171,12 +171,9 @@ func TestCompletion(t *testing.T) {
 	}}
 	target := form.TargetVersion{Kind: form.TargetTree, Tree: "tree"}
 	norms := []form.NormReference{{Path: "AGENTS.md", BlobID: "blob"}}
-	identity := check.DetectionIdentity{RunnerHash: "runner", TemplateHash: "template", CriteriaHash: "criteria", ExamplesHash: "examples"}
 	input := CompletionInput{
 		Rule: stage.CompletionRule(), TargetVersion: target, Norms: norms,
-		Runners:        map[string]plan.Runner{"purpose": "review", "command:test": "command:test"},
-		Detection:      []check.DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}},
-		DetectionTests: []check.DetectionTest{{Aspect: "purpose", Runner: "review", Identity: identity, Passed: true}},
+		Runners: map[string]plan.Runner{"purpose": "review", "command:test": "command:test"},
 		Judgments: []check.Judgment{
 			{JudgmentResult: form.JudgmentResult{Aspect: "purpose", TargetVersion: target, Norms: norms, Judgment: check.Pass, CompletionConditionIDs: []string{"C1"}}, Runner: "review"},
 			{JudgmentResult: form.JudgmentResult{Aspect: "command:test", TargetVersion: target, Norms: norms, Judgment: check.Pass}, Runner: "command:test"},
@@ -204,11 +201,6 @@ func TestCompletion(t *testing.T) {
 			t.Fatal("completed despite a target mismatch")
 		}
 	})
-	input.Detection = nil
-	if CheckCompletion(input).ReadyToCommit {
-		t.Fatal("passed without checking content identity")
-	}
-	input.Detection = []check.DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}}
 	input.Judgments[0].TargetVersion.Tree = "stale"
 	if CheckCompletion(input).ReadyToCommit {
 		t.Fatal("completed using a judgment for a stale target")

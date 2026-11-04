@@ -6,7 +6,7 @@ Devkit does not follow references inside a document. A check that selects a revi
 
 The output format and the rules common to every judgment (`NOT ASSESSED`, failure scenarios, no severity, nonblocking findings, exemption handling, aggregation) are in the judgment request template `templates/brief/judgment.md.tmpl`. Review documents do not repeat them.
 
-The repository owns and maintains these documents and the detection examples of the checks that select them. A change to a review document is a loop edit; detection tests for the checks that select it follow `examples/README.md`.
+The repository owns and maintains these documents. A change to a review document is a loop edit.
 
 - `principles/review/purpose.md`: Purpose.
 - `principles/review/irreversible.md`: Irreversible items.

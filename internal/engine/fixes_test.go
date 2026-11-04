@@ -38,8 +38,6 @@ func checkedResult(t *testing.T, e *Engine) Result {
 			t.Fatalf("missing instruction: %+v", result)
 		}
 		switch result.Instruction.Kind {
-		case form.InstructionDetectionTest:
-			acceptDetectionResult(t, e, result.Instruction)
 		case form.InstructionPlanCheck, form.InstructionJudgment:
 			data, err := e.readInstruction(result.Instruction.ID)
 			if err != nil {
@@ -82,29 +80,20 @@ func TestOutOfRoundNormsUseCommittedHEAD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	detection, err := e.Next(ctx)
-	if err != nil || detection.Instruction.Kind != form.InstructionDetectionTest {
-		t.Fatalf("detection: %+v, %v", detection, err)
-	}
-	head := git(t, e.Root(), "rev-parse", "HEAD")
-	data, err := e.readInstruction(detection.Instruction.ID)
-	if err != nil || data.Reference != head {
-		t.Fatalf("detection did not use HEAD: %+v, %v", data, err)
-	}
-	body, err := e.instructionBrief(detection.Instruction.ID)
-	if err != nil || strings.Contains(string(body), "Unconfirmed working rule marker") {
-		t.Fatalf("detection read working norms: %v", err)
-	}
-	acceptDetectionResult(t, e, detection.Instruction)
-	write(t, e.Root(), "devkit.toml", string(originalConfig))
 	review, err := e.Next(ctx)
 	if err != nil || review.Instruction.Kind != form.InstructionPlanCheck {
 		t.Fatalf("plan check: %+v, %v", review, err)
 	}
-	data, err = e.readInstruction(review.Instruction.ID)
+	head := git(t, e.Root(), "rev-parse", "HEAD")
+	data, err := e.readInstruction(review.Instruction.ID)
 	if err != nil || data.Reference != head {
-		t.Fatalf("plan check did not use HEAD: %v", err)
+		t.Fatalf("plan check did not use HEAD: %+v, %v", data, err)
 	}
+	body, err := e.instructionBrief(review.Instruction.ID)
+	if err != nil || strings.Contains(string(body), "Unconfirmed working rule marker") {
+		t.Fatalf("plan check read working norms: %v", err)
+	}
+	write(t, e.Root(), "devkit.toml", string(originalConfig))
 	collect(t, e, review.Instruction, pass(*data.Request))
 	question, err := e.Next(ctx)
 	question = approvedNext(t, e, question)
@@ -115,9 +104,9 @@ func TestOutOfRoundNormsUseCommittedHEAD(t *testing.T) {
 
 func TestCommittedNormChangeReissuesPendingPlanCheck(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n"))
+	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n"))
 	git(t, e.Root(), "add", ".")
-	git(t, e.Root(), "commit", "-qm", "Disable detection")
+	git(t, e.Root(), "commit", "-qm", "Configure deviation approval")
 	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +137,6 @@ func TestGateQuestionContainsRecordedEvidence(t *testing.T) {
 		s.Checks = []plan.Check{judgeCheck("wording", false)}
 	})
 	work := working(t, e, ctx)
-	// An optional aspect needs no detection pass.
 	write(t, e.Root(), "README.md", "# Evidence target\n")
 	progress := form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{"Recorded work performed"}, Confirmed: []string{"Recorded confirmed matter"}, Unconfirmed: []string{"Recorded unconfirmed matter"}}
 	if _, err := e.Submit(ctx, marshal(t, progress)); err != nil {
@@ -191,7 +179,7 @@ func TestGateQuestionContainsRecordedEvidence(t *testing.T) {
 
 func TestBackAnswerAndReplanApprovalConditions(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[detection]\nrequired = false\n"))
+	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n"))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Require requirements approval")
 	started, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
@@ -297,7 +285,7 @@ func TestPlanCheckUsesConfiguredCommandRunner(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
-	settings := withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n[plan_check]\naspect = 'consistency'\nrunner = 'registered-plan'\n[judges.registered-plan]\nexecutable = '" + executable + "'\nargs = ['-test.run=^TestRegisteredPlanJudgeProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n")
+	settings := withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[plan_check]\naspect = 'consistency'\nrunner = 'registered-plan'\n[judges.registered-plan]\nexecutable = '" + executable + "'\nargs = ['-test.run=^TestRegisteredPlanJudgeProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n")
 	write(t, e.Root(), "devkit.toml", settings)
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure plan judgment command")
@@ -413,7 +401,7 @@ func TestEmbeddedSchemasAreSelfContained(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"planner-result", "judgment", "detection-result", "decision", "evidence", "progress", "structure"} {
+	for _, name := range []string{"planner-result", "judgment", "decision", "evidence", "progress", "structure"} {
 		source, err := e.asset(ctx, "HEAD", "schemas/"+name+".json")
 		if err != nil {
 			t.Fatal(err)
@@ -439,7 +427,7 @@ func TestEmbeddedSchemasAreSelfContained(t *testing.T) {
 
 func TestConfiguredProductsAndMissingRules(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[sources.requirements]\npath = 'docs/accepted-requirements.md'\n[sources.structure]\npath = 'docs/system-structure.json'\n[detection]\nrequired = false\n"))
+	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[sources.requirements]\npath = 'docs/accepted-requirements.md'\n[sources.structure]\npath = 'docs/system-structure.json'\n"))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure product paths")
 	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
@@ -537,7 +525,7 @@ func TestLoopApprovalPolicyIsIndependentOfRouterCategories(t *testing.T) {
 		for _, when := range []string{"before_round", "before_commit"} {
 			t.Run(policy+"/"+when, func(t *testing.T) {
 				e, ctx := fixture(t)
-				write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\nmeta_loop_edit = '"+policy+"'\n[router]\nhuman_confirmation = []\n[detection]\nrequired = false\n"))
+				write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\nmeta_loop_edit = '"+policy+"'\n[router]\nhuman_confirmation = []\n"))
 				git(t, e.Root(), "add", ".")
 				git(t, e.Root(), "commit", "-qm", "Configure loop approval")
 				start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})

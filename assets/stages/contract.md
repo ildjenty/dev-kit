@@ -28,4 +28,4 @@ When claiming completion, fill `report` according to this stage's selected repor
 
 Express interfaces, data formats, and failure types as type signatures so that guarantees against accepting invalid states and public failure responses can be assessed. Finalize difficult-to-change contracts only after resolving unverified matters that affect the choice.
 
-All required checks valid for the returned target and norms are `PASS`, the detection requirements in `examples/README.md` are satisfied, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.
+All required checks valid for the returned target and norms are `PASS`, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.

@@ -30,17 +30,12 @@ type Selection struct {
 	Select string `toml:"select" json:"select"`
 }
 
-// State holds paths for indexes outside the knowledge sources.
-type State struct {
-	Detect string `toml:"detect"`
-}
-
 var sourceName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
 
 // KnowledgeSources returns effective sources without sharing mutable settings.
 func (c Config) KnowledgeSources() map[string]Source {
 	sources := make(map[string]Source)
-	for _, name := range []string{"principles", "stages", "plans", "examples", "templates", "rules", "git", "requirements", "structure"} {
+	for _, name := range []string{"principles", "stages", "plans", "templates", "rules", "git", "requirements", "structure"} {
 		location := ".devkit/" + name
 		switch name {
 		case "rules", "git", "requirements":
@@ -62,14 +57,6 @@ func (c Config) KnowledgeSources() map[string]Source {
 		sources[name] = source
 	}
 	return sources
-}
-
-// DetectionPath returns the effective detection pass index path.
-func (c Config) DetectionPath() string {
-	if c.State.Detect == "" {
-		return ".devkit/detect.json"
-	}
-	return c.State.Detect
 }
 
 func (c *Config) applySourceDefaults(metadata toml.MetaData) {
@@ -147,9 +134,6 @@ func (c Config) validateSources() error {
 	if err := c.validateSourceLocations(); err != nil {
 		return err
 	}
-	if !validRepositoryPath(c.State.Detect) {
-		return fmt.Errorf("state.detect must be a clean repository-relative slash path outside .devkit/run: %q", c.State.Detect)
-	}
 	return nil
 }
 
@@ -196,7 +180,6 @@ func (c Config) ValidateSourcePaths(repositoryRoot string) error {
 		}
 		resolved.Sources[name] = source
 	}
-	resolved.State.Detect = filepath.ToSlash(filepath.Join(root, filepath.FromSlash(c.DetectionPath())))
 	return resolved.validateSourceLocations()
 }
 
@@ -212,9 +195,6 @@ func (c Config) validateSourceLocations() error {
 			if pathsOverlap(source.Path, c.Sources[other].Path) {
 				return fmt.Errorf("sources.%s.path and sources.%s.path must not overlap", name, other)
 			}
-		}
-		if source.Norm && pathsOverlap(source.Path, c.State.Detect) {
-			return fmt.Errorf("state.detect and sources.%s.path must not overlap", name)
 		}
 	}
 	return nil

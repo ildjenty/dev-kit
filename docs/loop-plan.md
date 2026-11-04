@@ -12,7 +12,7 @@
 
 遷移、`start_stage`、戻り先、`StoppedStage`、修正の担当の規則、単位の所属は実体 ID を使う。`outputs` は実体 ID を選び、定義 ID を書いた場合はその定義の実体をすべて選ぶ。決まりは定義 ID を使う。経緯と集計は実体ごとであり、振り返りには定義ごとの集計も渡す。コミットメッセージの `{stage}` は実体 ID である。
 
-check の一覧は `devkit.toml` の `[checks.<観点>]` に置き、`runner`・`criteria`・`examples`・`schemas`・`history`・`brief_by_planner` を定める。計画とパターンの check に書くのは、観点の名前、必須か、対象、完了条件 ID、計画者の指示だけである。パターンは課題固有の `instructions` を持たない。判定者の基準は規範のソースから選ぶ。検出試験の識別には一覧の定義と実際の基準・例を使う。
+check の一覧は `devkit.toml` の `[checks.<観点>]` に置き、`runner`・`criteria`・`schemas`・`history`・`brief_by_planner` を定める。計画とパターンの check に書くのは、観点の名前、必須か、対象、完了条件 ID、計画者の指示だけである。パターンは課題固有の `instructions` を持たない。判定者の基準は規範のソースから選ぶ。
 
 計画者と計画の判定者の入力の選び方は `[planning] inputs` と `[plan_check] inputs` に置く。既定は要件・規則・構造である。作業者への入力はステージの `inputs` に置く。`report`・`unit_report`・`human_prompt`・`delegations`・`history`・`outputs` は[依頼の入力](architecture/data.md#依頼の入力)に従う。本文の参照を解析して必要な文書を補わない。
 
@@ -30,7 +30,7 @@ check の一覧は `devkit.toml` の `[checks.<観点>]` に置き、`runner`・
 
 決まりを確かめる対象は、採用済みの完了した実体を順に並べ、その後に計画の開始から `done` で到達する並びを足した作業の経路である。`follows` は次の `replan` または終わりまでの同じ区切りで満たす。`require` と `last` は `null` で終わる区切りだけで確かめる。`first` は採用済みまたは計画上の経路の先頭に適用する。計画の受理時と、実行可能な計画を選ぶステージ開始時に、固定した規範で確かめる。違反は理由付きで拒否して計画者へ戻す。
 
-計画の受理時には指示の参照コミットで、すべての `definition`、基準・例・報告・単位の報告・人への問い・入力の選び方が1件以上の文書に解決することを確かめる。例の観点と check の観点が一致し、`[detection] required = true` なら必須の判定の check に例があることも確かめる。参考パターンの存在と内容ハッシュも同じ参照で照合する。
+計画の受理時には指示の参照コミットで、すべての `definition`、基準・報告・単位の報告・人への問い・入力の選び方が1件以上の文書に解決することを確かめる。参考パターンの存在と内容ハッシュも同じ参照で照合する。
 
 `[limits] max_rounds_ceiling = 3` と `max_no_progress_ceiling = 2` はステージ上限の天井であり、超える計画を拒否する。`[[loop.stage]]` で対象の天井も定められる。計画の判定のやり直しは `[planning] max_rounds = 3`、作業全体の累計は `[limits] max_total_rounds = 40`、Stop の継続は `[limits] stop_continuation = 3` が既定である。上限は無効にできない。累計上限で続行を承認した場合は、その時点の累計に設定値を加えた値で次に止める。
 

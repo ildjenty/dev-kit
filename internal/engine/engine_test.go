@@ -171,34 +171,6 @@ func ask(text string) *form.Confirmation {
 	return &form.Confirmation{Text: text, Options: []string{}, Evidence: []form.Reference{}}
 }
 
-// observed reduces a judgment to the compact detection observation format.
-func observed(id string, j form.JudgmentResult, reason string) form.DetectionObservation {
-	observation := form.DetectionObservation{ID: id, Judgment: j.Judgment, Blocking: []form.DetectionFinding{}, Reason: reason}
-	for _, finding := range j.Findings {
-		if finding.Blocking {
-			observation.Blocking = append(observation.Blocking, form.DetectionFinding{Scenario: finding.Scenario})
-		}
-	}
-	return observation
-}
-
-func acceptDetectionResult(t *testing.T, e *Engine, instruction *form.Instruction) {
-	t.Helper()
-	data, err := e.readInstruction(instruction.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	result := form.DetectionResult{InstructionID: instruction.ID}
-	for _, example := range data.Detection.Spec.Cases {
-		j := pass(*data.Request)
-		j.Judgment = example.Expected
-		if example.Kind == check.Violation {
-			j.Findings = []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "The example violates the stated blocking condition"}}
-		}
-		result.Observations = append(result.Observations, observed(example.ID, j, "The actual finding matches the intended distinction"))
-	}
-	collect(t, e, instruction, result)
-}
 func working(t *testing.T, e *Engine, ctx context.Context) Result {
 	t.Helper()
 	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
@@ -206,14 +178,6 @@ func working(t *testing.T, e *Engine, ctx context.Context) Result {
 		t.Fatal(err)
 	}
 	planResult(t, e, start)
-	detection, err := e.Next(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if detection.Instruction == nil || detection.Instruction.Kind != form.InstructionDetectionTest {
-		t.Fatalf("expected detection: %+v", detection)
-	}
-	acceptDetectionResult(t, e, detection.Instruction)
 	review, err := e.Next(ctx)
 	if err != nil {
 		t.Fatal(err)

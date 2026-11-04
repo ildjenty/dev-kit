@@ -15,7 +15,7 @@ Reference: {{.Path}}
 Judge the target against the criteria documents supplied in this request. Each criteria document says what to check, which other documents are part of its criteria, what blocks, and what not to report. Every document it names as part of its criteria is supplied in this request; read them from here, not from the working tree.
 
 - **Output**: Return the judgment using `schemas/judgment.json` and findings using `schemas/finding.json`, or the output schema supplied in this request. Use the requested instruction ID, check name (`aspect`), target version, frozen norms, and completion condition IDs.
-- **Validity**: A judgment is valid only for its matching target version and norms. The target version identifies a tree snapshot, plan version, or structure content hash; use the supplied value rather than substituting the current working tree. Read norms from the supplied copies, not from norms being edited in the working tree. Round judgments use round-start norms; plan checks and detection tests use committed norms from the work checkout HEAD fixed at instruction issue time.
+- **Validity**: A judgment is valid only for its matching target version and norms. The target version identifies a tree snapshot, plan version, or structure content hash; use the supplied value rather than substituting the current working tree. Read norms from the supplied copies, not from norms being edited in the working tree. Round judgments use round-start norms; plan checks use committed norms from the work checkout HEAD fixed at instruction issue time.
 - **Inputs**: For a round judgment, inspect the expanded round-start comparison base, the changed-file list, and the patch to the returned target. Use the work-history file referenced by this request, fixed at instruction issue time, as required by the criteria.
 - **Independence**: The author's report does not replace independent judgment.
 - **NOT ASSESSED**: Return `NOT ASSESSED` when necessary criteria or required verification are unavailable. Record the checked and unchecked scope, method, and environment.
@@ -25,7 +25,6 @@ Judge the target against the criteria documents supplied in this request. Each c
 - **Exemptions**: Compare each exemption claim with its grounds, and waive only the requirements covered by the exemption. The rest of the requirements and blocking conditions still apply.
 - **Aggregation**: Aggregate results in the order `FAIL`, `NOT ASSESSED`, then `PASS`.
 
-{{if not .Detection}}
 ## Plan instructions
 {{range .Instructions}}
 - {{.}}
@@ -98,13 +97,9 @@ Reference: {{.Path}}
 {{end}}
 ## Other fixed norms
 
-Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work checkout HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks use committed norms from the work checkout HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
 {{range .NormPaths}}
 - Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
-{{end}}
-
-{{else}}
-For detection tests, evaluate each supplied anonymous example body independently against the selected criteria and return its actual judgment and grounds. Only criteria, opaque example IDs and bodies, selected input contract schemas, and the output contract are supplied. The specification, case kinds, file names, expected judgments, mapping, and any history or reference containing them are withheld; devkit compares the results with expectations.
 {{end}}
 
 ## Returning the result

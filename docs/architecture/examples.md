@@ -1,6 +1,6 @@
 # 最小の例
 
-パターンは計画を組む参考であり、計画者が課題ごとに並び・担当・check・ゲート・上限・指示を決める。機械で守らせる決まりは `devkit.toml` に置く。利用側の資産は既定 `.devkit/plans/`・`.devkit/stages/`・`.devkit/principles/`・`.devkit/checks/`・`.devkit/templates/`・`.devkit/rules.md`・`.devkit/requirements.md`・`.devkit/structure.json` に置き、配置は設定で変更できる。
+パターンは計画を組む参考であり、計画者が課題ごとに並び・担当・check・ゲート・上限・指示を決める。機械で守らせる決まりは `devkit.toml` に置く。利用側の資産は既定 `.devkit/plans/`・`.devkit/stages/`・`.devkit/principles/`・`.devkit/templates/`・`.devkit/rules.md`・`.devkit/requirements.md`・`.devkit/structure.json` に置き、配置は設定で変更できる。
 
 <a id="雛形と計画"></a>
 
@@ -10,7 +10,7 @@
 
 `start --plan fix` は fix を優先する指定である。省略時は `default_plan`(既定 default)を優先し、計画者はほかのパターンも参考にできる。計画の `pattern` に名前と内容ハッシュを記録し、指示の参照コミットで存在とハッシュを確かめる。
 
-`.devkit/plans/fix.json` に配るパターンである。check は名前と必須かだけを持ち、runner・基準・例・経緯は `[checks.<観点>]` で定める。
+`.devkit/plans/fix.json` に配るパターンである。check は名前と必須かだけを持ち、runner・基準・経緯は `[checks.<観点>]` で定める。
 
 ```json
 {
@@ -815,27 +815,22 @@ max_total_rounds = 40
 [checks."purpose"]
 runner = "judge"
 criteria = [{ source = "principles", select = "review/purpose.md" }]
-examples = { source = "examples", select = "purpose/spec.json" }
 
 [checks."irreversible"]
 runner = "judge"
 criteria = [{ source = "principles", select = "review/irreversible.md" }, { source = "principles", select = "designing.md" }]
-examples = { source = "examples", select = "irreversible/spec.json" }
 
 [checks."structure"]
 runner = "judge"
 criteria = [{ source = "principles", select = "review/structure.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "structure.md" }, { source = "principles", select = "data.md" }]
-examples = { source = "examples", select = "structure/spec.json" }
 
 [checks."contract"]
 runner = "judge"
 criteria = [{ source = "principles", select = "review/contract.md" }, { source = "principles", select = "data.md" }, { source = "principles", select = "engineering.md" }]
-examples = { source = "examples", select = "contract/spec.json" }
 
 [checks."steps"]
 runner = "judge"
 criteria = [{ source = "principles", select = "review/steps.md" }]
-examples = { source = "examples", select = "steps/spec.json" }
 
 [checks."command:test"]
 runner = "command:test"
@@ -843,12 +838,10 @@ runner = "command:test"
 [checks."test"]
 runner = "judge"
 criteria = [{ source = "principles", select = "review/test.md" }, { source = "principles", select = "testing.md" }]
-examples = { source = "examples", select = "test/spec.json" }
 
 [checks."diff"]
 runner = "judge"
 criteria = [{ source = "principles", select = "review/diff.md" }, { source = "principles", select = "engineering.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "writing.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "security.md" }, { source = "templates", select = "pr.md.tmpl" }, { source = "rules", select = "" }]
-examples = { source = "examples", select = "diff/spec.json" }
 
 [checks."command:e2e"]
 runner = "command:e2e"
@@ -856,18 +849,15 @@ runner = "command:e2e"
 [checks."behavior"]
 runner = "judge"
 criteria = [{ source = "principles", select = "review/behavior.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "testing.md" }, { source = "principles", select = "ui.md" }, { source = "rules", select = "" }]
-examples = { source = "examples", select = "behavior/spec.json" }
 
 [checks."harness"]
 runner = "judge"
-criteria = [{ source = "principles", select = "review/harness.md" }, { source = "principles", select = "harness.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "review/README.md" }, { source = "stages", select = "README.md" }, { source = "stages", select = "retrospective.md" }, { source = "plans", select = "README.md" }, { source = "examples", select = "README.md" }, { source = "templates", select = "brief/judgment.md.tmpl" }]
-examples = { source = "examples", select = "harness/spec.json" }
+criteria = [{ source = "principles", select = "review/harness.md" }, { source = "principles", select = "harness.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "review/README.md" }, { source = "stages", select = "README.md" }, { source = "stages", select = "retrospective.md" }, { source = "plans", select = "README.md" }, { source = "templates", select = "brief/judgment.md.tmpl" }]
 history = "all"
 
 [checks."wording"]
 runner = "judge"
 criteria = [{ source = "principles", select = "review/wording.md" }, { source = "principles", select = "writing.md" }, { source = "templates", select = "pr.md.tmpl" }]
-examples = { source = "examples", select = "wording/spec.json" }
 
 [[loop.stage]]
 definition = "implement"
@@ -897,7 +887,7 @@ check の一覧は runner と基準を固定し、計画とパターンは観点
 
 `[[loop.path]]` の `definition = "implement"` と `follows = "verification"` は、implement の各実体の後に同じ区切りの verification を要求する。`last` は終了する経路の最後を定める。`require` は必ず含める定義、`first` は先頭を定める。計画1つだけでなく、採用済みの完了した実体と、計画の開始から `done` で到達する列を結んだ経路で確かめる。区切りは次の replan または終わりまでである。require と last は null で終わる区切りだけに適用する。
 
-計画の受理時とステージの開始時に決まりを検査する。受理時は指示の参照コミットで定義とすべての文書の選び方が1件以上に解決すること、例の観点が一致すること、検出試験を必須とする設定なら必須の判定に例があることも確かめる。
+計画の受理時とステージの開始時に決まりを検査する。受理時は指示の参照コミットで定義とすべての文書の選び方が1件以上に解決することも確かめる。
 
 `[limits] max_rounds_ceiling = 3` と `max_no_progress_ceiling = 2` を超える計画は拒否する。計画の判定のやり直しは `[planning] max_rounds = 3`、作業全体の上限は `[limits] max_total_rounds = 40` が既定である。累計上限で続行ならその時点の累計に40を加えて次の停止点とする。戻りや作り直しで累計を減らさない。
 
@@ -921,118 +911,13 @@ timeout_seconds = 120
 devkit start --plan fix --task-file task.txt
 ```
 
-途中の指示は JSON を `devkit instruct guidance.json` で記録する。次の計画者・作業者の依頼文へ渡し、判定者や検出試験へは渡さない。すでに発行した依頼文を変えず、計画や完了条件の変更は再計画と承認を通す。
+途中の指示は JSON を `devkit instruct guidance.json` で記録する。次の計画者・作業者の依頼文へ渡し、判定者へは渡さない。すでに発行した依頼文を変えず、計画や完了条件の変更は再計画と承認を通す。
 
 ```json
 {
   "text": "保存後に一覧へ戻る利用場面も作業で確かめる"
 }
 ```
-
-## 観点と検出試験
-
-原則のソースの用途別文書 `.devkit/principles/review/wording.md` は、`principles/writing.md` の原則2・3に照らし、想定読者の前提と表現の具体性を確認する。種別や期待判定を伏せても判定できるように、各例の本文に要求、完了条件、検証方法、対象を含める。違反・適合・許容の構成は `assets/examples/wording/` と揃える。
-
-```text
-.devkit/principles/
-  writing.md
-  review/wording.md
-.devkit/checks/wording/
-  spec.json
-  case-a.md
-  case-b.md
-  case-c.md
-```
-
-`examples` ソースの `wording/spec.json` は例の文書の参照と、devkit だけが読む期待判定の対応を持つ。check の `examples` でこの仕様と例を選ぶ。
-
-```json
-{
-  "aspect": "wording",
-  "cases": [
-    { "kind": "violation", "file": "case-a.md", "expected": "FAIL" },
-    { "kind": "conforming", "file": "case-b.md", "expected": "PASS" },
-    { "kind": "allowed", "file": "case-c.md", "expected": "PASS" }
-  ]
-}
-```
-
-`case-a.md` の本文である。
-
-```markdown
-## 要求
-
-会話を読んでいない担当者が、保存済みの日報を削除する手順を読んで実行する。
-
-## 完了条件
-
-担当者が、この手順だけで削除対象、操作する画面、操作の順序、削除の確認方法を特定できる。
-
-## 検証方法
-
-対象の手順を読み、完了条件と principles/writing.md の原則2・3に照合する。
-
-## 対象
-
-# 日報の削除手順
-
-1. あの画面であれを削除する。
-2. いつもの場所を確認する。
-```
-
-`case-b.md` の本文である。
-
-```markdown
-## 要求
-
-会話を読んでいない担当者が、保存済みの日報を削除する手順を読んで実行する。
-
-## 完了条件
-
-担当者が、この手順だけで削除対象、操作する画面、操作の順序、削除の確認方法を特定できる。
-
-## 検証方法
-
-対象の手順を読み、完了条件と principles/writing.md の原則2・3に照合する。
-
-## 対象
-
-# 日報の削除手順
-
-1. 日報一覧で、削除する日報のタイトルを選ぶ。
-2. 日報詳細で「削除」を押す。
-3. 確認画面のタイトルが削除する日報と一致したら「削除を確定」を押す。
-4. 日報一覧に対象のタイトルがないことを確認する。
-```
-
-`case-c.md` の本文である。
-
-```markdown
-## 要求
-
-会話を読んでいない担当者が、保存済みの日報を削除する手順を読んで実行する。
-
-## 完了条件
-
-担当者が、この手順だけで削除対象、操作する画面、操作の順序、削除の確認方法を特定できる。
-
-## 検証方法
-
-対象の手順を読み、完了条件と principles/writing.md の原則2・3に照合する。
-
-## 対象
-
-# 日報の削除手順
-
-1. 日報一覧で、削除する日報のタイトルを選ぶ。
-2. 日報詳細で「削除」を押す。
-3. 確認画面のタイトルが削除する日報と一致したら「削除を確定」を押す。
-4. 日報一覧に対象のタイトルがないことを確認する。
-
-元の問い合わせ記録: 「あれを削除したい」。出典は削除要求 R1 の発言であり、「あれ」は手順の対象の日報を指す。発言と照合するため引用内の原語を保持する。principles/writing.md の原則2の適用除外は、この引用だけに適用する。
-```
-
-各例は要求・完了条件・検証方法・対象を含む匿名の本文として、`criteria` で選んだ基準の文書、出力の約束とともに渡す。判定者には種別・期待判定・`spec.json`・対応表と、それらを含む履歴や参照先を渡さない。devkit が判定と期待を照合する。合格の識別には `[checks.<観点>]` の定義、担当の定義、判定規則を含む判定依頼テンプレート、実際に渡した基準の文書の集合と内容ハッシュ、例の文書の内容ハッシュを含める。必要な別の文書は選び方に明示し、文中の参照は解析しない。既存の違反例・適合例・許容例の期待判定を保つことを確かめる。設定と合格の扱いは[検出試験](guarantees.md#検出試験)に従う。
 
 ## pre-commit
 

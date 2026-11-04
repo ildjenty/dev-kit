@@ -214,15 +214,13 @@ func TestParallelWorktreeLoops(t *testing.T) {
 	if works[0].ID == works[1].ID || works[0].Branch == works[1].Branch || main.runRoot() == linked.runRoot() {
 		t.Fatal("worktrees shared work, branch, or runtime roots")
 	}
-	for _, kind := range []form.InstructionKind{form.InstructionDetectionTest, form.InstructionPlanCheck, form.InstructionQuestion, form.InstructionWork} {
+	for _, kind := range []form.InstructionKind{form.InstructionPlanCheck, form.InstructionQuestion, form.InstructionWork} {
 		for i, e := range engines {
 			results[i], err = e.Next(ctx)
 			if err != nil || results[i].Instruction == nil || results[i].Instruction.Kind != kind {
 				t.Fatalf("%s expected %s: %+v, %v", e.sessionID, kind, results[i], err)
 			}
 			switch kind {
-			case form.InstructionDetectionTest:
-				acceptDetectionResult(t, e, results[i].Instruction)
 			case form.InstructionPlanCheck:
 				data, err := e.readInstruction(results[i].Instruction.ID)
 				if err != nil {

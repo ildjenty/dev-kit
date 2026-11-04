@@ -20,7 +20,7 @@ const sessionWorker = "[roles.worker]\nkind = 'work'\nagent = ''\n"
 // instruction after planning.
 func flowWork(t *testing.T, e *Engine, settings string, change func(*plan.Stage), instruct func(*plan.Plan)) Result {
 	t.Helper()
-	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n"+settings))
+	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[approval]\nplan = 'deviation'\n"+settings))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure flow")
 	if change != nil {
@@ -326,32 +326,5 @@ func TestBriefOverflowMovesWholeBodiesToFiles(t *testing.T) {
 	moved, err := os.ReadFile(path)
 	if err != nil || len(moved) <= 200 {
 		t.Fatalf("moved body is missing or truncated: %v", err)
-	}
-}
-
-func TestDetectionIdentityIncludesDeclaredModelOnly(t *testing.T) {
-	e, ctx := fixture(t)
-	item := catalogJudge("plan", true)
-	inherited, _, err := e.detectionInput(ctx, "HEAD", item)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if inherited.Identity.Model != "" || inherited.Identity.Effort != "" {
-		t.Fatalf("an inherited model was recorded as declared: %+v", inherited.Identity)
-	}
-	path := filepath.Join(e.Root(), ".claude/agents/devkit-judge.md")
-	definition, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	write(t, e.Root(), ".claude/agents/devkit-judge.md", strings.Replace(string(definition), "model: inherit", "model: opus\neffort: high", 1))
-	git(t, e.Root(), "add", ".")
-	git(t, e.Root(), "commit", "-qm", "Declare the judge model")
-	declared, _, err := e.detectionInput(ctx, "HEAD", item)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if declared.Identity.Model != "opus" || declared.Identity.Effort != "high" || declared.Identity == inherited.Identity {
-		t.Fatalf("the declared model and effort are not part of the pass identity: %+v", declared.Identity)
 	}
 }

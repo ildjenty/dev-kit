@@ -20,12 +20,8 @@ type catalogCheck struct {
 func checkCatalog(settings config.Config) map[string]plan.CheckDefinition {
 	catalog := map[string]plan.CheckDefinition{}
 	for aspect, item := range settings.Checks {
-		definition := plan.CheckDefinition{Runner: plan.Runner(item.Runner), Criteria: planSelections(item.Criteria), Schemas: item.Schemas,
+		catalog[aspect] = plan.CheckDefinition{Runner: plan.Runner(item.Runner), Criteria: planSelections(item.Criteria), Schemas: item.Schemas,
 			History: plan.History(item.History), BriefByPlanner: item.BriefByPlanner}
-		if item.Examples != nil {
-			definition.Examples = &plan.Selection{Source: item.Examples.Source, Select: item.Examples.Select}
-		}
-		catalog[aspect] = definition
 	}
 	return catalog
 }

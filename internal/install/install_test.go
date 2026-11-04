@@ -121,7 +121,6 @@ func TestInitAndDoctor(t *testing.T) {
 		{"templates/brief/work.md.tmpl", ".devkit/templates/brief/work.md.tmpl"},
 		{"plans/default.json", ".devkit/plans/default.json"},
 		{"principles/review/contract.md", ".devkit/principles/review/contract.md"},
-		{"examples/contract/spec.json", ".devkit/examples/contract/spec.json"},
 		{"rules/rules.md", ".devkit/rules.md"},
 		{"skills/devkit/SKILL.md", ".agents/skills/devkit/SKILL.md"},
 	} {
@@ -175,7 +174,7 @@ func TestInitAndDoctor(t *testing.T) {
 			t.Fatal("doctor still checks a kit copy")
 		}
 	}
-	for _, name := range []string{".devkit/kit", ".devkit/checks", ".devkit/detect.json"} {
+	for _, name := range []string{".devkit/kit", ".devkit/checks"} {
 		if _, err := os.Stat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("init created a non-distributable path: %s: %v", name, err)
 		}
@@ -566,7 +565,7 @@ func TestUninstallReversesInit(t *testing.T) {
 	if got := string(readFile(t, root, ".gitignore")); got != "node_modules/\n" {
 		t.Fatalf(".gitignore = %q", got)
 	}
-	for _, name := range []string{"devkit.toml", ".devkit/kit", ".devkit/run", ".devkit/plans", ".devkit/principles", ".devkit/stages", ".devkit/templates", ".devkit/examples", ".agents", ".codex", ".claude/skills", ".claude/agents"} {
+	for _, name := range []string{"devkit.toml", ".devkit/kit", ".devkit/run", ".devkit/plans", ".devkit/principles", ".devkit/stages", ".devkit/templates", ".agents", ".codex", ".claude/skills", ".claude/agents"} {
 		if _, err := os.Lstat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("%s remains after uninstall: %v", name, err)
 		}
@@ -701,8 +700,6 @@ func TestConfiguredNormPathsAndUninstall(t *testing.T) {
 path = "norms/principles"
 [sources.stages]
 path = "norms/stages"
-[sources.examples]
-path = "norms/examples"
 [sources.plans]
 path = "norms/plans"
 [sources.templates]
@@ -713,8 +710,6 @@ path = "norms/rules.md"
 path = "records/requirements.md"
 [sources.structure]
 path = "records/structure.json"
-[state]
-detect = "records/detect.json"
 `)
 	writeFile(t, root, "norms/principles/harness.md", "Custom principle.\n")
 	if _, err := Init(ctx, root, nil); err != nil {
@@ -724,7 +719,6 @@ detect = "records/detect.json"
 		{"principles/testing.md", "norms/principles/testing.md"},
 		{"stages/implement.md", "norms/stages/implement.md"},
 		{"principles/review/contract.md", "norms/principles/review/contract.md"},
-		{"examples/contract/spec.json", "norms/examples/contract/spec.json"},
 		{"plans/default.json", "norms/plans/default.json"},
 		{"templates/brief/work.md.tmpl", "norms/templates/brief/work.md.tmpl"},
 		{"rules/rules.md", "norms/rules.md"},
@@ -743,7 +737,7 @@ detect = "records/detect.json"
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"norms/principles", "norms/stages", "norms/examples", "norms/plans", "norms/templates", "norms/rules.md", "HEAD", "init_committed"} {
+	for _, name := range []string{"norms/principles", "norms/stages", "norms/plans", "norms/templates", "norms/rules.md", "HEAD", "init_committed"} {
 		if check := checkNamed(t, report, name); !check.OK {
 			t.Fatalf("configured norm was rejected: %+v", check)
 		}
@@ -753,7 +747,7 @@ detect = "records/detect.json"
 	if err != nil || checkNamed(t, report, "init_committed").OK {
 		t.Fatalf("untracked configured plan was accepted: %+v, %v", report, err)
 	}
-	for _, name := range []string{"records/requirements.md", "records/structure.json", "records/detect.json"} {
+	for _, name := range []string{"records/requirements.md", "records/structure.json"} {
 		writeFile(t, root, name, "Stage-owned content.\n")
 	}
 	before, err := runGit(ctx, root, "rev-parse", "HEAD")
@@ -767,12 +761,12 @@ detect = "records/detect.json"
 	if !slices.Contains(result.Preserved, "norms/principles/harness.md") || !slices.Contains(result.Preserved, "devkit.toml") {
 		t.Fatalf("repository-owned norms or config were not preserved: %v", result.Preserved)
 	}
-	for _, name := range []string{"norms/stages", "norms/examples", "norms/templates", "norms/rules.md"} {
+	for _, name := range []string{"norms/stages", "norms/templates", "norms/rules.md"} {
 		if _, err := os.Stat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("unmodified norm remains: %s: %v", name, err)
 		}
 	}
-	for _, name := range []string{"records/requirements.md", "records/structure.json", "records/detect.json"} {
+	for _, name := range []string{"records/requirements.md", "records/structure.json"} {
 		if got := string(readFile(t, root, name)); got != "Stage-owned content.\n" {
 			t.Errorf("stage-owned content changed: %s", name)
 		}

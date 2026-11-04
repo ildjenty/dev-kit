@@ -1,7 +1,6 @@
 package plan
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -29,19 +28,19 @@ func ValidatePatternReference(ref PatternRef, resolve Resolver) error {
 
 // ValidateReferences checks definitions and every selected document without reading files.
 // Check definitions come from the instruction's fixed configuration.
-func ValidateReferences(p Plan, checks map[string]CheckDefinition, detectionRequired bool, resolve Resolver) error {
+func ValidateReferences(p Plan, checks map[string]CheckDefinition, resolve Resolver) error {
 	if err := ValidatePatternReference(p.Pattern, resolve); err != nil {
 		return err
 	}
 	for _, stage := range p.Stages {
-		if err := validateStageReferences(stage, checks, detectionRequired, resolve); err != nil {
+		if err := validateStageReferences(stage, checks, resolve); err != nil {
 			return fmt.Errorf("%s: %w", stage.ID, err)
 		}
 	}
 	return nil
 }
 
-func validateStageReferences(stage Stage, checks map[string]CheckDefinition, detectionRequired bool, resolve Resolver) error {
+func validateStageReferences(stage Stage, checks map[string]CheckDefinition, resolve Resolver) error {
 	definitionID := stage.DefinitionID()
 	if definitionID == "" || definitionID == "." || definitionID == ".." || strings.ContainsAny(definitionID, "/\\*?[]\x00") {
 		return fmt.Errorf("invalid stage definition: %q", definitionID)
@@ -62,38 +61,17 @@ func validateStageReferences(stage Stage, checks map[string]CheckDefinition, det
 		if !ok {
 			return fmt.Errorf("check is not configured: %q", check.Aspect)
 		}
-		if err := validateCheckReferences(check, definition, detectionRequired, resolve); err != nil {
+		if err := validateCheckReferences(check, definition, resolve); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func validateCheckReferences(check Check, definition CheckDefinition, detectionRequired bool, resolve Resolver) error {
+func validateCheckReferences(check Check, definition CheckDefinition, resolve Resolver) error {
 	for _, selection := range definition.Criteria {
 		if _, err := resolveDocuments(selection, resolve); err != nil {
 			return fmt.Errorf("%s criteria: %w", check.Aspect, err)
-		}
-	}
-	if definition.Examples == nil {
-		if detectionRequired && check.Required && !definition.Runner.IsCommand() {
-			return fmt.Errorf("%s: required judgment check has no examples", check.Aspect)
-		}
-		return nil
-	}
-	documents, err := resolveDocuments(*definition.Examples, resolve)
-	if err != nil {
-		return fmt.Errorf("%s examples: %w", check.Aspect, err)
-	}
-	for _, body := range documents {
-		var specification struct {
-			Aspect string `json:"aspect"`
-		}
-		if err := json.Unmarshal([]byte(body), &specification); err != nil {
-			return fmt.Errorf("%s examples: %w", check.Aspect, err)
-		}
-		if specification.Aspect != check.Aspect {
-			return fmt.Errorf("%s: examples aspect does not match: %q", check.Aspect, specification.Aspect)
 		}
 	}
 	return nil

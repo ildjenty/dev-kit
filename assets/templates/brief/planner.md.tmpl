@@ -102,7 +102,7 @@ List undecidable requirements in `open_questions`; incorporate human clarificati
 
 Assign each stage a unique instance `id` and a catalog `definition` (omitting definition uses id). Reuse definitions freely with distinct instance IDs. Reuse an ID that ran in this work only when rerunning that work. A back-triggered plan must contain its return instance. Back targets are current instances or instances that ran in this work. All planned instances must be reachable from start_stage by done transitions. Ask and scalar fix target the same instance. Done may name the next instance, replan, or null.
 
-Use only listed definitions, configured roles, configured check names, and selections resolving to documents at the fixed reference. Each plan check contains aspect, required status, target, completion_condition_ids, and optional instructions. Runner, criteria, examples, schemas, history, and brief_by_planner come from the check registry and cannot be set by the plan. Follow loop.stage and loop.path rules and limit ceilings. Every implement instance must have its required verification later in the same segment before replan or end when the configured follows rule requires it.
+Use only listed definitions, configured roles, configured check names, and selections resolving to documents at the fixed reference. Each plan check contains aspect, required status, target, completion_condition_ids, and optional instructions. Runner, criteria, schemas, history, and brief_by_planner come from the check registry and cannot be set by the plan. Follow loop.stage and loop.path rules and limit ceilings. Every implement instance must have its required verification later in the same segment before replan or end when the configured follows rule requires it.
 
 Choose stage reports, unit reports, human prompts, inputs, output selections, history, gates, limits, correction roles, and instructions as needed within the rules. Output selections may name an instance or all instances of a definition. Split units have unique plan-wide IDs, descriptions, and nonoverlapping scopes. Units have no after dependencies; put dependent work in later stages. Checks, gates, questions, and replanning stay at stage level.
 
@@ -157,7 +157,7 @@ Reference: {{.Path}}
 {{end}}{{define "normPaths"}}
 ## Other fixed norms
 
-Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work checkout HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks use committed norms from the work checkout HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
 {{range .}}
 - Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}

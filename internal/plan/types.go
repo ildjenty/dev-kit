@@ -105,7 +105,6 @@ type Check struct {
 type CheckDefinition struct {
 	Runner         Runner      `json:"runner"`
 	Criteria       []Selection `json:"criteria,omitempty"`
-	Examples       *Selection  `json:"examples,omitempty"`
 	Schemas        []string    `json:"schemas,omitempty"`
 	History        History     `json:"history,omitempty"`
 	BriefByPlanner bool        `json:"brief_by_planner,omitempty"`
@@ -167,16 +166,14 @@ func (s Stage) RequiredChecks() []Check {
 	return checks
 }
 
-// Detection tests in CompletionRule apply to aspects of required checks handled by judges.
 type CompletionRule struct {
-	Checks                []Check
-	RequireDetectionTests bool
-	RequireCommit         bool
-	RequireTargetMatch    bool
+	Checks             []Check
+	RequireCommit      bool
+	RequireTargetMatch bool
 }
 
 func (s Stage) CompletionRule() CompletionRule {
-	return CompletionRule{s.RequiredChecks(), true, true, true}
+	return CompletionRule{s.RequiredChecks(), true, true}
 }
 
 // PlanTemplate is a reference pattern, not a constraint on task plans.

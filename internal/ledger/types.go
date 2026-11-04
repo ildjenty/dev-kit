@@ -31,7 +31,6 @@ const (
 	KindExternalOp    Kind = "external_op"
 	KindProgress      Kind = "progress"
 	KindJudgment      Kind = "judgment"
-	KindDetectionTest Kind = "detection_test"
 	KindStageRun      Kind = "stage_run"
 	KindRound         Kind = "round"
 	KindInstruction   Kind = "instruction"
@@ -244,11 +243,6 @@ type ResultRejection struct {
 	Reason        string `json:"reason"`
 }
 
-type DetectionTest struct {
-	check.DetectionTest
-	InstructionID string `json:"instruction_id"`
-}
-
 type StageState string
 
 const (
@@ -290,35 +284,24 @@ type Round struct {
 
 // Instruction stores issuance facts; engine regenerates its text and brief.
 type Instruction struct {
-	ID           string                `json:"id"`
-	Unit         *plan.Unit            `json:"unit,omitempty"`
-	Kind         form.InstructionKind  `json:"kind"`
-	TargetKey    string                `json:"target_key"`
-	Reissue      int                   `json:"reissue"`
-	SessionID    string                `json:"session_id"`
-	RoundID      string                `json:"round_id,omitempty"`
-	StageRunID   string                `json:"stage_run_id,omitempty"`
-	PlanVersion  int                   `json:"plan_version,omitempty"`
-	QuestionID   string                `json:"question_id,omitempty"`
-	Reference    string                `json:"reference,omitempty"`
-	Inputs       []plan.Selection      `json:"inputs,omitempty"`
-	Runner       string                `json:"runner,omitempty"`
-	TargetPath   string                `json:"target_path,omitempty"`
-	PatternName  string                `json:"pattern_name,omitempty"`
-	Origin       plan.ProposalOrigin   `json:"origin,omitempty"`
-	Request      *check.Request        `json:"request,omitempty"`
-	Detection    *InstructionDetection `json:"detection,omitempty"`
-	Context      *InstructionContext   `json:"context,omitempty"`
-}
-
-// InstructionDetection preserves the inputs used to accept a detection result.
-// Check and Definition keep the catalog selections that produced the identity.
-type InstructionDetection struct {
-	Check      plan.Check           `json:"check"`
-	Definition plan.CheckDefinition `json:"definition"`
-	Spec     check.DetectionSpec     `json:"spec"`
-	Identity check.DetectionIdentity `json:"identity"`
-	Examples map[string]string       `json:"examples"`
+	ID          string               `json:"id"`
+	Unit        *plan.Unit           `json:"unit,omitempty"`
+	Kind        form.InstructionKind `json:"kind"`
+	TargetKey   string               `json:"target_key"`
+	Reissue     int                  `json:"reissue"`
+	SessionID   string               `json:"session_id"`
+	RoundID     string               `json:"round_id,omitempty"`
+	StageRunID  string               `json:"stage_run_id,omitempty"`
+	PlanVersion int                  `json:"plan_version,omitempty"`
+	QuestionID  string               `json:"question_id,omitempty"`
+	Reference   string               `json:"reference,omitempty"`
+	Inputs      []plan.Selection     `json:"inputs,omitempty"`
+	Runner      string               `json:"runner,omitempty"`
+	TargetPath  string               `json:"target_path,omitempty"`
+	PatternName string               `json:"pattern_name,omitempty"`
+	Origin      plan.ProposalOrigin  `json:"origin,omitempty"`
+	Request     *check.Request       `json:"request,omitempty"`
+	Context     *InstructionContext  `json:"context,omitempty"`
 }
 
 // InstructionOutput preserves a prior output supplied when an instruction was issued.
@@ -369,26 +352,25 @@ type StopObservation struct {
 	Question      *form.Question `json:"question,omitempty"`
 }
 
-func (*Work) recordKind() Kind          { return KindWork }
-func (*Pause) recordKind() Kind         { return KindPause }
-func (*Resume) recordKind() Kind        { return KindResume }
-func (*PlanVersion) recordKind() Kind   { return KindPlan }
-func (*Withdrawal) recordKind() Kind    { return KindWithdrawal }
-func (*Decision) recordKind() Kind      { return KindDecision }
-func (*Evidence) recordKind() Kind      { return KindEvidence }
-func (*Lesson) recordKind() Kind        { return KindLesson }
-func (*StateChange) recordKind() Kind   { return KindStateChange }
-func (*Question) recordKind() Kind      { return KindQuestion }
-func (*Answer) recordKind() Kind        { return KindAnswer }
-func (*Approval) recordKind() Kind      { return KindApproval }
-func (*ExternalOp) recordKind() Kind    { return KindExternalOp }
-func (*Progress) recordKind() Kind      { return KindProgress }
-func (*Judgment) recordKind() Kind      { return KindJudgment }
-func (*DetectionTest) recordKind() Kind { return KindDetectionTest }
-func (*StageRun) recordKind() Kind      { return KindStageRun }
-func (*Round) recordKind() Kind         { return KindRound }
-func (*Instruction) recordKind() Kind   { return KindInstruction }
-func (*Artifact) recordKind() Kind      { return KindArtifact }
+func (*Work) recordKind() Kind        { return KindWork }
+func (*Pause) recordKind() Kind       { return KindPause }
+func (*Resume) recordKind() Kind      { return KindResume }
+func (*PlanVersion) recordKind() Kind { return KindPlan }
+func (*Withdrawal) recordKind() Kind  { return KindWithdrawal }
+func (*Decision) recordKind() Kind    { return KindDecision }
+func (*Evidence) recordKind() Kind    { return KindEvidence }
+func (*Lesson) recordKind() Kind      { return KindLesson }
+func (*StateChange) recordKind() Kind { return KindStateChange }
+func (*Question) recordKind() Kind    { return KindQuestion }
+func (*Answer) recordKind() Kind      { return KindAnswer }
+func (*Approval) recordKind() Kind    { return KindApproval }
+func (*ExternalOp) recordKind() Kind  { return KindExternalOp }
+func (*Progress) recordKind() Kind    { return KindProgress }
+func (*Judgment) recordKind() Kind    { return KindJudgment }
+func (*StageRun) recordKind() Kind    { return KindStageRun }
+func (*Round) recordKind() Kind       { return KindRound }
+func (*Instruction) recordKind() Kind { return KindInstruction }
+func (*Artifact) recordKind() Kind    { return KindArtifact }
 
 func (*ResultRejection) recordKind() Kind { return KindResultRejection }
 func (*UnitResult) recordKind() Kind      { return KindUnitResult }

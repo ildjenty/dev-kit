@@ -30,7 +30,6 @@ type instructionData struct {
 	Request     *check.Request             `json:"request,omitempty"`
 	Origin      plan.ProposalOrigin        `json:"origin,omitempty"`
 	PatternName string                     `json:"pattern_name,omitempty"`
-	Detection   *detectionInput            `json:"detection,omitempty"`
 	BriefText   string                     `json:"brief_text,omitempty"`
 	Context     *ledger.InstructionContext `json:"context,omitempty"`
 	Inputs      []plan.Selection           `json:"inputs,omitempty"`
@@ -378,10 +377,7 @@ func (e *Engine) publishInstruction(meta ledger.Instruction, fresh bool, data in
 	if data.Context != nil {
 		meta.Context = data.Context
 	}
-	// The detection specification and mapping stay in the ledger, not next to the brief.
-	published := data
-	published.Detection = nil
-	body, err := json.Marshal(published)
+	body, err := json.Marshal(data)
 	if err != nil {
 		return Result{}, err
 	}
@@ -428,8 +424,6 @@ func (e *Engine) readInstructionFacts(id string) (instructionData, error) {
 			i.Text = "Launch the worker with: devkit-instruction " + id
 		case form.InstructionJudgment, form.InstructionPlanCheck:
 			i.Text = "Launch the assigned judge with: devkit-instruction " + id
-		case form.InstructionDetectionTest:
-			i.Text = "Run the detection test with the assigned judge: devkit-instruction " + id
 		case form.InstructionQuestion:
 			for _, r := range records {
 				if question, ok := r.Payload.(*ledger.Question); ok && question.ID == meta.QuestionID {
@@ -438,7 +432,7 @@ func (e *Engine) readInstructionFacts(id string) (instructionData, error) {
 				}
 			}
 		}
-		return instructionData{Instruction: i, Reference: meta.Reference, Origin: meta.Origin, PatternName: meta.PatternName, Request: meta.Request, Detection: meta.Detection, Context: meta.Context, Inputs: meta.Inputs, RoundID: meta.RoundID}, nil
+		return instructionData{Instruction: i, Reference: meta.Reference, Origin: meta.Origin, PatternName: meta.PatternName, Request: meta.Request, Context: meta.Context, Inputs: meta.Inputs, RoundID: meta.RoundID}, nil
 	}
 	return instructionData{}, fmt.Errorf("instruction not found: %s", id)
 }
@@ -517,8 +511,6 @@ func (e *Engine) buildInstructionBrief(ctx context.Context, meta ledger.Instruct
 		return e.judgmentBrief(ctx, data)
 	case form.InstructionJudgmentBrief:
 		return e.regenerateJudgmentBrief(ctx, state, meta)
-	case form.InstructionDetectionTest:
-		return e.detectionBrief(ctx, data)
 	case form.InstructionQuestion:
 		text, err := form.RenderMarkdown(*data.Instruction.Question)
 		return brief.Brief{Text: text}, err
@@ -962,7 +954,7 @@ func (e *Engine) recordInstruction(meta ledger.Instruction, data instructionData
 	meta.Reference, meta.Runner, meta.TargetPath = data.Reference, data.Instruction.Runner, data.Instruction.TargetPath
 	meta.PatternName, meta.Origin = data.PatternName, data.Origin
 	meta.Inputs = slices.Clone(data.Inputs)
-	meta.Request, meta.Detection = data.Request, data.Detection
+	meta.Request = data.Request
 	if data.Request != nil {
 		request := *data.Request
 		request.Norms = slices.Clone(request.Norms)

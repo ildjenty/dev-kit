@@ -237,7 +237,7 @@ func (e *Engine) validateAnswerTree(ctx context.Context, state *ledger.State, qu
 			if err := e.refreshQuestionEvidence(ctx, state, &replacement); err != nil {
 				return err
 			}
-			if round, ok := state.OpenRound(); ok && round.ReturnedTarget != nil && question.StopCategory != "detection_failed" {
+			if round, ok := state.OpenRound(); ok && round.ReturnedTarget != nil {
 				if err = e.replaceQuestionTarget(ctx, round, actual); err != nil {
 					return err
 				}

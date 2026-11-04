@@ -28,4 +28,4 @@ When claiming completion, fill `report` according to this stage's selected repor
 
 Make inclusions, exclusions, and externally visible behavior explicit. Show the list of difficult-to-change decisions, unverified matters needed to decide them, and when to finalize them. Do not begin dependent implementation, publication, or storage while matters affecting the choice remain unverified.
 
-All required checks valid for the returned target and norms are `PASS`, the detection requirements in `examples/README.md` are satisfied, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.
+All required checks valid for the returned target and norms are `PASS`, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.

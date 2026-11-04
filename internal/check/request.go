@@ -10,9 +10,8 @@ import (
 type RequestKind string
 
 const (
-	RoundRequest     RequestKind = "round"
-	PlanRequest      RequestKind = "plan"
-	DetectionRequest RequestKind = "detection"
+	RoundRequest RequestKind = "round"
+	PlanRequest  RequestKind = "plan"
 )
 
 // Norm holds a fixed norm identity and content. Provide the brief and plan as norms too.
@@ -46,7 +45,6 @@ type RequestInput struct {
 	Progress               *form.Progress
 	PreviousFindings       []Finding
 	Authorizations         []Authorization
-	DetectionExamples      []DetectionExample
 }
 
 // Request holds judgment request content for brief without composing the request text.
@@ -62,7 +60,7 @@ func PrepareRequest(input RequestInput) (Request, error) {
 		if input.Progress == nil {
 			return Request{}, fmt.Errorf("round judgment requires a termination block")
 		}
-	case PlanRequest, DetectionRequest:
+	case PlanRequest:
 	default:
 		return Request{}, fmt.Errorf("unknown judgment request kind: %q", input.Kind)
 	}

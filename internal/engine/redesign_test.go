@@ -72,17 +72,6 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 				t.Fatalf("missing instruction: %+v", result)
 			}
 			switch result.Instruction.Kind {
-			case form.InstructionDetectionTest:
-				body, err := e.instructionBrief(result.Instruction.ID)
-				if err != nil {
-					t.Fatal(err)
-				}
-				for _, forbidden := range []string{`"expected":`, `"kind": "violation"`, `"spec":`, `"file": "violation.md"`} {
-					if strings.Contains(string(body), forbidden) {
-						t.Fatalf("detection leaked %s", forbidden)
-					}
-				}
-				acceptDetectionResult(t, e, result.Instruction)
 			case form.InstructionPlanCheck, form.InstructionJudgment:
 				data, err := e.readInstruction(result.Instruction.ID)
 				if err != nil {
@@ -251,32 +240,6 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	}
 }
 
-func TestDetectionCanBeDisabled(t *testing.T) {
-	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n"))
-	git(t, e.Root(), "add", ".")
-	git(t, e.Root(), "commit", "-qm", "Disable detection tests")
-	started, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	planResult(t, e, started)
-	review, err := e.Next(ctx)
-	if err != nil || review.Instruction == nil || review.Instruction.Kind != form.InstructionPlanCheck {
-		t.Fatalf("disabled detection was issued: %+v, %v", review, err)
-	}
-	data, err := e.readInstruction(review.Instruction.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	collect(t, e, review.Instruction, pass(*data.Request))
-	work, err := e.Next(ctx)
-	work = approvedNext(t, e, work)
-	if err != nil || work.Instruction == nil || work.Instruction.Kind != form.InstructionWork {
-		t.Fatalf("plan did not run without a detection pass: %+v, %v", work, err)
-	}
-}
-
 func TestGitSettingsAndEmptyStage(t *testing.T) {
 	for _, empty := range []bool{false, true} {
 		name := "changed"
@@ -285,7 +248,7 @@ func TestGitSettingsAndEmptyStage(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			e, ctx := fixture(t)
-			write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\ndefault_plan = 'test'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[git]\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n[detection]\nrequired = false\n"))
+			write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\ndefault_plan = 'test'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[git]\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n"))
 			git(t, e.Root(), "add", ".")
 			git(t, e.Root(), "commit", "-qm", "Configure git behavior")
 			head := git(t, e.Root(), "rev-parse", "HEAD")

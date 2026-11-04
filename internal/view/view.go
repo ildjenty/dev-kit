@@ -217,7 +217,6 @@ func metricFields(m ledger.Metrics) []field {
 		{"Rounds by definition", strings.Join(definitions, "; ")},
 		{"Human stops", fmt.Sprintf("%d. %s", m.HumanStops, strings.Join(reasons, "; "))},
 		{"Assignee changes", fmt.Sprint(m.AssigneeChanges)},
-		{"Detection tests", fmt.Sprint(m.DetectionTests)},
 		{"Request sizes", fmt.Sprintf("%d briefs, %d bytes in total, largest %d bytes, %d with overflow files", m.Briefs, m.BriefBytes, m.LargestBrief, m.BriefOverflows)},
 	}
 }

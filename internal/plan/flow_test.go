@@ -97,7 +97,7 @@ func TestFlowSchemaRestrictions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"runner", "criteria", "examples", "history", "schemas", "outputs", "brief_by_planner"} {
+	for _, field := range []string{"runner", "criteria", "history", "schemas", "outputs", "brief_by_planner"} {
 		body := strings.Replace(string(data), `"aspect":"wording"`, `"aspect":"wording","`+field+`":null`, 1)
 		if _, err := v.ParsePlan([]byte(body)); err == nil {
 			t.Fatalf("accepted check configuration in a plan: %s", field)

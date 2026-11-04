@@ -57,10 +57,10 @@ git の運用は計画のステージの入力で選ぶ `git` ソースの散文
 
 ## 利用者が組むもの
 
-利用者は `init` が配る既定を起点に、リポジトリが所有する規範と検査を育てる。知識の接続先と配置は `devkit.toml` の `[sources.<名前>]` で変更できる。必須の「選ぶ」を持つアダプタで接続し、規範はソース全体を固定する。リポジトリ外のソースは読み取り専用である。既定は `files` である。検出試験の索引は `[state] detect`(既定 `.devkit/detect.json`)で設定する。
+利用者は `init` が配る既定を起点に、リポジトリが所有する規範と検査を育てる。知識の接続先と配置は `devkit.toml` の `[sources.<名前>]` で変更できる。必須の「選ぶ」を持つアダプタで接続し、規範はソース全体を固定する。リポジトリ外のソースは読み取り専用である。既定は `files` である。
 
 1. **パターンと決まり**: `.devkit/plans/<name>.json` に参考を置き、`devkit.toml` の `[[loop.stage]]` と `[[loop.path]]` に絶対に守らせる決まりを置く。計画者が毎回組む計画を、採用済みの完了した実体を含む経路で検査する。
-2. **判定の基準と例**: `[checks.<観点>]` に runner と基準・例・スキーマ・経緯の選び方を定める。 `.devkit/principles/` の原則と用途別文書、`.devkit/checks/<観点ID>/` の検出試験の例と仕様を育てる。check は `criteria` と `examples` で文書を明示して選ぶ。[検出試験](architecture/guarantees.md#検出試験)で観点の判定能力を確かめる。
+2. **判定の基準**: `[checks.<観点>]` に runner と基準・スキーマ・経緯の選び方を定める。`.devkit/principles/` の原則と用途別文書を育てる。check は `criteria` で基準の文書を明示して選ぶ。
 3. **検証コマンド(`[commands.<name>]`)**: パターンの `command:<name>` の check(終了コードによる検証)から使う。テストのないリポジトリでも、必須の `command:test` の指摘を受けて作業の中で仕組みと登録を作る。期限は登録ごとに必須である。
 4. **pre-commit**: リポジトリで有効な pre-commit にテストと lint を書く。既存の hook の扱いと実行は[完了条件](architecture/guarantees.md#完了条件)に従う([例](architecture/examples.md#pre-commit))。
 5. **ステージ・テンプレート・規則**: `.devkit/stages/`、`.devkit/templates/`、`.devkit/rules.md` を育てる。作業をまたぐ要件は `.devkit/requirements.md`、構造は `.devkit/structure.json` に残す。規範と成果の区別は[リポジトリ側の構成](repository.md#リポジトリ側の構成)に従う。

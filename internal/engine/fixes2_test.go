@@ -17,70 +17,6 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
-func TestDetectionIndexUsesInstructionReferenceOnAcceptAndRestore(t *testing.T) {
-	e, ctx := fixture(t)
-	settings, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	write(t, e.Root(), "devkit.toml", string(settings)+"\n[state]\ndetect = '.devkit/fixed-detect.json'\n")
-	git(t, e.Root(), "add", ".")
-	git(t, e.Root(), "commit", "-qm", "Configure detection index path")
-	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	planResult(t, e, start)
-	detection, err := e.Next(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	data, err := e.readInstruction(detection.Instruction.ID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	settings, err = os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	write(t, e.Root(), "devkit.toml", strings.Replace(string(settings), ".devkit/fixed-detect.json", ".devkit/uncommitted-detect.json", 1))
-	acceptDetectionResult(t, e, detection.Instruction)
-	review, err := e.Next(ctx)
-	if err != nil || review.Instruction.Kind != form.InstructionPlanCheck {
-		t.Fatalf("result was not accepted with an uncommitted detect path: %+v, %v", review, err)
-	}
-	index := filepath.Join(e.Root(), ".devkit/fixed-detect.json")
-	if _, err := os.Stat(index); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(e.Root(), ".devkit/uncommitted-detect.json")); !os.IsNotExist(err) {
-		t.Fatalf("uncommitted detection path was used: %v", err)
-	}
-	state, err := e.load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	records, err := e.records()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, record := range records {
-		if meta, ok := record.Payload.(*ledger.Instruction); ok && meta.ID == detection.Instruction.ID {
-			if err := os.Remove(index); err != nil {
-				t.Fatal(err)
-			}
-			if _, _, err := e.restoreDetection(ctx, state, *meta, data); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := os.Stat(index); err != nil {
-				t.Fatal(err)
-			}
-			return
-		}
-	}
-	t.Fatal("detection instruction missing")
-}
-
 func TestReplanNotAssessedHumanRevisionKeepsRemainingWork(t *testing.T) {
 	e, ctx := fixture(t)
 	source, err := e.asset(ctx, "HEAD", "plans/test.json")
@@ -142,71 +78,6 @@ func TestReplanNotAssessedHumanRevisionKeepsRemainingWork(t *testing.T) {
 	after, err := e.readInstruction(revised.Instruction.ID)
 	if err != nil || after.Origin != plan.BackProposal || !reflect.DeepEqual(before.Context.RemainingPlan, after.Context.RemainingPlan) {
 		t.Fatalf("human revision lost replan kind or remaining work: %+v, %v", after, err)
-	}
-}
-
-func TestDetectionHistoryIncludesPassedAndFailedCases(t *testing.T) {
-	for _, passed := range []bool{true, false} {
-		t.Run(map[bool]string{true: "passed", false: "failed"}[passed], func(t *testing.T) {
-			e, ctx := fixture(t)
-			start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			planResult(t, e, start)
-			detection, err := e.Next(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			data, err := e.readInstruction(detection.Instruction.ID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			result := form.DetectionResult{InstructionID: detection.Instruction.ID}
-			for _, example := range data.Detection.Spec.Cases {
-				j := pass(*data.Request)
-				j.Judgment = example.Expected
-				if example.Kind == check.Violation {
-					j.Findings = []form.Finding{{ID: "history-finding", Blocking: true, Kind: form.AutoFixable, Scenario: "Detection history finding"}}
-					if !passed {
-						j.Judgment, j.Findings = form.Pass, []form.Finding{}
-					}
-				} else {
-					j.Findings = []form.Finding{{ID: "reference", Kind: form.AutoFixable, Scenario: "Detection history reference finding"}}
-				}
-				result.Observations = append(result.Observations, observed(example.ID, j, "Case assessment reason"))
-			}
-			collect(t, e, detection.Instruction, result)
-			if _, err := e.Next(ctx); err != nil {
-				t.Fatal(err)
-			}
-			state, err := e.load()
-			if err != nil {
-				t.Fatal(err)
-			}
-			meta := ledger.Instruction{ID: "history"}
-			path, err := e.historyIndex(state, &meta, historyScope{Kind: plan.HistoryAll}, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			history, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, want := range []string{"detection_test", `"cases"`, `"observation"`, `"expected"`, `"passed": ` + map[bool]string{true: "true", false: "false"}[passed], "Case assessment reason"} {
-				if !strings.Contains(string(history), want) {
-					t.Fatalf("history omitted %q", want)
-				}
-			}
-			if !passed {
-				q := state.UnansweredQuestions()[0]
-				for _, want := range []string{"human must commit", "out-of-round", "not required", "[detection] required = false"} {
-					if !strings.Contains(q.Text, want) {
-						t.Fatalf("detection failure question omitted %q: %s", want, q.Text)
-					}
-				}
-			}
-		})
 	}
 }
 
@@ -397,11 +268,6 @@ func TestPlanCheckKeepsOriginalRequestAndStartTask(t *testing.T) {
 				t.Fatal(err)
 			}
 			planResult(t, e, start)
-			detection, err := e.Next(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			acceptDetectionResult(t, e, detection.Instruction)
 			review, err := e.Next(ctx)
 			if err != nil {
 				t.Fatal(err)
@@ -430,8 +296,8 @@ func TestPlanCheckKeepsOriginalRequestAndStartTask(t *testing.T) {
 	}
 }
 
-func TestMalformedJudgeAndDetectionResultsReissue(t *testing.T) {
-	for _, kind := range []form.InstructionKind{form.InstructionPlanCheck, form.InstructionDetectionTest, form.InstructionJudgment} {
+func TestMalformedJudgeResultsReissue(t *testing.T) {
+	for _, kind := range []form.InstructionKind{form.InstructionPlanCheck, form.InstructionJudgment} {
 		t.Run(string(kind), func(t *testing.T) {
 			e, ctx := fixture(t)
 			configureStage(t, e, func(s *plan.Stage) {
@@ -445,13 +311,6 @@ func TestMalformedJudgeAndDetectionResultsReissue(t *testing.T) {
 			result, err := e.Next(ctx)
 			if err != nil {
 				t.Fatal(err)
-			}
-			if kind != form.InstructionDetectionTest {
-				acceptDetectionResult(t, e, result.Instruction)
-				result, err = e.Next(ctx)
-				if err != nil {
-					t.Fatal(err)
-				}
 			}
 			if kind == form.InstructionJudgment {
 				data, err := e.readInstruction(result.Instruction.ID)
@@ -492,21 +351,13 @@ func TestMalformedJudgeAndDetectionResultsReissue(t *testing.T) {
 			for i := range before.Request.Norms {
 				before.Request.Norms[i].Content = strings.ReplaceAll(before.Request.Norms[i].Content, result.Instruction.ID+"-history.md", reissued.Instruction.ID+"-history.md")
 			}
-			if kind == form.InstructionDetectionTest {
-				if before.Context != nil && before.Context.WorkHistory != "" || after.Context != nil && after.Context.WorkHistory != "" {
-					t.Fatal("detection request received a work history")
-				}
-			} else if before.Context.WorkHistory != after.Context.WorkHistory {
+			if before.Context.WorkHistory != after.Context.WorkHistory {
 				t.Fatal("reissued request changed fixed history contents")
 			}
-			if !reflect.DeepEqual(before.Request, after.Request) || before.Reference != after.Reference || !reflect.DeepEqual(before.Detection, after.Detection) {
+			if !reflect.DeepEqual(before.Request, after.Request) || before.Reference != after.Reference {
 				t.Fatal("reissued request changed fixed judgment inputs")
 			}
-			if kind == form.InstructionDetectionTest {
-				acceptDetectionResult(t, e, reissued.Instruction)
-			} else {
-				collect(t, e, reissued.Instruction, pass(*after.Request))
-			}
+			collect(t, e, reissued.Instruction, pass(*after.Request))
 			if _, err := e.Next(ctx); err != nil {
 				t.Fatal(err)
 			}

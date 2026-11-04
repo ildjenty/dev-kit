@@ -35,31 +35,26 @@ max_total_rounds = 40
 description = "Checks that the purpose and completion conditions preserve the human request."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/purpose.md" }]
-examples = { source = "examples", select = "purpose/spec.json" }
 
 [checks."irreversible"]
 description = "Checks difficult-to-change decisions, alternatives, and approval grounds."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/irreversible.md" }, { source = "principles", select = "designing.md" }]
-examples = { source = "examples", select = "irreversible/spec.json" }
 
 [checks."structure"]
 description = "Checks responsibility boundaries, dependencies, and structure records."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/structure.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "structure.md" }, { source = "principles", select = "data.md" }]
-examples = { source = "examples", select = "structure/spec.json" }
 
 [checks."contract"]
 description = "Checks public contracts, input validation, data ownership, and failures."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/contract.md" }, { source = "principles", select = "data.md" }, { source = "principles", select = "engineering.md" }]
-examples = { source = "examples", select = "contract/spec.json" }
 
 [checks."steps"]
 description = "Checks implementation order and verifiable completion steps."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/steps.md" }]
-examples = { source = "examples", select = "steps/spec.json" }
 
 [checks."command:test"]
 description = "Runs the registered test command."
@@ -69,13 +64,11 @@ runner = "command:test"
 description = "Checks test coverage and meaningful assertions through user entry points."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/test.md" }, { source = "principles", select = "testing.md" }]
-examples = { source = "examples", select = "test/spec.json" }
 
 [checks."diff"]
 description = "Checks the cumulative diff against scope, quality principles, and rules."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/diff.md" }, { source = "principles", select = "engineering.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "writing.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "security.md" }, { source = "templates", select = "pr.md.tmpl" }, { source = "rules", select = "" }]
-examples = { source = "examples", select = "diff/spec.json" }
 
 [checks."command:e2e"]
 description = "Runs the registered end-to-end verification command."
@@ -85,20 +78,17 @@ runner = "command:e2e"
 description = "Checks completion scenarios against end-to-end execution evidence."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/behavior.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "testing.md" }, { source = "principles", select = "ui.md" }, { source = "rules", select = "" }]
-examples = { source = "examples", select = "behavior/spec.json" }
 
 [checks."harness"]
 description = "Checks lessons, recurrence prevention, requirements, and loop quality."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/harness.md" }, { source = "principles", select = "harness.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "review/README.md" }, { source = "stages", select = "README.md" }, { source = "stages", select = "retrospective.md" }, { source = "plans", select = "README.md" }, { source = "examples", select = "README.md" }, { source = "templates", select = "brief/judgment.md.tmpl" }]
-examples = { source = "examples", select = "harness/spec.json" }
+criteria = [{ source = "principles", select = "review/harness.md" }, { source = "principles", select = "harness.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "review/README.md" }, { source = "stages", select = "README.md" }, { source = "stages", select = "retrospective.md" }, { source = "plans", select = "README.md" }, { source = "templates", select = "brief/judgment.md.tmpl" }]
 history = "all"
 
 [checks."wording"]
 description = "Checks clarity, accuracy, and consistency of wording."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/wording.md" }, { source = "principles", select = "writing.md" }, { source = "templates", select = "pr.md.tmpl" }]
-examples = { source = "examples", select = "wording/spec.json" }
 
 [[loop.stage]]
 definition = "implement"
