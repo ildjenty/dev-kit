@@ -41,7 +41,24 @@ func write(t *testing.T, root, name, content string) {
 		t.Fatal(err)
 	}
 }
+
+// fixture configures the session as the worker (a work role without an agent), the
+// configuration kept for repositories that do not delegate work to subagents. The "agent"
+// role keeps a devkit-worker subagent available for worktree units.
 func fixture(t *testing.T) (*Engine, context.Context) {
+	t.Helper()
+	return fixtureWith(t, func(settings string) string {
+		return strings.Replace(settings, `agent = "devkit-worker"`, `agent = ""`, 1) + "\n[roles.agent]\nkind = 'work'\nagent = 'devkit-worker'\n"
+	})
+}
+
+// defaultFixture keeps the installed roles, where the worker is the devkit-worker subagent.
+func defaultFixture(t *testing.T) (*Engine, context.Context) {
+	t.Helper()
+	return fixtureWith(t, func(settings string) string { return settings })
+}
+
+func fixtureWith(t *testing.T, roles func(string) string) (*Engine, context.Context) {
 	t.Helper()
 	for _, variable := range os.Environ() {
 		name, _, _ := strings.Cut(variable, "=")
@@ -74,7 +91,8 @@ func fixture(t *testing.T) (*Engine, context.Context) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, root, "devkit.toml", string(settings)+"\n[approval]\nplan = 'deviation'\n")
+	configured := roles(string(settings))
+	write(t, root, "devkit.toml", configured+"\n[approval]\nplan = 'deviation'\n")
 	template := plan.PlanTemplate{Name: "test", StartStage: "implement", Stages: []plan.Stage{{ID: "implement", Assignee: plan.Worker, Gate: plan.Gate{Reason: "Documentation task"}, Checks: []plan.Check{}, Limits: plan.Limits{MaxRounds: 3, MaxNoProgress: 2}, Transitions: plan.Transitions{Fix: "implement", Ask: "implement", Back: "implement"}}}, OptionalStages: []plan.Stage{}}
 	source, err := json.Marshal(template)
 	if err != nil {
@@ -138,6 +156,23 @@ func planResult(t *testing.T, e *Engine, start Result) plan.Plan {
 	collect(t, e, start.Instruction, form.PlannerResult{InstructionID: start.Instruction.ID, Plan: marshal(t, p)})
 	return p
 }
+
+// ask returns a confirmation request without a recommendation.
+func ask(text string) *form.Confirmation {
+	return &form.Confirmation{Text: text, Options: []string{}, Evidence: []form.Reference{}}
+}
+
+// observed reduces a judgment to the compact detection observation format.
+func observed(id string, j form.JudgmentResult, reason string) form.DetectionObservation {
+	observation := form.DetectionObservation{ID: id, Judgment: j.Judgment, Blocking: []form.DetectionFinding{}, Reason: reason}
+	for _, finding := range j.Findings {
+		if finding.Blocking {
+			observation.Blocking = append(observation.Blocking, form.DetectionFinding{Scenario: finding.Scenario})
+		}
+	}
+	return observation
+}
+
 func acceptDetectionResult(t *testing.T, e *Engine, instruction *form.Instruction) {
 	t.Helper()
 	data, err := e.readInstruction(instruction.ID)
@@ -151,7 +186,7 @@ func acceptDetectionResult(t *testing.T, e *Engine, instruction *form.Instructio
 		if example.Kind == check.Violation {
 			j.Findings = []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "The example violates the stated blocking condition"}}
 		}
-		result.Observations = append(result.Observations, form.DetectionObservation{File: example.ID, Judgment: j, Reason: "The actual finding matches the intended distinction"})
+		result.Observations = append(result.Observations, observed(example.ID, j, "The actual finding matches the intended distinction"))
 	}
 	collect(t, e, instruction, result)
 }
@@ -255,6 +290,7 @@ func TestLifecycleAndIdempotentNext(t *testing.T) {
 }
 func TestPauseWithoutLockAndBranchMismatch(t *testing.T) {
 	e, ctx := fixture(t)
+	started := git(t, e.Root(), "branch", "--show-current")
 	work := working(t, e, ctx)
 	lock, err := e.store().Lock()
 	if err != nil {
@@ -279,7 +315,7 @@ func TestPauseWithoutLockAndBranchMismatch(t *testing.T) {
 	if _, err = e.Resume(ctx); err == nil {
 		t.Fatal("resumed on a different branch")
 	}
-	git(t, e.Root(), "switch", "devkit/"+e.workID)
+	git(t, e.Root(), "switch", started)
 	if _, err = e.Resume(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -328,7 +364,7 @@ func observeAnswer(t *testing.T, e *Engine, text string) {
 func TestAnswerKeepsObservedInputAndCorrection(t *testing.T) {
 	e, ctx := fixture(t)
 	work := working(t, e, ctx)
-	_, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationQuestion, Obstacles: []string{"Choose the documentation scope"}}))
+	_, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationQuestion, Confirmation: ask("Confirm how to continue."), Obstacles: []string{"Choose the documentation scope"}}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -607,10 +643,7 @@ func TestJudgeAcceptanceUsesFirstCollectedResult(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	hasPlan := false
-	for _, norm := range request.Request.Norms {
-		hasPlan = hasPlan || strings.Contains(norm.Content, "Agreed plan")
-	}
+	hasPlan := strings.Contains(briefText(t, review.Instruction), "Agreed plan")
 	if request.Request.Progress == nil || !hasPlan {
 		t.Fatal("judgment omitted progress or the agreed plan")
 	}

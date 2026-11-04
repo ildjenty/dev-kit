@@ -150,10 +150,12 @@ func TestSelectionAndDeviations(t *testing.T) {
 		{Kind: RemovedStage, StageID: "scope"},
 		{Kind: RemovedStage, StageID: "structure"},
 		{Kind: RemovedStage, StageID: "steps"},
+		{Kind: RemovedStage, StageID: "verification"},
 		{Kind: ChangedTransition, StageID: "research", Transition: Done},
 		{Kind: ChangedTransition, StageID: "contract", Transition: Back},
 		{Kind: ChangedTransition, StageID: "contract", Transition: Done},
 		{Kind: ChangedTransition, StageID: "implement", Transition: Back},
+		{Kind: ChangedTransition, StageID: "implement", Transition: Done},
 	}
 	if got := Deviations(template, selected); !reflect.DeepEqual(got, wantSelection) {
 		t.Fatalf("stage selection deviations: got %+v, want %+v", got, wantSelection)
@@ -172,13 +174,15 @@ func TestSelectionAndDeviations(t *testing.T) {
 		{Kind: RemovedStage, StageID: "purpose"},
 		{Kind: RemovedStage, StageID: "scope"},
 		{Kind: RemovedStage, StageID: "structure"},
+		{Kind: RemovedStage, StageID: "verification"},
 		{Kind: ChangedTransition, StageID: "contract", Transition: Back},
+		{Kind: ChangedTransition, StageID: "implement", Transition: Done},
 	}
 	if got := Deviations(template, leading); !reflect.DeepEqual(got, wantLeading) {
 		t.Fatalf("omitted leading stages and redirected transitions: %+v", got)
 	}
 	leading.StartStage = "implement"
-	wantLeading = append(wantLeading[:3], append([]Deviation{{Kind: ChangedStartStage, StageID: "implement"}}, wantLeading[3:]...)...)
+	wantLeading = append(wantLeading[:4], append([]Deviation{{Kind: ChangedStartStage, StageID: "implement"}}, wantLeading[4:]...)...)
 	if got := Deviations(template, leading); !reflect.DeepEqual(got, wantLeading) {
 		t.Fatalf("missed a change to a retained start stage: %+v", got)
 	}
@@ -265,7 +269,7 @@ func TestOptionalStageTransitionRedirection(t *testing.T) {
 		t.Fatalf("optional stage transitions were not redirected: %+v", stage.Transitions)
 	}
 	got := Deviations(template, selected)
-	if len(got) != 11 {
+	if len(got) != 13 {
 		t.Fatalf("redirected stage transition deviations: %+v", got)
 	}
 	for _, action := range []Transition{Fix, Ask, Back, Done} {
@@ -292,7 +296,9 @@ func TestStageSelectionRequiresTransitionApproval(t *testing.T) {
 		{Kind: RemovedStage, StageID: "structure"},
 		{Kind: RemovedStage, StageID: "contract"},
 		{Kind: RemovedStage, StageID: "steps"},
+		{Kind: RemovedStage, StageID: "verification"},
 		{Kind: ChangedTransition, StageID: "implement", Transition: Back},
+		{Kind: ChangedTransition, StageID: "implement", Transition: Done},
 	}
 	if got := Deviations(template, selected); !reflect.DeepEqual(got, want) {
 		t.Fatalf("stage selection deviations: got %+v, want %+v", got, want)

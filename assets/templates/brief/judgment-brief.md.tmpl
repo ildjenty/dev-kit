@@ -1,0 +1,31 @@
+# Pre-judgment planner instruction
+
+Instruction ID: {{.InstructionID}}
+
+Write how to check this round for the `{{.Check.Aspect}}` check run by `{{.Check.Runner}}`. Your instructions are supplementary: they are given to the judge verbatim, they cannot narrow the fixed criteria or the scope to check, and the judge still receives the original diff, reports, plan, and requirements separately. Point the judge at the parts of the change and report that need the closest look, and at scenarios worth confirming. Do not judge the round yourself and do not edit any file.
+
+## Plan
+
+```json
+{{.PlanJSON}}
+```
+{{if .Check.Instructions}}
+## Plan instructions for this check
+{{range .Check.Instructions}}
+- {{.}}
+{{end}}{{end}}{{if .Requirements.Path}}
+## Repository requirements
+
+Reference: requirements.md -> {{.Requirements.Path}}
+
+{{.Requirements.Content}}
+{{end}}
+## Round report and diff
+
+{{.CurrentMaterial}}
+
+## Returning the result
+
+Return only a JSON object as your final message, with `instruction_id` set to {{.InstructionIDJSON}} and `instructions` as an array of strings.
+
+{{.OutputSchema}}

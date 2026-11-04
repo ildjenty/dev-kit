@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Retrospective report",
+  "description": "Worker-reported material, not independent evidence of completion.",
+  "type": "object",
+  "properties": {
+    "problems": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "problem": {
+            "type": "string",
+            "minLength": 1
+          },
+          "should_have_caught": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destination": {
+            "type": "string",
+            "minLength": 1
+          },
+          "change": {
+            "type": "string"
+          },
+          "no_change_reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "problem",
+          "should_have_caught",
+          "destination",
+          "change",
+          "no_change_reason"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "requirements_updates": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "norm_assessment": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "problems",
+    "requirements_updates",
+    "norm_assessment"
+  ],
+  "additionalProperties": false
+}

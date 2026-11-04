@@ -46,7 +46,7 @@ func TestBundledCriteriaSelectTheirRequiredDocuments(t *testing.T) {
 			t.Fatalf("%s does not express default role inputs as data", name)
 		}
 		for _, stage := range append(template.Stages, template.OptionalStages...) {
-			if !slices.Equal(stage.Inputs, plan.DefaultInputs()) {
+			if !slices.Equal(stage.Inputs, append(plan.DefaultInputs(), plan.Selection{Source: "git"})) {
 				t.Fatalf("%s/%s does not express worker inputs as data", name, stage.ID)
 			}
 			checks = append(checks, stage.Checks...)

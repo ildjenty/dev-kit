@@ -52,12 +52,16 @@ func TestProgressExample(t *testing.T) {
 		t.Fatalf("Parsed termination block: %+v", progress)
 	}
 	for _, kind := range []TerminationKind{TerminationCompleted, TerminationQuestion, TerminationStopped} {
-		data, err := json.Marshal(Progress{InstructionID: "work-instruction", TerminationKind: kind})
+		progress := Progress{InstructionID: "work-instruction", TerminationKind: kind}
+		if kind == TerminationQuestion {
+			progress.Confirmation = &Confirmation{Text: "Which scope should be used?", Options: []string{}, Evidence: []Reference{}}
+		}
+		data, err := json.Marshal(progress)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if err := schemaFor(t, "progress").Validate(data); err != nil {
-			t.Fatalf("Required kind-specific fields not specified by the source of truth: %v", err)
+			t.Fatalf("Valid termination block was rejected: %v", err)
 		}
 	}
 }

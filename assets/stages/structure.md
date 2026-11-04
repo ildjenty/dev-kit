@@ -24,6 +24,8 @@ Updated `structure.json` following the bundled `schemas/structure.json` at the w
 
 ## Completion conditions
 
+When claiming completion, fill `report` according to this stage's selected report JSON Schema supplied in the brief. When asking the human, use `termination_kind: "confirmation-required"` and fill `confirmation` with the verbatim question (`text`), `options`, `recommendation`, `recommendation_reason`, and material references (`evidence`). Leave the recommendation and reason empty when no recommendation is supported. A question or stop may include a partial report conforming to the supplied fields; only a completion claim requires the full report. Schema conformance is not evidence of completion.
+
 Reflect modules, responsibilities, placement, and dependency direction in the structure record using `schemas/structure.json`. Show existing locations to follow, rejected alternatives and reasons, and unverified premises. Provide recovery methods when needed. Finalize difficult-to-change placement only after resolving unverified matters affecting the choice.
 
 All required checks valid for the returned target and norms are `PASS`, the detection requirements in `examples/README.md` are satisfied, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.

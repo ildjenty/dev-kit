@@ -77,7 +77,8 @@
                   ]
                 }
               }
-            }
+            },
+            "description": "Task-specific instructions are allowed on stages, checks and units; templates cannot contain instructions."
           }
         ]
       }

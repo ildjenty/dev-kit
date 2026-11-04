@@ -171,7 +171,7 @@ func TestDetectionHistoryIncludesPassedAndFailedCases(t *testing.T) {
 				} else {
 					j.Findings = []form.Finding{{ID: "reference", Kind: form.AutoFixable, Scenario: "Detection history reference finding"}}
 				}
-				result.Observations = append(result.Observations, form.DetectionObservation{File: example.ID, Judgment: j, Reason: "Case assessment reason"})
+				result.Observations = append(result.Observations, observed(example.ID, j, "Case assessment reason"))
 			}
 			collect(t, e, detection.Instruction, result)
 			if _, err := e.Next(ctx); err != nil {
@@ -182,7 +182,7 @@ func TestDetectionHistoryIncludesPassedAndFailedCases(t *testing.T) {
 				t.Fatal(err)
 			}
 			meta := ledger.Instruction{ID: "history"}
-			path, err := e.workHistory(state, &meta)
+			path, err := e.historyIndex(state, &meta, historyScope{Kind: plan.HistoryAll}, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -190,7 +190,7 @@ func TestDetectionHistoryIncludesPassedAndFailedCases(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, want := range []string{"detection_test", `"cases"`, `"observation"`, `"expected"`, `"passed": ` + map[bool]string{true: "true", false: "false"}[passed], "Case assessment reason", "Detection history reference finding"} {
+			for _, want := range []string{"detection_test", `"cases"`, `"observation"`, `"expected"`, `"passed": ` + map[bool]string{true: "true", false: "false"}[passed], "Case assessment reason"} {
 				if !strings.Contains(string(history), want) {
 					t.Fatalf("history omitted %q", want)
 				}
@@ -254,7 +254,7 @@ func TestFixRoundDiffAndClassificationAreCumulative(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	serialized := string(marshal(t, data.Request))
+	serialized := briefText(t, review.Instruction)
 	for _, want := range []string{"go.mod", ".agents/skills/example/SKILL.md", "README.md"} {
 		if !strings.Contains(serialized, want) {
 			t.Fatalf("second round diff omitted %q", want)

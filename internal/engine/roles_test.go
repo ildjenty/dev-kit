@@ -89,7 +89,7 @@ func TestHumanRejectedFixRuleKeepsCumulativeDiff(t *testing.T) {
 
 func TestAgentWorkRoleRunsAsOneWorktreeUnit(t *testing.T) {
 	e, result := roleWork(t, func(stage *plan.Stage) {
-		stage.Assignee = "unit_worker"
+		stage.Assignee = "agent"
 		stage.Checks = []plan.Check{judgeCheck("wording", false)}
 	})
 	if len(result.Instructions) != 1 {
@@ -99,7 +99,7 @@ func TestAgentWorkRoleRunsAsOneWorktreeUnit(t *testing.T) {
 	if unit.Kind != form.InstructionUnitWork || unit.Runner != "devkit-worker" || unit.TargetPath != e.unitPath(unit.ID) {
 		t.Fatalf("wrong worktree runner: %+v", unit)
 	}
-	if !strings.Contains(briefText(t, &unit), "Role ID: unit_worker") {
+	if !strings.Contains(briefText(t, &unit), "Role ID: agent") {
 		t.Fatal("worktree brief omitted the role")
 	}
 	write(t, unit.TargetPath, "unit.txt", "Merged one-unit work.\n")
@@ -193,7 +193,7 @@ func TestRolePlanValidation(t *testing.T) {
 	for _, stage := range []plan.Stage{
 		{ID: "s", Assignee: "missing"},
 		{ID: "s", Assignee: "judge"},
-		{ID: "s", Assignee: "unit_worker", Split: true},
+		{ID: "s", Assignee: "worker", Split: true},
 		{ID: "s", Assignee: "worker", Checks: []plan.Check{{Runner: "planner"}}},
 		{ID: "s", Assignee: "worker", Split: true, Units: []plan.Unit{{Role: "worker"}}},
 		{ID: "s", Assignee: "worker", Transitions: plan.Transitions{FixRules: []plan.FixRule{{Assignee: "human"}}}},
@@ -206,8 +206,8 @@ func TestRolePlanValidation(t *testing.T) {
 
 func TestUndoRoundsPreserveAssigneeWithoutRules(t *testing.T) {
 	stage := plan.Stage{Assignee: plan.Worker, Transitions: plan.Transitions{FixRules: []plan.FixRule{{Assignee: "senior"}}}}
-	decision, err := (&Engine{}).correctionDecision(nil, stage, &ledger.Round{Assignee: "unit_worker"}, router.Decision{Action: plan.Fix, PreserveAssignee: true})
-	if err != nil || decision.Assignee != "unit_worker" || decision.FixRule != 0 {
+	decision, err := (&Engine{}).correctionDecision(nil, stage, &ledger.Round{Assignee: "agent"}, router.Decision{Action: plan.Fix, PreserveAssignee: true})
+	if err != nil || decision.Assignee != "agent" || decision.FixRule != 0 {
 		t.Fatalf("undo changed the assignee: %+v, %v", decision, err)
 	}
 }
@@ -218,7 +218,7 @@ func TestDefaultRolesPreserveInstructionsAndDeviations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for role, agent := range map[string]string{"worker": "", "unit_worker": "devkit-worker", "judge": "devkit-judge", "planner": "devkit-planner", "human": ""} {
+	for role, agent := range map[string]string{"worker": "", "agent": "devkit-worker", "judge": "devkit-judge", "planner": "devkit-planner", "human": ""} {
 		got, err := e.runnerAgent(ctx, "HEAD", role)
 		if err != nil || got != agent {
 			t.Fatalf("default role %s changed instruction runner: %q, %v", role, got, err)
@@ -317,7 +317,7 @@ func TestRoleChangesAppearInPlanApproval(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := plan.NewPlan(template, plan.ContentHash(source), "Review role changes", []plan.CompletionCondition{{ID: "C1", Description: "Correct assignments"}})
-	p.Stages[0].Assignee = "unit_worker"
+	p.Stages[0].Assignee = "agent"
 	p.Stages[0].Transitions.FixRules = []plan.FixRule{{Assignee: "worker"}}
 	state, err := e.load()
 	if err != nil {
@@ -327,7 +327,7 @@ func TestRoleChangesAppearInPlanApproval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"changed_assignee", "changed_fix_rules", "Template: \"worker\"", "Plan: \"unit_worker\"", "\"assignee\": \"worker\""} {
+	for _, want := range []string{"changed_assignee", "changed_fix_rules", "Template: \"worker\"", "Plan: \"agent\"", "\"assignee\": \"worker\""} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("approval omitted %q: %s", want, text)
 		}
@@ -390,7 +390,7 @@ func TestRoleConfigurationAndAgentChangesAreNorms(t *testing.T) {
 
 func TestAgentWorkRoleFixUsesAnotherWorktreeUnit(t *testing.T) {
 	e, result := roleWork(t, func(stage *plan.Stage) {
-		stage.Assignee = "unit_worker"
+		stage.Assignee = "agent"
 		stage.Checks = []plan.Check{judgeCheck("wording", true)}
 	})
 	unit := result.Instructions[0]
@@ -421,7 +421,7 @@ func TestAgentWorkRoleFixUsesAnotherWorktreeUnit(t *testing.T) {
 		t.Fatal(err)
 	}
 	rounds := state.Rounds(state.StageRuns()[0].ID)
-	if len(rounds) != 2 || rounds[1].MergeFix || rounds[1].Assignee != "unit_worker" {
+	if len(rounds) != 2 || rounds[1].MergeFix || rounds[1].Assignee != "agent" {
 		t.Fatalf("fix bypassed its assigned work role: %+v", rounds)
 	}
 }
@@ -452,7 +452,7 @@ func TestWorkerQuestionRejectionUsesFixRules(t *testing.T) {
 	e, work := roleWork(t, func(stage *plan.Stage) {
 		stage.Transitions.FixRules = []plan.FixRule{{When: &plan.FixCondition{HumanRejected: &rejected}, Assignee: "senior"}}
 	})
-	if _, err := e.Submit(t.Context(), marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationQuestion, Obstacles: []string{"Confirm the next edit."}})); err != nil {
+	if _, err := e.Submit(t.Context(), marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationQuestion, Confirmation: ask("Confirm how to continue."), Obstacles: []string{"Confirm the next edit."}})); err != nil {
 		t.Fatal(err)
 	}
 	asked := checkedNext(t, e)

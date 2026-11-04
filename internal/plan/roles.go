@@ -71,10 +71,10 @@ func (t *Transitions) UnmarshalJSON(data []byte) error {
 	return json.Unmarshal(raw.Fix, &t.Fix)
 }
 
-// WorkRole returns the unit's role ID, defaulting to unit_worker.
+// WorkRole returns the unit's role ID, defaulting to worker.
 func (u Unit) WorkRole() string {
 	if u.Role == "" {
-		return "unit_worker"
+		return "worker"
 	}
 	return u.Role
 }

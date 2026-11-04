@@ -402,3 +402,82 @@ func (s *State) ExecutablePlan(template plan.PlanTemplate, norms []form.NormRefe
 	}
 	return plan.ExecutableVersion(template, versions, replanAfter, policy)
 }
+
+// StageMetrics counts the rounds of one stage across all of its runs.
+type StageMetrics struct {
+	StageID string `json:"stage_id"`
+	Runs    int    `json:"runs"`
+	Rounds  int    `json:"rounds"`
+}
+
+// StopCount counts human questions of one stop category.
+type StopCount struct {
+	Category string `json:"category"`
+	Count    int    `json:"count"`
+}
+
+// Metrics is derived from existing records for status and view; it is never stored.
+type Metrics struct {
+	Stages          []StageMetrics `json:"stages"`
+	TotalRounds     int            `json:"total_rounds"`
+	HumanStops      int            `json:"human_stops"`
+	StopReasons     []StopCount    `json:"stop_reasons"`
+	AssigneeChanges int            `json:"assignee_changes"`
+	DetectionTests  int            `json:"detection_tests"`
+	Briefs          int            `json:"briefs"`
+	BriefBytes      int            `json:"brief_bytes"`
+	LargestBrief    int            `json:"largest_brief"`
+	BriefOverflows  int            `json:"brief_overflows"`
+}
+
+// Metrics counts per-work rounds by stage, human stops and their reasons, assignee changes,
+// detection tests, and request sizes. Counts never decrease after backs or replans.
+func (s *State) Metrics() Metrics {
+	m := Metrics{Stages: []StageMetrics{}, StopReasons: []StopCount{}}
+	for _, run := range s.StageRuns() {
+		index := slices.IndexFunc(m.Stages, func(item StageMetrics) bool { return item.StageID == run.StageID })
+		if index < 0 {
+			m.Stages = append(m.Stages, StageMetrics{StageID: run.StageID})
+			index = len(m.Stages) - 1
+		}
+		rounds := s.Rounds(run.ID)
+		m.Stages[index].Runs++
+		m.Stages[index].Rounds += len(rounds)
+		m.TotalRounds += len(rounds)
+		for i := 1; i < len(rounds); i++ {
+			if rounds[i].Assignee != rounds[i-1].Assignee {
+				m.AssigneeChanges++
+			}
+		}
+	}
+	for _, q := range s.Questions() {
+		m.HumanStops++
+		index := slices.IndexFunc(m.StopReasons, func(item StopCount) bool { return item.Category == q.StopCategory })
+		if index < 0 {
+			m.StopReasons = append(m.StopReasons, StopCount{Category: q.StopCategory})
+			index = len(m.StopReasons) - 1
+		}
+		m.StopReasons[index].Count++
+	}
+	s.briefMetrics(&m)
+	return m
+}
+
+func (s *State) briefMetrics(m *Metrics) {
+	for _, record := range s.records {
+		switch p := record.Payload.(type) {
+		case *DetectionTest:
+			m.DetectionTests++
+		case *Instruction:
+			if p.Context == nil || p.Context.BriefBytes == 0 {
+				continue
+			}
+			m.Briefs++
+			m.BriefBytes += p.Context.BriefBytes
+			m.LargestBrief = max(m.LargestBrief, p.Context.BriefBytes)
+			if len(p.Context.Overflow) > 0 {
+				m.BriefOverflows++
+			}
+		}
+	}
+}

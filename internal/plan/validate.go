@@ -179,7 +179,8 @@ func validateStageChecks(stage Stage, conditions map[string]bool) error {
 		if slices.ContainsFunc(stage.Checks[:i], func(previous Check) bool {
 			return previous.Aspect == check.Aspect && previous.Runner == check.Runner &&
 				(previous.Target != check.Target || !slices.Equal(previous.CompletionConditionIDs, check.CompletionConditionIDs) ||
-					!slices.Equal(previous.Criteria, check.Criteria) || !equalSelection(previous.Examples, check.Examples))
+					!slices.Equal(previous.Criteria, check.Criteria) || !equalSelection(previous.Examples, check.Examples) ||
+					conflictingCheckFlow(previous, check))
 		}) {
 			return fmt.Errorf("%s: conflicting check mappings for aspect %q and runner %q", stage.ID, check.Aspect, check.Runner)
 		}
@@ -199,6 +200,12 @@ func validateStageChecks(stage Stage, conditions map[string]bool) error {
 		}
 	}
 	return nil
+}
+
+func conflictingCheckFlow(a, b Check) bool {
+	return a.JudgmentHistory() != b.JudgmentHistory() || !slices.Equal(a.Schemas, b.Schemas) ||
+		!slices.Equal(a.Instructions, b.Instructions) || a.BriefByPlanner != b.BriefByPlanner ||
+		!slices.Equal(a.Outputs, b.Outputs) || (a.Outputs == nil) != (b.Outputs == nil)
 }
 
 func validateDoneChains(stages []Stage) error {

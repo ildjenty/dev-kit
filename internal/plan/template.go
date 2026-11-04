@@ -110,18 +110,26 @@ func setTransition(t *Transitions, action Transition, target *string) {
 type DeviationKind string
 
 const (
-	AddedStage           DeviationKind = "added_stage"
-	RemovedStage         DeviationKind = "removed_stage"
-	RemovedGate          DeviationKind = "removed_gate"
-	ChangedTransition    DeviationKind = "changed_transition"
-	ChangedStartStage    DeviationKind = "changed_start_stage"
-	ChangedSplit         DeviationKind = "changed_split"
-	ChangedAssignee      DeviationKind = "changed_assignee"
-	ChangedFixRules      DeviationKind = "changed_fix_rules"
-	ChangedUnitRole      DeviationKind = "changed_unit_role"
-	RemovedRequiredCheck DeviationKind = "removed_required_check"
-	ChangedCriteria      DeviationKind = "changed_criteria"
-	ChangedExamples      DeviationKind = "changed_examples"
+	AddedStage            DeviationKind = "added_stage"
+	RemovedStage          DeviationKind = "removed_stage"
+	RemovedGate           DeviationKind = "removed_gate"
+	ChangedTransition     DeviationKind = "changed_transition"
+	ChangedStartStage     DeviationKind = "changed_start_stage"
+	ChangedSplit          DeviationKind = "changed_split"
+	ChangedAssignee       DeviationKind = "changed_assignee"
+	ChangedFixRules       DeviationKind = "changed_fix_rules"
+	ChangedUnitRole       DeviationKind = "changed_unit_role"
+	RemovedRequiredCheck  DeviationKind = "removed_required_check"
+	ChangedCriteria       DeviationKind = "changed_criteria"
+	ChangedExamples       DeviationKind = "changed_examples"
+	ChangedReport         DeviationKind = "changed_report"
+	ChangedUnitReport     DeviationKind = "changed_unit_report"
+	ChangedHumanPrompt    DeviationKind = "changed_human_prompt"
+	ChangedDelegations    DeviationKind = "changed_delegations"
+	ChangedOutputs        DeviationKind = "changed_outputs"
+	ChangedHistory        DeviationKind = "changed_history"
+	ChangedSchemas        DeviationKind = "changed_schemas"
+	ChangedBriefByPlanner DeviationKind = "changed_brief_by_planner"
 )
 
 type Deviation struct {
@@ -228,6 +236,7 @@ func (p *Plan) insertOptionalStages(template PlanTemplate, ids []string) {
 func stageDeviations(original, stage Stage) []Deviation {
 	var result []Deviation
 	result = append(result, roleDeviations(original, stage)...)
+	result = append(result, flowDeviations(original, stage)...)
 	if original.Split != stage.Split {
 		result = append(result, Deviation{Kind: ChangedSplit, StageID: stage.ID})
 	}
@@ -262,6 +271,45 @@ func stageDeviations(original, stage Stage) []Deviation {
 			if !reflect.DeepEqual(before.Examples, after.Examples) {
 				result = append(result, Deviation{Kind: ChangedExamples, StageID: stage.ID, Aspect: before.Aspect, Runner: before.Runner})
 			}
+			result = append(result, checkFlowDeviations(stage.ID, before, after)...)
+		}
+	}
+	return result
+}
+
+func flowDeviations(original, stage Stage) []Deviation {
+	var result []Deviation
+	for _, field := range []struct {
+		kind          DeviationKind
+		before, after any
+	}{
+		{ChangedReport, original.Report, stage.Report},
+		{ChangedUnitReport, original.UnitReport, stage.UnitReport},
+		{ChangedHumanPrompt, original.HumanPrompt, stage.HumanPrompt},
+		{ChangedDelegations, original.Delegations, stage.Delegations},
+		{ChangedOutputs, original.Outputs, stage.Outputs},
+		{ChangedHistory, original.WorkerHistory(), stage.WorkerHistory()},
+	} {
+		if !reflect.DeepEqual(field.before, field.after) {
+			result = append(result, Deviation{Kind: field.kind, StageID: stage.ID})
+		}
+	}
+	return result
+}
+
+func checkFlowDeviations(stageID string, before, after Check) []Deviation {
+	var result []Deviation
+	for _, field := range []struct {
+		kind          DeviationKind
+		before, after any
+	}{
+		{ChangedHistory, before.JudgmentHistory(), after.JudgmentHistory()},
+		{ChangedSchemas, before.Schemas, after.Schemas},
+		{ChangedOutputs, before.Outputs, after.Outputs},
+		{ChangedBriefByPlanner, before.BriefByPlanner, after.BriefByPlanner},
+	} {
+		if !reflect.DeepEqual(field.before, field.after) {
+			result = append(result, Deviation{Kind: field.kind, StageID: stageID, Aspect: before.Aspect, Runner: before.Runner})
 		}
 	}
 	return result
@@ -276,7 +324,7 @@ func roleDeviations(original, stage Stage) []Deviation {
 		result = append(result, Deviation{Kind: ChangedFixRules, StageID: stage.ID, Transition: Fix})
 	}
 	for _, unit := range stage.Units {
-		before := "unit_worker"
+		before := "worker"
 		for _, previous := range original.Units {
 			if previous.ID == unit.ID {
 				before = previous.WorkRole()

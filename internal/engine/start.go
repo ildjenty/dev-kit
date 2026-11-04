@@ -45,7 +45,7 @@ func (e *Engine) requireUnusedCheckout() error {
 			return err
 		}
 		if work != nil {
-			return fmt.Errorf("checkout already has unfinished work %s on branch %s; start another loop in a separate worktree (git worktree add <path> -b <branch> or the host's worktree feature) and open a new session there", work.ID, work.Branch)
+			return fmt.Errorf("checkout already has unfinished work %s, started on branch %s; start another loop in a separate worktree following the git rules (git worktree add <path> -b <branch> or the host's worktree feature) and open a new session there", work.ID, work.Branch)
 		}
 	}
 	return nil
@@ -79,4 +79,32 @@ func unfinishedWork(root string) (*ledger.Work, error) {
 		return nil, nil
 	}
 	return work, nil
+}
+
+// CheckoutWork returns the unfinished work of the checkout whose run root is given, or the
+// most recent work when none is unfinished. A checkout holds at most one unfinished work.
+func CheckoutWork(runRoot string) (string, error) {
+	root := filepath.Join(runRoot, "work")
+	entries, err := os.ReadDir(root)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	latest := ""
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		work, err := unfinishedWork(filepath.Join(root, entry.Name()))
+		if err != nil {
+			return "", err
+		}
+		if work != nil {
+			return work.ID, nil
+		}
+		latest = max(latest, entry.Name())
+	}
+	return latest, nil
 }

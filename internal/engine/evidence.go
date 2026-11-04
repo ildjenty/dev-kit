@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -13,39 +12,6 @@ import (
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
-
-func (e *Engine) workHistory(state *ledger.State, meta *ledger.Instruction) (string, error) {
-	if meta.Context == nil {
-		meta.Context = &ledger.InstructionContext{}
-	}
-	if meta.Context.WorkHistory == "" {
-		records, err := e.records()
-		if err != nil {
-			return "", err
-		}
-		var text strings.Builder
-		text.WriteString("# Work history\n\n")
-		for _, record := range records {
-			switch record.Payload.(type) {
-			case *ledger.Judgment, *ledger.Question, *ledger.Answer, *ledger.Approval, *ledger.Decision, *ledger.Evidence, *ledger.Lesson, *ledger.DetectionTest, *ledger.ResultRejection:
-				data, err := json.MarshalIndent(record.Payload, "", "  ")
-				if err != nil {
-					return "", err
-				}
-				fmt.Fprintf(&text, "%s %s\n%s\n\n", record.ID, record.Kind(), data)
-			}
-		}
-		for _, run := range state.StageRuns() {
-			fmt.Fprintf(&text, "Stage %s (%s): %d rounds, state: %s, plan version: %d\n", run.StageID, run.ID, len(state.Rounds(run.ID)), run.State, run.PlanVersion)
-		}
-		meta.Context.WorkHistory = text.String()
-	}
-	name := "brief/" + meta.ID + "-history.md"
-	if err := e.store().Publish(name, []byte(meta.Context.WorkHistory)); err != nil {
-		return "", err
-	}
-	return filepath.Join(e.workRoot(), name), nil
-}
 
 func (e *Engine) comparison(ctx context.Context, before, after string) (string, error) {
 	base, err := e.expanded(ctx, before)
@@ -74,22 +40,6 @@ func (e *Engine) comparison(ctx context.Context, before, after string) (string, 
 		fmt.Fprintf(&text, "\n```diff\n%s\n```\n", patch)
 	}
 	return text.String(), nil
-}
-
-func (e *Engine) judgmentEvidence(ctx context.Context, meta *ledger.Instruction, state *ledger.State, round *ledger.Round) (string, error) {
-	history, err := e.workHistory(state, meta)
-	if err != nil {
-		return "", err
-	}
-	text := "Work-history file (fixed at instruction issue time): " + history + "\n"
-	if round != nil && round.ReturnedTarget != nil {
-		comparison, err := e.stageComparison(ctx, round)
-		if err != nil {
-			return "", err
-		}
-		text += comparison
-	}
-	return text, nil
 }
 
 func (e *Engine) loopEditText(ctx context.Context, before, after, reason string) (string, error) {
@@ -157,12 +107,40 @@ func (e *Engine) stageQuestionText(ctx context.Context, stage plan.Stage, round 
 	for _, item := range progress.Unconfirmed {
 		fmt.Fprintf(&text, "- %s\n", item)
 	}
+	findings, err := e.decisionFindings(round)
+	if err != nil {
+		return "", err
+	}
+	text.WriteString(findings)
 	comparison, err := e.stageComparison(ctx, round)
 	if err != nil {
 		return "", err
 	}
 	text.WriteString("\n" + comparison)
 	return text.String(), nil
+}
+
+// decisionFindings renders the findings of the judged round that need a human decision.
+func (e *Engine) decisionFindings(round *ledger.Round) (string, error) {
+	if round.ReturnedTarget == nil {
+		return "", nil
+	}
+	judgments, err := e.roundJudgments(round)
+	if err != nil {
+		return "", err
+	}
+	var text strings.Builder
+	for _, judgment := range judgments {
+		for _, finding := range judgment.Findings {
+			if finding.Blocking || finding.Kind == form.NeedsDecision {
+				fmt.Fprintf(&text, "- %s (%s, %s): %s\n", judgment.Aspect, judgment.Runner, finding.Kind, finding.Scenario)
+			}
+		}
+	}
+	if text.Len() == 0 {
+		return "", nil
+	}
+	return "\nFindings that require this decision:\n" + text.String(), nil
 }
 
 func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.State, q *form.Question) error {

@@ -19,7 +19,8 @@
         "external",
         "completed",
         "aborted",
-        "unit_work"
+        "unit_work",
+        "judgment_brief"
       ]
     },
     "target_key": {
@@ -66,7 +67,8 @@
             "enum": [
               "work",
               "plan",
-              "unit_work"
+              "unit_work",
+              "judgment_brief"
             ]
           }
         }

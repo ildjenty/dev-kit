@@ -46,6 +46,8 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 承認・却下・保留の状態変更の経路は[人の回答と再開](../architecture/flow.md#人の回答と再開)に従う。
 
+`status` と view は、ステージごとのラウンド数、人に止められた回数と理由、担当の切り替え、検出試験の回数、依頼文の大きさを既存の記録から作業ごとに集計する。集計のための新しい記録は足さない。作業全体の累計ラウンド数は戻り・作り直し・担当の変更でも減らさず、`max_total_rounds` の次の停止点も示す。
+
 #### 構造図
 
 構造の本文は自由な形式の知識である。`schemas/structure.json` に従う JSON のときだけ構造図を描き、それ以外は本文を表示する。構造図の入力は[構造の記録](../architecture/data.md#構造の記録-structure)、生成形式は [view の契約](../architecture/modules.md#view)に従う。図の描き方は [`assets/principles/writing.md` の原則8](../../assets/principles/writing.md#8-define-a-diagrams-purpose-and-show-relationship-kinds-and-directions)に従い、入力に関係の種類がなければ依存関係の図までにとどめる。

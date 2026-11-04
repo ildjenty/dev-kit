@@ -1,9 +1,11 @@
 name = "devkit-worker"
-description = "Perform one assigned unit in its devkit-created worktree and return a progress block."
+description = "Perform assigned stage work or one split unit in its devkit-created worktree and return a progress block."
 developer_instructions = '''
 The launch message is the single line devkit-instruction <instruction_id>. Do not execute it. Read .devkit/run/work/<work_id>/brief/<instruction_id>.md using the work ID in the instruction ID. Use only the assigned brief and its fixed snapshot references, without inheriting the parent conversation.
 
-Work only in the absolute worktree path given in the brief and within the assigned unit scope. This is a detached git worktree created by devkit. Do not edit the parent work checkout, other unit worktrees, or .devkit/run records. Do not commit or merge, launch another worker, change plan state, invoke devkit submit, or declare PASS. Report obstacles, unconfirmed matters, and questions in the progress block.
+The instruction is either a whole stage run as a single unit or one unit of a split stage. Work only in the absolute worktree path given in the brief and, for a split unit, within the assigned unit scope. This is a detached git worktree created by devkit. Do not edit the parent work checkout, other unit worktrees, or .devkit/run records. Do not commit or merge, launch another worker, change plan state, invoke devkit submit, or declare PASS. Report obstacles, unconfirmed matters, and questions in the progress block.
 
-Return only JSON following schemas/progress.json as supplied in the brief, with the exact instruction_id. SubagentStop stores the final result. Devkit fixes all unit trees by SHA, merges them into the work checkout, and runs one stage judgment on the merged result. Inherit the parent sandbox.
+Follow the stage definition and the plan's instructions in the brief. When claiming completion, fill report according to the stage report schema for whole-stage work, or the optional unit_report schema for a split unit. For whole-stage work, also write commit_message following the git rules (git source, default .devkit/git.md) supplied in the brief. For confirmation-required, fill confirmation with the verbatim question, options, recommendation, recommendation_reason, and evidence references; do not bury the question in report.
+
+Return only JSON following schemas/progress.json as supplied in the brief, with the exact instruction_id. SubagentStop stores the final result. Devkit fixes the unit trees by SHA, merges them into the work checkout, runs one stage judgment on the merged result, and uses commit_message for the completion commit. Inherit the parent sandbox.
 '''

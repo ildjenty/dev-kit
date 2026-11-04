@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,7 +19,7 @@ import (
 func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	e, ctx := fixture(t)
 	// The fixture initializes and commits a fresh repository. Use the shipped default policy.
-	settings := "kit_version = 'v3'\n"
+	settings := "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n"
 	write(t, e.Root(), "devkit.toml", settings)
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Use default settings")
@@ -55,6 +56,17 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 			result, err := e.Next(ctx)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if result.Instruction == nil && len(result.Instructions) > 1 {
+				// Independent judges of a round are issued together.
+				for i := range result.Instructions {
+					data, err := e.readInstruction(result.Instructions[i].ID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					collect(t, e, &result.Instructions[i], pass(*data.Request))
+				}
+				continue
 			}
 			if result.Instruction == nil {
 				t.Fatalf("missing instruction: %+v", result)
@@ -104,7 +116,7 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 		if result.Instruction.Kind != form.InstructionWork || run.StageID != stage {
 			t.Fatalf("expected %s work, got %+v, %+v", stage, result, run)
 		}
-		if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: result.Instruction.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{"Complete " + stage}})); err != nil {
+		if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: result.Instruction.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{"Complete " + stage}, Report: stageReport(t, e, run.StageID)})); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -244,7 +256,7 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 
 func TestDetectionCanBeDisabled(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n")
+	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Disable detection tests")
 	started, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
@@ -275,16 +287,17 @@ func TestGitSettingsAndEmptyStage(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			e, ctx := fixture(t)
-			write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\ndefault_plan = 'test'\n[approval]\nplan = 'deviation'\n[git]\nbranch = 'topic/{work_id}/work'\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n[detection]\nrequired = false\n")
+			write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\ndefault_plan = 'test'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[git]\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n[detection]\nrequired = false\n")
 			git(t, e.Root(), "add", ".")
 			git(t, e.Root(), "commit", "-qm", "Configure git behavior")
 			head := git(t, e.Root(), "rev-parse", "HEAD")
+			before := git(t, e.Root(), "branch", "--show-current")
 			started, err := e.Start(ctx, StartRequest{Task: "Update documentation"})
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := git(t, e.Root(), "branch", "--show-current"); got != "topic/"+e.workID+"/work" {
-				t.Fatalf("branch setting ignored: %s", got)
+			if got := git(t, e.Root(), "branch", "--show-current"); got != before {
+				t.Fatalf("start changed the branch from %s to %s", before, got)
 			}
 			planResult(t, e, started)
 			review, err := e.Next(ctx)
@@ -428,4 +441,54 @@ func TestStartRequiresCommittedInitialization(t *testing.T) {
 			}
 		})
 	}
+}
+
+// stageReport fills every required field of the stage's selected report schema.
+func stageReport(t *testing.T, e *Engine, stageID string) json.RawMessage {
+	t.Helper()
+	state, err := e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	round, ok := state.OpenRound()
+	if !ok {
+		t.Fatal("no open round")
+	}
+	stage, _, err := e.roundPlanStage(state, round)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := e.reportSchema(t.Context(), roundReference(round), stage.Report)
+	if err != nil || body == "" {
+		return nil
+	}
+	var schema any
+	if err := json.Unmarshal([]byte(body), &schema); err != nil {
+		t.Fatal(err)
+	}
+	return marshal(t, sampleValue(schema))
+}
+
+func sampleValue(schema any) any {
+	fields, _ := schema.(map[string]any)
+	if values, ok := fields["enum"].([]any); ok && len(values) > 0 {
+		return values[0]
+	}
+	switch fields["type"] {
+	case "object":
+		object := map[string]any{}
+		properties, _ := fields["properties"].(map[string]any)
+		required, _ := fields["required"].([]any)
+		for _, name := range required {
+			object[name.(string)] = sampleValue(properties[name.(string)])
+		}
+		return object
+	case "array":
+		return []any{sampleValue(fields["items"])}
+	case "boolean":
+		return false
+	case "integer", "number":
+		return 1
+	}
+	return "Recorded value"
 }

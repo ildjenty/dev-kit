@@ -192,10 +192,29 @@ func summary(input Input, position ledger.Position, pending []form.Question, pro
 	case len(deferred) != 0:
 		action = "Review the recorded conditions for deferred decisions."
 	}
-	return []field{{"Purpose", task}, {"Target", position.Work.TaskRef + "; branch " + position.Work.Branch},
+	return append([]field{{"Purpose", task}, {"Target", position.Work.TaskRef + "; branch at work start " + position.Work.Branch},
 		{"Current achievement", "Completed stages: " + strings.Join(completed, ", ") + ". Recorded changes: " + strings.Join(outcomes, ", ") + "."},
 		{"Execution state", state}, {"Stage run", stage}, {"Stop reason", reason}, {"Next actor", actor},
-		{"Your next action", action}, {"Record coverage", "Limited to artifacts recorded by submit."}}
+		{"Your next action", action}, {"Record coverage", "Limited to artifacts recorded by submit."}}, metricFields(input.Ledger.Metrics())...)
+}
+
+// metricFields shows per-work counts derived from the records.
+func metricFields(m ledger.Metrics) []field {
+	stages := []string{}
+	for _, stage := range m.Stages {
+		stages = append(stages, fmt.Sprintf("%s %d rounds in %d runs", stage.StageID, stage.Rounds, stage.Runs))
+	}
+	reasons := []string{}
+	for _, reason := range m.StopReasons {
+		reasons = append(reasons, fmt.Sprintf("%s %d", reason.Category, reason.Count))
+	}
+	return []field{
+		{"Rounds", fmt.Sprintf("%d in total. %s", m.TotalRounds, strings.Join(stages, "; "))},
+		{"Human stops", fmt.Sprintf("%d. %s", m.HumanStops, strings.Join(reasons, "; "))},
+		{"Assignee changes", fmt.Sprint(m.AssigneeChanges)},
+		{"Detection tests", fmt.Sprint(m.DetectionTests)},
+		{"Request sizes", fmt.Sprintf("%d briefs, %d bytes in total, largest %d bytes, %d with overflow files", m.Briefs, m.BriefBytes, m.LargestBrief, m.BriefOverflows)},
+	}
 }
 
 func stageLabel(input Input, run *ledger.StageRun) string {

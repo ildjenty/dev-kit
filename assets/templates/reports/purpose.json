@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Purpose report",
+  "description": "Worker-reported material, not independent evidence of completion.",
+  "type": "object",
+  "properties": {
+    "users": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "completion_conditions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "grounds": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "grounds"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "agreement": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "users",
+    "purpose",
+    "requirements",
+    "completion_conditions",
+    "agreement"
+  ],
+  "additionalProperties": false
+}

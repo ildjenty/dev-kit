@@ -14,7 +14,7 @@ func TestCompletedStagesAreNotReplanDeviations(t *testing.T) {
 		for _, policy := range []string{"requirements", "deviation"} {
 			t.Run(mode+"/"+policy, func(t *testing.T) {
 				e, ctx := fixture(t)
-				write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = '"+policy+"'\n[detection]\nrequired = false\n")
+				write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = '"+policy+"'\n[detection]\nrequired = false\n")
 				template := plan.PlanTemplate{Name: "test", StartStage: "purpose", OptionalStages: []plan.Stage{}}
 				ids := []string{"purpose", "implement", "retrospective"}
 				for index, id := range ids {
@@ -66,7 +66,7 @@ func TestCompletedStagesAreNotReplanDeviations(t *testing.T) {
 				}
 				replanning := nextResult(t, e, ctx)
 				if mode == "back" {
-					if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: replanning.Instruction.ID, TerminationKind: form.TerminationQuestion, Obstacles: []string{"Rebuild remaining work"}})); err != nil {
+					if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: replanning.Instruction.ID, TerminationKind: form.TerminationQuestion, Confirmation: ask("Confirm how to continue."), Obstacles: []string{"Rebuild remaining work"}})); err != nil {
 						t.Fatal(err)
 					}
 					question := nextResult(t, e, ctx)

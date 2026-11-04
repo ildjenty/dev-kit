@@ -12,11 +12,32 @@
       "items": {
         "type": "object",
         "properties": {
-          "file": {
-            "type": "string"
+          "id": {
+            "type": "string",
+            "minLength": 1
           },
           "judgment": {
-            "$ref": "urn:devkit:form:judgment"
+            "enum": [
+              "PASS",
+              "FAIL",
+              "NOT ASSESSED"
+            ]
+          },
+          "blocking": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scenario": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "scenario"
+              ],
+              "additionalProperties": false
+            }
           },
           "reason": {
             "type": "string",
@@ -24,8 +45,9 @@
           }
         },
         "required": [
-          "file",
+          "id",
           "judgment",
+          "blocking",
           "reason"
         ],
         "additionalProperties": false

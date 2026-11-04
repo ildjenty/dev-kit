@@ -71,6 +71,10 @@ type WorkInput struct {
 	OutputSchema      string
 	Unit              *plan.Unit
 	WorktreePath      string
+	// CurrentMaterial holds this round's material: the previous round report and human answers.
+	CurrentMaterial string
+	// ReportSchema is the selected stage or unit report schema body.
+	ReportSchema string
 }
 
 // JudgmentInput receives the request content and output schema selected by check.
@@ -89,6 +93,15 @@ type JudgmentInput struct {
 	Norms             []Document
 	NormPaths         []NormPath
 	OutputSchema      string
+	// Instructions are the plan's check instructions; PreJudgmentInstructions are the planner's
+	// supplementary instructions for this round. Neither narrows the criteria or scope.
+	Instructions            []string
+	PreJudgmentInstructions []string
+	PreviousOutputs         []StageOutput
+	CurrentMaterial         string
+	WorkHistoryPath         string
+	// Delegations are template-selected standing delegation documents, with Path as provenance.
+	Delegations []Document
 }
 
 // PlannerInput contains information for initial planning, revised proposals, and rebuilding the remaining plan.
@@ -112,4 +125,17 @@ type PlannerInput struct {
 	PreviousFindings  []form.Finding
 	PreviousOutputs   []StageOutput
 	OutputSchema      string
+}
+
+// JudgmentBriefInput asks the planner how to check one round before a judgment. The result is
+// supplementary and cannot narrow the fixed criteria or the judgment scope.
+type JudgmentBriefInput struct {
+	// RequestTemplate is the request text resolved by the caller from the fixed repository snapshot.
+	RequestTemplate string
+	InstructionID   string
+	Check           plan.Check
+	Plan            plan.Plan
+	Requirements    Document
+	CurrentMaterial string
+	OutputSchema    string
 }

@@ -52,6 +52,10 @@ func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check
 		texts[file] = string(body)
 	}
 	identity, err := check.NewDetectionIdentity(runner, template, criteria, []byte(specDocument.Body), examples)
+	if err != nil {
+		return detectionInput{}, nil, err
+	}
+	identity.Model, identity.Effort, err = e.declaredSettings(ctx, ref, item.Runner, runner)
 	return detectionInput{Check: item, Spec: spec, Identity: identity, Examples: texts}, criteria, err
 }
 
@@ -231,11 +235,15 @@ func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brie
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	content, err := json.MarshalIndent(request, "", "  ")
+	content, err := json.MarshalIndent(struct {
+		InstructionID string                   `json:"instruction_id"`
+		Aspect        string                   `json:"aspect"`
+		Examples      []check.DetectionExample `json:"examples"`
+	}{request.InstructionID, request.Aspect.ID, request.DetectionExamples}, "", "  ")
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	text := "Evaluate each example body independently. Return an observation for each opaque example ID in the file field, with the actual judgment and grounds. Each nested judgment must use the instruction ID, aspect, target, and norms from the request.\n\n```json\n" + string(content) + "\n```"
+	text := "Evaluate each example body independently against the criteria. Return one observation per example ID with the judgment value, the blocking findings, and the grounds.\n\n```json\n" + string(content) + "\n```"
 	schema, err := e.asset(ctx, data.Reference, "schemas/detection-result.json")
 	if err != nil {
 		return brief.Brief{}, err
@@ -244,7 +252,7 @@ func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brie
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	supporting, err := e.judgmentSchemas(ctx, data.Reference)
+	supporting, err := e.inputSchemas(ctx, data.Reference, nil)
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -323,15 +331,7 @@ func (e *Engine) validateDetection(meta ledger.Instruction, data instructionData
 	}
 	observations := []check.DetectionObservation{}
 	for _, observation := range result.Observations {
-		raw, err := json.Marshal(observation.Judgment)
-		if err != nil {
-			return check.DetectionTest{}, err
-		}
-		judgment, _, err := check.AcceptResult(*data.Request, raw, e.forms["judgment"], provenance, nil)
-		if err != nil {
-			return check.DetectionTest{}, err
-		}
-		observations = append(observations, check.DetectionObservation{File: observation.File, Judgment: judgment, Reason: observation.Reason})
+		observations = append(observations, check.DetectionObservation{File: observation.ID, Judgment: detectionJudgment(*data.Request, observation, provenance), Reason: observation.Reason})
 	}
 	test, err := check.AssessDetection(data.Detection.Spec, data.Request.Runner, data.Detection.Identity, observations)
 	if err != nil {
@@ -423,4 +423,42 @@ func detectionFailureText(meta ledger.Instruction) string {
 		text += " The human must commit the fix before continuing because out-of-round judgments read committed norms."
 	}
 	return text + " Alternatively, make this check not required in the plan template or set [detection] required = false in devkit.toml."
+}
+
+// detectionJudgment expands a compact detection observation with the request's shared identity.
+func detectionJudgment(request check.Request, observation form.DetectionObservation, provenance check.Provenance) check.Judgment {
+	findings := []form.Finding{}
+	for i, finding := range observation.Blocking {
+		findings = append(findings, form.Finding{ID: check.FindingID(request.Aspect.ID, fmt.Sprintf("%s-%d", observation.ID, i+1)), Blocking: true, Kind: form.AutoFixable, Scenario: finding.Scenario})
+	}
+	result := form.JudgmentResult{InstructionID: request.InstructionID, Aspect: request.Aspect.ID, TargetVersion: request.TargetVersion, Norms: normRefs(request.Norms), CompletionConditionIDs: []string{},
+		Judgment: observation.Judgment, Findings: findings, CheckedScope: []string{observation.ID}, UncheckedScope: []string{}, Method: "Detection example assessment: " + observation.Reason, Environment: "detection test"}
+	return check.Judgment{JudgmentResult: result, Runner: request.Runner, Provenance: provenance}
+}
+
+// declaredSettings returns the model and effort written in a subagent runner's definition. Empty
+// values mean the runner inherits them; a pass then holds for that definition, and observed values
+// are kept only as provenance.
+func (e *Engine) declaredSettings(ctx context.Context, ref string, runner plan.Runner, definition []byte) (string, string, error) {
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return "", "", err
+	}
+	if _, command := settings.Judges[string(runner)]; command {
+		return "", "", nil
+	}
+	obs, err := hook.ReadSession(e.runRoot(), e.sessionID)
+	if err != nil || obs == nil {
+		return "", "", err
+	}
+	parsed, err := hook.ParseAgentDefinition(obs.Host == "codex", definition)
+	return declared(parsed.Model), declared(parsed.Effort), err
+}
+
+// declared treats an explicit "inherit" as no setting in the definition.
+func declared(value string) string {
+	if value == "inherit" {
+		return ""
+	}
+	return value
 }

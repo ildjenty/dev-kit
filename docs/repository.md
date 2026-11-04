@@ -6,7 +6,7 @@
 
 `init` が既定のソースの初期内容をリポジトリへコピーし、以後はリポジトリが所有する知識として育てる。接続先と配置は `devkit.toml` の `[sources.<名前>]` で変更できる。アダプタは必須の「選ぶ」と元のバージョンの識別子を扱い、「書く」は比較と更新を一体で行えることを保証できるアダプタのための口として定める。[知識のソース](architecture/data.md#知識のソース)の契約に従う。
 
-- 規範(`norm = true`): principles は `.devkit/principles`、stages は `.devkit/stages`、plans は `.devkit/plans`、rules は `.devkit/rules.md` を1文書として、examples は `.devkit/examples`、templates は `.devkit/templates` を既定とする。
+- 規範(`norm = true`): principles は `.devkit/principles`、stages は `.devkit/stages`、plans は `.devkit/plans`、rules は `.devkit/rules.md`、git は `.devkit/git.md` をそれぞれ1文書として、examples は `.devkit/checks`、templates は `.devkit/templates` を既定とする。
 - 成果(`norm = false`): requirements は `.devkit/requirements.md`、structure は `.devkit/structure.json` を既定とする。
 - 検出試験の合格の索引: ソースではなく `[state] detect`(既定 `.devkit/detect.json`)で保存先を設定する。
 
@@ -23,7 +23,7 @@
 - **設定ファイル**: `devkit.toml` の項目は [config](architecture/modules.md#config)、配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。[判定コマンド](architecture/modules.md#config)(`[judges]`)は別エンジンによる判定に使う。[検証コマンド](architecture/modules.md#config)(`[commands]`)はテスト・型検査などに使い、`command:<name>` の [check](parts/check.md)(評価と判定の部品)から呼ぶ。実行の扱いは[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
 - **実行の記録と生成物**: `.devkit/run/` に固定し、git 管理しない。サブエージェント定義・hook・保護の設定・ignore がこの場所を前提にし、途中で変えると記録を見失うためである。後の作業に効かせたい決定は要件・構造・規則へ残す。記録から組み立てる [checkpoint](architecture/data.md#checkpoint)(再開用の派生状態)は保存する記録と区別する。
 - **単位の作業場所**: `.devkit/worktrees/<単位の指示 ID>/` に detached の worktree を作り、ignore する。記録の保護と重ならないよう `.devkit/run/` と分ける。中断中は保持し、中止・作業完了時は変更のない worktree だけを削除する。変更の残るものは保持して場所を知らせ、破棄は人が git で行う。
-- **役割**: 作業・判定・計画・回答の担当を `devkit.toml` の `[roles.<id>]` で定義する。既定は `worker`・`unit_worker`・`judge`・`planner`・`human` の5つであり、上書き・追加できる。役割を足すときは、その agent の定義を `.claude/agents/`・`.codex/agents/` に置く。種類ごとの規則と職務の分離は[役割](architecture/data.md#役割-role)に従う。役割の定義と agent の定義は規範として固定し、変更はループ自身の変更として扱う。
+- **役割**: 作業・判定・計画・回答の担当を `devkit.toml` の `[roles.<id>]` で定義する。既定は `worker`・`judge`・`planner`・`human` の4つであり、上書き・追加できる。役割を足すときは、その agent の定義を `.claude/agents/`・`.codex/agents/` に置く。種類ごとの規則と職務の分離は[役割](architecture/data.md#役割-role)に従う。役割の定義と agent の定義は規範として固定し、変更はループ自身の変更として扱う。
 - **バイナリが持つもの**: 記録とバイナリの約束である JSON Schema、分類表と役割の既定、ホスト設定の断片を持つ。人への確認の分類は `devkit.toml` の `[router] human_confirmation` で上書き・追加・削除できる。check の結果から次の行動への対応は固定である。`kit_version` は記録形式とバイナリの互換性の識別であり、各作業に記録する。
 
 規範の識別は、規範のソース全体の全文書と、ソースの外の `devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md から求める。成果のソース・検出試験の索引・実行の記録は規範の識別に含めない。成果の更新は規範の変更による判定の失効を起こさないが、判定対象の識別には含める。判定・承認・反映・完了は、git のツリーに外部の成果の文書のソース名・ID・内容ハッシュの集合を加えた同じ識別を指す。
@@ -36,6 +36,8 @@
 
 `devkit init` は人の確認後に導入したファイルをコミットし、`--no-commit` で省略できる。HEAD がない場合や、作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合は、`start` が理由と直し方を返して拒否する。
 
+git の運用は規範のソース `git` の文書で定め、雛形の入力で選ぶ。既定の場所は `.devkit/git.md` であり、ソースの設定で変更できる。既定の規則は、作業ごとに `feat/`・`fix/`・`chore/`・`refactor/`・`docs/` と短い説明を組み合わせた作業ブランチを用意し、コミットメッセージにも同じ種類の接頭辞を付け、完了後に起点のブランチ(多くは main)へ統合するものである。セッションのまとめ役が `start` の前のブランチ準備と完了後の統合を担う。push と PR の作成は外部操作の経路を通す。
+
 ## 実行の仕組みとの対応
 
 - **skill**: 作業の進め方をセッションに伝える手順である。開始、`next`、`submit`、`pause`、`resume`、問いの見せ方、作業者・判定者・計画者のサブエージェントの起動、振り返りを扱う。教訓の反映先の提案は[メタループ](meta-loop.md#メタループ)に従う。配置と指示ファイルとの関係は[指示ファイルとホスト設定](architecture/layout.md#指示ファイルとホスト設定)、手順は[処理の流れ](architecture/flow.md)、教訓の記録と改善は[メタループの入口](meta-loop.md#メタループ)を参照する。
@@ -44,13 +46,13 @@
 
 skill は `.agents/skills/devkit/`、サブエージェント定義は `.claude/agents/` と `.codex/agents/` に置く。
 
-`init` は既定の役割 `unit_worker` の agent `devkit-worker` の定義も両ホストへ配る。雛形のステージの `split` と計画者が書く `units` で作業を分け、単位がなければ通常のステージとして進める。既定の雛形は分割を使わない。`work` の役割の agent は指定された worktree だけを編集し、判定者用の書き込み禁止 `[deny] judge` の対象外とする。agent のある `work` の役割がステージの担当になったラウンドも、単位が1つの同じ手順で動かす。結果をすべて受理した後の SHA の固定・合流・ステージ全体の判定は[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。
+`init` は既定の役割 `worker` の agent `devkit-worker` の定義も両ホストへ配る。雛形のステージの `split` と計画者が書く `units` で作業を分け、単位がなければ通常のステージとして進める。既定の雛形は複数単位への分割を使わない。`work` の役割の agent は指定された worktree だけを編集し、判定者用の書き込み禁止 `[deny] judge` の対象外とする。agent のある `work` の役割がステージの担当になったラウンドも、単位が1つの同じ手順で動かす。結果をすべて受理した後の SHA の固定・合流・ステージ全体の判定は[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。
 
 ループ自体を並行して回す場合は、別の worktree で新しいセッションを開く。各チェックアウトは自分の `.devkit/run/` を持ち、作業中のチェックアウトでの2つ目の `start` は拒否する。
 
 本文で渡す知識は、雛形の計画者・作業者・判定者それぞれの `inputs` と、判定の check の `criteria` の選び方で指定する。ステージ定義も `stages` ソースから選ぶ。要件と規則を渡す既定値を用意する。規範はソース全体を固定し、成果は選んだ本文を固定して渡す。その他の規範はソース名・文書 ID と固定した写しのパスの一覧で渡し、編集中の原本を読ませない。文中の参照は解析せず、必要な別の文書も選び方に明示する。変更の範囲は scope の出力と rules で渡す。
 
-成果の requirements と structure は、固定した本文とソース名・文書 ID・編集先・存在の有無を示す。要件が未作成なら作成先を案内する。出力スキーマは参照先をすべて同梱し、作業の brief には note の種別と各スキーマを含める。通常の依頼は指示発行時点の履歴を参照するが、検出試験には試験仕様・期待判定・対応表と、それらを含む履歴や参照先を渡さない。
+成果の requirements と structure は、固定した本文とソース名・文書 ID・編集先・存在の有無を示す。要件が未作成なら作成先を案内する。出力スキーマの参照先と check の `schemas` に列挙した入力契約のスキーマを同梱する。補助のスキーマはその和集合だけを渡す。通常の依頼の経緯は `history` で決定的に絞った固定した索引から参照するが、検出試験には試験仕様・期待判定・対応表と、それらを含む履歴や参照先を渡さない。
 
 規範にあるコード書式の `principles/…`・`stages/…`・`templates/…`・`rules.md` は、リポジトリ側の資産の論理名である。brief が設定で解決した実際のパスとの対応を示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
 
@@ -62,12 +64,13 @@ skill の手順では、再現手順の保存先とバージョンを修正開�
 
 リポジトリごとの進行は `devkit.toml` で設定する。
 
-- `[git] branch = "devkit/{work_id}"` は作業ブランチの名前の形であり、`{work_id}` を必ず含める。
-- `[git] commit_message = "devkit: {stage} ({work_id})"` は完了時のコミットメッセージの形であり、`{stage}`・`{work_id}`・`{task}` を使える。
+- ステージの完了時には、判定した対象を現在のブランチに devkit がコミットする。メッセージは作業者が終了ブロックの `commit_message` に git の規則に沿って書いた値を使う。省略時は `[git] commit_message`(既定 `"devkit: {stage} ({work_id})"`)のテンプレートで補い、`{stage}`・`{work_id}`・`{task}` を使える。
 - `[git] allow_empty_commit = true` は成果のないステージでも空のコミットを作る。`false` なら変更のないステージはコミットせず、その時点の HEAD で完了を記録する。
 - `[classification] dependency_files` は依存の宣言として扱うファイルの glob の一覧であり、既定の一覧を変更できる。分類表の追加・削除に未知の分類名を書けば設定エラーとする。
 - `[limits] stop_continuation = 3` は Stop の継続上限であり、1以上で無効にはできない。計画の check のやり直しの上限(既定3)とラウンドの上限は雛形が持つ。
-- `[parallel] max_workers = 3` は同時に動かす単位の作業者数の上限であり、1以上を必須とする。1でも同じ worktree と合流の手順で単位を1つずつ進める。
+- 同時に動かす数は全体の `[parallel] max_concurrent`(既定3、1以上)と役割ごとの `[roles.<id>] max_concurrent`(指定時は1以上)の両方を満たす。数えるのは発行済みでまだ受理していないサブエージェントの指示である。互いに依存しない単位の作業、検証コマンド後の判定者の check、check ごとの判定直前の指示をまとめて返し、空いた分だけ次の `next` で発行する。役割の上限を省略した場合も全体の上限を守る。
+- `[briefs] max_bytes = 200000` は依頼文の本文の上限である。超える分はファイルにして一覧で渡し、超過を記録する。
+- `[limits] max_total_rounds` は既定値を置かない。設定した場合は作業全体の累計が達したときに人に確認し、続行ならその時点の累計に設定値を足した値を次の停止点とする。戻り・作り直し・担当変更でも累計を減らさない。
 - 検証コマンドの期限は `[commands.<name>]` の登録ごとに必須とする。
 
 リポジトリ外のソースは読み取り専用であり、devkit は書き込まない。リポジトリ内の書き込めるソースのファイルは直接編集して git の差分を取り、完了時のコミットで反映する。リポジトリ外のソースと読み取り専用のソースへの改善は教訓として管理者に引き継ぐ。

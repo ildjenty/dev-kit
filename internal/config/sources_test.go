@@ -13,7 +13,7 @@ func TestSourceDefaultsAndOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.Sources) != 9 || c.Sources["principles"].Path != "/vault/principles" || c.Sources["principles"].CanWrite() || !c.Sources["principles"].Norm || !c.Sources["requirements"].Norm || c.DetectionPath() != "state/detect.json" {
+	if len(c.Sources) != 10 || c.Sources["principles"].Path != "/vault/principles" || c.Sources["principles"].CanWrite() || !c.Sources["principles"].Norm || !c.Sources["requirements"].Norm || c.DetectionPath() != "state/detect.json" {
 		t.Fatalf("source defaults or overrides differ: %+v", c)
 	}
 	if !c.Sources["extra"].CanWrite() || c.Sources["extra"].Norm || c.Sources["extra"].Adapter != "files" {
@@ -22,7 +22,7 @@ func TestSourceDefaultsAndOverrides(t *testing.T) {
 	copy := c.KnowledgeSources()
 	*copy["principles"].Writable = true
 	delete(copy, "rules")
-	if c.Sources["principles"].CanWrite() || len(c.KnowledgeSources()) != 9 {
+	if c.Sources["principles"].CanWrite() || len(c.KnowledgeSources()) != 10 {
 		t.Fatal("source accessor modified stored settings")
 	}
 	if err := c.ValidateImprovementDestination("principles"); err == nil {
@@ -72,13 +72,14 @@ func TestPlanCheckSelections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := PlanCheck{Aspect: "plan", Runner: "judge", Criteria: []Selection{{Source: "rules", Select: ""}}, Examples: &Selection{Source: "examples", Select: "custom/spec.json"}}
+	want := PlanCheck{Aspect: "plan", Runner: "judge", Criteria: []Selection{{Source: "rules", Select: ""}}, Examples: &Selection{Source: "examples", Select: "custom/spec.json"}, Schemas: []string{"plan", "plan-template"}}
 	if !reflect.DeepEqual(c.PlanCheckSettings(), want) {
 		t.Fatalf("plan selections differ: %+v", c.PlanCheckSettings())
 	}
 	copy := c.PlanCheckSettings()
 	copy.Criteria[0].Source = "changed"
 	copy.Examples.Source = "changed"
+	copy.Schemas[0] = "changed"
 	if !reflect.DeepEqual(c.PlanCheck, want) {
 		t.Fatal("plan check accessor modified stored selections")
 	}
@@ -99,6 +100,7 @@ func TestDefaultSources(t *testing.T) {
 		{"examples", ".devkit/examples", true},
 		{"templates", ".devkit/templates", true},
 		{"rules", ".devkit/rules.md", true},
+		{"git", ".devkit/git.md", true},
 		{"requirements", ".devkit/requirements.md", false},
 		{"structure", ".devkit/structure.json", false},
 	} {
@@ -107,7 +109,7 @@ func TestDefaultSources(t *testing.T) {
 			t.Fatalf("default source %s = %+v", tc.name, got)
 		}
 	}
-	if len(c.Sources) != 8 || c.DetectionPath() != ".devkit/detect.json" {
+	if len(c.Sources) != 9 || c.DetectionPath() != ".devkit/detect.json" {
 		t.Fatalf("unexpected sources or state path: %+v", c)
 	}
 }

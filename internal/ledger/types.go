@@ -38,6 +38,7 @@ const (
 	KindArtifact      Kind = "artifact"
 	KindUnitResult    Kind = "unit_result"
 	KindMerge         Kind = "merge"
+	KindJudgmentBrief Kind = "judgment_brief"
 )
 
 const KindResultRejection Kind = "result_rejection"
@@ -56,6 +57,7 @@ type Record struct {
 
 func (r Record) Kind() Kind { return r.Payload.recordKind() }
 
+// Work records the branch checked out at start only for mismatch warnings; the checkout identifies work.
 type Work struct {
 	ID              string  `json:"id"`
 	TaskRef         string  `json:"task_ref"`
@@ -211,6 +213,18 @@ type Judgment struct {
 	RoundID string `json:"round_id,omitempty"`
 }
 
+// JudgmentBrief is a planner's supplementary instruction for one round, aspect, and runner.
+// It cannot narrow the fixed criteria or the judgment scope.
+type JudgmentBrief struct {
+	InstructionID string   `json:"instruction_id"`
+	RoundID       string   `json:"round_id"`
+	Aspect        string   `json:"aspect"`
+	Runner        string   `json:"runner"`
+	Instructions  []string `json:"instructions"`
+	AgentID       string   `json:"agent_id"`
+	ResultPath    string   `json:"result_path"`
+}
+
 // ResultRejection records a malformed subagent result that must not be read again.
 type ResultRejection struct {
 	InstructionID string `json:"instruction_id"`
@@ -310,6 +324,13 @@ type InstructionContext struct {
 	Commands          []check.Judgment    `json:"commands,omitempty"`
 	PreCommitOutput   string              `json:"pre_commit_output,omitempty"`
 	WorkHistory       string              `json:"work_history,omitempty"`
+	CurrentMaterial   string              `json:"current_material,omitempty"`
+	Schemas           []string            `json:"schemas,omitempty"`
+	Instructions      []string            `json:"instructions,omitempty"`
+	PreJudgment       []string            `json:"pre_judgment,omitempty"`
+	Delegations       []InstructionOutput `json:"delegations,omitempty"`
+	BriefBytes        int                 `json:"brief_bytes,omitempty"`
+	Overflow          []string            `json:"overflow,omitempty"`
 }
 
 type Artifact struct {
@@ -357,3 +378,4 @@ func (*Artifact) recordKind() Kind      { return KindArtifact }
 func (*ResultRejection) recordKind() Kind { return KindResultRejection }
 func (*UnitResult) recordKind() Kind      { return KindUnitResult }
 func (*Merge) recordKind() Kind           { return KindMerge }
+func (*JudgmentBrief) recordKind() Kind   { return KindJudgmentBrief }

@@ -8,7 +8,7 @@
 
 各見出しは用途別文書の候補である。使うステージ、実行主体、必須かどうか、`criteria` と `examples` の選び方は[雛形](architecture/data.md#ループの雛形-plantemplate)で定める。選び方を雛形と変える計画は、逸脱として承認の問いに差分を示す。出力の形式、`NOT ASSESSED` の使い方、失敗のシナリオを伴う指摘などの共通規則は判定依頼テンプレートに一度だけ記す。
 
-検出試験の例と `spec.json` は `examples` ソース(既定 `.devkit/examples/`)から選ぶ。合格の索引は `[state] detect`(既定 `.devkit/detect.json`)で設定する。試験には基準の文書、匿名の例の本文、出力の約束だけを渡し、仕様・期待判定・対応表と、それらを含む履歴や参照先は渡さない。合格の識別と実行時期は[検出試験](architecture/guarantees.md#検出試験)に従う。用途別の判定基準は、違反例・適合例・許容例の期待判定を保つことを確かめる。
+検出試験の例と `spec.json` は `examples` ソース(既定 `.devkit/checks/`)から選ぶ。合格の索引は `[state] detect`(既定 `.devkit/detect.json`)で設定する。試験には基準の文書、匿名の例の本文、出力の約束だけを渡し、仕様・期待判定・対応表と、それらを含む履歴や参照先は渡さない。合格の識別と実行時期は[検出試験](architecture/guarantees.md#検出試験)に従う。用途別の判定基準は、違反例・適合例・許容例の期待判定を保つことを確かめる。
 
 ## 目的
 
@@ -58,11 +58,13 @@
 
 - **確認事項**:
   - コード: 失敗と変更の影響は [`assets/principles/engineering.md`](../assets/principles/engineering.md) の原則1・5に従う。
-  - 承認・委任: 判断と操作の範囲は [`assets/principles/working.md`](../assets/principles/working.md) の原則6・7に従い、判定依頼に含まれる有効な承認・委任の一覧と[対象・範囲を照合する](architecture/guarantees.md#判定結果の受理)。
+  - 承認・委任: 判断と操作の範囲は [`assets/principles/working.md`](../assets/principles/working.md) の原則6・7に従い、判定依頼に含まれる有効な承認と出所付きの委任文書と[対象・範囲を照合する](architecture/guarantees.md#判定結果の受理)。
   - 流儀: 差分の揃え方は [`assets/principles/designing.md` の原則7](../assets/principles/designing.md#7-follow-existing-conventions)に従う。
   - PR 本文: [form](architecture/modules.md#form)(形式と描画を扱う部品)の契約と[文章と記録の規則](rules.md#文章と記録)に従う。
   - 報告: 判断に必要な記載は [`assets/principles/writing.md` の原則1](../assets/principles/writing.md#1-put-conclusions-and-information-needed-for-human-decisions-first)、検証の主張は [`assets/principles/verification.md` の原則1](../assets/principles/verification.md#1-do-not-present-unverified-matters-as-verified)に従う。PR 本文にも両原則を適用する。
 - **blocking**: 照合した原則の blocking 条件に該当する。
+
+既定の diff の基準には英語の `principles/security.md` を含める。セキュリティ専用のステージは置かない。雛形の `delegations` で選ぶ文書は、出所付きの原文を有効な承認と区別して渡す。機械で委任の一覧には変換しない。
 
 ## テスト
 
@@ -75,6 +77,8 @@
 `command:<name>` がラウンド開始時の設定に未登録なら、check は `FAIL`、指摘は `auto-fixable` とする。「検証コマンド `<name>` が登録されていない。検証の手段を作り `devkit.toml` の `[commands.<name>]` に登録する」と伝える。登録はループ自身の変更として人が確認し、次のラウンド開始時のスナップショットから使う。コマンドの期限は登録ごとに必須である。`command:` の check がツリーを変えたときの指摘には、出力先を ignore する案内を含める。
 
 ## 動作検証
+
+既定の `default` と `fix` は verification で必須の `command:e2e` と判定者の check を使う。判定者は `principles/review/behavior.md` などに照らし、完了条件ごとの利用場面を利用者の入口から通しで確かめているかを見る。`e2e` の未登録は `test` と同じ修正の経路でスクリプトと登録を用意する。
 
 - **確認事項**:
   - 共通: 起動、操作、コンソールエラー、証拠の取得、後片付けを確認する。
@@ -96,13 +100,15 @@
   - 逸脱: [計画の雛形からの逸脱](architecture/data.md#計画-plan)を確認し、`criteria` と `examples` の選び方、担当、`fix` の規則の一覧、単位の役割の差分を含め、該当する指摘に [`needs-decision`](architecture/data.md#指摘-finding)(人の判断が必要な指摘)を付けているか。
   - 分割: `split` の追加・削除を逸脱として扱っているか。`units` の担当する範囲が重なっていないか。範囲の重なりは機械では検査しない。再計画で完了済みのステージを残りに含めないことは逸脱に数えない。
   - 規模: ステージを減らせないか。
+
+  - 指示: 計画者がステージ・check・単位に書いた `instructions` が課題に対して十分か。
   - 完了条件: [計画](architecture/data.md#計画-plan)に従い、ID 付きの文章と、条件ごとの確認手段の妥当性・網羅性を確かめているか。
   - 網羅性: 変更の種類(画面・データ・外部との通信・構造)に必要な検査が含まれるか。
 - **blocking**: 要求の抜けや追加がある、または完了条件に check または人のゲートによる確認手段がない。
 
 ## harness
 
-毎回の振り返りでループ自身を評価するメタ観点である。`default` と `fix` は必須の `command:test`・`test` と併せて使い、`docs` は `harness` だけを必須とする。
+毎回の振り返りでループ自身を評価するメタ観点である。既定の check に `history = "all"` を明示する。`default` と `fix` は必須の `command:test`・`test` と併せて使い、`docs` は `harness` だけを必須とする。
 
 - **確認事項**:
   - 原則と契約: [`assets/principles/harness.md`](../assets/principles/harness.md) の各原則と[モジュールごとの契約](architecture/modules.md#モジュールごとの契約)に従う。

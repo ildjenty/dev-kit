@@ -102,7 +102,7 @@ func TestOutOfRoundNormsUseCommittedHEAD(t *testing.T) {
 
 func TestCommittedNormChangeReissuesPendingPlanCheck(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n")
+	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Disable detection")
 	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
@@ -149,7 +149,7 @@ func TestGateQuestionContainsRecordedEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	serialized := string(marshal(t, data.Request))
+	serialized := briefText(t, review.Instruction)
 	for _, want := range []string{"Round-start comparison base:", "Changed files:", "README.md", "Diff file:", "-history.md"} {
 		if !strings.Contains(serialized, want) {
 			t.Fatalf("judgment omitted %q", want)
@@ -178,7 +178,7 @@ func TestGateQuestionContainsRecordedEvidence(t *testing.T) {
 
 func TestBackAnswerAndReplanApprovalConditions(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[detection]\nrequired = false\n")
+	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[detection]\nrequired = false\n")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Require requirements approval")
 	started, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
@@ -193,7 +193,7 @@ func TestBackAnswerAndReplanApprovalConditions(t *testing.T) {
 	answerResult(t, e, approved, ledger.AnswerApproved)
 	work := checkedNext(t, e)
 	for _, changed := range []bool{false, true} {
-		if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationQuestion, Obstacles: []string{"Reconsider the earlier stage"}})); err != nil {
+		if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationQuestion, Confirmation: ask("Confirm how to continue."), Obstacles: []string{"Reconsider the earlier stage"}})); err != nil {
 			t.Fatal(err)
 		}
 		asked := checkedNext(t, e)
@@ -291,7 +291,7 @@ func TestPlanCheckUsesConfiguredCommandRunner(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
-	settings := "kit_version = 'v3'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n[plan_check]\naspect = 'consistency'\nrunner = 'registered-plan'\n[judges.registered-plan]\nexecutable = '" + executable + "'\nargs = ['-test.run=^TestRegisteredPlanJudgeProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n"
+	settings := "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n[plan_check]\naspect = 'consistency'\nrunner = 'registered-plan'\n[judges.registered-plan]\nexecutable = '" + executable + "'\nargs = ['-test.run=^TestRegisteredPlanJudgeProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n"
 	write(t, e.Root(), "devkit.toml", settings)
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure plan judgment command")
@@ -431,7 +431,7 @@ func TestEmbeddedSchemasAreSelfContained(t *testing.T) {
 
 func TestConfiguredProductsAndMissingRules(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = 'deviation'\n[sources.requirements]\npath = 'docs/accepted-requirements.md'\n[sources.structure]\npath = 'docs/system-structure.json'\n[detection]\nrequired = false\n")
+	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[sources.requirements]\npath = 'docs/accepted-requirements.md'\n[sources.structure]\npath = 'docs/system-structure.json'\n[detection]\nrequired = false\n")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure product paths")
 	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
@@ -471,6 +471,19 @@ func TestConfiguredProductsAndMissingRules(t *testing.T) {
 
 func TestWorkHistoryIsGenericAndFixedAtIssuance(t *testing.T) {
 	e, ctx := fixture(t)
+	source, err := os.ReadFile(filepath.Join(e.Root(), ".devkit/plans/test.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	template, err := e.plans.ParseTemplate(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The "all" scope selects every lesson and evidence record; narrower scopes are tested separately.
+	template.Stages[0].History = plan.HistoryAll
+	write(t, e.Root(), ".devkit/plans/test.json", string(marshal(t, template)))
+	git(t, e.Root(), "add", ".")
+	git(t, e.Root(), "commit", "-qm", "Select all history")
 	working(t, e, ctx)
 	if _, err := e.Note(ctx, ledger.KindLesson, marshal(t, ledger.Lesson{Content: "First recorded lesson", Evidence: []form.Reference{}})); err != nil {
 		t.Fatal(err)
@@ -516,7 +529,7 @@ func TestLoopApprovalPolicyIsIndependentOfRouterCategories(t *testing.T) {
 		for _, when := range []string{"before_round", "before_commit"} {
 			t.Run(policy+"/"+when, func(t *testing.T) {
 				e, ctx := fixture(t)
-				write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = 'deviation'\nmeta_loop_edit = '"+policy+"'\n[router]\nhuman_confirmation = []\n[detection]\nrequired = false\n")
+				write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\nmeta_loop_edit = '"+policy+"'\n[router]\nhuman_confirmation = []\n[detection]\nrequired = false\n")
 				git(t, e.Root(), "add", ".")
 				git(t, e.Root(), "commit", "-qm", "Configure loop approval")
 				start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})

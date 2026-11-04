@@ -15,6 +15,9 @@ const (
 type Progress struct {
 	InstructionID    string           `json:"instruction_id"`
 	TerminationKind  TerminationKind  `json:"termination_kind"`
+	Report           json.RawMessage  `json:"report,omitempty"`
+	Confirmation     *Confirmation    `json:"confirmation,omitempty"`
+	CommitMessage    string           `json:"commit_message,omitempty"`
 	WorkPerformed    []string         `json:"work_performed,omitempty"`
 	Confirmed        []string         `json:"confirmed,omitempty"`
 	Unconfirmed      []string         `json:"unconfirmed,omitempty"`
@@ -23,6 +26,15 @@ type Progress struct {
 	ResumeConditions []string         `json:"resume_conditions,omitempty"`
 	OutOfScope       []string         `json:"out_of_scope,omitempty"`
 	ChangeReason     string           `json:"change_reason,omitempty"`
+}
+
+// Confirmation carries a worker's question verbatim, separately from its stage report.
+type Confirmation struct {
+	Text                 string      `json:"text"`
+	Options              []string    `json:"options"`
+	Recommendation       string      `json:"recommendation"`
+	RecommendationReason string      `json:"recommendation_reason"`
+	Evidence             []Reference `json:"evidence"`
 }
 
 // TemporaryState describes temporary state whose validity must be checked on resumption.
@@ -189,6 +201,7 @@ const (
 	InstructionExternal      InstructionKind = "external"
 	InstructionCompleted     InstructionKind = "completed"
 	InstructionAborted       InstructionKind = "aborted"
+	InstructionJudgmentBrief InstructionKind = "judgment_brief"
 )
 
 // Instruction is an issued instruction. The caller handles ID derivation and reissuance.

@@ -12,23 +12,9 @@ func RenderMarkdown(value any) (string, error) {
 	var m markdown
 	switch v := value.(type) {
 	case Progress:
-		m.title("Work result")
-		m.field("Termination kind", string(v.TerminationKind))
-		m.field("Instruction ID", v.InstructionID)
-		m.list("Work performed", v.WorkPerformed)
-		m.list("Confirmed", v.Confirmed)
-		m.list("Unconfirmed", v.Unconfirmed)
-		m.list("Obstacles", v.Obstacles)
-		for _, state := range v.TemporaryState {
-			m.heading("Temporary state")
-			m.field("Content", state.Content)
-			m.field("Verification method", state.VerificationMethod)
-			m.field("Sources", state.Source)
-			m.field("Invalid when", state.InvalidWhen)
+		if err := m.progress(v); err != nil {
+			return "", err
 		}
-		m.list("Resume conditions", v.ResumeConditions)
-		m.list("Out-of-scope work", v.OutOfScope)
-		m.field("Change reason", v.ChangeReason)
 	case JudgmentResult:
 		m.title("Judgment result")
 		m.field("Judgment", string(v.Judgment))
@@ -196,5 +182,39 @@ func (m *markdown) question(v Question) error {
 		m.references("Stop observation", []Reference{*v.StopObservation})
 	}
 	m.WriteString("Answer in your own words. You may give an answer outside the options, a conditional answer, or ask a question in return. You may revise your answer later.\n\n")
+	return nil
+}
+
+func (m *markdown) progress(v Progress) error {
+	m.title("Work result")
+	m.field("Termination kind", string(v.TerminationKind))
+	m.field("Instruction ID", v.InstructionID)
+	if len(v.Report) > 0 {
+		if err := m.json("Stage report", v.Report); err != nil {
+			return err
+		}
+	}
+	if v.Confirmation != nil {
+		m.heading("Confirmation request")
+		m.WriteString(v.Confirmation.Text + "\n\n")
+		m.list("Options", v.Confirmation.Options)
+		m.field("Recommendation", v.Confirmation.Recommendation)
+		m.field("Recommendation reason", v.Confirmation.RecommendationReason)
+		m.references("Materials", v.Confirmation.Evidence)
+	}
+	m.list("Work performed", v.WorkPerformed)
+	m.list("Confirmed", v.Confirmed)
+	m.list("Unconfirmed", v.Unconfirmed)
+	m.list("Obstacles", v.Obstacles)
+	for _, state := range v.TemporaryState {
+		m.heading("Temporary state")
+		m.field("Content", state.Content)
+		m.field("Verification method", state.VerificationMethod)
+		m.field("Sources", state.Source)
+		m.field("Invalid when", state.InvalidWhen)
+	}
+	m.list("Resume conditions", v.ResumeConditions)
+	m.list("Out-of-scope work", v.OutOfScope)
+	m.field("Change reason", v.ChangeReason)
 	return nil
 }

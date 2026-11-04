@@ -48,7 +48,7 @@ dev-kit/
 
 ## 利用側のリポジトリ
 
-規範と成果のソースの既定の置き場所である。接続先と配置は `[sources.<名前>]`、検出試験の索引は `[state] detect` で変更できる。既定の規範のソースは principles・stages・plans・rules・examples・templates、成果は requirements・structure である。
+規範と成果のソースの既定の置き場所である。接続先と配置は `[sources.<名前>]`、検出試験の索引は `[state] detect` で変更できる。既定の規範のソースは principles・stages・plans・rules・git・examples・templates、成果は requirements・structure である。
 
 ```text
 <repo>/
@@ -65,9 +65,10 @@ dev-kit/
     principles/              原則と review/test.md などの用途別の判定基準。principles ソース
     stages/                  ステージ定義。init が初期内容をコピー
     plans/<name>.json        ループの雛形。init が既定の default・fix・docs をコピー
-    examples/<観点ID>/       検出試験の例と spec.json。examples ソース
+    checks/<観点ID>/         検出試験の例と spec.json。examples ソース
     templates/               brief と form のテンプレート
     rules.md                 規則と強制手段
+    git.md                   ブランチ・worktree・PR・統合の散文の規則。git ソース
     requirements.md          リポジトリが満たすべき要件の正本
     detect.json              検出試験の合格記録の索引
     structure.json           構造の知識。形式は自由であり、所定の JSON のときだけ図を描く
@@ -88,7 +89,7 @@ dev-kit/
 
 UserPromptSubmit は束縛の有無によらず、人の入力ごとにセッションの最新入力1件を更新し、束縛後は作業ごとの観測も残す。タスクの完了通知は入力に含めない。`start` はその原文を作業に結び付け、観測がなければ原文なしと記録する。
 
-作業履歴ファイルは指示発行時点の内容で固定した作業の生成物であり、検出試験を除くすべての作業の brief と判定依頼がそのパスを参照する。
+経緯の索引は指示発行時点の内容で固定する生成物であり、ステージ・check の `history` に従う範囲を記録から決定的に絞る。採用された成果と今の材料は区別し、本文の成果は `outputs` で選ぶ。既定の範囲と必須の判定材料は[依頼の入力](data.md#依頼の入力)に従う。
 
 入力ファイルの場所と内容の保存は[状態遷移と受理条件](data.md#状態遷移と受理条件)、記録 ID の形式は[記録の範囲](data.md#記録の範囲)、停止の観測の保持条件は[停止の観測](data.md#停止の観測-stopobservation)に従う。
 
@@ -96,7 +97,7 @@ UserPromptSubmit は束縛の有無によらず、人の入力ごとにセッシ
 
 配置ガイドは各ディレクトリの README に置き、[brief の入力](modules.md#brief)に使う。
 
-チェックアウトのルートは `git rev-parse --show-toplevel` で取得し、直下の `devkit.toml` を入口にする。作業はセッションの cwd であるチェックアウトで、[Work のブランチ](data.md#作業-work)を使う。実行の記録と生成物の場所は `.devkit/run/` に固定し、`init` が `.gitignore` に追加する。サブエージェント定義・hook・保護設定・ignore がこの場所を前提とする。実行の記録を git 管理する選択肢は設けず、ignore された未追跡ファイルなので対象のバージョンにも含まれない。
+チェックアウトのルートは `git rev-parse --show-toplevel` で取得し、直下の `devkit.toml` を入口にする。作業はセッションの cwd のチェックアウトの記録で特定する。セッションのまとめ役が git の規則に従って開始前に作業ブランチを用意する。既定の作業者は devkit が作る単位用の worktree で作業する。実行の記録と生成物の場所は `.devkit/run/` に固定し、`init` が `.gitignore` に追加する。サブエージェント定義・hook・保護設定・ignore がこの場所を前提とする。実行の記録を git 管理する選択肢は設けず、ignore された未追跡ファイルなので対象のバージョンにも含まれない。
 
 単位の作業場所 `.devkit/worktrees/<単位の指示 ID>/` も ignore し、記録を守る deny の対象と重ならないよう `.devkit/run/` の外に置く。devkit がラウンド開始時のスナップショットのコミットから detached で作り、物理的な名前には計画者の単位 ID を使わない。中断中は保持する。中止・作業完了時は変更のない worktree だけを削除し、変更の残るものは保持して場所を知らせる。破棄は人が git で行う。
 

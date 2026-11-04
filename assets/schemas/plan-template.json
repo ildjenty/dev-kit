@@ -84,6 +84,11 @@
                       "required": [
                         "target"
                       ]
+                    },
+                    {
+                      "required": [
+                        "instructions"
+                      ]
                     }
                   ]
                 }
@@ -91,8 +96,17 @@
             }
           },
           "not": {
-            "required": [
-              "units"
+            "anyOf": [
+              {
+                "required": [
+                  "units"
+                ]
+              },
+              {
+                "required": [
+                  "instructions"
+                ]
+              }
             ]
           }
         }
@@ -246,6 +260,12 @@
               "role": {
                 "type": "string",
                 "minLength": 1
+              },
+              "outputs": {
+                "$ref": "#/$defs/outputs"
+              },
+              "instructions": {
+                "$ref": "#/$defs/instructions"
               }
             },
             "required": [
@@ -264,6 +284,30 @@
           "items": {
             "$ref": "#/$defs/selection"
           }
+        },
+        "report": {
+          "$ref": "#/$defs/selection"
+        },
+        "unit_report": {
+          "$ref": "#/$defs/selection"
+        },
+        "human_prompt": {
+          "$ref": "#/$defs/selection"
+        },
+        "delegations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/selection"
+          }
+        },
+        "outputs": {
+          "$ref": "#/$defs/outputs"
+        },
+        "history": {
+          "$ref": "#/$defs/history"
+        },
+        "instructions": {
+          "$ref": "#/$defs/instructions"
         }
       },
       "required": [
@@ -311,6 +355,21 @@
         },
         "examples": {
           "$ref": "#/$defs/selection"
+        },
+        "history": {
+          "$ref": "#/$defs/history"
+        },
+        "schemas": {
+          "$ref": "#/$defs/schema-names"
+        },
+        "outputs": {
+          "$ref": "#/$defs/outputs"
+        },
+        "brief_by_planner": {
+          "type": "boolean"
+        },
+        "instructions": {
+          "$ref": "#/$defs/instructions"
         }
       },
       "required": [
@@ -336,6 +395,42 @@
         "select"
       ],
       "additionalProperties": false
+    },
+    "history": {
+      "type": "string",
+      "enum": [
+        "none",
+        "stage_run",
+        "check",
+        "all"
+      ]
+    },
+    "outputs": {
+      "description": "Stage IDs whose adopted outputs are inline. Omitted or null selects all; an empty array selects none. Other adopted outputs remain available through the fixed index.",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "instructions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "schema-names": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+      },
+      "uniqueItems": true
     }
   }
 }

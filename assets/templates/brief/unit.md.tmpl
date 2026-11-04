@@ -16,6 +16,15 @@ Absolute worktree path: {{.WorktreePath}}
 
 Edit only this detached worktree and the assigned scope. Do not edit the work checkout, other unit worktrees, or runtime records. Do not commit, merge, or run devkit submit. Return only the progress JSON as your final message; SubagentStop stores it and devkit merges the units before the stage judgment.
 
+## Plan instructions
+{{range .Stage.Instructions}}
+- {{.}}
+{{end}}
+Unit instructions:
+{{range .Unit.Instructions}}
+- {{.}}
+{{end}}
+
 ## Users and purpose
 
 {{.Purpose}}
@@ -58,11 +67,15 @@ Items from the plan:
 {{template "norms" .Norms}}
 {{template "normPaths" .NormPaths}}
 {{template "previousOutputs" .PreviousOutputs}}
-## Work history
+## Current material
+
+{{.CurrentMaterial}}
+
+## History reference
 
 Work-history file: {{.WorkHistoryPath}}
 
-Use the work-history file referenced here as required by the stage definition. It is fixed when this instruction is issued.
+This fixed index contains the optional history selected by the stage. Adopted outputs and current material are separate inputs. Other adopted outputs remain accessible through the fixed index.
 {{if .PreviousFindings}}
 ## Previous findings and finding IDs
 
@@ -86,6 +99,18 @@ Exit code: {{.ExitCode}}
 
 {{.PreCommitOutput}}
 {{end}}
+## Confirmation guidance
+
+Fill `report` according to the selected report schema when claiming completion. Questions and stops may include partial reports; a complete report is required only for completion claims. Schema conformance does not prove completion.
+For `confirmation-required`, fill `confirmation.text` with the original question, `options`, `recommendation`, `recommendation_reason`, and `evidence` material references. Use empty recommendation and reason strings if unsupported. Human answers are free-form, including questions and conditional answers.
+{{if .ReportSchema}}
+### Selected report JSON Schema
+
+```json
+{{.ReportSchema}}
+```
+{{end}}
+
 ## Returning the progress block
 
 Return only the work result JSON in your final message. Do not run `devkit submit`.
@@ -139,12 +164,7 @@ Reference: requirements.md -> {{.Requirements.Path}} ({{if .Requirements.Exists}
 {{if .Rules.Path}}
 ## Irreversible decisions
 
-See the Shared difficult-to-change decisions section in `rules.md` supplied above.
-
-Shared difficult-to-change decisions from `rules.md`:
-{{range .IrreversibleDecisions}}
-- {{.}}
-{{end}}
+Use the shared difficult-to-change decisions in the rules section supplied above. Keep task-specific irreversible decisions in the plan.
 {{end}}{{end}}{{define "norms"}}
 ## Norms supplied in full
 {{range .}}
@@ -155,12 +175,12 @@ Reference: {{.Path}}
 {{end}}{{define "normPaths"}}
 ## Other fixed norms
 
-Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work checkout HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
 {{range .}}
 - Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}
 {{end}}{{define "previousOutputs"}}
-## Previous stage outputs
+## Adopted outputs
 {{range .}}
 ### {{.StageID}}
 

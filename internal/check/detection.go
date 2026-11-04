@@ -83,11 +83,14 @@ func PrepareDetectionExamples(spec DetectionSpec, examples map[string]string) ([
 // DetectionIdentity identifies content for reusing a passing detection test: the runner
 // definition, the judgment request template with its rules, the criteria documents actually
 // supplied, and the specification with its example documents.
+// Model and Effort are the settings written in the runner definition; empty means inherited.
 type DetectionIdentity struct {
 	RunnerHash   string `json:"runner_hash"`
 	TemplateHash string `json:"template_hash"`
 	CriteriaHash string `json:"criteria_hash"`
 	ExamplesHash string `json:"examples_hash"`
+	Model        string `json:"model,omitempty"`
+	Effort       string `json:"effort,omitempty"`
 }
 
 // Complete reports whether every identity component is present.

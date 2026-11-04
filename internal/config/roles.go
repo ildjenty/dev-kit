@@ -9,8 +9,9 @@ import (
 
 // Role defines a repository role and its optional subagent.
 type Role struct {
-	Kind  string `toml:"kind"`
-	Agent string `toml:"agent"`
+	Kind          string `toml:"kind"`
+	Agent         string `toml:"agent"`
+	MaxConcurrent *int   `toml:"max_concurrent"`
 }
 
 // Roles holds role definitions and the Claude read-only tool allowlist.
@@ -46,24 +47,47 @@ func (r *Roles) UnmarshalTOML(value any) error {
 		if !ok {
 			return fmt.Errorf("roles.%s must be a table", id)
 		}
-		role := Role{}
-		for field, value := range fields {
-			text, ok := value.(string)
-			if !ok {
-				return fmt.Errorf("roles.%s.%s must be a string", id, field)
-			}
-			switch field {
-			case "kind":
-				role.Kind = text
-			case "agent":
-				role.Agent = text
-			default:
-				return fmt.Errorf("unknown configuration key: roles.%s.%s", id, field)
-			}
+		role, err := decodeRole(id, fields)
+		if err != nil {
+			return err
 		}
 		r.Definitions[id] = role
 	}
 	return nil
+}
+
+func decodeRole(id string, fields map[string]any) (Role, error) {
+	role := Role{}
+	for field, value := range fields {
+		if field == "max_concurrent" {
+			number, ok := value.(int64)
+			if !ok || number < 1 || int64(int(number)) != number {
+				return Role{}, fmt.Errorf("roles.%s.max_concurrent must be an integer of at least 1", id)
+			}
+			limit := int(number)
+			role.MaxConcurrent = &limit
+			continue
+		}
+		text, ok := value.(string)
+		if !ok {
+			return Role{}, fmt.Errorf("roles.%s.%s must be a string", id, field)
+		}
+		switch field {
+		case "kind":
+			role.Kind = text
+		case "agent":
+			role.Agent = text
+		default:
+			return Role{}, fmt.Errorf("unknown configuration key: roles.%s.%s", id, field)
+		}
+	}
+	if len(fields) == 1 && role.MaxConcurrent != nil {
+		if defaults, ok := (Config{}).RoleSettings()[id]; ok {
+			defaults.MaxConcurrent = role.MaxConcurrent
+			role = defaults
+		}
+	}
+	return role, nil
 }
 
 // Planning selects the role that proposes plans.
@@ -74,14 +98,21 @@ type Planning struct {
 // RoleSettings returns effective repository roles.
 func (c Config) RoleSettings() map[string]Role {
 	roles := map[string]Role{
-		"worker":      {Kind: "work"},
-		"unit_worker": {Kind: "work", Agent: "devkit-worker"},
-		"judge":       {Kind: "judge", Agent: "devkit-judge"},
-		"planner":     {Kind: "plan", Agent: "devkit-planner"},
-		"human":       {Kind: "human"},
+		"worker":  {Kind: "work", Agent: "devkit-worker"},
+		"judge":   {Kind: "judge", Agent: "devkit-judge"},
+		"planner": {Kind: "plan", Agent: "devkit-planner"},
+		"human":   {Kind: "human"},
 	}
 	maps.Copy(roles, c.Roles.Definitions)
 	return roles
+}
+
+// RoleMaxConcurrent returns a role's limit, which applies alongside the global limit.
+func (c Config) RoleMaxConcurrent(id string) int {
+	if limit := c.RoleSettings()[id].MaxConcurrent; limit != nil {
+		return *limit
+	}
+	return c.MaxConcurrent()
 }
 
 // ReadOnlyTools returns tools permitted in Claude judge and planner definitions.
@@ -165,6 +196,15 @@ func (c Config) validateRoles() error {
 	}
 	if judge.Agent == planner.Agent {
 		return fmt.Errorf("plan check and planning agents must differ")
+	}
+	return nil
+}
+
+func (c Config) validateRoleConcurrency() error {
+	for id, role := range c.RoleSettings() {
+		if role.MaxConcurrent != nil && *role.MaxConcurrent < 1 {
+			return fmt.Errorf("roles.%s.max_concurrent must be at least 1", id)
+		}
 	}
 	return nil
 }

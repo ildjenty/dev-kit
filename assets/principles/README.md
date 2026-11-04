@@ -8,6 +8,7 @@ The repository owns and develops the principles introduced by `devkit init`. Che
 - **`principles/data.md`**: When deciding on data and state
 - **`principles/testing.md`**: When writing tests and before changing existing code
 - **`principles/verification.md`**: When making statements about tools, APIs, versions, causes, or measurements
+- **`principles/security.md`**: When handling untrusted input, secrets, authentication and authorization, permissions and defaults, or dependencies
 - **`principles/working.md`**: When deciding how to work
 - **`principles/context.md`**: When handling context and records
 - **`principles/harness.md`**: When reviewing the loop mechanism (parts, assembly, and plans) in a retrospective, or running a check that selects `principles/review/harness.md`

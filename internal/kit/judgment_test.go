@@ -31,8 +31,10 @@ func TestJudgmentCriteriaAndDetectionInputs(t *testing.T) {
 				"Rules":        map[string]string{"Path": "rules.md", "Content": "Repository rule body"},
 				"LayoutGuides": []map[string]string{},
 			},
-			"Norms":     []map[string]string{{"Path": "examples/spec.json", "Content": "Hidden specification"}},
-			"NormPaths": []map[string]string{{"Path": "history", "SnapshotPath": "Hidden history path"}},
+			"Norms":        []map[string]string{{"Path": "examples/spec.json", "Content": "Hidden specification"}},
+			"NormPaths":    []map[string]string{{"Path": "history", "SnapshotPath": "Hidden history path"}},
+			"Instructions": []string{}, "PreJudgmentInstructions": []string{}, "PreviousOutputs": []map[string]string{},
+			"CurrentMaterial": "", "WorkHistoryPath": "Hidden history index", "Delegations": []map[string]string{},
 		}
 		var output bytes.Buffer
 		if err := tmpl.Execute(&output, input); err != nil {
@@ -42,7 +44,7 @@ func TestJudgmentCriteriaAndDetectionInputs(t *testing.T) {
 		if !strings.Contains(body, "principles/review/test.md") || !strings.Contains(body, "Selected frozen criteria") || strings.Count(body, "## Judgment rules") != 1 {
 			t.Fatalf("criteria or common rules are missing: %s", body)
 		}
-		for _, hidden := range []string{"Repository product body", "Repository rule body", "Hidden specification", "Hidden history path"} {
+		for _, hidden := range []string{"Repository product body", "Repository rule body", "Hidden specification", "Hidden history path", "Hidden history index"} {
 			if strings.Contains(body, hidden) == detection {
 				t.Fatalf("unexpected context visibility for detection=%t: %s", detection, hidden)
 			}

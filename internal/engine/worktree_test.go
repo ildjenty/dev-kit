@@ -163,7 +163,7 @@ func TestConcurrentStartsUseOneCheckout(t *testing.T) {
 
 func TestParallelWorktreeLoops(t *testing.T) {
 	main, ctx := fixture(t)
-	write(t, main.Root(), "devkit.toml", "kit_version = 'v3'\n")
+	write(t, main.Root(), "devkit.toml", "kit_version = 'v3'\n"+sessionWorker)
 	configureStage(t, main, func(stage *plan.Stage) {
 		stage.Checks = []plan.Check{judgeCheck("plan", true)}
 	})

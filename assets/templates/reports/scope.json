@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Scope report",
+  "description": "Worker-reported material, not independent evidence of completion.",
+  "type": "object",
+  "properties": {
+    "included": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "excluded": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "externally_visible": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "irreversible_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unverified": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "finalize_when": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "item",
+          "unverified",
+          "finalize_when"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "included",
+    "excluded",
+    "externally_visible",
+    "irreversible_items"
+  ],
+  "additionalProperties": false
+}

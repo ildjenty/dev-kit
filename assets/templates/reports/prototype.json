@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Prototype report",
+  "description": "Worker-reported material, not independent evidence of completion.",
+  "type": "object",
+  "properties": {
+    "premises": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "premise": {
+            "type": "string",
+            "minLength": 1
+          },
+          "experiment": {
+            "type": "string",
+            "minLength": 1
+          },
+          "result": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "premise",
+          "experiment",
+          "result",
+          "decision"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "evidence_references": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "prototype_disposition": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "premises",
+    "evidence_references",
+    "prototype_disposition"
+  ],
+  "additionalProperties": false
+}

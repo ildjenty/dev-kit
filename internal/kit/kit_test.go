@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"io/fs"
+	"strings"
 	"testing"
 
 	"github.com/ildjenty/dev-kit/assets"
@@ -22,7 +23,7 @@ func TestNormsLayoutAndContents(t *testing.T) {
 			}
 			target := name
 			if root == "rules" {
-				target = "rules.md"
+				target = strings.TrimPrefix(name, "rules/")
 			}
 			want, err := fs.ReadFile(assets.FS(), name)
 			if err != nil {

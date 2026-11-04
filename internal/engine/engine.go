@@ -84,6 +84,7 @@ type Status struct {
 	Progress     *ledger.Progress     `json:"progress,omitempty"`
 	Questions    []form.Question      `json:"questions"`
 	Instructions []ledger.Instruction `json:"instructions"`
+	Metrics      ledger.Metrics       `json:"metrics"`
 	Warning      string               `json:"warning,omitempty"`
 }
 
@@ -122,7 +123,7 @@ func (e *Engine) initialize() error {
 		}
 	}
 	forms := map[string]*form.Schema{}
-	for _, name := range []string{"progress", "planner-result", "judgment", "detection-result"} {
+	for _, name := range []string{"progress", "planner-result", "judgment", "detection-result", "judgment-brief"} {
 		forms[name], err = form.CompileSchemaWithResources(e.schemas[name], resources)
 		if err != nil {
 			return err
@@ -134,7 +135,7 @@ func (e *Engine) initialize() error {
 
 // SchemaNames returns the kit schema names required by forward operations.
 func SchemaNames() []string {
-	return []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan", "planner-result", "detection-result", "structure"}
+	return []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan", "planner-result", "detection-result", "judgment-brief", "structure"}
 }
 
 // Historical record validation remains available while forward assets are edited.
@@ -160,7 +161,7 @@ func (e *Engine) recordValidator() error {
 		}
 		sources := map[string][]byte{}
 		for _, name := range SchemaNames() {
-			if name == "planner-result" || name == "detection-result" {
+			if name == "planner-result" || name == "detection-result" || name == "judgment-brief" {
 				continue
 			}
 			sources[name], err = kit.Schema(name)
@@ -222,7 +223,7 @@ func (e *Engine) resolve(ctx context.Context, bind bool) (*ledger.State, string,
 	}
 	branch, branchErr := e.workspace.Branch(ctx)
 	if e.workID == "" || !localName(e.workID) {
-		return nil, "", errors.New("no work is bound to this session or branch")
+		return nil, "", errors.New("no work is bound to this session or checkout")
 	}
 	state, err := e.load()
 	if err != nil {
@@ -236,8 +237,11 @@ func (e *Engine) resolve(ctx context.Context, bind bool) (*ledger.State, string,
 		return nil, "", errors.New("work and kit versions do not match")
 	}
 	warning := ""
-	if branchErr != nil || branch != work.Branch {
-		warning = fmt.Sprintf("Current branch does not match work branch %s.", work.Branch)
+	if branchErr != nil {
+		branch = ""
+	}
+	if branch != work.Branch {
+		warning = fmt.Sprintf("Current branch does not match the branch at work start (%s).", work.Branch)
 	}
 	if bind && warning == "" && (obs == nil || obs.WorkID == "") {
 		if err := e.checkSession(); err != nil {
@@ -333,7 +337,7 @@ func (e *Engine) mutation(ctx context.Context) (*fsstore.Lock, error) {
 	return lock, nil
 }
 
-// Start creates a work branch and a planner instruction from a repository template.
+// Start records work on the current branch of this checkout and issues a planner instruction from a repository template.
 func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error) {
 	checkout, err := e.lockStart()
 	if err != nil {
@@ -394,13 +398,8 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 		return Result{}, err
 	}
 	defer lock.Close()
-	branch, err := settings.BranchName(e.workID)
-	if err != nil {
-		return Result{}, err
-	}
-	if err = e.workspace.CreateBranch(ctx, branch); err != nil {
-		return Result{}, err
-	}
+	// The session prepares the work branch following the git norm; devkit only records it for warnings.
+	branch, _ := e.workspace.Branch(ctx)
 	if err = e.store().Publish("inbox/task.txt", []byte(request.Task)); err != nil {
 		return Result{}, err
 	}
@@ -428,7 +427,7 @@ func (e *Engine) Status(ctx context.Context) (Status, error) {
 		return Status{}, err
 	}
 	progress, _ := state.LatestProgress()
-	return Status{WorkID: e.workID, Position: state.CurrentPosition(), Progress: progress, Questions: state.UnansweredQuestions(), Instructions: state.UnacceptedInstructions(), Warning: warning}, nil
+	return Status{WorkID: e.workID, Position: state.CurrentPosition(), Progress: progress, Questions: state.UnansweredQuestions(), Instructions: state.UnacceptedInstructions(), Metrics: state.Metrics(), Warning: warning}, nil
 }
 
 // Pause publishes the independent pause overlay without acquiring the work lock.

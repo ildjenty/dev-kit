@@ -52,8 +52,16 @@
         {
           "source": "structure",
           "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
         }
-      ]
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/implement.json"
+      }
     },
     {
       "id": "retrospective",
@@ -104,7 +112,8 @@
           "examples": {
             "source": "examples",
             "select": "harness/spec.json"
-          }
+          },
+          "history": "all"
         }
       ],
       "gate": {
@@ -133,8 +142,17 @@
         {
           "source": "structure",
           "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
         }
-      ]
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/retrospective.json"
+      },
+      "history": "all"
     }
   ],
   "optional_stages": [
@@ -168,8 +186,16 @@
         {
           "source": "structure",
           "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
         }
-      ]
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/research.json"
+      }
     },
     {
       "id": "prototype",
@@ -225,8 +251,16 @@
         {
           "source": "structure",
           "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
         }
-      ]
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/prototype.json"
+      }
     }
   ],
   "planner_inputs": [

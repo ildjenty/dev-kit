@@ -80,175 +80,65 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 			return meta, data, false, nil
 		}
 		fresh = meta.ID != previousID
+		meta.Context = nil
 	}
-	norms, inputs, err := e.judgmentNormDocuments(ctx, ref, target, round, version)
+	request, inputs, err := e.judgmentRequest(ctx, state, item, &meta, ref, target, path, round, version)
 	if err != nil {
 		return meta, instructionData{}, false, err
 	}
-	aspect := check.Aspect{ID: item.Aspect}
-	criteria := []check.Criterion{}
-	if !item.Runner.IsCommand() {
-		if criteria, err = e.criteria(ctx, ref, item.Criteria); err != nil {
-			return meta, instructionData{}, false, err
-		}
-	}
-	schema, _, err := e.outputSchema(ctx, ref, string(item.Runner))
-	if err != nil {
-		return meta, instructionData{}, false, err
-	}
-	requestKind := check.PlanRequest
-	var progress *form.Progress
-	findings := []form.Finding{}
-	if round != nil {
-		if err := e.roundNorms(ctx, state, round.ID, version, norms); err != nil {
-			return meta, instructionData{}, false, err
-		}
-		requestKind = check.RoundRequest
-		records, err := e.records()
-		if err != nil {
-			return meta, instructionData{}, false, err
-		}
-		for _, r := range records {
-			if p, ok := r.Payload.(*ledger.Progress); ok && p.RoundID == round.ID {
-				copy := p.Progress
-				progress = &copy
-			}
-		}
-		findings = check.FindingsForAspect(item.Aspect, state.UnresolvedBlocking(round.StageRunID))
-	}
-	evidence, err := e.judgmentEvidence(ctx, &meta, state, round)
-	if err != nil {
-		return meta, instructionData{}, false, err
-	}
-	if len(norms) > 0 {
-		norms[0].Content += "\n" + evidence
-	}
-	input := check.RequestInput{Kind: requestKind, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: aspect, Criteria: criteria, TargetVersion: target, TargetPath: path, Norms: norms, OutputSchema: schema, CompletionConditionIDs: append([]string{}, item.CompletionConditionIDs...), Progress: progress, PreviousFindings: findings, Authorizations: []check.Authorization{}}
-	input.Authorizations = judgmentAuthorizations(state, target, version)
-	if requestKind == check.PlanRequest {
-		if err := e.planRequestInputs(state, &input); err != nil {
-			return meta, instructionData{}, false, err
-		}
-	}
-	request, err := check.PrepareRequest(input)
-	if err != nil {
+	if err := e.judgmentContext(ctx, state, item, &meta, request, round); err != nil {
 		return meta, instructionData{}, false, err
 	}
 	runner, err := e.runnerAgent(ctx, ref, string(item.Runner))
 	if err != nil {
 		return meta, instructionData{}, false, err
 	}
-	data := instructionData{Reference: ref, Inputs: inputs, Request: &request, Context: meta.Context, Instruction: form.Instruction{ID: meta.ID, Kind: kind, TargetPath: path, Runner: runner, Text: "Launch the assigned judge with: devkit-instruction " + meta.ID}}
+	data := instructionData{Reference: ref, Inputs: inputs, Request: &request, Context: meta.Context, RoundID: meta.RoundID, Instruction: form.Instruction{ID: meta.ID, Kind: kind, TargetPath: path, Runner: runner, Text: "Launch the assigned judge with: devkit-instruction " + meta.ID}}
 	return meta, data, fresh, nil
 }
-func (e *Engine) roundNorms(ctx context.Context, state *ledger.State, roundID string, version int, norms []check.Norm) error {
-	bound, ok, err := e.boundPlan(version)
-	if err != nil {
-		return err
-	}
-	if !ok {
-		return errors.New("bound plan is missing")
-	}
-	agreed, err := json.MarshalIndent(bound, "", "  ")
-	if err != nil {
-		return err
-	}
-	additional := "\n\n## Agreed plan\n\n" + string(agreed)
-	for _, run := range state.StageRuns() {
-		for _, round := range state.Rounds(run.ID) {
-			if round.ID == roundID {
-				definition, err := e.asset(ctx, roundReference(round), "stages/"+run.StageID+".md")
-				if err != nil {
-					return err
-				}
-				additional += "\n\n## Stage definition\n\n" + string(definition)
-			}
-		}
-	}
-	for index := range norms {
-		if index == 0 {
-			norms[index].Content += additional
-		}
-	}
-	return nil
-}
 
-func (e *Engine) requestNorms(ctx context.Context, ref string, norms []check.Norm, inputs []plan.Selection, productRef ...string) error {
-	facts, err := e.repository(ctx, ref, inputs, productRef...)
+// judgmentRequest records the judgment identity: norms by reference, criteria by hash, and the
+// judged report, findings, and approvals. Document bodies are rendered once in the brief.
+func (e *Engine) judgmentRequest(ctx context.Context, state *ledger.State, item plan.Check, meta *ledger.Instruction, ref string, target form.TargetVersion, path string, round *ledger.Round, version int) (check.Request, []plan.Selection, error) {
+	norms, _, err := e.normDocuments(ctx, ref)
 	if err != nil {
-		return err
+		return check.Request{}, nil, err
 	}
-	docs := append([]brief.Document{facts.Rules, facts.Requirements}, facts.LayoutGuides...)
-	products := ref
-	if len(productRef) > 0 {
-		products = productRef[0]
+	for i := range norms {
+		norms[i].Content = ""
 	}
-	additional, err := e.additionalInputs(ctx, ref, products, inputs)
+	inputs, err := e.judgeInputs(ctx, ref, version)
 	if err != nil {
-		return err
+		return check.Request{}, nil, err
 	}
-	docs = append(docs, additional...)
-	if len(norms) > 0 {
-		for _, doc := range docs {
-			if doc.Path == "" {
-				continue
-			}
-			norms[0].Content += "\nReference: " + doc.Path + "\n\n" + doc.Content + "\n"
+	criteria := []check.Criterion{}
+	if !item.Runner.IsCommand() {
+		if criteria, err = e.criteria(ctx, ref, item.Criteria); err != nil {
+			return check.Request{}, nil, err
 		}
 	}
-	return nil
-}
-
-func (e *Engine) hydrateRequest(ctx context.Context, data instructionData) error {
-	if data.Request == nil || data.Request.Kind == check.DetectionRequest || len(data.Request.Norms) == 0 || data.Request.Norms[0].Content != "" {
-		return nil
-	}
-	norms, _, err := e.normDocuments(ctx, data.Reference)
+	schema, _, err := e.outputSchema(ctx, ref, string(item.Runner))
 	if err != nil {
-		return err
+		return check.Request{}, nil, err
 	}
-	productRef := data.Reference
-	if data.Request.Kind == check.RoundRequest {
-		productRef = data.Request.TargetVersion.Tree
-	}
-	if err := e.requestNorms(ctx, data.Reference, norms, data.Inputs, productRef); err != nil {
-		return err
-	}
-	if data.Request.Kind == check.RoundRequest {
-		if err := e.hydrateRoundNorms(ctx, data.Instruction.ID, norms); err != nil {
-			return err
-		}
-	}
-	records, err := e.records()
-	if err != nil {
-		return err
-	}
-	state, err := e.load()
-	if err != nil {
-		return err
-	}
-	for _, record := range records {
-		meta, ok := record.Payload.(*ledger.Instruction)
-		if !ok || meta.ID != data.Instruction.ID {
-			continue
-		}
-		var round *ledger.Round
-		for _, candidate := range state.Rounds(meta.StageRunID) {
-			if candidate.ID == meta.RoundID {
-				round = candidate
-			}
-		}
-		evidence, err := e.judgmentEvidence(ctx, meta, state, round)
+	input := check.RequestInput{Kind: check.PlanRequest, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: check.Aspect{ID: item.Aspect}, Criteria: criteria, TargetVersion: target, TargetPath: path, Norms: norms, OutputSchema: schema, CompletionConditionIDs: append([]string{}, item.CompletionConditionIDs...), PreviousFindings: []form.Finding{}}
+	input.Authorizations = judgmentAuthorizations(state, target, version)
+	if round != nil {
+		input.Kind = check.RoundRequest
+		records, err := e.records()
 		if err != nil {
-			return err
+			return check.Request{}, nil, err
 		}
-		if len(norms) > 0 {
-			norms[0].Content += "\n" + evidence
+		if progress := roundProgress(records, round.ID); progress != nil {
+			copy := progress.Progress
+			input.Progress = &copy
 		}
-		break
+		input.PreviousFindings = check.FindingsForAspect(item.Aspect, state.UnresolvedBlocking(round.StageRunID))
+	} else if err := e.planRequestInputs(state, &input); err != nil {
+		return check.Request{}, nil, err
 	}
-	data.Request.Norms = norms
-	return nil
+	request, err := check.PrepareRequest(input)
+	return request, inputs, err
 }
 
 func (e *Engine) publishJudgment(ctx context.Context, meta ledger.Instruction, data instructionData, fresh bool) (Result, error) {
@@ -257,49 +147,6 @@ func (e *Engine) publishJudgment(ctx context.Context, meta ledger.Instruction, d
 		return Result{}, err
 	}
 	return e.publishInstruction(meta, fresh, data, b.Text)
-}
-
-func (e *Engine) judgmentBrief(ctx context.Context, data instructionData) (brief.Brief, error) {
-	if err := e.hydrateRequest(ctx, data); err != nil {
-		return brief.Brief{}, err
-	}
-	template, err := e.asset(ctx, data.Reference, "templates/brief/judgment.md.tmpl")
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	productRef := data.Reference
-	if data.Request.Kind == check.RoundRequest {
-		productRef = data.Request.TargetVersion.Tree
-	}
-	facts, err := e.repository(ctx, data.Reference, data.Inputs, productRef)
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	criteria, err := e.criteriaDocuments(ctx, data.Reference, data.Request.Criteria)
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	paths, err := e.normPaths(ctx, data.Reference)
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	content, err := json.MarshalIndent(data.Request, "", "  ")
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	schema, err := e.judgmentSchema(ctx, data.Reference, data.Request.Runner)
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	docs, err := e.additionalInputs(ctx, data.Reference, productRef, data.Inputs)
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	supporting, err := e.judgmentSchemas(ctx, data.Reference)
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: "```json\n" + string(content) + "\n```", SupportingSchemas: supporting, Criteria: criteria, Repository: facts, Norms: docs, NormPaths: paths, OutputSchema: string(schema)})
 }
 
 func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan) (Result, error) {
@@ -312,7 +159,7 @@ func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan
 		return Result{}, err
 	}
 	selected := settings.PlanCheckSettings()
-	item := plan.Check{Aspect: selected.Aspect, Runner: plan.Runner(selected.Runner), Required: true, Criteria: planSelections(selected.Criteria)}
+	item := plan.Check{Aspect: selected.Aspect, Runner: plan.Runner(selected.Runner), Required: true, Criteria: planSelections(selected.Criteria), Schemas: selected.Schemas}
 	if selected.Examples != nil {
 		item.Examples = &plan.Selection{Source: selected.Examples.Source, Select: selected.Examples.Select}
 	}
@@ -368,7 +215,7 @@ func (e *Engine) acceptPending(ctx context.Context, state *ledger.State) (bool, 
 		return false, err
 	}
 	for _, instruction := range state.UnacceptedInstructions() {
-		if instruction.Kind != form.InstructionPlan && instruction.Kind != form.InstructionJudgment && instruction.Kind != form.InstructionPlanCheck && instruction.Kind != form.InstructionDetectionTest && instruction.Kind != form.InstructionUnitWork {
+		if instruction.Kind != form.InstructionPlan && instruction.Kind != form.InstructionJudgment && instruction.Kind != form.InstructionPlanCheck && instruction.Kind != form.InstructionDetectionTest && instruction.Kind != form.InstructionUnitWork && instruction.Kind != form.InstructionJudgmentBrief {
 			continue
 		}
 		request, err := e.readInstruction(instruction.ID)
@@ -420,25 +267,29 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 	if err != nil {
 		return Result{}, err
 	}
-	items := slices.Clone(stage.Checks)
-	slices.SortStableFunc(items, func(a, b plan.Check) int {
-		if a.Runner.IsCommand() && !b.Runner.IsCommand() {
-			return -1
-		}
-		if !a.Runner.IsCommand() && b.Runner.IsCommand() {
-			return 1
-		}
-		return 0
-	})
-	for _, item := range items {
+	settings, err := e.settings(ctx, roundReference(round))
+	if err != nil {
+		return Result{}, err
+	}
+	batch := &judgeBatch{free: newSlots(state, settings)}
+	for _, item := range orderedChecks(stage.Checks, settings) {
 		state, err = e.load()
 		if err != nil {
 			return Result{}, err
 		}
-		r, ready, err := e.judgeRoundCheck(ctx, state, p, stage, run, round, item, path)
+		r, ready, err := e.judgeRoundCheck(ctx, state, p, stage, run, round, item, path, batch)
 		if err != nil || ready {
 			return r, err
 		}
+	}
+	if len(batch.issued) > 0 || batch.waiting {
+		r := response(state)
+		r.Instructions = batch.issued
+		if len(batch.issued) == 1 {
+			r.Instruction = &batch.issued[0]
+		}
+		r.Message = launchMessage(len(batch.issued))
+		return r, nil
 	}
 	return e.decideRound(ctx, p, stage, run, round)
 }
@@ -787,26 +638,6 @@ func judgmentAuthorizations(state *ledger.State, target form.TargetVersion, vers
 	return authorizations
 }
 
-func (e *Engine) hydrateRoundNorms(ctx context.Context, instructionID string, norms []check.Norm) error {
-	records, err := e.records()
-	if err != nil {
-		return err
-	}
-	for _, record := range records {
-		if meta, ok := record.Payload.(*ledger.Instruction); ok && meta.ID == instructionID {
-			state, err := e.load()
-			if err != nil {
-				return err
-			}
-			if err := e.roundNorms(ctx, state, meta.RoundID, meta.PlanVersion, norms); err != nil {
-				return err
-			}
-			break
-		}
-	}
-	return nil
-}
-
 type observedResult struct {
 	result hook.SubagentResult
 	path   string
@@ -910,10 +741,13 @@ func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, 
 		return e.rejectResult(instruction, obs, errors.New("runner or agent identity does not match"))
 	}
 	if instruction.Kind == form.InstructionUnitWork {
-		return e.acceptUnitResult(instruction, obs)
+		return e.acceptUnitResult(state, instruction, obs)
 	}
 	if instruction.Kind == form.InstructionPlan {
 		return e.acceptPlannerResult(ctx, state, instruction, request, obs)
+	}
+	if instruction.Kind == form.InstructionJudgmentBrief {
+		return e.acceptJudgmentBrief(instruction, obs)
 	}
 	if request.Request == nil {
 		return false, errors.New("judgment request is missing")
@@ -979,7 +813,31 @@ func (e *Engine) parsePlannerResult(instruction ledger.Instruction, content []by
 	return p, nil
 }
 
-func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item plan.Check, path string) (Result, bool, error) {
+// judgeBatch collects the subagent instructions of a round issued together within the limits.
+type judgeBatch struct {
+	free    *slots
+	issued  []form.Instruction
+	waiting bool
+}
+
+// orderedChecks runs verification commands first, then registered judgment commands, and
+// subagent judges last so that their instructions are issued together.
+func orderedChecks(checks []plan.Check, settings config.Config) []plan.Check {
+	rank := func(item plan.Check) int {
+		if item.Runner.IsCommand() {
+			return 0
+		}
+		if _, ok := settings.Judges[string(item.Runner)]; ok {
+			return 1
+		}
+		return 2
+	}
+	items := slices.Clone(checks)
+	slices.SortStableFunc(items, func(a, b plan.Check) int { return rank(a) - rank(b) })
+	return items
+}
+
+func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item plan.Check, path string, batch *judgeBatch) (Result, bool, error) {
 	target := *round.ReturnedTarget
 	judgments, err := e.roundJudgments(round)
 	if err != nil {
@@ -1003,17 +861,19 @@ func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p pla
 		}
 		return Result{}, false, nil
 	}
-	key := round.ID + ":" + item.Aspect
-	meta, request, fresh, err := e.judgmentInstruction(ctx, state, item, form.InstructionJudgment, key, roundReference(round), target, path, round, p.Version)
-	if err != nil {
-		return Result{}, false, err
-	}
-	issued, err := e.publishJudgment(ctx, meta, request, fresh)
-	if err != nil {
-		return Result{}, false, err
-	}
 	settings, err := e.settings(ctx, roundReference(round))
 	if err != nil {
+		return Result{}, false, err
+	}
+	_, judgeCommand := settings.Judges[string(item.Runner)]
+	if !item.Runner.IsCommand() && !judgeCommand {
+		return e.issueRoundJudge(ctx, state, p, round, item, path, settings, batch)
+	}
+	meta, request, fresh, err := e.judgmentInstruction(ctx, state, item, form.InstructionJudgment, judgmentKey(round, item), roundReference(round), target, path, round, p.Version)
+	if err != nil {
+		return Result{}, false, err
+	}
+	if _, err := e.publishJudgment(ctx, meta, request, fresh); err != nil {
 		return Result{}, false, err
 	}
 	if item.Runner.IsCommand() {
@@ -1033,10 +893,43 @@ func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p pla
 		}
 		return Result{}, false, nil
 	}
+	return Result{}, false, nil
+}
+
+// issueRoundJudge issues a subagent judgment, preceded by a pre-judgment planner instruction for
+// brief_by_planner checks, when a slot is free under both concurrency limits.
+func (e *Engine) issueRoundJudge(ctx context.Context, state *ledger.State, p plan.Plan, round *ledger.Round, item plan.Check, path string, settings config.Config, batch *judgeBatch) (Result, bool, error) {
 	if role, ok := settings.RoleSettings()[string(item.Runner)]; !ok || role.Kind != "judge" {
 		return Result{}, false, fmt.Errorf("judge %q is neither a registered command nor a devkit subagent", item.Runner)
 	}
-	return issued, true, nil
+	key := judgmentKey(round, item)
+	var r Result
+	var err error
+	if item.BriefByPlanner && !hasJudgmentBrief(state, round, item) {
+		if !batch.free.take(form.InstructionJudgmentBrief, key, settings.PlanningRole()) {
+			batch.waiting = true
+			return Result{}, false, nil
+		}
+		r, err = e.judgmentBriefInstruction(ctx, state, p, round, item)
+	} else {
+		if !batch.free.take(form.InstructionJudgment, key, string(item.Runner)) {
+			batch.waiting = true
+			return Result{}, false, nil
+		}
+		meta, request, fresh, err := e.judgmentInstruction(ctx, state, item, form.InstructionJudgment, key, roundReference(round), *round.ReturnedTarget, path, round, p.Version)
+		if err != nil {
+			return Result{}, false, err
+		}
+		r, err = e.publishJudgment(ctx, meta, request, fresh)
+		if err != nil {
+			return Result{}, false, err
+		}
+	}
+	if err != nil || r.Paused {
+		return r, true, err
+	}
+	batch.issued = append(batch.issued, *r.Instruction)
+	return Result{}, false, nil
 }
 
 func (e *Engine) judgeCommandCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item plan.Check, request instructionData, settings config.Config) (Result, bool, error) {
@@ -1291,18 +1184,8 @@ func (e *Engine) judgmentCommandInput(ctx context.Context, data instructionData,
 	}{request, criteria, body.Text})
 }
 
-func (e *Engine) judgmentNormDocuments(ctx context.Context, ref string, target form.TargetVersion, round *ledger.Round, version int) ([]check.Norm, []plan.Selection, error) {
-	norms, _, err := e.normDocuments(ctx, ref)
-	if err != nil {
-		return nil, nil, err
-	}
-	inputs, err := e.judgeInputs(ctx, ref, version)
-	if err != nil {
-		return nil, nil, err
-	}
-	product := ref
-	if round != nil {
-		product = target.Tree
-	}
-	return norms, inputs, e.requestNorms(ctx, ref, norms, inputs, product)
+// judgmentKey identifies a round judgment by round, aspect, and runner. Pre-judgment
+// instructions, history scope, and reissues bind to the same key.
+func judgmentKey(round *ledger.Round, item plan.Check) string {
+	return round.ID + ":" + item.Aspect + ":" + string(item.Runner)
 }

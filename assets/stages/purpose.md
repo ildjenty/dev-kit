@@ -24,6 +24,8 @@ An explanation of how the purpose corresponds to the proposed completion conditi
 
 ## Completion conditions
 
+When claiming completion, fill `report` according to this stage's selected report JSON Schema supplied in the brief. When asking the human, use `termination_kind: "confirmation-required"` and fill `confirmation` with the verbatim question (`text`), `options`, `recommendation`, `recommendation_reason`, and material references (`evidence`). Leave the recommendation and reason empty when no recommendation is supported. A question or stop may include a partial report conforming to the supplied fields; only a completion claim requires the full report. Schema conformance is not evidence of completion.
+
 Explain the relationship between the purpose and proposed completion conditions in users' words so completion can be judged, confirm the requirements and proposal with the human, and reflect the agreed repository requirements in `requirements.md`. If the plan's `done` transition for this stage is `replan`, the planner rebuilds the remaining plan after this stage completes. Changes to completion conditions require human approval following `plans/README.md`; do not treat the proposal as the active plan.
 
 All required checks valid for the returned target and norms are `PASS`, the detection requirements in `examples/README.md` are satisfied, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.

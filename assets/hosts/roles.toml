@@ -3,10 +3,6 @@ read_only_tools = ["Read", "Glob", "Grep"]
 
 [roles.worker]
 kind = "work"
-agent = ""
-
-[roles.unit_worker]
-kind = "work"
 agent = "devkit-worker"
 
 [roles.judge]
@@ -25,3 +21,4 @@ role = "planner"
 
 [plan_check]
 runner = "judge"
+schemas = ["plan", "plan-template"]

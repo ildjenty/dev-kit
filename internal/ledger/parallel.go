@@ -73,3 +73,14 @@ func validateMerge(m *Merge) error {
 	}
 	return required(m.ResultTree)
 }
+
+// JudgmentBriefs returns accepted pre-judgment instructions for a round.
+func (s *State) JudgmentBriefs(roundID string) []*JudgmentBrief {
+	briefs := []*JudgmentBrief{}
+	for _, record := range s.records {
+		if brief, ok := record.Payload.(*JudgmentBrief); ok && brief.RoundID == roundID {
+			briefs = append(briefs, brief)
+		}
+	}
+	return briefs
+}

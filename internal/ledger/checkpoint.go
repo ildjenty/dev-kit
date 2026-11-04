@@ -52,6 +52,8 @@ func (s *State) UnacceptedInstructions() []Instruction {
 			accepted[p.InstructionID] = true
 		case *UnitResult:
 			accepted[p.InstructionID] = true
+		case *JudgmentBrief:
+			accepted[p.InstructionID] = true
 		case *Judgment:
 			accepted[p.InstructionID] = true
 		case *PlanVersion:

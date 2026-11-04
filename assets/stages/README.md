@@ -8,8 +8,10 @@ A stage definition is Markdown named `<stage_id>.md`, with an initial `# <name>`
 - `stages/contract.md`: 3 Contract.
 - `stages/steps.md`: 4 Steps.
 - `stages/implement.md`: 5 Implementation.
+- `stages/verification.md`: Verification.
 - `stages/research.md`: Research.
 - `stages/prototype.md`: Prototype.
+- `stages/handoff.md`: Handoff.
 - `stages/retrospective.md`: Retrospective.
 
 The `transitions.done` value is a stage ID to continue, `null` to finish, or `"replan"` to have the planner rebuild the remaining plan after that stage completes. The name `replan` is reserved and cannot be a stage ID.
@@ -20,9 +22,13 @@ Use the task, human-approved completion conditions with IDs, `requirements.md`, 
 
 Write completion conditions in prose. For each condition, select a check run by a verification command, a judge, or a judgment command, or a human gate; checks need not be mechanical. Verify conditions during requirements definition through judges and human gates. The plan judge assesses the suitability and coverage of verification, and the human reviews it during plan approval; devkit does not enforce a formal assignment of verification to every condition.
 
-The brief includes the current stage definition, the criteria documents selected by the checks being judged, `rules.md`, `requirements.md`, and relevant structure records. Other norms are listed by logical name and frozen snapshot path under `snap/`; read those paths when needed instead of norms being edited in the working tree. Round norms come from the round-start snapshot; plan checks and detection tests use committed norms from the work branch HEAD fixed when the instruction is issued. Requirements, structure records, detection pass indexes, and runtime records are outside norm identity; updating them does not invalidate judgments.
+The brief includes the current stage definition, the criteria documents selected by the checks being judged, `rules.md`, `requirements.md`, and relevant structure records. Other norms are listed by logical name and frozen snapshot path under `snap/`; read those paths when needed instead of norms being edited in the working tree. Round norms come from the round-start snapshot; plan checks and detection tests use committed norms from the work checkout's HEAD fixed when the instruction is issued. Requirements, structure records, detection pass indexes, and runtime records are outside norm identity; updating them does not invalidate judgments.
 
 Use `schemas/plan.json` for plans, `schemas/progress.json` for termination blocks, and `schemas/structure.json` for structure records. The brief supplies self-contained schemas, including all referenced definitions and the supported note kinds. Use the actual working-tree paths shown in the brief for `requirements.md` and `structure.json`; create a missing product at its indicated path. Write the current work instruction's `instruction_id`, work performed, confirmed and unconfirmed matters, obstacles, termination kind, and resume conditions, including unreadable inputs and their effects. Temporary state includes its verification method, source, and invalidation conditions. Submit the JSON file with `devkit submit <file>`, then follow `devkit next`; follow the installed devkit skill for commands and pause/resume. A completion claim is a report, not a judgment or a completed stage.
+
+When claiming completion, fill `report` according to this stage's selected report JSON Schema supplied in the brief. When asking the human, use `termination_kind: "confirmation-required"` and fill `confirmation` with the verbatim question (`text`), `options`, `recommendation`, `recommendation_reason`, and material references (`evidence`). Leave the recommendation and reason empty when no recommendation is supported. A question or stop may include a partial report conforming to the supplied fields; only a completion claim requires the full report. Schema conformance is not evidence of completion.
+
+Workers of split-stage units follow the optional `unit_report` schema for their own reports. Devkit preserves each report with its unit ID for judgment after merging; do not rewrite unit reports into a stage report.
 
 ## Decisions for later work
 
@@ -32,7 +38,7 @@ Runtime records stay under the fixed, untracked `.devkit/run/` directory. Preser
 
 Stage completion requires all required checks to be `PASS` for the returned target version and frozen norms, satisfaction of the detection requirements in `examples/README.md`, and devkit's successful finalization at a matching committed target. The judgment rules are in the judgment request template. Select verification through the plan; this definition adds no checks.
 
-Devkit aggregates required checks and finalizes completion; agents do not commit. It commits the judged snapshot without `--no-verify`, using the repository's existing pre-commit hook. A failed commit returns its output to a fix round. Devkit compares the target before committing and the committed tree afterward; a mismatch requires renewed checks, and a further change after one refresh requires human confirmation. Commit messages, branch names, and empty-commit behavior follow `[git]` in `devkit.toml`. If `allow_empty_commit` is false, an unchanged stage records completion at the current HEAD. Completion requires a matching committed target. The Stop hook does not finalize completion.
+Devkit aggregates required checks and finalizes completion; agents do not commit. It commits the judged snapshot without `--no-verify`, using the repository's existing pre-commit hook. A failed commit returns its output to a fix round. Devkit compares the target before committing and the committed tree afterward; a mismatch requires renewed checks, and a further change after one refresh requires human confirmation. Devkit commits on the current branch and creates no branches. The commit message is the worker's `commit_message` from the progress block, written following the git rules (`git` source, default `.devkit/git.md`); without it, devkit uses the `[git] commit_message` template. Empty-commit behavior follows `[git]` in `devkit.toml`. If `allow_empty_commit` is false, an unchanged stage records completion at the current HEAD. Completion requires a matching committed target. The Stop hook does not finalize completion.
 
 ## Split stage work
 
@@ -40,4 +46,4 @@ For a stage with `split: true` and planned `units`, launch the returned assigned
 
 Pause issues no new units and preserves results from running workers. Abort and completion remove unchanged unit worktrees and report retained changed worktrees for the human to manage with git. Do not discard them automatically.
 
-Stage assignees and judge runners are role IDs defined in `devkit.toml`. Agent-backed work roles run as one unit in a devkit-created worktree. Split-stage unit roles default to `unit_worker`. Fix rules can reassign the next round within the same StageRun; cumulative differences and limits remain shared. Read-only source and rejected loop-edit undo rounds preserve the prior assignee. See `plans/README.md` for the rule shape and role constraints.
+Stage assignees and judge runners are role IDs defined in `devkit.toml`. Agent-backed work roles, including the default `worker` (agent `devkit-worker`), run as one unit in a devkit-created worktree and return the progress block as the subagent's final message; the session agent launches them and waits. A work role with an empty `agent` means the session itself works in the checkout. Split-stage unit roles default to `worker`. Fix rules can reassign the next round within the same StageRun; cumulative differences and limits remain shared. Read-only source and rejected loop-edit undo rounds preserve the prior assignee. See `plans/README.md` for the rule shape and role constraints.

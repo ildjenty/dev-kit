@@ -39,6 +39,11 @@ func Norms() (map[string][]byte, error) {
 		return nil, err
 	}
 	files["rules.md"] = rules
+	git, err := fs.ReadFile(FS(), "rules/git.md")
+	if err != nil {
+		return nil, err
+	}
+	files["git.md"] = git
 	return files, nil
 }
 

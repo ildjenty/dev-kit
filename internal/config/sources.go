@@ -40,10 +40,10 @@ var sourceName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]*$`)
 // KnowledgeSources returns effective sources without sharing mutable settings.
 func (c Config) KnowledgeSources() map[string]Source {
 	sources := make(map[string]Source)
-	for _, name := range []string{"principles", "stages", "plans", "examples", "templates", "rules", "requirements", "structure"} {
+	for _, name := range []string{"principles", "stages", "plans", "examples", "templates", "rules", "git", "requirements", "structure"} {
 		location := ".devkit/" + name
 		switch name {
-		case "rules", "requirements":
+		case "rules", "git", "requirements":
 			location += ".md"
 		case "structure":
 			location += ".json"

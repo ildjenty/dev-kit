@@ -223,6 +223,9 @@ func (e *Engine) Submit(ctx context.Context, data []byte) (Result, error) {
 	if len(e.currentQuestions(state)) != 0 {
 		return Result{}, errors.New("an unanswered question blocks submission")
 	}
+	if err := e.validateRoundReport(ctx, state, round, nil, progress); err != nil {
+		return Result{}, err
+	}
 	run, _ := state.LatestStageRun()
 	if err = e.recordSubmission(ctx, state, run, round, progress); err != nil {
 		return Result{}, err
@@ -305,13 +308,17 @@ func (e *Engine) saveWorkerConfirmation(state *ledger.State, run *ledger.StageRu
 	if err != nil {
 		return "", err
 	}
-	text := strings.Join(append(slices.Clone(progress.Obstacles), progress.Unconfirmed...), "\n")
-	if text == "" {
-		text = "The worker stopped to request confirmation."
-	}
+	text := confirmationText(progress)
 	q := e.question(approvalTree(target), "worker_confirmation", text, run.StageID)
 	q.NextStage = *next
 	q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
+	if c := progress.Confirmation; c != nil {
+		if len(c.Options) > 0 {
+			q.Options = slices.Clone(c.Options)
+		}
+		q.Recommendation, q.RecommendationReason = c.Recommendation, c.RecommendationReason
+		q.Evidence = append(q.Evidence, c.Evidence...)
+	}
 	if source := unitResultRound(state, run.ID); source != nil {
 		if source.ID != round.ID {
 			q.Evidence = append(q.Evidence, form.Reference{RecordID: source.ID})
@@ -595,6 +602,7 @@ func (e *Engine) planApprovalText(state *ledger.State, template plan.PlanTemplat
 			fmt.Fprintf(&text, "- %s (deviation)\n", stage.ID)
 		}
 	}
+	text.WriteString(planInstructionsText(p))
 	deviations := plan.Deviations(template, p)
 	fmt.Fprintf(&text, "\nDeviations:\n%s\n%s\nIrreversible items:\n%s\n\nExternal operations:\n%s\n\nOpen questions (answer with revision instructions):\n%s",
 		approvalJSON(deviations, len(deviations)), selectionDifferences(template, p, deviations)+roleDifferences(template, p, deviations), approvalList(p.IrreversibleDecisions), approvalJSON(p.ExternalOperations, len(p.ExternalOperations)), approvalList(p.OpenQuestions))
@@ -764,7 +772,7 @@ func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.P
 			}
 			commit = workspace.CommitResult{Commit: head, Tree: tree}
 		} else {
-			commit, err = e.workspace.Commit(ctx, round.ReturnedTarget.Tree, e.workID, stage.ID, settings.CommitMessage(stage.ID, e.workID, p.Task))
+			commit, err = e.commitStage(ctx, p, stage, round, settings)
 		}
 	}
 	if errors.Is(err, workspace.ErrTargetChanged) {
@@ -1245,14 +1253,41 @@ func (e *Engine) advanceHumanRound(ctx context.Context, state *ledger.State, sta
 		}
 		return Result{}, false, nil
 	}
-	q := e.question(target, "human_stage", "Provide the output for human stage "+stage.ID+".", stage.ID)
+	text, err := e.humanStageText(ctx, state, stage, round)
+	if err != nil {
+		return Result{}, false, err
+	}
+	q := e.question(target, "human_stage", text, stage.ID)
 	q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
-	q, err := e.saveQuestion(state, q, "")
+	q, err = e.saveQuestion(state, q, "")
 	if err != nil {
 		return Result{}, false, err
 	}
 	r, err := e.issueQuestion(state, q)
 	return r, true, err
+}
+
+// humanStageText asks for a human stage's output with the template's human_prompt document,
+// which states the purpose, inputs, and what to return, and the fixed adopted outputs.
+func (e *Engine) humanStageText(ctx context.Context, state *ledger.State, stage plan.Stage, round *ledger.Round) (string, error) {
+	text := "Provide the output for human stage " + stage.ID + "."
+	if stage.HumanPrompt != nil {
+		documents, err := e.selectionDocuments(ctx, roundReference(round), round.StartTarget.Tree, []plan.Selection{*stage.HumanPrompt})
+		if err != nil {
+			return "", err
+		}
+		for _, document := range documents {
+			text += "\n\n" + document.Content + "\n\nSource: " + document.Path
+		}
+	}
+	adopted, err := e.adoptedOutputs(state)
+	if err != nil {
+		return "", err
+	}
+	for _, output := range selectOutputs(adopted, stage.Outputs) {
+		text += "\n\nAdopted output " + output.StageID + ":\n" + output.Content
+	}
+	return text, nil
 }
 
 func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage plan.Stage, run *ledger.StageRun) (Result, bool, error) {
@@ -1270,6 +1305,9 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 	if question != nil {
 		r, err := e.issueQuestion(state, *question)
 		return r, true, err
+	}
+	if r, ready, err := e.checkRoundBudget(ctx, state, startRef, snapshot.Tree); err != nil || ready {
+		return r, ready, err
 	}
 	if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), startRef, run.ID); err != nil || pending {
 		if err != nil || r.Instruction != nil || r.Paused {
@@ -1308,25 +1346,33 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 		return Result{}, false, err
 	}
 	if effective.Split && len(effective.Units) > 0 {
-		head, err := e.workspace.Head(ctx)
-		if err != nil {
+		if err := e.prepareUnitRound(ctx, state, stage, run, round, snapshot.Tree); err != nil {
 			return Result{}, false, err
-		}
-		base, err := e.workspace.CommitObject(ctx, e.workID, snapshot.Tree, head)
-		if err != nil {
-			return Result{}, false, err
-		}
-		round.StartCommit = base.Commit
-		previous := state.Rounds(run.ID)
-		if len(previous) > 0 {
-			merge, ok := state.RoundMerge(previous[len(previous)-1].ID)
-			round.MergeFix = stage.Split && (previous[len(previous)-1].MergeFix || ok && merge.Status == "conflict")
 		}
 	}
 	if _, err = e.append(round); err != nil {
 		return Result{}, false, err
 	}
 	return Result{}, false, nil
+}
+
+// prepareUnitRound fixes the unit base commit and marks merge-conflict repair rounds.
+func (e *Engine) prepareUnitRound(ctx context.Context, state *ledger.State, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, tree string) error {
+	head, err := e.workspace.Head(ctx)
+	if err != nil {
+		return err
+	}
+	base, err := e.workspace.CommitObject(ctx, e.workID, tree, head)
+	if err != nil {
+		return err
+	}
+	round.StartCommit = base.Commit
+	previous := state.Rounds(run.ID)
+	if len(previous) > 0 {
+		merge, ok := state.RoundMerge(previous[len(previous)-1].ID)
+		round.MergeFix = stage.Split && (previous[len(previous)-1].MergeFix || ok && merge.Status == "conflict")
+	}
+	return nil
 }
 
 func (e *Engine) branchWarning(state *ledger.State, warning string) (Result, error) {
@@ -1447,11 +1493,102 @@ func (e *Engine) checkCommitSession(ctx context.Context, state *ledger.State) er
 	}
 	branch, err := e.workspace.Branch(ctx)
 	if err != nil {
-		return err
+		branch = ""
 	}
 	work, _ := state.Work()
 	if branch != work.Branch {
-		return errors.New("work branch does not match")
+		return errors.New("current branch does not match the branch at work start")
 	}
 	return nil
+}
+
+// confirmationText puts the worker's question verbatim first, followed by the materials of the
+// termination block a human needs: the partial report, obstacles, unconfirmed items, and resume
+// conditions.
+func confirmationText(progress form.Progress) string {
+	var text strings.Builder
+	if progress.Confirmation != nil {
+		text.WriteString(progress.Confirmation.Text)
+	} else {
+		text.WriteString("The worker stopped to request confirmation.")
+	}
+	if len(progress.Report) > 0 {
+		text.WriteString("\n\nReport supplied with the request:\n" + reportText(progress.Report, nil))
+	}
+	for _, section := range []struct {
+		title string
+		items []string
+	}{{"Obstacles", progress.Obstacles}, {"Unconfirmed", progress.Unconfirmed}, {"Resume conditions", progress.ResumeConditions}} {
+		if len(section.items) > 0 {
+			text.WriteString("\n\n" + section.title + ":\n- " + strings.Join(section.items, "\n- "))
+		}
+	}
+	return text.String()
+}
+
+// commitStage commits the judged target on the current branch.
+func (e *Engine) commitStage(ctx context.Context, p plan.Plan, stage plan.Stage, round *ledger.Round, settings config.Config) (workspace.CommitResult, error) {
+	message, err := e.commitMessage(round, settings.CommitMessage(stage.ID, e.workID, p.Task))
+	if err != nil {
+		return workspace.CommitResult{}, err
+	}
+	return e.workspace.Commit(ctx, round.ReturnedTarget.Tree, e.workID, stage.ID, message)
+}
+
+// commitMessage uses the worker's commit_message, written following the git norm, and falls back
+// to the [git] commit_message template.
+func (e *Engine) commitMessage(round *ledger.Round, fallback string) (string, error) {
+	records, err := e.records()
+	if err != nil {
+		return "", err
+	}
+	if progress := roundProgress(records, round.ID); progress != nil && strings.TrimSpace(progress.CommitMessage) != "" {
+		return progress.CommitMessage, nil
+	}
+	return fallback, nil
+}
+
+// planInstructionsText lists the planner's stage, check, and unit instructions verbatim.
+func planInstructionsText(p plan.Plan) string {
+	var text strings.Builder
+	for _, stage := range p.Stages {
+		for _, instruction := range stage.Instructions {
+			fmt.Fprintf(&text, "- %s: %s\n", stage.ID, instruction)
+		}
+		for _, item := range stage.Checks {
+			for _, instruction := range item.Instructions {
+				fmt.Fprintf(&text, "- %s check %s (%s): %s\n", stage.ID, item.Aspect, item.Runner, instruction)
+			}
+		}
+		for _, unit := range stage.Units {
+			for _, instruction := range unit.Instructions {
+				fmt.Fprintf(&text, "- %s unit %s: %s\n", stage.ID, unit.ID, instruction)
+			}
+		}
+	}
+	if text.Len() == 0 {
+		return "\nPlan instructions:\nNone\n"
+	}
+	return "\nPlan instructions (passed verbatim to the workers and judges):\n" + text.String()
+}
+
+func (e *Engine) checkRoundBudget(ctx context.Context, state *ledger.State, ref, tree string) (Result, bool, error) {
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return Result{}, false, err
+	}
+	question, message, err := e.roundBudget(state, settings, tree)
+	if err != nil {
+		return Result{}, false, err
+	}
+	if question != nil {
+		r, err := e.issueQuestion(state, *question)
+		return r, true, err
+	}
+	if message != "" {
+		r := response(state)
+		r.Message = message
+		return r, true, nil
+	}
+	return Result{}, false, nil
 }

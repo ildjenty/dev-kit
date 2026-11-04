@@ -13,7 +13,7 @@ func TestRoleDefaultsAndOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.RoleSettings()) != 6 || c.RoleSettings()["senior"] != (Role{Kind: "work", Agent: "devkit-senior"}) || !reflect.DeepEqual(c.ReadOnlyTools(), []string{"Read"}) || c.PlanningRole() != "planner" || c.PlanCheckSettings().Runner != "judge" {
+	if len(c.RoleSettings()) != 5 || c.RoleSettings()["worker"] != (Role{Kind: "work", Agent: "devkit-worker"}) || c.RoleSettings()["senior"] != (Role{Kind: "work", Agent: "devkit-senior"}) || !reflect.DeepEqual(c.ReadOnlyTools(), []string{"Read"}) || c.PlanningRole() != "planner" || c.PlanCheckSettings().Runner != "judge" {
 		t.Fatalf("unexpected roles: %+v", c)
 	}
 }

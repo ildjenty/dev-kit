@@ -294,7 +294,7 @@ func writeOutput(output io.Writer, root string, name string, value any) error {
 		case engine.Result:
 			_, err = fmt.Fprintf(output, "Work %s: %s; paused=%t.\n", value.WorkID, value.Status, value.Paused)
 		case engine.Status:
-			_, err = fmt.Fprintf(output, "Work %s: %s; paused=%t.\n", value.WorkID, value.Position.Status, value.Position.Paused)
+			_, err = fmt.Fprintf(output, "Work %s: %s; paused=%t; rounds=%d; human stops=%d.\n", value.WorkID, value.Position.Status, value.Position.Paused, value.Metrics.TotalRounds, value.Metrics.HumanStops)
 		case install.Result:
 			if _, err := fmt.Fprintf(output, "Initialized %s (%d changes).\n", value.Root, len(value.Changes)); err != nil {
 				return err

@@ -210,7 +210,7 @@ func TestR10JudgeCommandProcess(t *testing.T) {
 				judgment.Judgment = form.Fail
 				judgment.Findings = []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "The proposed plan violates the fixed requirements"}}
 			}
-			result.Observations = append(result.Observations, form.DetectionObservation{File: example.ID, Judgment: judgment, Reason: "Compared the example against the supplied criteria"})
+			result.Observations = append(result.Observations, observed(example.ID, judgment, "Compared the example against the supplied criteria"))
 		}
 		if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
 			os.Exit(4)
@@ -319,8 +319,9 @@ func TestPlanDetectionIncludesRequiredCriteriaAndBundledSchemas(t *testing.T) {
 		if _, err := form.CompileSchema(schema); err != nil {
 			t.Fatalf("%s is not self-contained: %v", name, err)
 		}
-		if !strings.Contains(body, "### schemas/"+name+".json") || !strings.Contains(body, string(schema)) {
-			t.Fatalf("detection omitted supporting schema %s", name)
+		// Detection requests carry only the bundled output contract, not other schemas.
+		if strings.Contains(body, "### schemas/"+name+".json") {
+			t.Fatalf("detection supplied an unselected supporting schema %s", name)
 		}
 	}
 }

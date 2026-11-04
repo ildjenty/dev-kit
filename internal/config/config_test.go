@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"reflect"
 	"slices"
 	"strings"
@@ -54,7 +53,7 @@ func TestDefaults(t *testing.T) {
 	wantDependencies := []string{"go.mod", "go.sum", "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "uv.lock", "composer.json", "composer.lock"}
 	wantConfirmation := []string{DependencyChanged, TargetChangedAgain}
 	wantDestinations := []string{"hook_lint_type", "plan_template", "aspect", "principle", "skill"}
-	if c.DefaultPlan != "default" || !reflect.DeepEqual(c.Sources, wantSources) || c.Approval != (Approval{Plan: "requirements", MetaLoopEdit: "confirm"}) || c.Git.Branch != "devkit/{work_id}" || c.Git.CommitMessage != "devkit: {stage} ({work_id})" || c.Git.AllowEmptyCommit == nil || !*c.Git.AllowEmptyCommit || c.Limits.StopContinuation != 3 {
+	if c.DefaultPlan != "default" || !reflect.DeepEqual(c.Sources, wantSources) || c.Approval != (Approval{Plan: "requirements", MetaLoopEdit: "confirm"}) || c.Git.CommitMessage != "devkit: {stage} ({work_id})" || c.Git.AllowEmptyCommit == nil || !*c.Git.AllowEmptyCommit || c.Limits.StopContinuation != 3 {
 		t.Fatalf("parsed defaults do not match: %+v", c)
 	}
 	if !slices.Equal(c.Classification.DependencyFiles, wantDependencies) || !slices.Equal(c.Router.HumanConfirmation, wantConfirmation) || !slices.Equal(c.Lessons.Destinations, wantDestinations) {
@@ -66,10 +65,6 @@ func TestDefaults(t *testing.T) {
 		}
 		if !slices.Equal(settings.DependencyFiles(), wantDependencies) || !slices.Equal(settings.HumanConfirmation(), wantConfirmation) || !slices.Equal(settings.LessonDestinations(), wantDestinations) {
 			t.Fatalf("effective list defaults do not match: %+v", settings)
-		}
-		branch, err := settings.BranchName("work-123")
-		if err != nil || branch != "devkit/work-123" {
-			t.Fatalf("branch = %q, error = %v", branch, err)
 		}
 		if message := settings.CommitMessage("implement", "work-123", "Fix a defect"); message != "devkit: implement (work-123)" {
 			t.Fatalf("commit message = %q", message)
@@ -97,7 +92,6 @@ detect = "state/detect.json"
 plan = "always"
 meta_loop_edit = "allow"
 [git]
-branch = "work/{work_id}/topic"
 commit_message = "{task}: {stage} [{work_id}]"
 allow_empty_commit = false
 [classification]
@@ -123,10 +117,6 @@ destinations = ["skill", "aspect"]
 	}
 	if !slices.Equal(c.HumanConfirmation(), []string{TargetChangedAgain}) || !slices.Equal(c.LessonDestinations(), []string{"skill", "aspect"}) || !slices.Equal(c.DependencyFiles(), []string{"deps/*.lock", "manifest-?.json"}) {
 		t.Fatalf("effective lists do not match overrides: %+v", c)
-	}
-	branch, err := c.BranchName("abc")
-	if err != nil || branch != "work/abc/topic" {
-		t.Fatalf("branch = %q, error = %v", branch, err)
 	}
 	if message := c.CommitMessage("test", "abc", "Describe {stage}"); message != "Describe {stage}: test [abc]" {
 		t.Fatalf("commit message = %q", message)
@@ -186,8 +176,7 @@ func TestInvalidNewSettings(t *testing.T) {
 		{"[plan_check]\naspect = ' '", "plan_check.aspect"},
 		{"[plan_check]\nrunner = ''", "plan_check.runner"},
 		{"[plan_check]\nrunner = ' '", "plan_check.runner"},
-		{"[git]\nbranch = 'topic'", "git.branch"},
-		{"[git]\nbranch = ''", "git.branch"},
+		{"[git]\nbranch = 'devkit/{work_id}'", "unknown configuration key: git.branch"},
 		{"[git]\ncommit_message = ''", "git.commit_message"},
 		{"[git]\ncommit_message = '{unknown}'", "git.commit_message"},
 		{"[git]\ncommit_message = '{stage'", "git.commit_message"},
@@ -212,23 +201,6 @@ func TestInvalidNewSettings(t *testing.T) {
 				t.Fatalf("error = %v, expected field = %s", err, tt.want)
 			}
 		})
-	}
-}
-
-func TestInvalidBranchNames(t *testing.T) {
-	for _, name := range []string{"-work", "with space", "a..b", "a~b", "a^b", "a:b", "a?b", "a*b", "a[b", `a\b`, "a\tb", "a\nb", "a\x7fb", ".hidden", "a/.hidden", "a.lock", "a.lock/b", "a@{b", "a.", "a/", "/a", "a//b", "HEAD", ""} {
-		t.Run(fmt.Sprintf("%q", name), func(t *testing.T) {
-			c := Config{Git: Git{Branch: "{work_id}"}}
-			if _, err := c.BranchName(name); err == nil {
-				t.Fatalf("accepted invalid rendered branch name %q", name)
-			}
-		})
-	}
-	for _, pattern := range []string{"-{work_id}", "with space/{work_id}", "a..b/{work_id}", "a~{work_id}", "a^{work_id}", "a:{work_id}", "a?{work_id}", "a*{work_id}", "a[{work_id}", `a\{work_id}`, "a\t{work_id}", ".{work_id}", "a/.{work_id}", "{work_id}.lock", "a.lock/{work_id}", "a@{b/{work_id}", "{work_id}.", "{work_id}/", "/{work_id}", "a//{work_id}"} {
-		_, err := Parse([]byte("kit_version = 'v1'\n[git]\nbranch = " + fmt.Sprintf("%q", pattern)))
-		if err == nil || !strings.Contains(err.Error(), "git.branch") {
-			t.Errorf("pattern %q: error = %v", pattern, err)
-		}
 	}
 }
 

@@ -94,3 +94,19 @@ func render(id, source string, value any) (Brief, error) {
 	}
 	return Brief{InstructionID: id, Text: text}, nil
 }
+
+// BuildJudgmentBrief assembles the pre-judgment planner request for one round, aspect, and runner.
+func BuildJudgmentBrief(input JudgmentBriefInput) (Brief, error) {
+	p, err := jsonText(input.Plan)
+	if err != nil {
+		return Brief{}, err
+	}
+	id, err := jsonText(input.InstructionID)
+	if err != nil {
+		return Brief{}, err
+	}
+	return render(input.InstructionID, input.RequestTemplate, struct {
+		JudgmentBriefInput
+		PlanJSON, InstructionIDJSON string
+	}{input, p, id})
+}

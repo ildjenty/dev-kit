@@ -52,13 +52,15 @@ Codex では、束縛のあるセッションで呼び出し元の `agent_type` 
 ## SubagentStop
 
 - **入力**: `agent_type`、`agent_id`、`last_assistant_message`、`agent_transcript_path`、取得できる場合はホストから観測した effort または model、発行済みの[指示](data.md#指示-instruction)。
-- **判断**: `agent_type` がいずれかの[役割](data.md#役割-role)の agent であることを確かめて役割の種類を引き、[最終メッセージの結果](guarantees.md#判定結果の受理)から指示 ID を取る。束縛があり、発行済みのサブエージェントへの指示と指示 ID・担当名が一致すれば採取する。単位の作業、計画の check と検出試験の指示も対象とし、指示 ID・担当名の不一致なら何もしない。最終メッセージを JSON として解析できない場合は失敗の観測を残す。同じ runner の未受理の指示が複数あり、指示 ID のない不正な最終メッセージをどの指示にも結び付けられない場合も観測を残す。
+- **判断**: `agent_type` がいずれかの[役割](data.md#役割-role)の agent であることを確かめて役割の種類を引き、[最終メッセージの結果](guarantees.md#判定結果の受理)から指示 ID を取る。束縛があり、発行済みのサブエージェントへの指示と指示 ID・担当名が一致すれば採取する。単位の作業、計画の check、判定直前の計画者指示と検出試験の指示も対象とし、指示 ID・担当名の不一致なら何もしない。最終メッセージを JSON として解析できない場合は失敗の観測を残す。同じ runner の未受理の指示が複数あり、指示 ID のない不正な最終メッセージをどの指示にも結び付けられない場合も観測を残す。
 - **出力**: 最終メッセージに来歴を添えて結果ファイルとして公開し、[判定結果の受理](guarantees.md#判定結果の受理)に渡す。`work` の役割の agent の最終メッセージは `schemas/progress.json` の終了ブロックである。JSON の解析失敗の観測も公開し、`next` が失敗の記録・結果の拒否・再指示と上限での人への問いを処理する。指示に結び付けられない不正な結果は、観測を残して人に問う。
 - **書く生成物**: 結果ファイル `results/<指示 ID>-<agent_id>.json`、または JSON の解析失敗の観測である。結果ファイルには検証済みの指示 ID・担当、SubagentStop の観測時刻を添える。effort・model の来歴は [Judgment](data.md#check-の結果-judgment)に従う。
 
 両ホストで `agent_type` は定義の `name` と一致し、`last_assistant_message` から最終メッセージの本文を取得できる。Claude Code の `agent_transcript_path` は `<session>/subagents/agent-<id>.jsonl` で、最初の user メッセージから起動時の prompt を読める。Codex は rollout の JSONL を指すが、起動時の `message` は平文で取り出せない。
 
 来歴の採取元は Claude Code が SubagentStop 入力の `effort.level`、Codex が hook 入力の `model` である。Claude Code の入力に model はなく、Codex の入力に effort はない。
+
+検出試験では、agent の定義にあるモデル・推論量の指定を合格の識別に含める。指定がなく親から引き継ぐ場合は観測できた値を来歴として残し、観測値を識別に含めない。観測できない値は推測しない。専用の小さい試験結果と、ラウンド・観点・runner に結び付いた判定直前の計画者指示も、指示 ID と担当を照合して採取する。
 
 ## UserPromptSubmit
 

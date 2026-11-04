@@ -125,6 +125,8 @@ func (v *Validator) validateRaw(payload Payload, data []byte) error {
 		requiredFields = []string{"round_id", "unit_id", "agent_id", "result_path"}
 	case *Merge:
 		requiredFields = []string{"round_id", "head", "inputs", "applied", "current", "before_tree", "status"}
+	case *JudgmentBrief:
+		requiredFields = []string{"instruction_id", "round_id", "aspect", "runner", "instructions", "agent_id", "result_path"}
 	case *Judgment:
 		requiredFields = []string{"runner", "provenance"}
 	case *ResultRejection:
@@ -273,6 +275,8 @@ func (v *Validator) validatePayload(payload Payload) error {
 		return v.check("progress", p.Progress)
 	case *Merge:
 		return validateMerge(p)
+	case *JudgmentBrief:
+		return required(p.InstructionID, p.RoundID, p.Aspect, p.Runner, p.AgentID, p.ResultPath)
 	case *Judgment:
 		return v.judgment(*p)
 	case *ResultRejection:

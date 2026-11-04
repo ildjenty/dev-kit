@@ -101,7 +101,7 @@ func TestBuildWork(t *testing.T) {
 		previous, command, input.StageDefinition, input.Purpose, input.OutputSchema,
 		"C1", "Saved content can be read", input.Verification[0],
 		"3 rounds", "2 consecutive rounds without progress", "internal/save/README.md", "Storage layout guide",
-		".devkit/rules.md", "Existing rules", "Irreversible rule decision", "Irreversible plan decision",
+		".devkit/rules.md", "Existing rules", "Irreversible plan decision",
 		"AGENTS.md", "Fixed instructions", "F1", "Saving fails", "command:test", "Exit code: 1",
 		input.PreCommitOutput, `"instruction_id": "work-round-1"`, string(form.TerminationQuestion), string(form.TerminationStopped),
 	} {

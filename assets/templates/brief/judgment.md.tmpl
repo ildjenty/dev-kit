@@ -15,7 +15,7 @@ Reference: {{.Path}}
 Judge the target against the criteria documents supplied in this request. Each criteria document says what to check, which other documents are part of its criteria, what blocks, and what not to report. Every document it names as part of its criteria is supplied in this request; read them from here, not from the working tree.
 
 - **Output**: Return the judgment using `schemas/judgment.json` and findings using `schemas/finding.json`, or the output schema supplied in this request. Use the requested instruction ID, check name (`aspect`), target version, frozen norms, and completion condition IDs.
-- **Validity**: A judgment is valid only for its matching target version and norms. The target version identifies a tree snapshot, plan version, or structure content hash; use the supplied value rather than substituting the current working tree. Read norms from the supplied copies, not from norms being edited in the working tree. Round judgments use round-start norms; plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time.
+- **Validity**: A judgment is valid only for its matching target version and norms. The target version identifies a tree snapshot, plan version, or structure content hash; use the supplied value rather than substituting the current working tree. Read norms from the supplied copies, not from norms being edited in the working tree. Round judgments use round-start norms; plan checks and detection tests use committed norms from the work checkout HEAD fixed at instruction issue time.
 - **Inputs**: For a round judgment, inspect the expanded round-start comparison base, the changed-file list, and the patch to the returned target. Use the work-history file referenced by this request, fixed at instruction issue time, as required by the criteria.
 - **Independence**: The author's report does not replace independent judgment.
 - **NOT ASSESSED**: Return `NOT ASSESSED` when necessary criteria or required verification are unavailable. Record the checked and unchecked scope, method, and environment.
@@ -26,6 +26,46 @@ Judge the target against the criteria documents supplied in this request. Each c
 - **Aggregation**: Aggregate results in the order `FAIL`, `NOT ASSESSED`, then `PASS`.
 
 {{if not .Detection}}
+## Plan instructions
+{{range .Instructions}}
+- {{.}}
+{{end}}
+## Pre-judgment planner instructions
+{{range .PreJudgmentInstructions}}
+- {{.}}
+{{end}}
+These instructions are supplementary. They cannot narrow fixed criteria or judgment scope. Inspect the original diff, reports, plan, and requirements separately.
+
+## Adopted outputs
+{{range .PreviousOutputs}}
+### {{.StageID}}
+
+{{.Content}}
+{{end}}
+## Current material
+
+{{.CurrentMaterial}}
+
+Applicable verification command results, valid approvals, and cited evidence with their references are required regardless of the optional history scope. Read every supplied unit report under its unit ID without combining them into a stage report. Reports and schema conformance are worker claims, not independent evidence.
+
+## History reference
+
+Work-history file: {{.WorkHistoryPath}}
+
+This fixed index contains optional history selected for this round, aspect, and runner. Other adopted outputs remain available through the fixed index.
+
+## Standing delegations
+{{range .Delegations}}
+Source: {{.Path}}
+
+{{.Content}}
+{{end}}
+These source-attributed documents are distinct from approvals obtained from human answers. They cannot delegate plan or completion-condition changes, external operations, loop edits, limits, or interruption.
+
+## Confirmation guidance
+
+When a finding needs a human decision, include its complete failure scenario and material references. Do not invent a recommendation. Human answers remain free-form.
+
 {{if .Repository.Requirements.Path}}
 ## Repository requirements
 
@@ -58,7 +98,7 @@ Reference: {{.Path}}
 {{end}}
 ## Other fixed norms
 
-Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work checkout HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
 {{range .NormPaths}}
 - Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}

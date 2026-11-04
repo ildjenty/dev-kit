@@ -30,6 +30,8 @@ Updated `requirements.md` where needed, and any enduring structural or shared de
 
 ## Completion conditions
 
+When claiming completion, fill `report` according to this stage's selected report JSON Schema supplied in the brief. When asking the human, use `termination_kind: "confirmation-required"` and fill `confirmation` with the verbatim question (`text`), `options`, `recommendation`, `recommendation_reason`, and material references (`evidence`). Leave the recommendation and reason empty when no recommendation is supported. A question or stop may include a partial report conforming to the supplied fields; only a completion claim requires the full report. Schema conformance is not evidence of completion.
+
 Account for the task's findings, failed or unavailable assessments, human corrections, and discovered misses, including nonblocking findings. Explain where each problem should have been caught, apply justified prevention measures or record reasons for not applying them, and assess the relevant norms' usefulness and burden. Ensure repository requirements reflect the human-approved conditions even if purpose was omitted.
 
 Changes made in this stage, including changes to tests and verification methods, are verified by this stage's checks in the plan. If a required verification command is unregistered, create the verification method and register it in `devkit.toml`, following `stages/implement.md`; registration follows loop-edit confirmation and takes effect from the next round's snapshot.

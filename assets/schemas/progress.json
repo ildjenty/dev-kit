@@ -59,6 +59,18 @@
     },
     "change_reason": {
       "type": "string"
+    },
+    "report": {
+      "description": "Stage or unit report. The selected report schema is required only for a completion claim; partial reports are allowed when asking or stopping. Schema conformance is not proof of completion.",
+      "type": "object",
+      "additionalProperties": true
+    },
+    "confirmation": {
+      "$ref": "#/$defs/confirmation"
+    },
+    "commit_message": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "required": [
@@ -93,6 +105,82 @@
         "invalid_when"
       ],
       "additionalProperties": false
+    },
+    "confirmation": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "recommendation": {
+          "type": "string"
+        },
+        "recommendation_reason": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:devkit:form:reference"
+          }
+        }
+      },
+      "required": [
+        "text",
+        "options",
+        "recommendation",
+        "recommendation_reason",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "recommendation": {
+                "minLength": 1
+              }
+            },
+            "required": [
+              "recommendation"
+            ]
+          },
+          "then": {
+            "properties": {
+              "recommendation_reason": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "termination_kind": {
+            "const": "confirmation-required"
+          }
+        },
+        "required": [
+          "termination_kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "confirmation"
+        ]
+      }
+    }
+  ]
 }

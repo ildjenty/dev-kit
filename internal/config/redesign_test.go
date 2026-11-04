@@ -22,7 +22,7 @@ func TestPlanCheckSettings(t *testing.T) {
 			}
 		})
 	}
-	if got := (Config{}).PlanCheckSettings(); !reflect.DeepEqual(got, PlanCheck{Aspect: "plan", Runner: "judge", Criteria: []Selection{{Source: "principles", Select: "review/plan.md"}, {Source: "plans", Select: "README.md"}}, Examples: &Selection{Source: "examples", Select: "plan/spec.json"}}) {
+	if got := (Config{}).PlanCheckSettings(); !reflect.DeepEqual(got, PlanCheck{Aspect: "plan", Runner: "judge", Criteria: []Selection{{Source: "principles", Select: "review/plan.md"}, {Source: "plans", Select: "README.md"}}, Examples: &Selection{Source: "examples", Select: "plan/spec.json"}, Schemas: []string{"plan", "plan-template"}}) {
 		t.Fatalf("effective plan check defaults = %+v", got)
 	}
 }

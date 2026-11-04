@@ -82,7 +82,7 @@ func (w *Workspace) PreCommitPath(ctx context.Context) (string, error) {
 }
 
 // CreateBranch creates a branch from the current HEAD and switches to it.
-// Pass devkit/<work ID> as the work branch name.
+// Devkit itself does not create work branches; the session follows the git norm.
 func (w *Workspace) CreateBranch(ctx context.Context, name string) error {
 	_, err := w.run(ctx, nil, "switch", "-c", name)
 	return err

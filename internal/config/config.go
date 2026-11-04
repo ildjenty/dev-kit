@@ -34,19 +34,33 @@ type Config struct {
 	Lessons        Lessons                      `toml:"lessons"`
 	Detection      Detection                    `toml:"detection"`
 	Parallel       Parallel                     `toml:"parallel"`
+	Briefs         Briefs                       `toml:"briefs"`
 }
 
-// Parallel limits the number of outstanding unit workers.
+// Parallel limits the number of outstanding subagent instructions.
 type Parallel struct {
-	MaxWorkers int `toml:"max_workers"`
+	MaxConcurrent int `toml:"max_concurrent"`
 }
 
-// MaxWorkers returns the effective limit for unit workers.
-func (c Config) MaxWorkers() int {
-	if c.Parallel.MaxWorkers == 0 {
+// MaxConcurrent returns the effective global subagent limit.
+func (c Config) MaxConcurrent() int {
+	if c.Parallel.MaxConcurrent == 0 {
 		return 3
 	}
-	return c.Parallel.MaxWorkers
+	return c.Parallel.MaxConcurrent
+}
+
+// Briefs limits the size of inline request bodies.
+type Briefs struct {
+	MaxBytes int `toml:"max_bytes"`
+}
+
+// BriefMaxBytes returns the effective inline request size limit.
+func (c Config) BriefMaxBytes() int {
+	if c.Briefs.MaxBytes == 0 {
+		return 200000
+	}
+	return c.Briefs.MaxBytes
 }
 
 // Approval controls when plans and edits to the development loop require approval.
@@ -61,6 +75,7 @@ type PlanCheck struct {
 	Runner   string      `toml:"runner"`
 	Criteria []Selection `toml:"criteria"`
 	Examples *Selection  `toml:"examples"`
+	Schemas  []string    `toml:"schemas"`
 }
 
 // PlanCheckSettings returns the effective plan judgment settings.
@@ -83,12 +98,16 @@ func (c Config) PlanCheckSettings() PlanCheck {
 		examples := *settings.Examples
 		settings.Examples = &examples
 	}
+	if settings.Schemas == nil {
+		settings.Schemas = []string{"plan", "plan-template"}
+	} else {
+		settings.Schemas = slices.Clone(settings.Schemas)
+	}
 	return settings
 }
 
-// Git holds work branch and stage commit settings.
+// Git holds stage commit settings. Branch rules belong to the git norm document.
 type Git struct {
-	Branch           string `toml:"branch"`
 	CommitMessage    string `toml:"commit_message"`
 	AllowEmptyCommit *bool  `toml:"allow_empty_commit"`
 }
@@ -98,9 +117,10 @@ type Classification struct {
 	DependencyFiles []string `toml:"dependency_files"`
 }
 
-// Limits holds continuation limits that cannot be disabled.
+// Limits holds continuation limits and an optional work-wide round budget.
 type Limits struct {
-	StopContinuation int `toml:"stop_continuation"`
+	StopContinuation int  `toml:"stop_continuation"`
+	MaxTotalRounds   *int `toml:"max_total_rounds"`
 }
 
 // Lessons holds the priority order of repository lesson destinations.
@@ -147,22 +167,6 @@ func (c Config) MetaLoopEditApproval() string {
 		return "confirm"
 	}
 	return c.Approval.MetaLoopEdit
-}
-
-func (c Config) branchPattern() string {
-	if c.Git.Branch == "" {
-		return "devkit/{work_id}"
-	}
-	return c.Git.Branch
-}
-
-// BranchName renders and validates the work branch name.
-func (c Config) BranchName(workID string) (string, error) {
-	name := strings.ReplaceAll(c.branchPattern(), "{work_id}", workID)
-	if !validBranchName(name) {
-		return "", fmt.Errorf("git.branch renders an invalid branch name: %q", name)
-	}
-	return name, nil
 }
 
 func (c Config) commitMessagePattern() string {
@@ -271,13 +275,14 @@ func Parse(data []byte) (Config, error) {
 	c.State.Detect = c.DetectionPath()
 	c.Approval = Approval{Plan: c.PlanApproval(), MetaLoopEdit: c.MetaLoopEditApproval()}
 	allowEmpty := c.AllowEmptyCommit()
-	c.Git = Git{Branch: c.branchPattern(), CommitMessage: c.commitMessagePattern(), AllowEmptyCommit: &allowEmpty}
+	c.Git = Git{CommitMessage: c.commitMessagePattern(), AllowEmptyCommit: &allowEmpty}
 	c.Classification.DependencyFiles = c.DependencyFiles()
 	c.Router.HumanConfirmation = c.HumanConfirmation()
 	c.PlanCheck = c.PlanCheckSettings()
 	c.Limits.StopContinuation = c.StopContinuation()
 	c.Lessons.Destinations = c.LessonDestinations()
-	c.Parallel.MaxWorkers = c.MaxWorkers()
+	c.Parallel.MaxConcurrent = c.MaxConcurrent()
+	c.Briefs.MaxBytes = c.BriefMaxBytes()
 	metadata, err := toml.NewDecoder(bytes.NewReader(data)).Decode(&c)
 	if err != nil {
 		return Config{}, fmt.Errorf("parse configuration: %w", err)
@@ -294,8 +299,11 @@ func Parse(data []byte) (Config, error) {
 
 // Validate checks required settings and formats without checking path existence or kit compatibility.
 func (c Config) Validate() error {
-	if c.Parallel.MaxWorkers < 1 {
-		return fmt.Errorf("parallel.max_workers must be at least 1")
+	if c.Parallel.MaxConcurrent < 1 {
+		return fmt.Errorf("parallel.max_concurrent must be at least 1")
+	}
+	if c.Briefs.MaxBytes < 1 {
+		return fmt.Errorf("briefs.max_bytes must be at least 1")
 	}
 	if strings.TrimSpace(c.KitVersion) == "" {
 		return fmt.Errorf("kit_version is required")
@@ -313,6 +321,9 @@ func (c Config) Validate() error {
 		return err
 	}
 	if err := c.validateRouter(); err != nil {
+		return err
+	}
+	if err := c.validateRoleConcurrency(); err != nil {
 		return err
 	}
 	if err := c.validateRoles(); err != nil {
@@ -423,6 +434,11 @@ func (c Config) validatePlanSettings() error {
 			return fmt.Errorf("plan_check.examples: %w", err)
 		}
 	}
+	for _, name := range c.PlanCheck.Schemas {
+		if !sourceName.MatchString(name) {
+			return fmt.Errorf("invalid plan_check.schemas name: %q", name)
+		}
+	}
 	return nil
 }
 
@@ -441,9 +457,6 @@ func (c Config) validateApproval() error {
 }
 
 func (c Config) validateGit() error {
-	if !strings.Contains(c.Git.Branch, "{work_id}") || !validBranchName(strings.ReplaceAll(c.Git.Branch, "{work_id}", "work")) {
-		return fmt.Errorf("git.branch must contain {work_id} and render a valid git branch name")
-	}
 	if strings.TrimSpace(c.Git.CommitMessage) == "" {
 		return fmt.Errorf("git.commit_message must not be empty")
 	}
@@ -466,6 +479,9 @@ func (c Config) validateDependencyFiles() error {
 func (c Config) validateContinuationLimit() error {
 	if c.Limits.StopContinuation < 1 {
 		return fmt.Errorf("limits.stop_continuation must be at least 1")
+	}
+	if c.Limits.MaxTotalRounds != nil && *c.Limits.MaxTotalRounds < 1 {
+		return fmt.Errorf("limits.max_total_rounds must be at least 1 when set")
 	}
 	return nil
 }
@@ -497,21 +513,6 @@ func validRepositoryPath(value string) bool {
 		return false
 	}
 	return value != ".devkit/run" && !strings.HasPrefix(value, ".devkit/run/")
-}
-
-func validBranchName(name string) bool {
-	if name == "" || name == "HEAD" || strings.HasPrefix(name, "-") || strings.HasSuffix(name, ".") || strings.Contains(name, "..") || strings.Contains(name, "@{") || strings.ContainsAny(name, " ~^:?*[\\") {
-		return false
-	}
-	if strings.IndexFunc(name, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
-		return false
-	}
-	for _, component := range strings.Split(name, "/") {
-		if component == "" || strings.HasPrefix(component, ".") || strings.HasSuffix(component, ".lock") {
-			return false
-		}
-	}
-	return true
 }
 
 func validateCommand(section, name string, command Command) error {

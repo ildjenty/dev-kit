@@ -3,15 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/engine"
 	"github.com/ildjenty/dev-kit/internal/hook"
 	"github.com/ildjenty/dev-kit/internal/kit"
-	"github.com/ildjenty/dev-kit/internal/ledger"
-	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 	"github.com/ildjenty/dev-kit/internal/workspace"
 	"github.com/oklog/ulid/v2"
 )
@@ -36,7 +33,7 @@ func newEngine(ctx context.Context, cwd, session string) (*engine.Engine, error)
 		}
 	}
 	if workID == "" {
-		workID, err = branchWorkID(ctx, w, runRoot)
+		workID, err = engine.CheckoutWork(runRoot)
 		if err != nil {
 			return nil, err
 		}
@@ -84,38 +81,4 @@ func newEngine(ctx context.Context, cwd, session string) (*engine.Engine, error)
 			return schemas, nil
 		},
 	})
-}
-
-func branchWorkID(ctx context.Context, w *workspace.Workspace, runRoot string) (string, error) {
-	workID := ""
-	branch, err := w.Branch(ctx)
-	if err != nil {
-		return "", err
-	}
-	entries, err := os.ReadDir(filepath.Join(runRoot, "work"))
-	if err != nil && !os.IsNotExist(err) {
-		return "", err
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		records, err := fsstore.New(filepath.Join(runRoot, "work", entry.Name())).List()
-		if err != nil {
-			return "", err
-		}
-		for _, record := range records {
-			if record.Kind != string(ledger.KindWork) {
-				continue
-			}
-			var work ledger.Work
-			if err := fsstore.DecodePayload(record.Payload, &work); err != nil {
-				return "", err
-			}
-			if work.Branch == branch {
-				workID = work.ID
-			}
-		}
-	}
-	return workID, nil
 }

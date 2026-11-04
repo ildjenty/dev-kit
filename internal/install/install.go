@@ -198,14 +198,20 @@ func readOptional(path string) ([]byte, error) {
 
 func normPath(sources map[string]config.Source, name string) string {
 	root, rest, _ := strings.Cut(name, "/")
-	if root == "rules.md" {
-		root = "rules"
-	}
+	root = normSource(root)
 	base := sources[root].Path
 	if rest == "" {
 		return base
 	}
 	return base + "/" + rest
+}
+
+// normSource maps single-document norms to their source names.
+func normSource(root string) string {
+	if name, ok := strings.CutSuffix(root, ".md"); ok && (name == "rules" || name == "git") {
+		return name
+	}
+	return root
 }
 
 func sourceLocation(root, name string) string {
@@ -217,9 +223,7 @@ func sourceLocation(root, name string) string {
 
 func localNormPath(root string, sources map[string]config.Source, name string) (string, bool) {
 	source, _, _ := strings.Cut(name, "/")
-	if source == "rules.md" {
-		source = "rules"
-	}
+	source = normSource(source)
 	if !sources[source].CanWrite() {
 		return "", false
 	}

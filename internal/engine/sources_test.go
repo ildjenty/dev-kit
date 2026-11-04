@@ -25,7 +25,7 @@ func briefText(t *testing.T, instruction *form.Instruction) string {
 
 func configure(t *testing.T, e *Engine, settings string) {
 	t.Helper()
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = 'deviation'\n"+settings)
+	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[roles.agent]\nkind = 'work'\nagent = 'devkit-worker'\n[approval]\nplan = 'deviation'\n"+settings)
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure sources")
 }

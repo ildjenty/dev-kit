@@ -45,13 +45,16 @@ func (e *Engine) prepareUnitRetry(ctx context.Context, state *ledger.State, meta
 	return errors.New("worker retry round is missing")
 }
 
-func (e *Engine) acceptUnitResult(instruction ledger.Instruction, obs observedResult) (bool, error) {
+func (e *Engine) acceptUnitResult(state *ledger.State, instruction ledger.Instruction, obs observedResult) (bool, error) {
 	var progress form.Progress
 	if err := e.forms["progress"].Decode(obs.result.Content, &progress); err != nil {
 		return e.rejectResult(instruction, obs, err)
 	}
 	if progress.InstructionID != instruction.ID || instruction.Unit == nil {
 		return e.rejectResult(instruction, obs, errors.New("worker instruction ID or unit does not match"))
+	}
+	if err := e.validateUnitReport(state, instruction, progress); err != nil {
+		return e.rejectResult(instruction, obs, err)
 	}
 	_, err := e.append(&ledger.UnitResult{Progress: progress, RoundID: instruction.RoundID, UnitID: instruction.Unit.ID, AgentID: obs.result.AgentID, ResultPath: obs.path})
 	return true, err
@@ -69,29 +72,10 @@ func (e *Engine) advanceUnits(ctx context.Context, state *ledger.State, p plan.P
 	for _, result := range state.UnitResults(round.ID) {
 		accepted[result.UnitID] = true
 	}
-	pending := map[string]ledger.Instruction{}
-	for _, instruction := range state.UnacceptedInstructions() {
-		if instruction.Kind == form.InstructionUnitWork && instruction.RoundID == round.ID && instruction.Unit != nil {
-			pending[instruction.Unit.ID] = instruction
-		}
-	}
+	free := newSlots(state, settings)
 	r := response(state)
 	for _, unit := range stage.Units {
-		if accepted[unit.ID] {
-			continue
-		}
-		if _, ok := pending[unit.ID]; ok {
-			published, err := e.unitInstruction(ctx, state, p, stage, round, unit)
-			if err != nil {
-				return Result{}, false, err
-			}
-			if published.Paused {
-				return published, true, nil
-			}
-			r.Instructions = append(r.Instructions, *published.Instruction)
-			continue
-		}
-		if len(pending) >= settings.MaxWorkers() {
+		if accepted[unit.ID] || !free.take(form.InstructionUnitWork, round.ID+":"+unit.ID, unit.WorkRole()) {
 			continue
 		}
 		published, err := e.unitInstruction(ctx, state, p, stage, round, unit)
@@ -102,10 +86,17 @@ func (e *Engine) advanceUnits(ctx context.Context, state *ledger.State, p plan.P
 			return published, true, nil
 		}
 		r.Instructions = append(r.Instructions, *published.Instruction)
-		pending[unit.ID] = ledger.Instruction{}
 	}
-	r.Message = "Launch each assigned worker once, then wait for its result before calling devkit next."
+	r.Message = launchMessage(len(r.Instructions))
 	return r, true, nil
+}
+
+// launchMessage tells the session how to handle the subagent instructions issued together.
+func launchMessage(count int) string {
+	if count == 0 {
+		return "Wait for the outstanding subagent results, then call devkit next."
+	}
+	return "Launch each listed subagent instruction once, then wait for their results before calling devkit next."
 }
 
 func (e *Engine) unitInstruction(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, round *ledger.Round, unit plan.Unit) (Result, error) {
@@ -306,7 +297,40 @@ func mergedProgress(id string, results []*ledger.UnitResult) form.Progress {
 			p.ChangeReason += result.UnitID + ": " + result.ChangeReason + "\n"
 		}
 	}
+	if len(results) == 1 {
+		// A one-unit round is whole-stage work: its report and commit message are the stage's.
+		p.Report, p.CommitMessage = results[0].Report, results[0].CommitMessage
+	}
+	p.Confirmation = mergedConfirmation(results)
 	return p
+}
+
+// mergedConfirmation keeps each unit's confirmation request verbatim under its unit ID.
+func mergedConfirmation(results []*ledger.UnitResult) *form.Confirmation {
+	var requests []*ledger.UnitResult
+	for _, result := range results {
+		if result.Confirmation != nil {
+			requests = append(requests, result)
+		}
+	}
+	if len(requests) == 0 {
+		return nil
+	}
+	if len(results) == 1 {
+		copy := *requests[0].Confirmation
+		return &copy
+	}
+	merged := &form.Confirmation{Options: []string{}, Evidence: []form.Reference{}}
+	texts := []string{}
+	for _, result := range requests {
+		texts = append(texts, "Unit "+result.UnitID+": "+result.Confirmation.Text)
+		merged.Options = append(merged.Options, result.Confirmation.Options...)
+		merged.Evidence = append(merged.Evidence, result.Confirmation.Evidence...)
+	}
+	merged.Text = strings.Join(texts, "\n\n")
+	slices.Sort(merged.Options)
+	merged.Options = slices.Compact(merged.Options)
+	return merged
 }
 
 func (e *Engine) cleanupUnits(ctx context.Context, state *ledger.State) ([]string, error) {
@@ -370,4 +394,13 @@ func (e *Engine) acceptAmbiguous(state *ledger.State) (bool, error) {
 		return true, err
 	}
 	return false, nil
+}
+
+func (e *Engine) validateUnitReport(state *ledger.State, instruction ledger.Instruction, progress form.Progress) error {
+	for _, round := range state.Rounds(instruction.StageRunID) {
+		if round.ID == instruction.RoundID {
+			return e.validateRoundReport(context.Background(), state, round, instruction.Unit, progress)
+		}
+	}
+	return errors.New("worker round is missing")
 }

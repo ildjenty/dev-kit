@@ -82,6 +82,16 @@ type Selection struct {
 	Select string `json:"select"`
 }
 
+// History selects optional context from fixed work history indexes.
+type History string
+
+const (
+	HistoryNone     History = "none"
+	HistoryStageRun History = "stage_run"
+	HistoryCheck    History = "check"
+	HistoryAll      History = "all"
+)
+
 // DefaultInputs returns the default knowledge selections for each role.
 func DefaultInputs() []Selection {
 	return []Selection{{Source: "requirements", Select: ""}, {Source: "rules", Select: ""}, {Source: "structure", Select: ""}}
@@ -89,6 +99,11 @@ func DefaultInputs() []Selection {
 
 // The caller resolves judge role IDs and judgment command names.
 type Check struct {
+	History                History     `json:"history,omitempty"`
+	Schemas                []string    `json:"schemas,omitempty"`
+	Outputs                []string    `json:"outputs"`
+	BriefByPlanner         bool        `json:"brief_by_planner,omitempty"`
+	Instructions           []string    `json:"instructions,omitempty"`
 	Criteria               []Selection `json:"criteria,omitempty"`
 	Examples               *Selection  `json:"examples,omitempty"`
 	Aspect                 string      `json:"aspect"`
@@ -99,23 +114,48 @@ type Check struct {
 }
 
 type Stage struct {
-	Inputs      []Selection `json:"inputs"`
-	ID          string      `json:"id"`
-	Split       bool        `json:"split,omitempty"`
-	Units       []Unit      `json:"units,omitempty"`
-	Assignee    Assignee    `json:"assignee"`
-	Checks      []Check     `json:"checks"`
-	Gate        Gate        `json:"gate"`
-	Limits      Limits      `json:"limits"`
-	Transitions Transitions `json:"transitions"`
+	Report       *Selection  `json:"report,omitempty"`
+	UnitReport   *Selection  `json:"unit_report,omitempty"`
+	HumanPrompt  *Selection  `json:"human_prompt,omitempty"`
+	Delegations  []Selection `json:"delegations,omitempty"`
+	Outputs      []string    `json:"outputs"`
+	History      History     `json:"history,omitempty"`
+	Instructions []string    `json:"instructions,omitempty"`
+	Inputs       []Selection `json:"inputs"`
+	ID           string      `json:"id"`
+	Split        bool        `json:"split,omitempty"`
+	Units        []Unit      `json:"units,omitempty"`
+	Assignee     Assignee    `json:"assignee"`
+	Checks       []Check     `json:"checks"`
+	Gate         Gate        `json:"gate"`
+	Limits       Limits      `json:"limits"`
+	Transitions  Transitions `json:"transitions"`
 }
 
 // Unit describes one worker's share of a split stage.
 type Unit struct {
-	Role        string `json:"role,omitempty"`
-	ID          string `json:"id"`
-	Description string `json:"description"`
-	Scope       string `json:"scope"`
+	Instructions []string `json:"instructions,omitempty"`
+	Outputs      []string `json:"outputs"`
+	Role         string   `json:"role,omitempty"`
+	ID           string   `json:"id"`
+	Description  string   `json:"description"`
+	Scope        string   `json:"scope"`
+}
+
+// WorkerHistory returns the selected optional history scope for stage work.
+func (s Stage) WorkerHistory() History {
+	if s.History == "" {
+		return HistoryStageRun
+	}
+	return s.History
+}
+
+// JudgmentHistory returns the optional history scope; required evidence is always supplied.
+func (c Check) JudgmentHistory() History {
+	if c.History == "" {
+		return HistoryCheck
+	}
+	return c.History
 }
 
 func (s Stage) RequiredChecks() []Check {
@@ -233,6 +273,9 @@ func roleInputs(inputs []Selection) []Selection {
 }
 
 func cloneCheck(c Check) Check {
+	c.Schemas = slices.Clone(c.Schemas)
+	c.Outputs = slices.Clone(c.Outputs)
+	c.Instructions = slices.Clone(c.Instructions)
 	c.Criteria = slices.Clone(c.Criteria)
 	if c.Examples != nil {
 		examples := *c.Examples
@@ -243,6 +286,12 @@ func cloneCheck(c Check) Check {
 }
 
 func cloneStage(s Stage) Stage {
+	s.Report = cloneSelection(s.Report)
+	s.UnitReport = cloneSelection(s.UnitReport)
+	s.HumanPrompt = cloneSelection(s.HumanPrompt)
+	s.Delegations = slices.Clone(s.Delegations)
+	s.Outputs = slices.Clone(s.Outputs)
+	s.Instructions = slices.Clone(s.Instructions)
 	s.Transitions.FixRules = slices.Clone(s.Transitions.FixRules)
 	for i, rule := range s.Transitions.FixRules {
 		if rule.When != nil {
@@ -256,6 +305,10 @@ func cloneStage(s Stage) Stage {
 	}
 	s.Inputs = slices.Clone(s.Inputs)
 	s.Units = slices.Clone(s.Units)
+	for i := range s.Units {
+		s.Units[i].Instructions = slices.Clone(s.Units[i].Instructions)
+		s.Units[i].Outputs = slices.Clone(s.Units[i].Outputs)
+	}
 	s.Checks = slices.Clone(s.Checks)
 	for i := range s.Checks {
 		s.Checks[i] = cloneCheck(s.Checks[i])
@@ -265,6 +318,14 @@ func cloneStage(s Stage) Stage {
 		s.Transitions.Done = &done
 	}
 	return s
+}
+
+func cloneSelection(selection *Selection) *Selection {
+	if selection == nil {
+		return nil
+	}
+	copy := *selection
+	return &copy
 }
 
 func clonePlan(p Plan) Plan {

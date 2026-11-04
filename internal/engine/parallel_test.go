@@ -17,7 +17,8 @@ import (
 
 func splitWork(t *testing.T, maxWorkers int, extraUnits ...plan.Unit) (*Engine, context.Context, Result) {
 	t.Helper()
-	e, ctx := fixture(t)
+	// Units default to the worker subagent; the split stage is assigned to a session work role.
+	e, ctx := defaultFixture(t)
 	source, err := os.ReadFile(filepath.Join(e.Root(), ".devkit/plans/test.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -27,15 +28,16 @@ func splitWork(t *testing.T, maxWorkers int, extraUnits ...plan.Unit) (*Engine, 
 		t.Fatal(err)
 	}
 	template.Stages[0].Split = true
+	template.Stages[0].Assignee = "session"
 	template.Stages[0].Checks = []plan.Check{judgeCheck("plan", true)}
 	write(t, e.Root(), ".devkit/plans/test.json", string(marshal(t, template)))
 	settings, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	extra := "\n[detection]\nrequired = false\n"
+	extra := "\n[detection]\nrequired = false\n[roles.session]\nkind = 'work'\nagent = ''\n"
 	if maxWorkers == 1 {
-		extra += "\n[parallel]\nmax_workers = 1\n"
+		extra += "\n[parallel]\nmax_concurrent = 1\n"
 	}
 	write(t, e.Root(), "devkit.toml", string(settings)+extra)
 	git(t, e.Root(), "add", ".")
@@ -392,7 +394,7 @@ func TestSplitConflictPreservesUnitConfirmation(t *testing.T) {
 	first := work.Instructions[0]
 	write(t, first.TargetPath, "README.md", "First conflicting output\n")
 	collect(t, e, &first, form.Progress{
-		InstructionID: first.ID, TerminationKind: form.TerminationQuestion,
+		InstructionID: first.ID, TerminationKind: form.TerminationQuestion, Confirmation: ask("Confirm how to continue."),
 		WorkPerformed:    []string{"Updated the first unit"},
 		Obstacles:        []string{"Choose the supported document format"},
 		Unconfirmed:      []string{"Human confirmation is still required"},

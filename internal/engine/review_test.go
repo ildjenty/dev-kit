@@ -480,7 +480,7 @@ func TestDetectionCommandRetriesAfterHumanAnswer(t *testing.T) {
 		if example.Kind == check.Violation {
 			judgment.Findings = []form.Finding{{ID: "example-violation", Blocking: true, Kind: form.AutoFixable, Scenario: "The example violates the blocking condition"}}
 		}
-		output.Observations = append(output.Observations, form.DetectionObservation{File: example.ID, Judgment: judgment, Reason: "The observation distinguishes the example"})
+		output.Observations = append(output.Observations, observed(example.ID, judgment, "The observation distinguishes the example"))
 	}
 	write(t, e.Root(), ".devkit/run/detection-result.json", string(marshal(t, output)))
 	head, err := e.workspace.Head(ctx)

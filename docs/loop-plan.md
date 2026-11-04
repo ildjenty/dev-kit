@@ -14,7 +14,7 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 
 ステージの遷移 `fix` には、同じステージの次のラウンドの担当を変える規則の一覧を書ける。条件は記録から決まる事実(`check`・`failures_at_least`・`human_rejected`)だけであり、条件式の言語は持たない。形式と当てはめ方は[修正の担当の規則](architecture/data.md#修正の担当の規則)に従う。
 
-雛形のステージに `split: true` を書くと、そのステージの作業を単位に分けてよい。計画者は、そのステージの `units` に、計画内の ID、説明、担当する範囲、任意の役割 `role`(既定 `unit_worker`)を持つ単位の一覧を書く。範囲はファイルやディレクトリを文章で示してよい。単位がなければ通常のステージとして作業する。単位の ID の重複は検証で拒否し、範囲の重なりは計画の観点の判定者が指摘する。分割の追加・削除は雛形からの逸脱である。再計画で完了済みのステージを残りの計画に含めないことは逸脱に数えない。
+雛形のステージに `split: true` を書くと、そのステージの作業を単位に分けてよい。計画者は、そのステージの `units` に、計画内の ID、説明、担当する範囲、任意の役割 `role`(既定 `worker`)を持つ単位の一覧を書く。範囲はファイルやディレクトリを文章で示してよい。単位がなければ通常のステージとして作業する。単位の ID の重複は検証で拒否し、範囲の重なりは計画の観点の判定者が指摘する。分割の追加・削除は雛形からの逸脱である。再計画で完了済みのステージを残りの計画に含めないことは逸脱に数えない。
 
 個別の承認なしに計画の承認だけで実行してよい[外部操作](architecture/flow.md#外部操作)(リポジトリ外への書き込み行為)は、[計画の宣言](architecture/data.md#計画-plan)と[外部操作の承認](architecture/guarantees.md#外部操作の承認)に従って扱う。
 
@@ -28,17 +28,25 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 
 計画の検証では、`done` をたどって同じステージを再び通る循環を拒否する。`"replan"` または `null` で遷移の連鎖を終える。
 
+課題ごとの計画のステージ・check・単位には `instructions`(文字列の配列)を書ける。devkit は対応する依頼文へそのまま渡し、承認の問いにも載せる。雛形はこの指示を持たない。`history`・`outputs`・`schemas`・`brief_by_planner`・`report`・`unit_report`・`human_prompt`・`delegations` の契約は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)と[依頼の入力](architecture/data.md#依頼の入力)に従う。単位どうしの成果に依存する仕事は別のステージとする。
+
 ## 既定の雛形
 
 既定の雛形は分割を使わず、分割するステージはリポジトリが選ぶ。
 
-- **`default`**: `purpose → scope → structure → contract → steps → implement → retrospective`。候補は `research` と `prototype` である。`scope` に人の承認ゲートを置く。`implement` に必須の `command:test` と、観点 `test`・`diff` の check を置く。
-- **`fix`**: `implement → retrospective`。候補は `research` と `prototype` である。`implement` に必須の `command:test` と、観点 `test`・`diff` の check を置く。
-- **`docs`**: `implement → retrospective`。`implement` に観点 `wording` の check を置く。
+- **`default`**: `purpose → scope → structure → contract → steps → implement → verification → retrospective`。候補は `research`・`prototype`・`handoff` である。`scope` に人の承認ゲートを置く。`implement` に必須の `command:test` と、観点 `test`・`diff` の check を置く。
+- **`fix`**: `implement → verification → retrospective`。候補は `research`・`prototype`・`handoff` である。`implement` に必須の `command:test` と、観点 `test`・`diff` の check を置く。
+- **`docs`**: `implement → retrospective`。候補は `handoff` である。`implement` に観点 `wording` の check を置く。
 
 `default` は `purpose` の遷移 `done` を `"replan"` にする。最初の計画には、要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md` に書き、完了条件の案を作る。置き場所は `[sources.requirements]` で変更できる。`purpose` の完了後、計画者が合意した完了条件で残りの計画を作り直し、人が承認する。`fix` と `docs` はこの形を使わない。
 
 すべての既定の雛形の `retrospective` は作業者が担当する。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけを置く。ステージの担当は既定の役割 `worker`、観点の判定者(runner)は既定の役割 `judge` であり、その agent は `init` が配る `devkit-judge` である。`--plan` の省略時は `default_plan` の値を使い、既定は `"default"` である。計画者は不要なステージを外してよく、外したステージは逸脱として承認の問いに載せる。
+
+`default` と `fix` の `verification` は implement と retrospective の間に置き、`worker` が担当する。必須の `command:e2e` と、`principles/review/behavior.md` などを基準にする判定者の check を置く。`e2e` が未登録なら、作業者は利用者の入口から通しで確かめるスクリプトを作り、`[commands.e2e]` に登録する。登録と次のラウンドからの適用は `command:test` と同じ経路である。判定者は完了条件ごとの利用場面が通しの確認に含まれるかを見る。`docs` には verification を置かない。
+
+既定の diff の `criteria` には英語の原則 `principles/security.md` を含める。セキュリティ専用のステージは設けない。`handoff` はすべての既定の雛形の `optional_stages` にだけ置く。作業者が `templates/pr.md.tmpl` に沿ってレビューする人向けの PR 本文を書き、判定者が wording などの基準で確かめる。git の操作は含めない。
+
+既定の各ステージは、その定義が求める成果を表す `report` の形を持つ。retrospective とその harness の check は `history = "all"` を明示する。既定の雛形は `brief_by_planner` を使わない。
 
 ## 例
 
@@ -109,7 +117,7 @@ check と必要なゲートの進行は[計画の check と承認ゲート](arch
 
 次の行動を選ぶ入力は [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)、必須 check とコミットの関係は[完了条件](architecture/guarantees.md#完了条件)に従う。起動・操作を要する check の実行主体は[操作の禁止とサブエージェントの制限](architecture/guarantees.md#操作の禁止とサブエージェントの制限)で定める。
 
-分割した作業は単位の役割(既定 `unit_worker`、agent `devkit-worker`)が単位ごとの worktree で進め、固定した SHA を作業ブランチへコミットしないマージで合流する。単位ごとの判定はせず、合流後のツリーを通常のステージのラウンドとして判定する。ゲート・確認・上限・戻り・再計画・問いもステージ単位である。作業者数は `[parallel] max_workers`(既定3、1以上)で制限し、1でも同じ作業場所と合流の手順を使う。分割するステージの担当はセッションの `work` の役割であり、合流の修正を担う。agent のある `work` の役割がステージの担当になったラウンドも、単位が1つの同じ手順で動かす。実行・中断・中止・作業完了の扱いは[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。
+分割した作業は単位の役割(既定 `worker`、agent `devkit-worker`)が単位ごとの worktree で進め、固定した SHA を作業ブランチへコミットしないマージで合流する。単位ごとの判定はせず、合流後のツリーを通常のステージのラウンドとして判定する。ゲート・確認・上限・戻り・再計画・問いもステージ単位である。同時に動かす数は全体の `[parallel] max_concurrent`(既定3、1以上)と役割ごとの `[roles.<id>] max_concurrent`(指定時は1以上)の両方を満たす。数えるのは発行済みでまだ受理していないサブエージェントの指示である。互いに依存しない単位の作業、検証コマンド後の判定者の check、check ごとの判定直前の指示をまとめて返し、空いた分だけ次の `next` で発行する。役割の上限を省略した場合も全体の上限を守る。分割するステージの担当はセッションの `work` の役割であり、合流の修正を担う。agent のある `work` の役割がステージの担当になったラウンドも、単位が1つの同じ手順で動かす。実行・中断・中止・作業完了の扱いは[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。
 
 計画で使う `command:<name>` がラウンド開始時の `devkit.toml` に登録されていなければ、その check を `FAIL` とする。指摘は `auto-fixable` とし、「検証コマンド `<name>` が登録されていない。検証の手段を作り `devkit.toml` の `[commands.<name>]` に登録する」と伝える。作業者が用意したコマンドは、次のラウンド開始時のスナップショットから使う。登録はループ自身の変更として人が確認する。
 

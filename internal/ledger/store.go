@@ -141,6 +141,8 @@ func readRecord(raw fsstore.Record, validator *Validator) (Record, error) {
 		payload = &UnitResult{}
 	case KindMerge:
 		payload = &Merge{}
+	case KindJudgmentBrief:
+		payload = &JudgmentBrief{}
 	case KindJudgment:
 		payload = &Judgment{}
 	case KindDetectionTest:
@@ -183,8 +185,8 @@ func (v *Validator) validate(r Record) error {
 		if p.KitVersion != ReadableKitVersion {
 			return fmt.Errorf("unreadable kit version %q; readable version is %q", p.KitVersion, ReadableKitVersion)
 		}
-		if p.ID == "" || p.TaskRef == "" || p.Branch == "" || p.BaseCommit == "" {
-			return fmt.Errorf("work identity, task reference, branch, and base commit are required")
+		if p.ID == "" || p.TaskRef == "" || p.BaseCommit == "" {
+			return fmt.Errorf("work identity, task reference, and base commit are required")
 		}
 	case *StageRun:
 		if p.ID == "" || p.StageID == "" || p.PlanVersion <= 0 {
@@ -263,6 +265,8 @@ func references(r Record) []form.Reference {
 	case *UnitResult:
 		add(p.RoundID)
 	case *Merge:
+		add(p.RoundID)
+	case *JudgmentBrief:
 		add(p.RoundID)
 	case *Judgment:
 		add(p.RoundID)
