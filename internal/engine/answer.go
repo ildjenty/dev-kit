@@ -93,13 +93,7 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 	if err := validateAnswerCorrection(request, previous, answered, observedAt); err != nil {
 		return Result{}, err
 	}
-	if err := validateAmbiguousAnswer(state, question, request); err != nil {
-		return Result{}, err
-	}
-	if err := validateRoleContinuation(question, request); err != nil {
-		return Result{}, err
-	}
-	if err := e.validateOpenQuestionAnswer(question, request); err != nil {
+	if err := e.validateAnswerContent(state, question, request); err != nil {
 		return Result{}, err
 	}
 	if err := e.recordAnswer(state, question, request, original, observedAt); err != nil {
@@ -370,6 +364,17 @@ func (e *Engine) deferQuestion(question *form.Question) (Result, error) {
 		return Result{}, err
 	}
 	return e.issueQuestion(state, replacement)
+}
+
+// validateAnswerContent checks what an answer may say for its question before it is recorded.
+func (e *Engine) validateAnswerContent(state *ledger.State, question *form.Question, request AnswerRequest) error {
+	if err := validateAmbiguousAnswer(state, question, request); err != nil {
+		return err
+	}
+	if err := validateRoleContinuation(question, request); err != nil {
+		return err
+	}
+	return e.validateOpenQuestionAnswer(question, request)
 }
 
 // validateOpenQuestionAnswer refuses to approve a plan that still has open questions: the
