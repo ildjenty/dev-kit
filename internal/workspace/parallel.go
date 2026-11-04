@@ -147,3 +147,12 @@ func (w *Workspace) Conflicts(ctx context.Context) ([]string, error) {
 	}
 	return strings.Split(strings.TrimSuffix(string(output), "\x00"), "\x00"), nil
 }
+
+// ResolveMerge stages the worker's conflict resolution and returns its tree.
+// HEAD remains unchanged.
+func (w *Workspace) ResolveMerge(ctx context.Context) (string, error) {
+	if _, err := w.run(ctx, nil, "add", "--all", "--", "."); err != nil {
+		return "", err
+	}
+	return w.SnapshotTree(ctx)
+}

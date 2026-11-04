@@ -38,7 +38,7 @@ func (e *Engine) prepareUnitRetry(ctx context.Context, state *ledger.State, meta
 			if err := e.active(); err != nil {
 				return err
 			}
-			_, err := e.workspace.AddWorktree(ctx, e.unitPath(meta.ID), round.StartCommit)
+			_, err := e.workspace.AddWorktree(ctx, meta.TargetPath, round.StartCommit)
 			return err
 		}
 	}
@@ -80,12 +80,8 @@ func (e *Engine) advanceUnits(ctx context.Context, state *ledger.State, p plan.P
 		if accepted[unit.ID] {
 			continue
 		}
-		if previous, ok := pending[unit.ID]; ok {
-			data, err := e.readInstruction(previous.ID)
-			if err != nil {
-				return Result{}, false, err
-			}
-			published, err := e.publishInstruction(previous, false, data, "")
+		if _, ok := pending[unit.ID]; ok {
+			published, err := e.unitInstruction(ctx, state, p, stage, round, unit)
 			if err != nil {
 				return Result{}, false, err
 			}
@@ -117,18 +113,31 @@ func (e *Engine) unitInstruction(ctx context.Context, state *ledger.State, p pla
 	if err != nil {
 		return Result{}, err
 	}
+	if !fresh {
+		data, err := e.readInstruction(meta.ID)
+		if err != nil {
+			return Result{}, err
+		}
+		return e.publishInstruction(meta, false, data, "")
+	}
 	meta.Unit = &unit
+	meta.TargetPath = e.unitPath(meta.ID)
+	for _, previous := range state.UnacceptedInstructions() {
+		if previous.Kind == meta.Kind && previous.TargetKey == meta.TargetKey {
+			meta.TargetPath, meta.Context = previous.TargetPath, previous.Context
+		}
+	}
 	if err := e.active(); err != nil {
 		return Result{}, err
 	}
-	if _, err := e.workspace.AddWorktree(ctx, e.unitPath(meta.ID), round.StartCommit); err != nil {
+	if _, err := e.workspace.AddWorktree(ctx, meta.TargetPath, round.StartCommit); err != nil {
 		return Result{}, err
 	}
 	b, err := e.workBrief(ctx, state, p, stage, round, &meta)
 	if err != nil {
 		return Result{}, err
 	}
-	data := instructionData{Reference: roundReference(round), Instruction: form.Instruction{Runner: "devkit-worker", TargetPath: e.unitPath(meta.ID), Text: "Launch the worker with: devkit-instruction " + meta.ID}}
+	data := instructionData{Reference: roundReference(round), Instruction: form.Instruction{Runner: "devkit-worker", TargetPath: meta.TargetPath, Text: "Launch the worker with: devkit-instruction " + meta.ID}}
 	return e.publishInstruction(meta, fresh, data, b.Text)
 }
 
@@ -145,7 +154,11 @@ func (e *Engine) freezeUnits(ctx context.Context, state *ledger.State, stage pla
 			return nil, errors.New("unit result is missing")
 		}
 		result := results[index]
-		w, err := e.workspace.AddWorktree(ctx, e.unitPath(result.InstructionID), round.StartCommit)
+		data, err := e.readInstruction(result.InstructionID)
+		if err != nil {
+			return nil, err
+		}
+		w, err := e.workspace.AddWorktree(ctx, data.Instruction.TargetPath, round.StartCommit)
 		if err != nil {
 			return nil, err
 		}
@@ -172,12 +185,20 @@ func (e *Engine) mergeUnits(ctx context.Context, state *ledger.State, p plan.Pla
 			return Result{}, false, err
 		}
 	}
+	progress := mergedProgress(round.ID, state.UnitResults(round.ID))
+	_, accepted, err := e.submittedArtifact(round, progress)
+	if err != nil {
+		return Result{}, false, err
+	}
+	if !accepted {
+		_, err := e.append(&ledger.Progress{Progress: progress, RoundID: round.ID})
+		return Result{}, false, err
+	}
 	if merge.Status == "conflict" {
 		r, err := e.mergeConflict(ctx, state, p, stage, run, round, merge)
 		return r, r.Instruction != nil || r.Message != "", err
 	}
 	if merge.Status == "merged" {
-		progress := mergedProgress(round.ID, state.UnitResults(round.ID))
 		return Result{}, false, e.recordSubmission(ctx, state, run, round, progress)
 	}
 	if err := e.mergeUnit(ctx, round, merge); err != nil {
@@ -215,7 +236,7 @@ func (e *Engine) mergeUnit(ctx context.Context, round *ledger.Round, saved *ledg
 		return err
 	}
 	if tree == merge.BeforeTree && tree != merge.ResultTree {
-		if err := e.workspace.Merge(ctx, round.StartCommit, merge.Current, merge.Inputs[merge.Applied].Commit); err != nil {
+		if err := e.workspace.Merge(ctx, merge.Inputs[0].Commit+"^", merge.Current, merge.Inputs[merge.Applied].Commit); err != nil {
 			return err
 		}
 	}
@@ -237,15 +258,8 @@ func (e *Engine) recordMergeStep(ctx context.Context, merge *ledger.Merge) error
 	if len(conflicts) > 0 {
 		merge.Status = "conflict"
 	} else {
-		commit, err := e.workspace.CommitObject(ctx, e.workID, tree, merge.Current, merge.Inputs[merge.Applied].Commit)
-		if err != nil {
+		if err := e.completeMergeInput(ctx, merge, tree); err != nil {
 			return err
-		}
-		merge.Current, merge.BeforeTree = commit.Commit, tree
-		merge.Applied++
-		merge.Status = "ready"
-		if merge.Applied == len(merge.Inputs) {
-			merge.Status = "merged"
 		}
 	}
 	_, err = e.append(merge)
@@ -264,7 +278,7 @@ func (e *Engine) mergeConflict(ctx context.Context, state *ledger.State, p plan.
 	for _, input := range merge.Inputs {
 		units = append(units, input.UnitID+" ("+input.Commit+")")
 	}
-	reason := fmt.Sprintf("Resolve unit merge conflicts in the work checkout and integrate any remaining fixed unit SHAs. %d units were merged before the conflicting input. Conflicting files: %s. Units in merge order: %s", merge.Applied, strings.Join(merge.Conflicts, ", "), strings.Join(units, ", "))
+	reason := fmt.Sprintf("Resolve only the unit merge conflicts in the work checkout, then submit. Devkit will record the resolution and merge the remaining fixed unit SHAs. %d units were merged before the conflicting input. Conflicting files: %s. Units in merge order: %s", merge.Applied, strings.Join(merge.Conflicts, ", "), strings.Join(units, ", "))
 	return e.fixRound(ctx, state, p, stage, run, &copy, reason)
 }
 
@@ -303,12 +317,12 @@ func (e *Engine) cleanupUnits(ctx context.Context, state *ledger.State) ([]strin
 			if round.ID != i.RoundID {
 				continue
 			}
-			removed, err := e.workspace.RemoveWorktree(ctx, e.unitPath(i.ID), round.StartCommit)
+			removed, err := e.workspace.RemoveWorktree(ctx, i.TargetPath, round.StartCommit)
 			if err != nil {
 				return nil, err
 			}
-			if !removed {
-				retained = append(retained, e.unitPath(i.ID))
+			if !removed && !slices.Contains(retained, i.TargetPath) {
+				retained = append(retained, i.TargetPath)
 			}
 		}
 	}
@@ -316,6 +330,9 @@ func (e *Engine) cleanupUnits(ctx context.Context, state *ledger.State) ([]strin
 }
 
 func (e *Engine) acceptAmbiguous(state *ledger.State) (bool, error) {
+	if changed, err := e.rejectAmbiguousAnswer(state); changed || err != nil {
+		return changed, err
+	}
 	files, err := filepath.Glob(filepath.Join(e.workRoot(), "results", "unmatched-*.json"))
 	if err != nil {
 		return false, err
@@ -334,8 +351,14 @@ func (e *Engine) acceptAmbiguous(state *ledger.State) (bool, error) {
 		if err := json.Unmarshal(data, &result); err != nil {
 			return false, err
 		}
-		q := e.question(form.ApprovalTarget{Kind: form.ApprovalWork, WorkID: e.workID}, "ambiguous_result", fmt.Sprintf("A %s result without an instruction ID could not be associated with one of the outstanding instructions. Inspect %s and provide instructions.\n%s", result.Runner, name, result.Failure), "")
+		q := e.question(form.ApprovalTarget{Kind: form.ApprovalWork, WorkID: e.workID}, "ambiguous_result", fmt.Sprintf("A %s result without an instruction ID could not be associated with one of the outstanding instructions. Inspect %s and answer with the exact instruction ID to retry in the answer text.\n%s", result.Runner, name, result.Failure), "")
 		q.Evidence = []form.Reference{{External: name}}
+		q.Options = nil
+		for _, instruction := range state.UnacceptedInstructions() {
+			if instruction.Runner == result.Runner {
+				q.Options = append(q.Options, instruction.ID)
+			}
+		}
 		_, err = e.saveQuestion(state, q, "")
 		return true, err
 	}

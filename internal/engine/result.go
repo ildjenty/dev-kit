@@ -53,7 +53,7 @@ func (e *Engine) retryRejected(ctx context.Context, state *ledger.State, meta le
 		if err := e.prepareUnitRetry(ctx, state, meta); err != nil {
 			return err
 		}
-		data.Instruction.TargetPath = e.unitPath(meta.ID)
+		data.Instruction.TargetPath = meta.TargetPath
 	}
 	if data.Request != nil {
 		request := *data.Request

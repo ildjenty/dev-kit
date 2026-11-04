@@ -639,6 +639,9 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 	}
 	input := brief.WorkInput{RequestTemplate: string(template), InstructionID: meta.ID, Stage: stage, StageDefinition: string(definition), Plan: p, Purpose: p.Task, Repository: facts, Norms: docs, NormPaths: paths, PreviousOutputs: outputs, PreviousFindings: state.UnresolvedBlocking(round.StageRunID), OutputSchema: string(outputSchema)}
 	input.Unit, input.WorktreePath = meta.Unit, e.unitPath(meta.ID)
+	if meta.Unit != nil {
+		input.WorktreePath = meta.TargetPath
+	}
 	for _, condition := range p.CompletionConditions {
 		input.Verification = append(input.Verification, condition.ID+": "+condition.Description)
 	}

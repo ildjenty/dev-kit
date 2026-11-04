@@ -92,6 +92,9 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 	if err := validateAnswerCorrection(request, previous, answered, observedAt); err != nil {
 		return Result{}, err
 	}
+	if err := validateAmbiguousAnswer(state, question, request); err != nil {
+		return Result{}, err
+	}
 	if err := e.recordAnswer(state, question, request, original, observedAt); err != nil {
 		return Result{}, err
 	}

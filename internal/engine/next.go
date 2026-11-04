@@ -198,6 +198,7 @@ func (e *Engine) Submit(ctx context.Context, data []byte) (Result, error) {
 	if err = e.forms["progress"].Decode(data, &progress); err != nil {
 		return Result{}, err
 	}
+	progress = repairProgress(state, round, progress)
 	current := ""
 	for _, i := range state.UnacceptedInstructions() {
 		if i.Kind == form.InstructionWork && i.RoundID == round.ID {
@@ -240,6 +241,9 @@ func (e *Engine) recordSubmission(ctx context.Context, state *ledger.State, run 
 	if err != nil {
 		return err
 	}
+	if handled, err := e.continueUnitSubmission(ctx, state, run, round, progress, accepted); handled || err != nil {
+		return err
+	}
 	if artifact == nil {
 		snapshot, err := e.workspace.Snapshot(ctx, e.workID)
 		if err != nil {
@@ -270,24 +274,8 @@ func (e *Engine) recordSubmission(ctx context.Context, state *ledger.State, run 
 	update.State = ledger.StageJudgmentWait
 	update.NextActor = "judge"
 	if progress.TerminationKind == form.TerminationQuestion {
-		p, ok, err := e.boundPlan(run.PlanVersion)
+		text, err := e.saveWorkerConfirmation(state, run, round, target, progress)
 		if err != nil {
-			return err
-		}
-		if !ok {
-			return errors.New("bound plan is missing")
-		}
-		next, err := p.Next(run.StageID, plan.Ask)
-		if err != nil {
-			return err
-		}
-		text := strings.Join(append(slices.Clone(progress.Obstacles), progress.Unconfirmed...), "\n")
-		if text == "" {
-			text = "The worker stopped to request confirmation."
-		}
-		q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}, "worker_confirmation", text, run.StageID)
-		q.NextStage = *next
-		if _, err = e.saveQuestion(state, q, ""); err != nil {
 			return err
 		}
 		update.State = ledger.StageAnswerWait
@@ -299,6 +287,36 @@ func (e *Engine) recordSubmission(ctx context.Context, state *ledger.State, run 
 	}
 	_, err = e.append(&update)
 	return err
+}
+
+func (e *Engine) saveWorkerConfirmation(state *ledger.State, run *ledger.StageRun, round *ledger.Round, target form.TargetVersion, progress form.Progress) (string, error) {
+	p, ok, err := e.boundPlan(run.PlanVersion)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", errors.New("bound plan is missing")
+	}
+	next, err := p.Next(run.StageID, plan.Ask)
+	if err != nil {
+		return "", err
+	}
+	text := strings.Join(append(slices.Clone(progress.Obstacles), progress.Unconfirmed...), "\n")
+	if text == "" {
+		text = "The worker stopped to request confirmation."
+	}
+	q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}, "worker_confirmation", text, run.StageID)
+	q.NextStage = *next
+	if source := unitResultRound(state, run.ID); source != nil {
+		q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
+		if source.ID != round.ID {
+			q.Evidence = append(q.Evidence, form.Reference{RecordID: source.ID})
+		}
+	}
+	if _, err = e.saveQuestion(state, q, ""); err != nil {
+		return "", err
+	}
+	return text, nil
 }
 
 func (e *Engine) recoverSubmission(ctx context.Context, state *ledger.State) (bool, error) {
