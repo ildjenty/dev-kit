@@ -13,7 +13,13 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
-func (e *Engine) comparison(ctx context.Context, before, after string) (string, error) {
+// Labels name the comparison base a question shows the human.
+const (
+	stageStartBase   = "Comparison base (tree at the start of this stage run)"
+	lastApprovedBase = "Comparison base (tree at the last approved loop edit)"
+)
+
+func (e *Engine) comparison(ctx context.Context, label, before, after string) (string, error) {
 	base, err := e.expanded(ctx, before)
 	if err != nil {
 		return "", err
@@ -31,7 +37,7 @@ func (e *Engine) comparison(ctx context.Context, before, after string) (string, 
 		return "", err
 	}
 	var text strings.Builder
-	fmt.Fprintf(&text, "Round-start comparison base: %s\nChanged files:\n", base)
+	fmt.Fprintf(&text, "%s: %s\nChanged files:\n", label, base)
 	for _, path := range paths {
 		fmt.Fprintf(&text, "- %s\n", path)
 	}
@@ -42,7 +48,7 @@ func (e *Engine) comparison(ctx context.Context, before, after string) (string, 
 	return text.String(), nil
 }
 
-func (e *Engine) loopEditText(ctx context.Context, before, after, reason string) (string, error) {
+func (e *Engine) loopEditText(ctx context.Context, label, before, after, reason string) (string, error) {
 	paths, err := e.workspace.ChangedFiles(ctx, gitReference(before), gitReference(after))
 	if err != nil {
 		return "", err
@@ -75,7 +81,7 @@ func (e *Engine) loopEditText(ctx context.Context, before, after, reason string)
 		return "", err
 	}
 	text.WriteString(sources)
-	comparison, err := e.comparison(ctx, before, after)
+	comparison, err := e.comparison(ctx, label, before, after)
 	if err != nil {
 		return "", err
 	}
@@ -145,7 +151,7 @@ func (e *Engine) decisionFindings(round *ledger.Round) (string, error) {
 
 func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.State, q *form.Question) error {
 	work, _ := state.Work()
-	before := work.BaseCommit
+	before, label := work.BaseCommit, "Comparison base (commit the work started from)"
 	if q.StopCategory == config.MetaLoopEdit {
 		latest := ""
 		answers := state.AnsweredQuestions()
@@ -156,7 +162,7 @@ func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.Stat
 			answer, ok := answers[previous.ID]
 			effective, valid := state.ResolveAnswer(previous.ApprovalTarget)
 			if ok && valid && effective.RecordID == answer.RecordID && answer.Answer.Interpretation == ledger.AnswerApproved && answer.RecordID > latest {
-				before, latest = approvalReference(previous.ApprovalTarget), answer.RecordID
+				before, latest, label = approvalReference(previous.ApprovalTarget), answer.RecordID, lastApprovedBase
 			}
 		}
 	}
@@ -181,11 +187,11 @@ func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.Stat
 			if err != nil {
 				return err
 			}
-			before = state.Rounds(run.ID)[0].StartTarget.Tree
+			before, label = state.Rounds(run.ID)[0].StartTarget.Tree, stageStartBase
 		}
 	}
 	if q.StopCategory == config.MetaLoopEdit {
-		text, err := e.loopEditText(ctx, before, approvalReference(q.ApprovalTarget), "Approve the updated development loop edits? If rejected, the worker must undo the edits.\n\n"+stageText)
+		text, err := e.loopEditText(ctx, label, before, approvalReference(q.ApprovalTarget), "Approve the updated development loop edits? If rejected, the worker must undo the edits.\n\n"+stageText)
 		if err != nil {
 			return err
 		}
@@ -214,5 +220,5 @@ func (e *Engine) stageComparison(ctx context.Context, round *ledger.Round) (stri
 	if err != nil {
 		return "", err
 	}
-	return e.comparison(ctx, base, round.ReturnedTarget.Tree)
+	return e.comparison(ctx, stageStartBase, base, round.ReturnedTarget.Tree)
 }

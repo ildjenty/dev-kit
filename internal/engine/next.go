@@ -570,7 +570,7 @@ func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run
 			return base, nil, nil
 		}
 	}
-	text, err := e.loopEditText(ctx, base, tree, "Approve development loop edits before opening the next round? If rejected, the worker must undo the edits.")
+	text, err := e.loopEditText(ctx, lastApprovedBase, base, tree, "Approve development loop edits before opening the next round? If rejected, the worker must undo the edits.")
 	if err != nil {
 		return "", nil, err
 	}

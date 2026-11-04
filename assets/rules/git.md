@@ -11,7 +11,7 @@ The session agent follows these rules for branches, worktrees, commits, and inte
 ## Commit messages
 
 - Prefix each commit message with the same kind as the work branch, followed by a colon and a short imperative summary, for example `fix: retry order submission after a timeout`.
-- When claiming stage completion, the worker writes `commit_message` in the progress block following this rule. Devkit uses it for the stage's completion commit and falls back to the `[git] commit_message` template in `devkit.toml` when it is absent.
+- When claiming stage completion, the worker writes `commit_message` in the progress block following this rule. The completion commit holds every change of the stage run since the stage started, across all its rounds, so the message describes that whole change, not only the last round. Devkit uses it for the stage's completion commit and falls back to the `[git] commit_message` template in `devkit.toml` when it is absent.
 
 ## Integration
 

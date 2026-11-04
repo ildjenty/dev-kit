@@ -978,7 +978,7 @@ func (e *Engine) askRoundApproval(ctx context.Context, state *ledger.State, p pl
 		if baseErr != nil {
 			return Result{}, baseErr
 		}
-		text, err = e.loopEditText(ctx, base, target.Tree, "Approve development loop edits before committing this stage? If rejected, the worker must undo the edits.\n\n"+text)
+		text, err = e.loopEditText(ctx, stageStartBase, base, target.Tree, "Approve development loop edits before committing this stage? If rejected, the worker must undo the edits.\n\n"+text)
 		if err != nil {
 			return Result{}, err
 		}

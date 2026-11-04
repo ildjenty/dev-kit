@@ -163,7 +163,7 @@ func TestGateQuestionContainsRecordedEvidence(t *testing.T) {
 		t.Fatal(err)
 	}
 	serialized := briefText(t, review.Instruction)
-	for _, want := range []string{"Round-start comparison base:", "Changed files:", "README.md", "Diff file:", "-history.md"} {
+	for _, want := range []string{"Comparison base (tree at the start of this stage run):", "Changed files:", "README.md", "Diff file:", "-history.md"} {
 		if !strings.Contains(serialized, want) {
 			t.Fatalf("judgment omitted %q", want)
 		}

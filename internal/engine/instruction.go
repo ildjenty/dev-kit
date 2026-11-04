@@ -25,16 +25,16 @@ import (
 
 // instructionData is a regenerable request artifact, never a ledger record.
 type instructionData struct {
-	Instruction  form.Instruction           `json:"instruction"`
-	Reference    string                     `json:"reference"`
-	Request      *check.Request             `json:"request,omitempty"`
-	Origin       plan.ProposalOrigin        `json:"origin,omitempty"`
-	PatternName  string                     `json:"pattern_name,omitempty"`
-	Detection    *detectionInput            `json:"detection,omitempty"`
-	BriefText    string                     `json:"brief_text,omitempty"`
-	Context      *ledger.InstructionContext `json:"context,omitempty"`
-	Inputs       []plan.Selection           `json:"inputs,omitempty"`
-	RoundID      string                     `json:"round_id,omitempty"`
+	Instruction form.Instruction           `json:"instruction"`
+	Reference   string                     `json:"reference"`
+	Request     *check.Request             `json:"request,omitempty"`
+	Origin      plan.ProposalOrigin        `json:"origin,omitempty"`
+	PatternName string                     `json:"pattern_name,omitempty"`
+	Detection   *detectionInput            `json:"detection,omitempty"`
+	BriefText   string                     `json:"brief_text,omitempty"`
+	Context     *ledger.InstructionContext `json:"context,omitempty"`
+	Inputs      []plan.Selection           `json:"inputs,omitempty"`
+	RoundID     string                     `json:"round_id,omitempty"`
 }
 
 func (e *Engine) asset(ctx context.Context, ref, name string) ([]byte, error) {
