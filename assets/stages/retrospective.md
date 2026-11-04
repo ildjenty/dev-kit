@@ -34,6 +34,6 @@ When claiming completion, fill `report` according to this stage's selected repor
 
 Account for the task's findings, failed or unavailable assessments, human corrections, and discovered misses, including nonblocking findings. Explain where each problem should have been caught, apply justified prevention measures or record reasons for not applying them, and assess the relevant norms' usefulness and burden. Ensure repository requirements reflect the human-approved conditions even if purpose was omitted.
 
-Changes made in this stage, including changes to tests and verification methods, are verified by this stage's checks in the plan. If a required verification command is unregistered, create the verification method and register it in `devkit.toml`, following `stages/implement.md`; registration follows loop-edit confirmation and takes effect from the next round's snapshot.
+Changes made in this stage, including changes to tests and verification methods, are verified by this stage's checks in the plan. If a required verification command is unregistered, create the verification method and register it in `devkit.toml`, following `stages/implement.md`; devkit asks the human to confirm the loop edit itself, and the registration takes effect from the next round's snapshot.
 
 All required checks valid for the returned target and norms are `PASS`, and completion is finalized following `stages/README.md#completion-finalization`.
