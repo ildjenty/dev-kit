@@ -117,8 +117,8 @@ func TestUnregisteredCommand(t *testing.T) {
 	if judgment.Judgment != Fail || len(judgment.Findings) != 1 || !judgment.Findings[0].Blocking || judgment.Findings[0].Kind != AutoFixable {
 		t.Fatalf("missing command was not a fixable failure: %+v", judgment)
 	}
-	want := "Verification command `test` is not registered. Create a verification method and register it in `[commands.test]` in `devkit.toml`."
-	if judgment.Findings[0].Scenario != want || judgment.Command != nil || len(judgment.CompletionConditionIDs) != 0 || !judgment.ValidFor(request.TargetVersion, request.normReferences()) {
+	scenario := judgment.Findings[0].Scenario
+	if !strings.Contains(scenario, "`test` is not registered") || !strings.Contains(scenario, "[commands.test]") || !strings.Contains(scenario, "timeout_seconds") || judgment.Command != nil || len(judgment.CompletionConditionIDs) != 0 || !judgment.ValidFor(request.TargetVersion, request.normReferences()) {
 		t.Fatalf("incorrect missing command judgment: %+v", judgment)
 	}
 	request.Aspect.ID = "different"

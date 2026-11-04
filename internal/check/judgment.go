@@ -211,6 +211,6 @@ func UnregisteredCommand(request Request) (Judgment, error) {
 	name := strings.TrimPrefix(request.Runner, "command:")
 	judgment.Command = nil
 	judgment.CompletionConditionIDs = []string{}
-	judgment.Findings[0].Scenario = fmt.Sprintf("Verification command `%s` is not registered. Create a verification method and register it in `[commands.%s]` in `devkit.toml`.", name, name)
+	judgment.Findings[0].Scenario = fmt.Sprintf("Verification command `%s` is not registered. Create a verification method and register it in `devkit.toml`, for example:\n\n[commands.%s]\nexecutable = \"<program>\"\nargs = [\"<fixed>\", \"<arguments>\"]\ntimeout_seconds = 120\n\nThe command runs in the repository root without a shell; exit code 0 passes.", name, name)
 	return judgment, nil
 }
