@@ -360,7 +360,7 @@ func (s *State) PlanEvaluations(norms []form.NormReference) []plan.VersionEvalua
 		}
 		if answer, ok := s.ResolveAnswer(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: proposal.Plan.Version}); ok {
 			version.Approved = answer.Answer.Interpretation == AnswerApproved
-			version.Rejected = answer.Answer.Interpretation == AnswerRejected
+			version.Rejected = answer.Answer.Interpretation == AnswerRejected || answer.Answer.Interpretation == AnswerText
 		}
 		versions = append(versions, version)
 	}
@@ -368,7 +368,7 @@ func (s *State) PlanEvaluations(norms []form.NormReference) []plan.VersionEvalua
 }
 
 // ExecutablePlan applies plan's version selection only when opening a new stage run.
-func (s *State) ExecutablePlan(template plan.PlanTemplate, norms []form.NormReference) (plan.Plan, bool) {
+func (s *State) ExecutablePlan(template plan.PlanTemplate, norms []form.NormReference, policy string) (plan.Plan, bool) {
 	replanAfter := 0
 	for _, record := range s.records {
 		if round, ok := record.Payload.(*Round); ok && round.Decision != nil && round.Decision.Action == plan.Back {
@@ -379,5 +379,18 @@ func (s *State) ExecutablePlan(template plan.PlanTemplate, norms []form.NormRefe
 			}
 		}
 	}
-	return plan.ExecutableVersion(template, s.PlanEvaluations(norms), replanAfter)
+	for _, run := range s.StageRuns() {
+		if run.State != StageCompleted {
+			continue
+		}
+		for _, record := range s.records {
+			if proposal, ok := record.Payload.(*PlanVersion); ok && proposal.Plan.Version == run.PlanVersion {
+				next, _ := proposal.Plan.Next(run.StageID, plan.Done)
+				if next != nil && *next == "replan" {
+					replanAfter = max(replanAfter, run.PlanVersion)
+				}
+			}
+		}
+	}
+	return plan.ExecutableVersion(template, s.PlanEvaluations(norms), replanAfter, policy)
 }

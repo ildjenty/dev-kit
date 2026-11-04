@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/engine"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/hook"
@@ -39,7 +40,7 @@ func workValidator(ctx context.Context, w *workspace.Workspace, workRoot string)
 		}
 		sources := make(map[string][]byte)
 		for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
-			sources[name], err = w.ReadFile(ctx, work.BaseCommit, ".devkit/kit/"+work.KitVersion+"/schemas/"+name+".json")
+			sources[name], err = kit.Schema(name)
 			if err != nil {
 				return nil, err
 			}
@@ -117,7 +118,15 @@ func inspect(ctx context.Context, e *engine.Engine, name string, f *flag.FlagSet
 		targets = append(targets, form.TargetVersion{Kind: form.TargetPlan, Plan: status.Position.Plan.Plan.Version})
 	}
 	var structure *view.Structure
-	data, err := os.ReadFile(filepath.Join(e.Root(), ".devkit/structure.json"))
+	source, err := w.ReadFile(ctx, tree, "devkit.toml")
+	if err != nil {
+		return err
+	}
+	settings, err := config.Parse(source)
+	if err != nil {
+		return err
+	}
+	data, err := os.ReadFile(filepath.Join(e.Root(), settings.RepositoryPaths().Structure))
 	if err == nil {
 		structure, err = parseStructure(data, fmt.Sprintf("%x", sha256.Sum256(data)))
 	} else if errors.Is(err, os.ErrNotExist) {

@@ -16,7 +16,7 @@ func schemaFor(t *testing.T, name string) *Schema {
 		t.Fatal(err)
 	}
 	resources := make(map[string][]byte)
-	for _, dependency := range []string{"finding", "question", "reference"} {
+	for _, dependency := range []string{"finding", "question", "reference", "plan", "plan-template"} {
 		if dependency == name {
 			continue
 		}
@@ -25,6 +25,9 @@ func schemaFor(t *testing.T, name string) *Schema {
 			t.Fatal(err)
 		}
 		resources["urn:devkit:form:"+dependency] = data
+		if dependency == "plan" || dependency == "plan-template" {
+			resources["https://devkit.invalid/schemas/v1/"+dependency+".json"] = data
+		}
 	}
 	schema, err := CompileSchemaWithResources(source, resources)
 	if err != nil {
@@ -97,7 +100,7 @@ func TestFixedFormats(t *testing.T) {
 			Judgment: NotAssessed, Findings: []Finding{finding}, CheckedScope: []string{}, UncheckedScope: []string{"Screen"},
 			Method: "Open the screen", Environment: "Local",
 		}},
-		{"planner-result", PlannerResult{InstructionID: "instruction", Plan: json.RawMessage(`{"task":"The plan package validates the plan content"}`)}},
+		{"planner-result", PlannerResult{InstructionID: "instruction", Plan: json.RawMessage(`{"version":1,"template":{"name":"test","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"task":"Implement the task","completion_conditions":[{"id":"C1","description":"The task is complete"}],"start_stage":"implement","stages":[{"id":"implement","assignee":"worker","checks":[],"gate":{"required":false,"reason":"No gate required"},"limits":{"max_rounds":3,"max_no_progress":2},"transitions":{"fix":"implement","ask":"implement","back":"implement","done":null}}],"external_operations":[]}`)}},
 		{"question", question},
 		{"question", decisionQuestion},
 		{"question", externalQuestion},

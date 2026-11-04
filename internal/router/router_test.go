@@ -8,6 +8,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/ildjenty/dev-kit/assets"
 	"github.com/ildjenty/dev-kit/internal/check"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
@@ -22,20 +23,20 @@ func defaultTable(t *testing.T) Table {
 	if _, err := toml.Decode(string(data), &table); err != nil {
 		t.Fatal(err)
 	}
-	return table
+	return table.WithConfig(config.Config{})
 }
 
 func TestTableAndConfirmation(t *testing.T) {
 	base := defaultTable(t)
-	if !base.ClassifyConfirmation(ConfirmationInput{Categories: []string{DependencyChanged}}).Required {
+	if !base.ClassifyConfirmation(ConfirmationInput{Categories: []string{config.DependencyChanged}}).Required {
 		t.Fatal("dependency change did not require confirmation")
 	}
-	merged := MergeTables(base, Table{ConfirmationRules: map[string]ConfirmationMode{DependencyChanged: Provisional}})
-	confirmation := merged.ClassifyConfirmation(ConfirmationInput{Categories: []string{DependencyChanged}, NeedsDecision: true})
+	merged := MergeTables(base, Table{ConfirmationRules: map[string]ConfirmationMode{config.DependencyChanged: Provisional}})
+	confirmation := merged.ClassifyConfirmation(ConfirmationInput{Categories: []string{config.DependencyChanged}, NeedsDecision: true})
 	if confirmation.Required || !confirmation.Provisional {
 		t.Fatalf("could not apply per-name override: %+v", confirmation)
 	}
-	if !base.ClassifyConfirmation(ConfirmationInput{Categories: []string{DependencyChanged}}).Required {
+	if !base.ClassifyConfirmation(ConfirmationInput{Categories: []string{config.DependencyChanged}}).Required {
 		t.Fatal("modified the default table")
 	}
 	if !merged.ClassifyConfirmation(ConfirmationInput{Gate: plan.Gate{Required: true}}).Required {
@@ -45,7 +46,7 @@ func TestTableAndConfirmation(t *testing.T) {
 
 func TestPreferredLesson(t *testing.T) {
 	base := defaultTable(t)
-	if destination, ok := base.PreferredLesson([]LessonDestination{Kit, Skill, HookLintType}); !ok || destination != HookLintType {
+	if destination, ok := base.PreferredLesson([]LessonDestination{Aspect, Skill, HookLintType}); !ok || destination != HookLintType {
 		t.Fatalf("lesson destination: %q, %v", destination, ok)
 	}
 }
@@ -53,47 +54,47 @@ func TestPreferredLesson(t *testing.T) {
 func TestMergeConfirmationCategories(t *testing.T) {
 	base := defaultTable(t)
 	additions := Table{
-		HumanConfirmation: []string{"billing_changed", DependencyChanged, "billing_changed"},
-		ConfirmationRules: map[string]ConfirmationMode{DependencyChanged: NoConfirm},
+		HumanConfirmation: []string{"billing_changed", config.DependencyChanged, "billing_changed"},
+		ConfirmationRules: map[string]ConfirmationMode{config.DependencyChanged: NoConfirm},
 	}
 	merged := MergeTables(base, additions)
-	want := append(slices.Clone(base.HumanConfirmation), "billing_changed")
+	want := additions.HumanConfirmation
 	if !slices.Equal(merged.HumanConfirmation, want) {
 		t.Fatalf("confirmation categories: %v; want: %v", merged.HumanConfirmation, want)
 	}
-	for _, category := range []string{"billing_changed", UndeclaredMetaLoopEdit, TargetChangedAgain} {
+	for _, category := range []string{"billing_changed"} {
 		if !merged.ClassifyConfirmation(ConfirmationInput{Categories: []string{category}}).Required {
 			t.Fatalf("category did not require confirmation: %s", category)
 		}
 	}
-	if merged.ClassifyConfirmation(ConfirmationInput{Categories: []string{DependencyChanged}, NeedsDecision: true}).Required {
+	if merged.ClassifyConfirmation(ConfirmationInput{Categories: []string{config.DependencyChanged}, NeedsDecision: true}).Required {
 		t.Fatal("ignored an explicit per-name override")
 	}
 	if slices.Contains(base.HumanConfirmation, "billing_changed") || len(additions.HumanConfirmation) != 3 {
 		t.Fatal("modified the original category lists")
 	}
-	if !slices.Equal(MergeTables(base, Table{HumanConfirmation: []string{}}).HumanConfirmation, base.HumanConfirmation) {
-		t.Fatal("empty additions removed default categories")
+	if len(MergeTables(base, Table{HumanConfirmation: []string{}}).HumanConfirmation) != 0 {
+		t.Fatal("empty replacement retained default categories")
 	}
 }
 
 func TestConfirmationPerItem(t *testing.T) {
 	table := MergeTables(defaultTable(t), Table{ConfirmationRules: map[string]ConfirmationMode{
-		DependencyChanged: Provisional, "delegated": NoConfirm,
+		config.DependencyChanged: Provisional, "delegated": NoConfirm,
 	}})
 	cases := []struct {
 		name       string
 		categories []string
 		required   bool
 	}{
-		{"provisional only", []string{DependencyChanged}, false},
+		{"provisional only", []string{config.DependencyChanged}, false},
 		{"unclassified only", []string{"unclassified"}, true},
 		{"no category", nil, true},
-		{"unclassified after provisional", []string{DependencyChanged, "unclassified"}, true},
-		{"uncategorized after provisional", []string{DependencyChanged, ""}, true},
-		{"unclassified before provisional", []string{"unclassified", DependencyChanged}, true},
+		{"unclassified after provisional", []string{config.DependencyChanged, "unclassified"}, true},
+		{"uncategorized after provisional", []string{config.DependencyChanged, ""}, true},
+		{"unclassified before provisional", []string{"unclassified", config.DependencyChanged}, true},
 		{"unclassified after delegation", []string{"delegated", "unclassified"}, true},
-		{"all classified", []string{DependencyChanged, "delegated"}, false},
+		{"all classified", []string{config.DependencyChanged, "delegated"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -150,15 +151,15 @@ func TestRoutes(t *testing.T) {
 			}
 		})
 	}
-	provisional := MergeTables(table, Table{ConfirmationRules: map[string]ConfirmationMode{DependencyChanged: Provisional}})
+	provisional := MergeTables(table, Table{ConfirmationRules: map[string]ConfirmationMode{config.DependencyChanged: Provisional}})
 	input := base
 	input.Summary = check.Summary{Judgment: check.Fail, Findings: []check.Finding{{ID: "F1", Blocking: true, Kind: check.NeedsDecision}}}
-	input.Confirmation.Categories = []string{DependencyChanged}
+	input.Confirmation.Categories = []string{config.DependencyChanged}
 	decision, err := provisional.Decide(input)
 	if err != nil || decision.Action != plan.Ask {
 		t.Fatalf("skipped a finding decision because of another confirmation category: %+v, %v", decision, err)
 	}
-	input.FindingCategories = map[string]string{"F1": DependencyChanged}
+	input.FindingCategories = map[string]string{"F1": config.DependencyChanged}
 	decision, err = provisional.Decide(input)
 	if err != nil || decision.Action != plan.Fix || !decision.Confirmation.Provisional {
 		t.Fatalf("provisional decision: %+v, %v", decision, err)
@@ -172,7 +173,7 @@ func TestCompletion(t *testing.T) {
 	}}
 	target := form.TargetVersion{Kind: form.TargetTree, Tree: "tree"}
 	norms := []form.NormReference{{Path: "AGENTS.md", BlobID: "blob"}}
-	identity := check.DetectionIdentity{AspectHash: "aspect", SpecHash: "spec", RunnerHash: "runner"}
+	identity := check.DetectionIdentity{AspectHash: "aspect", SpecHash: "spec", RunnerHash: "runner", NormsHash: "norms"}
 	input := CompletionInput{
 		Rule: stage.CompletionRule(), TargetVersion: target, Norms: norms,
 		Detection:      []check.DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}},

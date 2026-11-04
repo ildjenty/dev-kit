@@ -26,7 +26,7 @@ type Check struct {
 	Message string
 }
 
-// Report contains configuration, copy, work compatibility, and hook observations.
+// Report contains configuration, repository norms, git, work compatibility, and hook observations.
 type Report struct {
 	Root   string
 	Checks []Check
@@ -65,22 +65,24 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 		}
 		r.add("kit_version", "Binary and configuration kit versions match.", versionErr)
 	}
-	k, err := kit.Open(r.Root, kit.Version)
-	if err == nil {
-		err = k.Verify()
+	r.checkHostFiles()
+	paths := c.RepositoryPaths()
+	for _, name := range []string{paths.Principles, paths.Stages, paths.Checks, paths.Plans, paths.Templates} {
+		info, err := os.Stat(filepath.Join(r.Root, filepath.FromSlash(name)))
+		if err == nil && !info.IsDir() {
+			err = fmt.Errorf("expected a directory: %s", name)
+		}
+		r.add(name, "Norm directory is present.", err)
 	}
-	r.add("kit_copy", "The kit copy matches the binary's embedded assets.", err)
-	if k != nil {
-		r.checkHostFiles(k)
-	}
+	r.add(paths.Rules, "Rules file is present.", requireFile(filepath.Join(r.Root, filepath.FromSlash(paths.Rules))))
 	for _, name := range []string{
-		".agents/skills/devkit/SKILL.md", ".devkit/rules.md", ".devkit/plans/default.json",
+		".agents/skills/devkit/SKILL.md",
 		".claude/agents/devkit-judge.md", ".claude/agents/devkit-planner.md",
 		".codex/agents/devkit-judge.toml", ".codex/agents/devkit-planner.toml",
 	} {
 		r.add(name, "File is present.", requireFile(filepath.Join(r.Root, name)))
 	}
-	for _, name := range []string{".devkit/checks", ".devkit/run/sessions", ".devkit/run/work"} {
+	for _, name := range []string{".devkit/run/sessions", ".devkit/run/work"} {
 		info, err := os.Stat(filepath.Join(r.Root, name))
 		if err == nil && !info.IsDir() {
 			err = fmt.Errorf("expected a directory: %s", name)
@@ -97,7 +99,17 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 		err = fmt.Errorf(".devkit/run/ is not ignored; run devkit init and review its additions")
 	}
 	r.add("gitignore", "Git ignores the runtime directory.", err)
-	r.checkWorkVersions(c.KitVersion, k)
+	_, headErr := w.Head(ctx)
+	if headErr != nil {
+		headErr = fmt.Errorf("HEAD is unavailable; commit the installed initialization files before starting work: %w", headErr)
+	}
+	r.add("HEAD", "HEAD exists.", headErr)
+	status, statusErr := runGit(ctx, r.Root, "status", "--porcelain=v1", "--untracked-files=all", "--ignored=matching", "--", "devkit.toml", paths.Plans)
+	if statusErr == nil && len(status) != 0 {
+		statusErr = fmt.Errorf("initialization files are uncommitted; commit devkit.toml and %s before starting work:\n%s", paths.Plans, status)
+	}
+	r.add("init_committed", "Configuration and plans are committed.", statusErr)
+	r.checkWorkVersions(c.KitVersion)
 	r.checkSession(sessionID)
 	return r, nil
 }
@@ -110,12 +122,12 @@ func (r *Report) add(name, success string, err error) {
 	r.Checks = append(r.Checks, check)
 }
 
-func (r *Report) checkHostFiles(k *kit.Kit) {
+func (r *Report) checkHostFiles() {
 	for _, fragment := range hostFragments {
 		before, err := os.ReadFile(filepath.Join(r.Root, fragment.target))
 		if err == nil {
 			var required, after []byte
-			required, err = k.ReadFile(fragment.source)
+			required, err = kit.HostFragment(strings.TrimPrefix(fragment.source, "hosts/"))
 			if err == nil {
 				after, err = fragment.merge(before, required)
 			}
@@ -135,7 +147,7 @@ func requireFile(path string) error {
 	return err
 }
 
-func (r *Report) checkWorkVersions(configVersion string, k *kit.Kit) {
+func (r *Report) checkWorkVersions(configVersion string) {
 	root := filepath.Join(r.Root, ".devkit/run/work")
 	entries, err := os.ReadDir(root)
 	if err != nil {
@@ -148,13 +160,9 @@ func (r *Report) checkWorkVersions(configVersion string, k *kit.Kit) {
 			continue
 		}
 		if validator == nil {
-			if k == nil {
-				r.add("work_versions", "", fmt.Errorf("kit copy is unavailable; cannot validate work records"))
-				return
-			}
 			sources := make(map[string][]byte)
 			for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
-				source, err := k.ReadFile("schemas/" + name + ".json")
+				source, err := kit.Schema(name)
 				if err != nil {
 					r.add("work_versions", "", err)
 					return

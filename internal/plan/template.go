@@ -11,7 +11,7 @@ func NewPlan(template PlanTemplate, contentHash, task string, conditions []Compl
 	p := Plan{
 		Version: 1, Template: TemplateRef{template.Name, contentHash}, Task: task,
 		CompletionConditions: conditions, StartStage: template.StartStage,
-		MetaLoopStages: template.MetaLoopStages, Stages: template.Stages,
+		Stages:             template.Stages,
 		ExternalOperations: []ExternalOperation{},
 	}
 	return clonePlan(p)
@@ -83,7 +83,7 @@ func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 		stage, _ := result.Stage(id)
 		for _, action := range []Transition{Fix, Ask, Back, Done} {
 			target, _ := stage.Transitions.Next(action)
-			if target != nil && !selected[*target] {
+			if target != nil && !(action == Done && *target == "replan") && !selected[*target] {
 				return Plan{}, fmt.Errorf("%s: %s transition target not found: %q", id, action, *target)
 			}
 		}
@@ -91,12 +91,6 @@ func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 	}
 	result.Stages = ordered
 	result.StartStage = ids[0]
-	result.MetaLoopStages = make([]string, 0)
-	for _, id := range template.MetaLoopStages {
-		if selected[id] {
-			result.MetaLoopStages = append(result.MetaLoopStages, id)
-		}
-	}
 	return result, nil
 }
 
@@ -139,6 +133,7 @@ type DeviationKind string
 
 const (
 	AddedStage           DeviationKind = "added_stage"
+	RemovedStage         DeviationKind = "removed_stage"
 	RemovedGate          DeviationKind = "removed_gate"
 	ChangedTransition    DeviationKind = "changed_transition"
 	ChangedStartStage    DeviationKind = "changed_start_stage"
@@ -165,6 +160,11 @@ func Deviations(template PlanTemplate, p Plan) []Deviation {
 		}
 	}
 	result := make([]Deviation, 0)
+	for _, stage := range template.Stages {
+		if !slices.Contains(ids, stage.ID) {
+			result = append(result, Deviation{Kind: RemovedStage, StageID: stage.ID})
+		}
+	}
 	// Changing a retained start stage is a deviation, except when omitting leading stages or inserting optional stages.
 	start := template.StartStage
 	if !slices.Contains(ids, start) {
@@ -208,6 +208,22 @@ func Deviations(template PlanTemplate, p Plan) []Deviation {
 	return result
 }
 
-func (p Plan) RequiresApproval(template PlanTemplate) bool {
-	return len(p.ExternalOperations) > 0 || len(Deviations(template, p)) > 0
+// RequiresApproval compares the plan with the last human-approved requirements.
+// The caller supplies a validated approval policy.
+func (p Plan) RequiresApproval(template PlanTemplate, policy string, lastApproved *Plan) bool {
+	if policy == "always" || len(p.ExternalOperations) > 0 || len(Deviations(template, p)) > 0 {
+		return true
+	}
+	if policy == "deviation" {
+		return false
+	}
+	if lastApproved == nil || len(p.CompletionConditions) != len(lastApproved.CompletionConditions) {
+		return true
+	}
+	for _, condition := range p.CompletionConditions {
+		if !slices.Contains(lastApproved.CompletionConditions, condition) {
+			return true
+		}
+	}
+	return false
 }

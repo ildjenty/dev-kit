@@ -108,8 +108,6 @@ func startWork(t *testing.T, host event.Host) (string, engine.Result) {
 	if got := command(t, "", "init", "--yes"); !strings.Contains(got, "Initialized") {
 		t.Fatalf("missing init summary: %s", got)
 	}
-	gitCommand(t, root, "add", ".")
-	gitCommand(t, root, "commit", "--quiet", "-m", "Initialize devkit")
 	nested := filepath.Join(root, "nested")
 	if err := os.Mkdir(nested, 0o755); err != nil {
 		t.Fatal(err)
@@ -443,5 +441,20 @@ func TestInstallerPathEntries(t *testing.T) {
 				t.Fatalf("unexpected PATH result: %v, %s", err, output)
 			}
 		})
+	}
+}
+
+func TestInitNoCommitFlag(t *testing.T) {
+	root := checkout(t)
+	command(t, "", "init", "--yes", "--no-commit")
+	if err := exec.Command("git", "-C", root, "rev-parse", "--verify", "HEAD").Run(); err == nil {
+		t.Fatal("init --no-commit created a commit")
+	}
+	if _, err := os.Stat(filepath.Join(root, "devkit.toml")); err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	if err := run(context.Background(), []string{"doctor"}, strings.NewReader(""), &output); err == nil {
+		t.Fatal("doctor accepted initialization without HEAD")
 	}
 }

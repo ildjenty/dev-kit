@@ -67,11 +67,9 @@ func TestBuildWork(t *testing.T) {
 			CompletionConditions:  []plan.CompletionCondition{{ID: "C1", Description: "Saved content can be read"}},
 			IrreversibleDecisions: []string{"Irreversible plan decision"},
 		},
-		Purpose:          "Save user records",
-		AllowedChanges:   []string{"internal/save/"},
-		ForbiddenChanges: []string{"Public API"},
-		Verification:     []string{"C1: Read after saving and compare the content"},
-		PreviousOutputs:  []StageOutput{{StageID: "contract", Content: previous}},
+		Purpose:         "Save user records",
+		Verification:    []string{"C1: Read after saving and compare the content"},
+		PreviousOutputs: []StageOutput{{StageID: "contract", Content: previous}},
 		Repository: RepositoryFacts{
 			LayoutGuides:          []Document{{Path: "internal/save/README.md", Content: "Storage layout guide"}},
 			Rules:                 Document{Path: ".devkit/rules.md", Content: "Existing rules"},
@@ -101,7 +99,7 @@ func TestBuildWork(t *testing.T) {
 	}
 	for _, want := range []string{
 		previous, command, input.StageDefinition, input.Purpose, input.OutputSchema,
-		"C1", "Saved content can be read", "internal/save/", "Public API", input.Verification[0],
+		"C1", "Saved content can be read", input.Verification[0],
 		"3 rounds", "2 consecutive rounds without progress", "internal/save/README.md", "Storage layout guide",
 		".devkit/rules.md", "Existing rules", "Irreversible rule decision", "Irreversible plan decision",
 		"AGENTS.md", "Fixed instructions", "F1", "Saving fails", "command:test", "Exit code: 1",

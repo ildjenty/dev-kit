@@ -2,7 +2,7 @@
 
 For shared decisions, record the decision, its current enforcement mechanism, and grounds. Keep change history in git and PRs; do not keep grounds needed for sharing only in local work records. Record task-specific irreversible items in the plan.
 
-Apply the following rules to the target code and documents. "Enforcement: Not implemented" means that no implementation enforces the rule yet. Resolve principle and contract references within `.devkit/kit/` for the `kit_version` in `devkit.toml`.
+Apply the following rules to the target code and documents. "Enforcement: Not implemented" means that no implementation enforces the rule yet. During retrospective, consider rules marked "Enforcement: Not implemented" and recurring violations for machine enforcement through tests, lint, type checks, pre-commit, or registered verification commands.
 
 ## Shared difficult-to-change decisions
 
@@ -13,16 +13,9 @@ None registered. When adding a decision, include its enforcement mechanism and g
 - **Do not reuse communication types (requests and responses) internally**. Principle 6 of `principles/structure.md`. Enforcement: Not implemented.
 - **Providers and lower layers must not depend on concrete implementations of consumers and upper layers. Dependencies on abstractions (ports) defined by consumers are allowed**. Principle 3 of `principles/structure.md`. Enforcement: Not implemented.
 - **Do not import framework, infrastructure, or application configuration types into the domain**. Principles 5 and 6 of `principles/structure.md`. Enforcement: Not implemented.
-- **Do not include cycles in static dependencies**. Principle 3 of `principles/structure.md`. Enforcement: Leave Go package import cycles to the build check. Assess the validity of design dependencies separately.
 - **Do not include framework types or annotations in domain types**. Principle 5 of `principles/structure.md`. Enforcement: Not implemented.
 - **Do not directly import internal paths without going through a module's public entry point**. Principle 6 of `principles/structure.md`. Enforcement: Not implemented.
 - **Do not add functions that only forward arguments unchanged**. Principle 7 of `principles/structure.md`. Enforcement: Not implemented.
-
-## Work procedures
-
-For parallel work on one machine, use separate checkouts opened through the host or git worktrees; each checkout has its own `.devkit/run/`. Follow principle 6 of `principles/data.md` for shared state and common invariants.
-
-Follow `skills/devkit/SKILL.md#pause-and-resume` for human-initiated pause and resume. After three consecutive Stop blocks without new work records, Stop allows stopping and asks whether to continue; wait for the human answer. Tool calls and session changes do not reset the count.
 
 ## Comments and lint
 

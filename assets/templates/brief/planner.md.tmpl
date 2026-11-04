@@ -2,7 +2,11 @@
 
 Instruction ID: {{.InstructionID}}
 
-## Task
+## Original user request
+
+{{if .OriginalRequest}}{{.OriginalRequest}}{{else}}No original user request was observed.{{end}}
+
+## Task supplied to start
 
 {{.Task}}
 
@@ -27,6 +31,7 @@ Reference: {{.Path}}
 {{.ChecksJSON}}
 ```
 {{template "norms" .Norms}}
+{{template "normPaths" .NormPaths}}
 {{if .CurrentPlan}}
 ## Current plan
 
@@ -56,10 +61,13 @@ Reference: {{.Path}}
 {{template "previousOutputs" .PreviousOutputs}}
 ## Plan contents
 
-Use the supplied task and loop template to fill in completion conditions with IDs and the required stages.
-Remove unrelated stages and select any necessary research or prototyping from the template candidates. Specify each check's target and completion condition IDs.
+Use the original user request, the task supplied to start, repository requirements, and the loop template to fill in completion conditions with IDs and the required stages. Do not invent a missing original request.
+If a requirement is ambiguous or cannot be decided from the inputs, do not fill the gap by guessing. List it in the optional `open_questions` array of strings for human clarification. Human answers are returned as rejection and revision instructions; incorporate them in the next proposal.
+Remove unrelated stages and select any necessary research or prototyping from the template candidates. Specify each check's target and completion condition IDs. Give each completion condition a way to verify it: a check run by a verification command, a judge, or a judgment command, or a human gate. Checks are not necessarily mechanical.
 Fill in task-specific irreversible decisions and declarations of required external operations. Use values confirmed in the inputs for each external operation's kind, target, input hash, registration definition hash, and executable content hash.
-Report additions of stages outside the candidates, removal of gates, changes to transitions, and removal of required checks as deviations. Deviations and declarations of external operations require human approval.
+Report removal of template stages, additions of stages outside the candidates, removal of gates, changes to transitions, and removal of required checks as deviations.
+Under the default approval policy, human approval is required for the first plan, changes to completion condition IDs or descriptions since the last human-approved plan, deviations, and declarations of external operations. Replanning with unchanged completion conditions and no deviations or external operations stays within the approved agreement. Human-approved completion conditions define completion of the work.
+Changes to the loop itself require human confirmation before they first take effect under the default policy, regardless of stage.
 For a revised proposal, incorporate human revision instructions and check findings. For replanning, rebuild the supplied remaining work.
 
 ## Returning the result
@@ -73,7 +81,7 @@ Set `instruction_id` to {{.InstructionIDJSON}}.
 {{.OutputSchema}}
 {{end}}
 {{define "repository"}}
-## Layout guides
+## Relevant structure records
 {{range .LayoutGuides}}
 Reference: {{.Path}}
 
@@ -85,6 +93,12 @@ Reference: {{.Rules.Path}}
 
 {{.Rules.Content}}
 
+## Repository requirements
+
+Reference: requirements.md
+
+{{.Requirements.Content}}
+
 ## Irreversible decisions
 
 Items from the rules:
@@ -92,11 +106,18 @@ Items from the rules:
 - {{.}}
 {{end}}
 {{end}}{{define "norms"}}
-## Fixed norms
+## Norms supplied in full
 {{range .}}
 Reference: {{.Path}}
 
 {{.Content}}
+{{end}}
+{{end}}{{define "normPaths"}}
+## Other fixed norms
+
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. The snapshot is fixed at round start, or when an instruction outside a round is issued. Do not substitute norms from the working tree.
+{{range .}}
+- Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}
 {{end}}{{define "previousOutputs"}}
 ## Previous stage outputs

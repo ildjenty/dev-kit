@@ -1,15 +1,24 @@
 {
   "name": "fix",
   "start_stage": "implement",
-  "meta_loop_stages": [],
   "stages": [
     {
       "id": "implement",
       "assignee": "worker",
       "checks": [
         {
+          "aspect": "command:test",
+          "runner": "command:test",
+          "required": true
+        },
+        {
+          "aspect": "test",
+          "runner": "devkit-judge",
+          "required": true
+        },
+        {
           "aspect": "diff",
-          "runner": "review",
+          "runner": "devkit-judge",
           "required": true
         }
       ],
@@ -24,6 +33,36 @@
       "transitions": {
         "fix": "implement",
         "ask": "implement",
+        "back": "implement",
+        "done": "retrospective"
+      }
+    },
+    {
+      "id": "retrospective",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "command:test",
+          "runner": "command:test",
+          "required": true
+        },
+        {
+          "aspect": "harness",
+          "runner": "devkit-judge",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "Review lessons and preserve requirements and prevention measures"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "retrospective",
+        "ask": "retrospective",
         "back": "implement",
         "done": null
       }
@@ -55,7 +94,7 @@
       "checks": [
         {
           "aspect": "contract",
-          "runner": "review",
+          "runner": "devkit-judge",
           "required": true
         }
       ],

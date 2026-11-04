@@ -4,6 +4,39 @@ Instruction ID: {{.InstructionID}}
 
 {{.Content}}
 
+## Repository requirements
+
+Reference: requirements.md
+
+{{.Repository.Requirements.Content}}
+
+## Relevant structure records
+{{range .Repository.LayoutGuides}}
+Reference: {{.Path}}
+
+{{.Content}}
+{{end}}
+## Rules and enforcement
+
+Reference: rules.md
+
+{{.Repository.Rules.Content}}
+
+## Norms supplied in full
+{{range .Norms}}
+Reference: {{.Path}}
+
+{{.Content}}
+{{end}}
+## Other fixed norms
+
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. The snapshot is fixed at round start, or when an instruction outside a round is issued. Do not substitute norms from the working tree.
+{{range .NormPaths}}
+- Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
+{{end}}
+
+For detection tests, evaluate each supplied example body independently against the aspect and return its actual judgment and grounds. Case kinds and expected judgments are not inputs to the evaluation; devkit compares the results with expectations.
+
 ## Returning the result
 
 Return the result as a JSON-only final message in the specified output format.

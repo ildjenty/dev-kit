@@ -17,6 +17,7 @@ const (
 )
 
 type DetectionCase struct {
+	ID       string        `json:"id"`
 	Kind     CaseKind      `json:"kind"`
 	File     string        `json:"file"`
 	Expected JudgmentValue `json:"expected"`
@@ -38,7 +39,9 @@ func ParseDetectionSpec(data []byte) (DetectionSpec, error) {
 	}
 	kinds := make(map[CaseKind]bool)
 	files := make(map[string]bool)
-	for _, example := range spec.Cases {
+	for i := range spec.Cases {
+		example := &spec.Cases[i]
+		example.ID = fmt.Sprintf("e%d", i+1)
 		expected := Pass
 		switch example.Kind {
 		case Violation:
@@ -58,16 +61,37 @@ func ParseDetectionSpec(data []byte) (DetectionSpec, error) {
 	return spec, nil
 }
 
+// DetectionExample is judge-visible input without paths, kinds, or expectations.
+type DetectionExample struct {
+	ID   string `json:"id"`
+	Body string `json:"body"`
+}
+
+// PrepareDetectionExamples maps private specification files to opaque example IDs.
+func PrepareDetectionExamples(spec DetectionSpec, examples map[string]string) ([]DetectionExample, error) {
+	result := make([]DetectionExample, 0, len(spec.Cases))
+	for _, example := range spec.Cases {
+		body, ok := examples[example.File]
+		if !ok {
+			return nil, fmt.Errorf("detection example content not found: %q", example.File)
+		}
+		result = append(result, DetectionExample{ID: example.ID, Body: body})
+	}
+	return result, nil
+}
+
 // DetectionIdentity identifies content for reusing a passing detection test.
 type DetectionIdentity struct {
 	AspectHash string `json:"aspect_hash"`
 	SpecHash   string `json:"spec_hash"`
 	RunnerHash string `json:"runner_hash"`
+	NormsHash  string `json:"norms_hash"`
 }
 
 // NewDetectionIdentity hashes the original specification, example contents, and expected judgments.
 // examples maps file names relative to the specification to their contents.
-func NewDetectionIdentity(aspect, specSource, runner []byte, examples map[string][]byte) (DetectionIdentity, error) {
+// references maps logical names from AspectReferences to their resolved contents.
+func NewDetectionIdentity(aspect, specSource, runner []byte, examples, references map[string][]byte) (DetectionIdentity, error) {
 	spec, err := ParseDetectionSpec(specSource)
 	if err != nil {
 		return DetectionIdentity{}, err
@@ -85,19 +109,29 @@ func NewDetectionIdentity(aspect, specSource, runner []byte, examples map[string
 	if err != nil {
 		return DetectionIdentity{}, err
 	}
-	return DetectionIdentity{contentHash(aspect), contentHash(data), contentHash(runner)}, nil
+	normHashes := make(map[string]string)
+	for _, name := range AspectReferences(string(aspect)) {
+		content, ok := references[name]
+		if !ok {
+			return DetectionIdentity{}, fmt.Errorf("referenced norm content not found: %q", name)
+		}
+		normHashes[name] = contentHash(content)
+	}
+	norms, err := json.Marshal(normHashes)
+	if err != nil {
+		return DetectionIdentity{}, err
+	}
+	return DetectionIdentity{AspectHash: contentHash(aspect), SpecHash: contentHash(data), RunnerHash: contentHash(runner), NormsHash: contentHash(norms)}, nil
 }
 
 func contentHash(data []byte) string { return fmt.Sprintf("%x", sha256.Sum256(data)) }
 
-// DetectionObservation holds an actual judgment and an assessment of whether it used the intended reason.
-// MatchesBlocking applies to violations; RespectsDifference applies to conforming and allowed examples.
+// DetectionObservation holds an actual judgment and its reason for an opaque example ID.
+// File contains the example ID used by the detection result schema, never its source path.
 type DetectionObservation struct {
-	File               string   `json:"file"`
-	Judgment           Judgment `json:"judgment"`
-	Reason             string   `json:"reason"`
-	MatchesBlocking    bool     `json:"matches_blocking"`
-	RespectsDifference bool     `json:"respects_difference"`
+	File     string   `json:"file"`
+	Judgment Judgment `json:"judgment"`
+	Reason   string   `json:"reason"`
 }
 
 type DetectionCaseResult struct {
@@ -119,7 +153,7 @@ func AssessDetection(spec DetectionSpec, runner string, identity DetectionIdenti
 	if runner == "" || strings.HasPrefix(runner, "command:") {
 		return DetectionTest{}, fmt.Errorf("detection test requires a judge runner")
 	}
-	if identity.AspectHash == "" || identity.SpecHash == "" || identity.RunnerHash == "" {
+	if identity.AspectHash == "" || identity.SpecHash == "" || identity.RunnerHash == "" || identity.NormsHash == "" {
 		return DetectionTest{}, fmt.Errorf("detection test content hashes are required")
 	}
 	byFile := make(map[string]DetectionObservation)
@@ -134,7 +168,7 @@ func AssessDetection(spec DetectionSpec, runner string, identity DetectionIdenti
 	}
 	result := DetectionTest{Aspect: spec.Aspect, Runner: runner, Identity: identity, Cases: []DetectionCaseResult{}, Passed: true}
 	for _, example := range spec.Cases {
-		observation, ok := byFile[example.File]
+		observation, ok := byFile[example.ID]
 		if !ok {
 			return DetectionTest{}, fmt.Errorf("detection test result not found: %q", example.File)
 		}
@@ -145,9 +179,9 @@ func AssessDetection(spec DetectionSpec, runner string, identity DetectionIdenti
 		blocking := slices.ContainsFunc(judgment.Findings, func(f Finding) bool { return f.Blocking })
 		passed := judgment.Judgment == example.Expected && observation.Reason != ""
 		if example.Kind == Violation {
-			passed = passed && blocking && observation.MatchesBlocking
+			passed = passed && blocking
 		} else {
-			passed = passed && !blocking && observation.RespectsDifference
+			passed = passed && !blocking
 		}
 		result.Cases = append(result.Cases, DetectionCaseResult{example, observation, passed})
 		result.Passed = result.Passed && passed
@@ -169,7 +203,7 @@ func MissingDetection(required []DetectionRequirement, records []DetectionTest) 
 		if strings.HasPrefix(requirement.Runner, "command:") {
 			continue
 		}
-		if requirement.Identity.AspectHash == "" || requirement.Identity.SpecHash == "" || requirement.Identity.RunnerHash == "" {
+		if requirement.Identity.AspectHash == "" || requirement.Identity.SpecHash == "" || requirement.Identity.RunnerHash == "" || requirement.Identity.NormsHash == "" {
 			missing = append(missing, requirement)
 			continue
 		}

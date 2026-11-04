@@ -17,6 +17,12 @@ type Document struct {
 	Content string
 }
 
+// NormPath maps a logical name to its fixed snapshot location.
+type NormPath struct {
+	Path         string
+	SnapshotPath string
+}
+
 // StageOutput passes an adopted previous stage output without changing its content.
 type StageOutput struct {
 	StageID string
@@ -28,6 +34,7 @@ type StageOutput struct {
 type RepositoryFacts struct {
 	LayoutGuides          []Document
 	Rules                 Document
+	Requirements          Document
 	IrreversibleDecisions []string
 	AvailableChecks       []plan.Check
 }
@@ -42,49 +49,54 @@ type CommandOutput struct {
 // WorkInput contains known information to include in a work request.
 // Read Norms and documents from the fixed reference source and preserve conditions with their items.
 type WorkInput struct {
-	// RequestTemplate is the request text resolved by the caller from the fixed kit copy.
-	RequestTemplate  string
-	InstructionID    string
-	Stage            plan.Stage
-	StageDefinition  string
-	Plan             plan.Plan
-	Purpose          string
-	AllowedChanges   []string
-	ForbiddenChanges []string
-	Verification     []string
-	PreviousOutputs  []StageOutput
-	Repository       RepositoryFacts
-	Norms            []Document
-	PreviousFindings []form.Finding
-	CommandOutputs   []CommandOutput
-	PreCommitOutput  string
-	OutputSchema     string
+	// RequestTemplate is the request text resolved by the caller from the fixed repository snapshot.
+	RequestTemplate      string
+	InstructionID        string
+	Stage                plan.Stage
+	StageDefinition      string
+	Plan                 plan.Plan
+	Purpose              string
+	Verification         []string
+	PreviousOutputs      []StageOutput
+	Repository           RepositoryFacts
+	Norms                []Document
+	NormPaths            []NormPath
+	RetrospectiveContext string
+	PreviousFindings     []form.Finding
+	CommandOutputs       []CommandOutput
+	PreCommitOutput      string
+	OutputSchema         string
 }
 
 // JudgmentInput receives the request content and output schema selected by check.
 // Content includes the target and its location, norms, aspects, progress block, and previous finding IDs.
 // check selects the request content, including valid approvals and delegations for the difference aspect.
 type JudgmentInput struct {
-	// RequestTemplate is the request text resolved by the caller from the fixed kit copy.
+	// RequestTemplate is the request text resolved by the caller from the fixed repository snapshot.
 	RequestTemplate string
 	InstructionID   string
 	Content         string
+	Repository      RepositoryFacts
+	Norms           []Document
+	NormPaths       []NormPath
 	OutputSchema    string
 }
 
 // PlannerInput contains information for initial planning, revised proposals, and rebuilding the remaining plan.
 // The caller determines Version and TemplateHash; brief neither generates nor verifies them.
 type PlannerInput struct {
-	// RequestTemplate is the request text resolved by the caller from the fixed kit copy.
+	// RequestTemplate is the request text resolved by the caller from the fixed repository snapshot.
 	RequestTemplate   string
 	InstructionID     string
 	Version           int
 	Template          plan.PlanTemplate
 	TemplateHash      string
 	Task              string
+	OriginalRequest   string
 	StageDefinitions  []Document
 	Repository        RepositoryFacts
 	Norms             []Document
+	NormPaths         []NormPath
 	CurrentPlan       *plan.Plan
 	RemainingPlan     *plan.Plan
 	HumanInstructions string

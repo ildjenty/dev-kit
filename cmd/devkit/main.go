@@ -38,7 +38,7 @@ const usage = `Usage: devkit <command> [arguments]
   abort
   status [--records | --record <id>]
   view
-  init [--yes]
+  init [--yes] [--no-commit]
   uninstall [--yes]
   doctor
   version
@@ -103,6 +103,10 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	}
 	if name == "init" || name == "uninstall" || name == "doctor" {
 		yes := false
+		noCommit := false
+		if name == "init" {
+			f.BoolVar(&noCommit, "no-commit", false, "Skip committing initialization changes")
+		}
 		if name == "init" || name == "uninstall" {
 			f.BoolVar(&yes, "yes", false, "Apply changes without confirmation")
 		}
@@ -116,7 +120,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 			}
 			result, err := install.Init(ctx, cwd, func(changes []install.Change) error {
 				return confirmInit(changes, filepath.Join(w.Root(), ".devkit/run"), input, output, yes)
-			})
+			}, install.InitOptions{NoCommit: noCommit})
 			if err != nil {
 				return err
 			}
@@ -150,7 +154,7 @@ func run(ctx context.Context, args []string, input io.Reader, output io.Writer) 
 	var result engine.Result
 	switch name {
 	case "start":
-		template := f.String("plan", "default", "Repository plan template")
+		template := f.String("plan", "", "Repository plan template")
 		if err := parse(f, args, 1, len(args)); err != nil {
 			return err
 		}
@@ -294,7 +298,7 @@ func confirmInit(changes []install.Change, root string, input io.Reader, output 
 }
 
 // confirmUninstall lists the removals and shows the edits to settings files.
-// Paths under the kit copy and runtime state are summarized per directory.
+// Paths under runtime state are summarized per directory.
 func confirmUninstall(changes []install.Change, input io.Reader, output io.Writer, yes bool) error {
 	var text strings.Builder
 	summarized := map[string]int{}
@@ -313,7 +317,7 @@ func confirmUninstall(changes []install.Change, input io.Reader, output io.Write
 			fmt.Fprintln(&text, "+"+strings.ReplaceAll(strings.TrimSuffix(string(change.After), "\n"), "\n", "\n+"))
 		}
 	}
-	for _, dir := range []string{".devkit/kit/", ".devkit/run/"} {
+	for _, dir := range []string{".devkit/run/"} {
 		if n := summarized[dir]; n != 0 {
 			fmt.Fprintf(&text, "remove %s (%d files)\n", dir, n)
 		}
@@ -341,7 +345,7 @@ func confirmUninstall(changes []install.Change, input io.Reader, output io.Write
 }
 
 func summarizedDirectory(path string) (string, bool) {
-	for _, dir := range []string{".devkit/kit/", ".devkit/run/"} {
+	for _, dir := range []string{".devkit/run/"} {
 		if strings.HasPrefix(path, dir) {
 			return dir, true
 		}
@@ -355,7 +359,7 @@ func writeUninstalled(output io.Writer, result install.Result) error {
 		return err
 	}
 	if len(result.Preserved) != 0 {
-		if _, err := fmt.Fprintln(output, "Left in place because they differ from the kit or hold your settings:"); err != nil {
+		if _, err := fmt.Fprintln(output, "Left in place because they differ from embedded assets or hold your settings:"); err != nil {
 			return err
 		}
 		for _, path := range result.Preserved {

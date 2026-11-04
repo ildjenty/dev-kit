@@ -32,6 +32,8 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 省略した手順の報告は [assets/principles/working.md](../../assets/principles/working.md) の原則1、判定後の反証の検討は [assets/principles/verification.md](../../assets/principles/verification.md) の原則1に従う。
 
+観点 `test` は `principles/testing.md` に照らし、完了条件ごとに具体的なテストがあるか、登録済みコマンドから実行されるか、利用者から見える入口で契約を確かめるか、実装をなぞっていないかを判定する。CLI では引数・標準出力・終了コードを確認する。観点 `harness` は、振り返りでの問題の捕捉先、再発防止の反映先と反映しない理由、どの原則がどの観点・雛形で使われているか、使われない仕組みや負担に見合わない仕組みがないか、前提を確認する。規範全体の棚卸しは必要が見えたときに行う。
+
 ### 実行主体と受理
 
 [実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する担当)の指定は[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)の check、種類と必要な確認能力は[計画](../architecture/data.md#計画-plan)(雛形から作る課題ごとの実行内容)と[操作の禁止とサブエージェントの制限](../architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。検証コマンド(`[commands]`)(テストなどを実行するコマンド)を使う `command:` の check と判定コマンドの登録は [config](../architecture/modules.md#config)で定める。
@@ -40,9 +42,15 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 コマンド実行結果の Judgment への変換は[作業結果の判定](../architecture/flow.md#作業結果の判定)と[受理境界](../architecture/guarantees.md#判定結果の受理)に従う。結果の保存の責務は [check のモジュール契約](../architecture/modules.md#check)に従い、判定の有効性は[対象のバージョンと規範の識別](../architecture/data.md#check-の結果-judgment)で照合する。
 
+ラウンド開始時の `devkit.toml` に `command:<name>` が登録されていない場合、その check を `FAIL` とし、`auto-fixable` の指摘「検証コマンド `<name>` が登録されていない。検証の手段を作り `devkit.toml` の `[commands.<name>]` に登録する」を返す。登録はループ自身の変更として `[approval] meta_loop_edit` に従い確認し、次のラウンドのスナップショットから使う。検証コマンドがツリーを変更した場合の指摘には、出力先を ignore する案内を含める。
+
 ### 検出試験
 
 検出試験の対象・実行時期・合格記録の再利用・原則の適用除外は[検出試験の保証](../architecture/guarantees.md#検出試験)、合格記録の同一性は [DetectionTest](../architecture/data.md#検出試験の記録-detectiontest)(観点ファイルの試験記録)に従う。
+
+判定者への依頼には例の本文だけを渡し、種別(違反・適合・許容)と期待判定は渡さない。devkit が結果と期待を照合する。
+
+合格の識別には、観点・試験仕様・担当の定義に加え、観点が参照する原則ファイルと規則ファイルの内容ハッシュを含める。原則や規則を変更した場合、それを参照する観点を既定では次に必須として使うラウンドの前に再試験する。観点を更新するときは検出試験の例も更新する。合格の索引は既定 `.devkit/detect.json`、観点と例は既定 `.devkit/checks/` に置き、`[paths] detect` と `checks` で変更できる。
 
 ### 集約と遷移の境界
 

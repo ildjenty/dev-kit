@@ -43,6 +43,7 @@ type RequestInput struct {
 	Progress               *form.Progress
 	PreviousFindings       []Finding
 	Authorizations         []Authorization
+	DetectionExamples      []DetectionExample
 }
 
 // Request holds judgment request content for brief without composing the request text.

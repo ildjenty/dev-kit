@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/config"
@@ -37,13 +38,18 @@ type Result struct {
 
 const trustGuidance = "Open Codex interactively, trust the project, and trust each project hook through /hooks. In Claude Code, accept workspace trust and check the project hook settings. Start a new session and run devkit doctor to verify SessionStart observation."
 
-const commandGuidance = "The bundled templates in .devkit/plans/ use judge checks only. Once the repository has tests or other mechanical checks, register them under [commands] in devkit.toml and add command:<name> checks to your templates."
+const commandGuidance = "Register the repository test command under [commands.test] in devkit.toml. The bundled default and fix templates require command:test."
 
-// Init installs repository assets and merges the supplied host fragments.
-// It stages the kit copy first, then calls confirm with all remaining changes
-// before applying them. A nil callback means the caller already authorized them.
-// Existing skills, templates, aspects, rules, and agent definitions are preserved.
-func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result, error) {
+// InitOptions controls whether initialization commits the files it writes.
+type InitOptions struct {
+	NoCommit bool
+}
+
+// Init installs repository norms and merges the embedded host fragments.
+// It calls confirm before applying changes and commits only the files it writes.
+// A nil callback means the caller already authorized the changes.
+// Existing norms, skills, and agent definitions are preserved.
+func Init(ctx context.Context, cwd string, confirm func([]Change) error, options ...InitOptions) (Result, error) {
 	w, err := workspace.Open(ctx, cwd)
 	if err != nil {
 		return Result{}, err
@@ -63,14 +69,7 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 	if c.KitVersion != kit.Version {
 		return result, fmt.Errorf("kit version mismatch: binary %q, devkit.toml %q", kit.Version, c.KitVersion)
 	}
-	if err := kit.Copy(result.Root); err != nil {
-		return result, err
-	}
-	k, err := kit.Open(result.Root, c.KitVersion)
-	if err != nil {
-		return result, err
-	}
-	deny, err := k.ReadFile("hosts/deny.toml")
+	deny, err := kit.HostFragment("deny.toml")
 	if err != nil {
 		return result, err
 	}
@@ -82,30 +81,23 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 		return result, err
 	}
 	result.addChange("devkit.toml", existing, configuration)
+	if err := result.addNorms(c.RepositoryPaths()); err != nil {
+		return result, err
+	}
 	for _, pair := range [][2]string{
-		{"plans", ".devkit/plans"},
-		{"checks", ".devkit/checks"},
-		{"examples", ".devkit/checks"},
 		{"skills/devkit", ".agents/skills/devkit"},
 		{"hosts/claude/agents", ".claude/agents"},
 		{"hosts/codex/agents", ".codex/agents"},
 	} {
-		if err := result.addTree(k, pair[0], pair[1]); err != nil {
+		if err := result.addTree(kit.FS(), pair[0], pair[1]); err != nil {
 			return result, err
 		}
-	}
-	rules, err := k.ReadFile("rules/rules.md")
-	if err != nil {
-		return result, err
-	}
-	if err := result.addFile(".devkit/rules.md", rules); err != nil {
-		return result, err
 	}
 	if err := result.addSkillLink(); err != nil {
 		return result, err
 	}
 	for _, fragment := range hostFragments {
-		data, err := k.ReadFile(fragment.source)
+		data, err := kit.HostFragment(strings.TrimPrefix(fragment.source, "hosts/"))
 		if err != nil {
 			return result, err
 		}
@@ -157,6 +149,11 @@ func Init(ctx context.Context, cwd string, confirm func([]Change) error) (Result
 			err = writeConfig(target, change.After)
 		}
 		if err != nil {
+			return result, err
+		}
+	}
+	if len(options) == 0 || !options[0].NoCommit {
+		if err := result.commit(ctx); err != nil {
 			return result, err
 		}
 	}
@@ -223,12 +220,12 @@ func (r *Result) addFile(name string, data []byte) error {
 	return nil
 }
 
-func (r *Result) addTree(k *kit.Kit, source, target string) error {
-	return fs.WalkDir(k, source, func(name string, entry fs.DirEntry, err error) error {
+func (r *Result) addTree(files fs.FS, source, target string) error {
+	return fs.WalkDir(files, source, func(name string, entry fs.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return err
 		}
-		data, err := k.ReadFile(name)
+		data, err := fs.ReadFile(files, name)
 		if err != nil {
 			return err
 		}
@@ -260,4 +257,62 @@ func readOptional(path string) ([]byte, error) {
 		return nil, nil
 	}
 	return data, err
+}
+
+func normPath(paths config.Paths, name string) string {
+	root, rest, _ := strings.Cut(name, "/")
+	base := map[string]string{
+		"principles": paths.Principles,
+		"stages":     paths.Stages,
+		"checks":     paths.Checks,
+		"plans":      paths.Plans,
+		"templates":  paths.Templates,
+		"rules.md":   paths.Rules,
+	}[root]
+	if rest == "" {
+		return base
+	}
+	return base + "/" + rest
+}
+
+func (r *Result) addNorms(paths config.Paths) error {
+	files, err := kit.Norms()
+	if err != nil {
+		return err
+	}
+	names := make([]string, 0, len(files))
+	for name := range files {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if err := r.addFile(normPath(paths, name), files[name]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *Result) commit(ctx context.Context) error {
+	if len(r.Changes) == 0 {
+		return nil
+	}
+	paths := make([]string, 0, len(r.Changes))
+	for _, change := range r.Changes {
+		paths = append(paths, change.Path)
+	}
+	if _, err := runGit(ctx, r.Root, append([]string{"add", "--"}, paths...)...); err != nil {
+		return err
+	}
+	_, err := runGit(ctx, r.Root, append([]string{"commit", "--only", "-m", "devkit: init", "--"}, paths...)...)
+	return err
+}
+
+func runGit(ctx context.Context, root string, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "git", append([]string{"--literal-pathspecs", "-C", root}, args...)...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return output, fmt.Errorf("git %s: %w: %s", strings.Join(args, " "), err, output)
+	}
+	return output, nil
 }

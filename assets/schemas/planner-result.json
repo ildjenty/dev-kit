@@ -8,7 +8,7 @@
       "minLength": 1
     },
     "plan": {
-      "type": "object"
+      "$ref": "https://devkit.invalid/schemas/v1/plan.json"
     }
   },
   "required": [

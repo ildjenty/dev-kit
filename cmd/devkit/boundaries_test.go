@@ -34,7 +34,7 @@ func TestFrontmatterValue(t *testing.T) {
 }
 
 func TestPausedCommandsWithoutForwardAssets(t *testing.T) {
-	for _, broken := range []string{"devkit.toml", ".devkit/kit/v1/schemas/progress.json"} {
+	for _, broken := range []string{"devkit.toml"} {
 		t.Run(broken, func(t *testing.T) {
 			root, _ := startWork(t, event.ClaudeCode)
 			if err := os.WriteFile(filepath.Join(root, broken), []byte("Invalid configuration or schema"), 0o644); err != nil {

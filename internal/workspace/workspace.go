@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/ildjenty/dev-kit/internal/config"
 )
 
 // Workspace runs the git CLI in a single checkout.
@@ -160,7 +162,45 @@ func (w *Workspace) ReadFile(ctx context.Context, ref, path string) ([]byte, err
 
 // NormativeIDs returns tree and blob IDs for each normative root, omitting missing roots.
 func (w *Workspace) NormativeIDs(ctx context.Context, ref string) (map[string]string, error) {
-	return w.treeEntries(ctx, ref, ".devkit", "devkit.toml", ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md")
+	settings := config.Config{}
+	entries, err := w.treeEntries(ctx, ref, "devkit.toml")
+	if err != nil {
+		return nil, err
+	}
+	if entries["devkit.toml"] != "" {
+		source, err := w.ReadFile(ctx, ref, "devkit.toml")
+		if err != nil {
+			return nil, err
+		}
+		settings, err = config.Parse(source)
+		if err != nil {
+			return nil, err
+		}
+	}
+	p := settings.RepositoryPaths()
+	return w.treeEntries(ctx, ref, p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, "devkit.toml", ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md")
+}
+
+// RequireCommitted checks that each path exists in HEAD and has no pending changes.
+func (w *Workspace) RequireCommitted(ctx context.Context, paths ...string) error {
+	entries, err := w.treeEntries(ctx, "HEAD", paths...)
+	if err != nil {
+		return err
+	}
+	for _, path := range paths {
+		if entries[path] == "" {
+			return fmt.Errorf("%s is not committed; commit the devkit init changes first", path)
+		}
+	}
+	args := append([]string{"status", "--porcelain", "--untracked-files=all", "--"}, paths...)
+	status, err := w.run(ctx, nil, args...)
+	if err != nil {
+		return err
+	}
+	if len(status) != 0 {
+		return fmt.Errorf("initialization files have pending changes; commit the devkit init changes first")
+	}
+	return nil
 }
 
 // Expand extracts a target into a new directory without applying export-ignore or export-subst.
@@ -243,7 +283,15 @@ func (w *Workspace) ChangedFiles(ctx context.Context, before, after string) ([]s
 
 // StructureHistory reads additions, changes, and deletions of structure.json from the given reference.
 func (w *Workspace) StructureHistory(ctx context.Context, ref string) ([]StructureRevision, error) {
-	const path = ".devkit/structure.json"
+	source, err := w.ReadFile(ctx, ref, "devkit.toml")
+	if err != nil {
+		return nil, err
+	}
+	settings, err := config.Parse(source)
+	if err != nil {
+		return nil, err
+	}
+	path := settings.RepositoryPaths().Structure
 	output, err := w.run(ctx, nil, "log", "--format=%H", ref, "--", path)
 	if err != nil {
 		return nil, err

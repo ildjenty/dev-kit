@@ -20,20 +20,13 @@ import (
 type detectionInput = ledger.InstructionDetection
 
 func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check) (detectionInput, error) {
-	expanded, err := e.expanded(ctx, ref)
+	settings, err := e.settings(ctx, ref)
 	if err != nil {
 		return detectionInput{}, err
 	}
-	base := ".devkit/checks/" + item.Aspect
-	aspectPath := base + ".md"
+	base := settings.RepositoryPaths().Checks + "/" + item.Aspect
 	specPath := base + "/spec.json"
-	if _, err = os.Stat(filepath.Join(expanded, aspectPath)); errors.Is(err, os.ErrNotExist) {
-		aspectPath = e.kitPath("checks/" + item.Aspect + ".md")
-		specPath = e.kitPath("examples/" + item.Aspect + "/spec.json")
-	} else if err != nil {
-		return detectionInput{}, err
-	}
-	aspect, err := e.workspace.ReadFile(ctx, ref, aspectPath)
+	aspect, err := e.asset(ctx, ref, "checks/"+item.Aspect+".md")
 	if err != nil {
 		return detectionInput{}, err
 	}
@@ -61,10 +54,6 @@ func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check
 		examples[example.File] = data
 		texts[example.File] = string(data)
 	}
-	settings, err := e.settings(ctx, ref)
-	if err != nil {
-		return detectionInput{}, err
-	}
 	var runner []byte
 	if command, ok := settings.Judges[string(item.Runner)]; ok {
 		runner, err = json.Marshal(command)
@@ -85,7 +74,14 @@ func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check
 	if err != nil {
 		return detectionInput{}, err
 	}
-	identity, err := check.NewDetectionIdentity(aspect, specSource, runner, examples)
+	references := map[string][]byte{}
+	for _, name := range check.AspectReferences(string(aspect)) {
+		references[name], err = e.asset(ctx, ref, name)
+		if err != nil {
+			return detectionInput{}, err
+		}
+	}
+	identity, err := check.NewDetectionIdentity(aspect, specSource, runner, examples, references)
 	return detectionInput{Spec: spec, Identity: identity, Examples: texts}, err
 }
 func (e *Engine) detectionRecords(ctx context.Context, ref string) ([]check.DetectionTest, error) {
@@ -93,7 +89,11 @@ func (e *Engine) detectionRecords(ctx context.Context, ref string) ([]check.Dete
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(filepath.Join(path, ".devkit/detect.json"))
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(filepath.Join(path, settings.RepositoryPaths().Detect))
 	if errors.Is(err, os.ErrNotExist) {
 		return []check.DetectionTest{}, nil
 	}
@@ -107,6 +107,13 @@ func (e *Engine) detectionRecords(ctx context.Context, ref string) ([]check.Dete
 	return records, nil
 }
 func (e *Engine) detectionContext(ctx context.Context, items []plan.Check, ref string) ([]check.DetectionRequirement, []check.DetectionTest, error) {
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !settings.DetectionRequired() {
+		return nil, nil, nil
+	}
 	requirements := []check.DetectionRequirement{}
 	for _, item := range items {
 		if item.Runner.IsCommand() {
@@ -193,13 +200,13 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 	if err != nil {
 		return Result{}, false, err
 	}
-	path, err := e.expanded(ctx, ref)
-	if err != nil {
-		return Result{}, false, err
-	}
+	path := filepath.Join(e.workRoot(), "brief", meta.ID+".md")
 	tree, err := e.workspace.CommitTree(ctx, ref)
 	if err != nil {
 		tree = ref
+	}
+	if err := e.requestNorms(ctx, ref, plan.Check{Aspect: item.Aspect, Runner: item.Runner, Target: "detection"}, norms); err != nil {
+		return Result{}, false, err
 	}
 	output := e.schemas["detection-result"]
 	request, err := check.PrepareRequest(check.RequestInput{Kind: check.DetectionRequest, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: aspect, TargetVersion: form.TargetVersion{Kind: form.TargetTree, Tree: tree}, TargetPath: path, Norms: norms, OutputSchema: output, CompletionConditionIDs: []string{}})
@@ -225,19 +232,37 @@ func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brie
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	content, err := json.MarshalIndent(struct {
-		Request   check.Request  `json:"request"`
-		Detection detectionInput `json:"detection"`
-	}{*data.Request, *data.Detection}, "", "  ")
+	request, err := detectionRequest(data)
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	text := "Evaluate each example independently against the aspect. Return an observation for each file. For violations, explain whether the blocking finding detects the intended violation; for conforming and allowed cases, explain why the relevant difference is respected. Each nested judgment must use the instruction ID, aspect, target, and norms from the request.\n\n```json\n" + string(content) + "\n```"
+	content, err := json.MarshalIndent(request, "", "  ")
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	text := "Evaluate each example body independently. Return an observation for each opaque example ID in the file field, with the actual judgment and grounds. Each nested judgment must use the instruction ID, aspect, target, and norms from the request.\n\n```json\n" + string(content) + "\n```"
 	schema, err := e.asset(ctx, data.Reference, "schemas/detection-result.json")
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, OutputSchema: string(schema)})
+	facts, err := e.repository(ctx, data.Reference)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	docs, err := e.aspectDocuments(ctx, data.Reference, []plan.Check{{Aspect: request.Aspect.ID, Runner: plan.Runner(request.Runner)}})
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	// Detection inputs contain only the aspect and its referenced principles and rules.
+	facts.LayoutGuides, facts.Requirements.Content = nil, ""
+	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, OutputSchema: string(schema), Repository: facts, Norms: docs})
+}
+
+func detectionRequest(data instructionData) (check.Request, error) {
+	request := *data.Request
+	examples, err := check.PrepareDetectionExamples(data.Detection.Spec, data.Detection.Examples)
+	request.DetectionExamples = examples
+	return request, err
 }
 func (e *Engine) executeDetection(ctx context.Context, state *ledger.State, meta ledger.Instruction, data instructionData, r Result) (Result, bool, error) {
 	settings, err := e.settings(ctx, data.Reference)
@@ -252,7 +277,14 @@ func (e *Engine) executeDetection(ctx context.Context, state *ledger.State, meta
 		if err != nil {
 			return Result{}, false, err
 		}
-		encoded, _ := json.Marshal(data)
+		request, err := detectionRequest(data)
+		if err != nil {
+			return Result{}, false, err
+		}
+		encoded, err := json.Marshal(request)
+		if err != nil {
+			return Result{}, false, err
+		}
 		result, stdout, err := e.runCommand(ctx, command.Command, "", encoded)
 		if err != nil {
 			return Result{}, false, err
@@ -301,7 +333,7 @@ func (e *Engine) acceptDetection(ctx context.Context, state *ledger.State, meta 
 		if err != nil {
 			return err
 		}
-		observations = append(observations, check.DetectionObservation{File: observation.File, Judgment: judgment, Reason: observation.Reason, MatchesBlocking: observation.MatchesBlocking, RespectsDifference: observation.RespectsDifference})
+		observations = append(observations, check.DetectionObservation{File: observation.File, Judgment: judgment, Reason: observation.Reason})
 	}
 	test, err := check.AssessDetection(data.Detection.Spec, data.Instruction.Runner, data.Detection.Identity, observations)
 	if err != nil {
@@ -332,5 +364,9 @@ func (e *Engine) publishDetection(ctx context.Context, test check.DetectionTest)
 	if err != nil {
 		return err
 	}
-	return fsstore.New(e.Root()).Publish(".devkit/detect.json", append(encoded, '\n'))
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return err
+	}
+	return fsstore.New(e.Root()).Publish(settings.RepositoryPaths().Detect, append(encoded, '\n'))
 }

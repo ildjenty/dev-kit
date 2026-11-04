@@ -72,7 +72,12 @@ func fixture(t *testing.T) (*Engine, context.Context) {
 	if _, err := install.Init(ctx, root, func([]install.Change) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	template := plan.PlanTemplate{Name: "test", StartStage: "implement", MetaLoopStages: []string{}, Stages: []plan.Stage{{ID: "implement", Assignee: plan.Worker, Gate: plan.Gate{Reason: "Documentation task"}, Checks: []plan.Check{}, Limits: plan.Limits{MaxRounds: 3, MaxNoProgress: 2}, Transitions: plan.Transitions{Fix: "implement", Ask: "implement", Back: "implement"}}}, OptionalStages: []plan.Stage{}}
+	settings, err := os.ReadFile(filepath.Join(root, "devkit.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, root, "devkit.toml", string(settings)+"\n[approval]\nplan = 'deviation'\n")
+	template := plan.PlanTemplate{Name: "test", StartStage: "implement", Stages: []plan.Stage{{ID: "implement", Assignee: plan.Worker, Gate: plan.Gate{Reason: "Documentation task"}, Checks: []plan.Check{}, Limits: plan.Limits{MaxRounds: 3, MaxNoProgress: 2}, Transitions: plan.Transitions{Fix: "implement", Ask: "implement", Back: "implement"}}}, OptionalStages: []plan.Stage{}}
 	source, err := json.Marshal(template)
 	if err != nil {
 		t.Fatal(err)
@@ -148,7 +153,7 @@ func acceptDetectionResult(t *testing.T, e *Engine, instruction *form.Instructio
 		if example.Kind == check.Violation {
 			j.Findings = []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "The example violates the stated blocking condition"}}
 		}
-		result.Observations = append(result.Observations, form.DetectionObservation{File: example.File, Judgment: j, Reason: "The actual finding matches the intended distinction", MatchesBlocking: example.Kind == check.Violation, RespectsDifference: example.Kind != check.Violation})
+		result.Observations = append(result.Observations, form.DetectionObservation{File: example.ID, Judgment: j, Reason: "The actual finding matches the intended distinction"})
 	}
 	collect(t, e, instruction, result)
 }

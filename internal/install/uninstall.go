@@ -15,7 +15,6 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"github.com/ildjenty/dev-kit/assets"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/workspace"
@@ -23,8 +22,8 @@ import (
 
 const uninstallGuidance = "Remove any devkit commands you added to git hooks yourself. Remove the devkit binary separately if no other repository uses it."
 
-// Uninstall reverses Init. It removes the kit copy, runtime state, the skill link,
-// and installed files that still match the kit, and strips the kit fragments from
+// Uninstall reverses Init. It removes runtime state, the skill link,
+// and installed files that still match embedded assets, and strips the host fragments from
 // host settings, devkit.toml, and .gitignore. Files the user changed are left in
 // place and listed in Preserved. It calls confirm with all changes before applying
 // them; a nil callback means the caller already authorized them.
@@ -34,19 +33,42 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 		return Result{}, err
 	}
 	result := Result{Root: w.Root(), Guidance: []string{uninstallGuidance}}
-	files := assets.FS()
+	files := kit.FS()
+	paths := config.Config{}.RepositoryPaths()
+	configuration, err := readOptional(filepath.Join(result.Root, "devkit.toml"))
+	if err != nil {
+		return result, err
+	}
+	if configuration != nil {
+		c, err := config.Parse(configuration)
+		if err != nil {
+			return result, err
+		}
+		paths = c.RepositoryPaths()
+	}
 	if err := result.removeConfig(files); err != nil {
 		return result, err
 	}
-	for _, name := range []string{".devkit/kit", ".devkit/run"} {
+	for _, name := range []string{".devkit/run"} {
 		if err := result.removeAll(name); err != nil {
 			return result, err
 		}
 	}
+	norms, err := kit.Norms()
+	if err != nil {
+		return result, err
+	}
+	names := make([]string, 0, len(norms))
+	for name := range norms {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if err := result.removeFile(normPath(paths, name), norms[name]); err != nil {
+			return result, err
+		}
+	}
 	for _, pair := range [][2]string{
-		{"plans", ".devkit/plans"},
-		{"checks", ".devkit/checks"},
-		{"examples", ".devkit/checks"},
 		{"skills/devkit", ".agents/skills/devkit"},
 		{"hosts/claude/agents", ".claude/agents"},
 		{"hosts/codex/agents", ".codex/agents"},
@@ -54,13 +76,6 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 		if err := result.removeTree(files, pair[0], pair[1]); err != nil {
 			return result, err
 		}
-	}
-	rules, err := fs.ReadFile(files, "rules/rules.md")
-	if err != nil {
-		return result, err
-	}
-	if err := result.removeFile(".devkit/rules.md", rules); err != nil {
-		return result, err
 	}
 	if err := result.removeSkillLink(); err != nil {
 		return result, err
@@ -101,7 +116,7 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 		}
 	}
 	// The listed files are gone; this also removes the empty directories left in them.
-	for _, name := range []string{".devkit/kit", ".devkit/run"} {
+	for _, name := range []string{".devkit/run"} {
 		if err := os.RemoveAll(filepath.Join(result.Root, filepath.FromSlash(name))); err != nil {
 			return result, err
 		}

@@ -201,3 +201,16 @@ func FromCommand(request Request, result CommandResult) (Judgment, error) {
 		Provenance: Provenance{Source: CommandCheck, InstructionID: request.InstructionID, Runner: request.Runner},
 	}, nil
 }
+
+// UnregisteredCommand returns a fixable failure for a missing verification command.
+func UnregisteredCommand(request Request) (Judgment, error) {
+	judgment, err := FromCommand(request, CommandResult{ExitCode: 1, Method: "command registration check", Environment: "round-start configuration"})
+	if err != nil {
+		return Judgment{}, err
+	}
+	name := strings.TrimPrefix(request.Runner, "command:")
+	judgment.Command = nil
+	judgment.CompletionConditionIDs = []string{}
+	judgment.Findings[0].Scenario = fmt.Sprintf("Verification command `%s` is not registered. Create a verification method and register it in `[commands.%s]` in `devkit.toml`.", name, name)
+	return judgment, nil
+}

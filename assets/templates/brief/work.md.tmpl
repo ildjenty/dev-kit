@@ -25,14 +25,8 @@ Instruction ID: {{.InstructionID}}
 Verify completion conditions against their IDs in the plan.
 The current stage allows {{.Stage.Limits.MaxRounds}} rounds and {{.Stage.Limits.MaxNoProgress}} consecutive rounds without progress.
 
-## Allowed changes
-{{range .AllowedChanges}}
-- {{.}}
-{{end}}
-## Forbidden changes
-{{range .ForbiddenChanges}}
-- {{.}}
-{{end}}
+Use the scope stage output and rules.md to determine the change boundaries.
+
 ## Verification of completion conditions
 {{range .Verification}}
 - {{.}}
@@ -48,7 +42,15 @@ Items from the plan:
 {{.ChecksJSON}}
 ```
 {{template "norms" .Norms}}
+{{template "normPaths" .NormPaths}}
 {{template "previousOutputs" .PreviousOutputs}}
+{{if eq .Stage.ID "retrospective"}}
+## Retrospective inputs
+
+{{.RetrospectiveContext}}
+
+Review all judgments and findings, including non-blocking findings, FAIL and NOT ASSESSED history, round counts, human rejections, corrections and revision instructions, lessons about missed issues, and the norm inventory supplied here.
+{{end}}
 {{if .PreviousFindings}}
 ## Previous findings and finding IDs
 
@@ -89,7 +91,7 @@ devkit confirms completion and runs git commit.
 {{.OutputSchema}}
 {{end}}
 {{define "repository"}}
-## Layout guides
+## Relevant structure records
 {{range .LayoutGuides}}
 Reference: {{.Path}}
 
@@ -101,6 +103,12 @@ Reference: {{.Rules.Path}}
 
 {{.Rules.Content}}
 
+## Repository requirements
+
+Reference: requirements.md
+
+{{.Requirements.Content}}
+
 ## Irreversible decisions
 
 Items from the rules:
@@ -108,11 +116,18 @@ Items from the rules:
 - {{.}}
 {{end}}
 {{end}}{{define "norms"}}
-## Fixed norms
+## Norms supplied in full
 {{range .}}
 Reference: {{.Path}}
 
 {{.Content}}
+{{end}}
+{{end}}{{define "normPaths"}}
+## Other fixed norms
+
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. The snapshot is fixed at round start, or when an instruction outside a round is issued. Do not substitute norms from the working tree.
+{{range .}}
+- Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}
 {{end}}{{define "previousOutputs"}}
 ## Previous stage outputs

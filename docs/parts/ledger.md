@@ -10,7 +10,7 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 ### 作業
 
-作業の単位と識別は [Work](../architecture/data.md#作業-work)(課題単位のループ)の定義に従う。
+作業の単位と識別は [Work](../architecture/data.md#作業-work)(課題単位のループ)の定義に従う。`kit_version` は記録形式とバイナリの互換性の識別として保存する。`start` に渡した課題と、UserPromptSubmit で観測した人の要求の原文を結び付け、観測がなければ原文なしと記録する。
 
 作業の中断・再開と現在地の関係は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)、受理条件は[中断](../architecture/guarantees.md#中断)に従う。
 
@@ -27,6 +27,8 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 ### 問い・回答・承認
 
 [問い](../architecture/data.md#問い-question)(人への確認事項)と[回答・承認](../architecture/data.md#回答承認-answer--approval)(問いへの判断)の保存項目は各定義、受理と訂正は[回答の受理](../architecture/guarantees.md#回答の受理)に従う。
+
+ループ自身の変更の確認済みの範囲は、確認したスナップショットの規範の識別で表す。計画承認では人が承認した完了条件の ID と文面を比較の基準とする。
 
 ### ステージの実行
 
@@ -47,6 +49,8 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 ### 検出試験
 
 合格記録の正本との分離、記録の同一性と来歴は [DetectionTest](../architecture/data.md#検出試験の記録-detectiontest)(観点ファイルの判定能力の試験記録)の定義に従う。
+
+合格の識別には、観点・試験仕様・担当の定義に加え、観点が参照する原則と規則の内容ハッシュを含める。索引の既定の場所は `.devkit/detect.json` であり、`[paths] detect` で変更できる。
 
 ### 外部操作の記録
 
@@ -71,5 +75,9 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 - **生存期間**: 完了・中止後の記録と、人の判断の追記は[所有と生存期間](../architecture/data.md#所有と生存期間)に従う。配置は[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。
 
 ### 育てるものとの境界
+
+要件の正本は既定 `.devkit/requirements.md`、構造の記録は `.devkit/structure.json`、規則は `.devkit/rules.md` に置き、`[paths] requirements`・`structure`・`rules` で変更できる。実行の記録 `.devkit/run/` は git 管理せず、後の作業に効かせる決定は要件・構造・規則のいずれかに残す。要件は purpose で承認された完了条件と既存の要件を照らして更新し、purpose で未反映の要件は retrospective で反映する。
+
+requirements・structure・detect・実行の記録は規範の識別に含めず、変更で判定は失効しない。requirements と structure はループ自身の変更の確認対象に含めず、ステージの判定で確認する。規則の変更はループ自身の変更として確認する。
 
 [構造](../architecture/data.md#構造の記録-structure)(リポジトリの構造の資産)と[規則と強制手段](../architecture/data.md#規則と強制手段-rules)(設計上の決定と守る手段)の分類は、[育てるもの](../architecture/data.md#所有と生存期間)(リポジトリが git で管理する資産)を定める「所有と生存期間」と各定義に従う。

@@ -26,17 +26,7 @@ func (e *Engine) aspect(ctx context.Context, ref, id string) (check.Aspect, erro
 	if !localName(id) {
 		return check.Aspect{}, errors.New("invalid aspect ID")
 	}
-	path, err := e.expanded(ctx, ref)
-	if err != nil {
-		return check.Aspect{}, err
-	}
-	name := ".devkit/checks/" + id + ".md"
-	if _, err = os.Stat(filepath.Join(path, name)); errors.Is(err, os.ErrNotExist) {
-		name = e.kitPath("checks/" + id + ".md")
-	} else if err != nil {
-		return check.Aspect{}, err
-	}
-	data, err := e.workspace.ReadFile(ctx, ref, name)
+	data, err := e.asset(ctx, ref, "checks/"+id+".md")
 	if err != nil {
 		return check.Aspect{}, err
 	}
@@ -85,6 +75,9 @@ func (e *Engine) outputSchema(ctx context.Context, ref, runner string) ([]byte, 
 			return nil, nil, err
 		}
 		resources["urn:devkit:form:"+name] = frozen
+		if name == "plan" || name == "plan-template" {
+			resources["https://devkit.invalid/schemas/v1/"+name+".json"] = frozen
+		}
 	}
 	schema, err := form.CompileSchemaWithResources(source, resources)
 	return source, schema, err
@@ -115,6 +108,9 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 	}
 	norms, _, err := e.normDocuments(ctx, ref)
 	if err != nil {
+		return meta, instructionData{}, false, err
+	}
+	if err := e.requestNorms(ctx, ref, item, norms); err != nil {
 		return meta, instructionData{}, false, err
 	}
 	aspect := check.Aspect{ID: item.Aspect}
@@ -184,32 +180,42 @@ func (e *Engine) roundNorms(ctx context.Context, state *ledger.State, roundID st
 		return err
 	}
 	additional := "\n\n## Agreed plan\n\n" + string(agreed)
-	for _, issued := range state.UnacceptedInstructions() {
-		if issued.Kind == form.InstructionWork && issued.RoundID == roundID {
-			body, err := e.instructionBrief(issued.ID)
-			if err != nil {
-				return err
+	for _, run := range state.StageRuns() {
+		for _, round := range state.Rounds(run.ID) {
+			if round.ID == roundID {
+				definition, err := e.asset(ctx, round.StartTarget.Tree, "stages/"+run.StageID+".md")
+				if err != nil {
+					return err
+				}
+				additional += "\n\n## Stage definition\n\n" + string(definition)
 			}
-			additional += "\n\n## Work brief\n\n" + string(body)
-		}
-	}
-	// Submitted work instructions are no longer pending; locate the accepted issuance too.
-	records, err := e.records()
-	if err != nil {
-		return err
-	}
-	for _, record := range records {
-		if progress, ok := record.Payload.(*ledger.Progress); ok && progress.RoundID == roundID && !strings.HasPrefix(progress.InstructionID, "human-") {
-			body, err := e.instructionBrief(progress.InstructionID)
-			if err != nil {
-				return err
-			}
-			additional += "\n\n## Accepted work brief\n\n" + string(body)
 		}
 	}
 	for index := range norms {
-		if norms[index].Reference.Path == ".devkit" {
+		if index == 0 {
 			norms[index].Content += additional
+		}
+	}
+	return nil
+}
+
+func (e *Engine) requestNorms(ctx context.Context, ref string, item plan.Check, norms []check.Norm) error {
+	docs, err := e.aspectDocuments(ctx, ref, []plan.Check{item})
+	if err != nil {
+		return err
+	}
+	facts, err := e.repository(ctx, ref)
+	if err != nil {
+		return err
+	}
+	docs = append(docs, facts.Rules)
+	if item.Target != "detection" {
+		docs = append(docs, facts.Requirements)
+		docs = append(docs, facts.LayoutGuides...)
+	}
+	if len(norms) > 0 {
+		for _, doc := range docs {
+			norms[0].Content += "\nReference: " + doc.Path + "\n\n" + doc.Content + "\n"
 		}
 	}
 	return nil
@@ -221,6 +227,13 @@ func (e *Engine) hydrateRequest(ctx context.Context, data instructionData) error
 	}
 	norms, _, err := e.normDocuments(ctx, data.Reference)
 	if err != nil {
+		return err
+	}
+	item := plan.Check{Aspect: data.Request.Aspect.ID, Runner: plan.Runner(data.Request.Runner)}
+	if data.Request.Kind == check.DetectionRequest {
+		item.Target = "detection"
+	}
+	if err := e.requestNorms(ctx, data.Reference, item, norms); err != nil {
 		return err
 	}
 	if data.Request.Kind == check.RoundRequest {
@@ -261,6 +274,18 @@ func (e *Engine) judgmentBrief(ctx context.Context, data instructionData) (brief
 	if err != nil {
 		return brief.Brief{}, err
 	}
+	facts, err := e.repository(ctx, data.Reference)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	docs, err := e.aspectDocuments(ctx, data.Reference, []plan.Check{{Aspect: data.Request.Aspect.ID, Runner: plan.Runner(data.Request.Runner)}})
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	paths, err := e.normPaths(ctx, data.Reference)
+	if err != nil {
+		return brief.Brief{}, err
+	}
 	content, err := json.MarshalIndent(data.Request, "", "  ")
 	if err != nil {
 		return brief.Brief{}, err
@@ -269,14 +294,10 @@ func (e *Engine) judgmentBrief(ctx context.Context, data instructionData) (brief
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: "```json\n" + string(content) + "\n```", OutputSchema: string(schema)})
+	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: "```json\n" + string(content) + "\n```", Repository: facts, Norms: docs, NormPaths: paths, OutputSchema: string(schema)})
 }
 
 func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan) (Result, error) {
-	head, err := e.workspace.Head(ctx)
-	if err != nil {
-		return Result{}, err
-	}
 	item := plan.Check{Aspect: "plan", Runner: "devkit-judge", Required: true}
 	snapshot, err := e.workspace.Snapshot(ctx, e.workID)
 	if err != nil {
@@ -295,7 +316,7 @@ func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan
 	if err = e.store().Publish(name, data); err != nil {
 		return Result{}, err
 	}
-	meta, request, fresh, err := e.judgmentInstruction(ctx, state, item, form.InstructionPlanCheck, key, head, form.TargetVersion{Kind: form.TargetPlan, Plan: p.Version}, filepath.Join(e.workRoot(), name), nil, p.Version)
+	meta, request, fresh, err := e.judgmentInstruction(ctx, state, item, form.InstructionPlanCheck, key, snapshot.Tree, form.TargetVersion{Kind: form.TargetPlan, Plan: p.Version}, filepath.Join(e.workRoot(), name), nil, p.Version)
 	if err != nil {
 		return Result{}, err
 	}
@@ -460,10 +481,12 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 		}
 		if item.Runner.IsCommand() {
 			command, ok := settings.Commands[strings.TrimPrefix(string(item.Runner), "command:")]
+			var judgment check.Judgment
 			if !ok {
-				return Result{}, fmt.Errorf("verification command %q is not registered", item.Runner)
+				judgment, err = check.UnregisteredCommand(*request.Request)
+			} else {
+				judgment, err = e.runCheck(ctx, *request.Request, command, stage.ID, target.Tree)
 			}
-			judgment, err := e.runCheck(ctx, *request.Request, command, stage.ID, target.Tree)
 			if err != nil {
 				return Result{}, err
 			}
@@ -474,7 +497,12 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 				return e.fixRound(ctx, state, p, stage, run, round, "A command check changed its target.")
 			}
 			if judgment.Judgment == check.Fail && item.Required {
-				return e.fixRound(ctx, state, p, stage, run, round, "A required command check failed.")
+				result, err := e.fixRound(ctx, state, p, stage, run, round, "A required command check failed.")
+				if !ok && err == nil && result.Instruction == nil {
+					result = response(state)
+					result.Message = judgment.Findings[0].Scenario + "\nCorrect this finding, then run devkit next to open the fix round."
+				}
+				return result, err
 			}
 			continue
 		}
@@ -512,22 +540,23 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 	if err != nil {
 		return Result{}, err
 	}
-	completion := router.CheckCompletion(router.CompletionInput{Rule: stage.CompletionRule(), TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments, Detection: requirements, DetectionTests: tests})
+	settings, err := e.settings(ctx, round.StartTarget.Tree)
+	if err != nil {
+		return Result{}, err
+	}
+	rule := stage.CompletionRule()
+	rule.RequireDetectionTests = settings.DetectionRequired()
+	completion := router.CheckCompletion(router.CompletionInput{Rule: rule, TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments, Detection: requirements, DetectionTests: tests})
 	summary := check.Aggregate(judgments)
 	paths, err := e.workspace.ChangedFiles(ctx, round.StartTarget.Tree, target.Tree)
 	if err != nil {
 		return Result{}, err
 	}
-	meta := slices.Contains(p.MetaLoopStages, stage.ID)
-	categories := differenceCategories(paths, meta)
-	if !meta {
-		hookPath, err := e.workspace.PreCommitPath(ctx)
-		if err != nil {
-			return Result{}, err
-		}
-		if slices.Contains(paths, hookPath) && !slices.Contains(categories, router.UndeclaredMetaLoopEdit) {
-			categories = append(categories, router.UndeclaredMetaLoopEdit)
-		}
+	categories := differenceCategories(paths, settings)
+	if changed, err := e.metaLoopChanged(ctx, round.StartTarget.Tree, target.Tree); err != nil {
+		return Result{}, err
+	} else if changed && !slices.Contains(categories, config.MetaLoopEdit) {
+		categories = append(categories, config.MetaLoopEdit)
 	}
 	approvalTarget := form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}
 	if gateApproved(state, run, round, approvalTarget) {
@@ -556,8 +585,7 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 	if err != nil {
 		return Result{}, err
 	}
-	premiseBroken := slices.ContainsFunc(judgments, func(j check.Judgment) bool { return j.Aspect == "premise" && j.Judgment == check.Fail })
-	decision, err := table.Decide(router.Input{Summary: summary, Stage: stage, CompletedRounds: len(window), PreviousNoProgressRounds: noProgress, ProgressMade: progressMade, TerminationKind: termination, PremiseBroken: premiseBroken, Completion: completion, Confirmation: router.ConfirmationInput{Categories: categories, GateApproved: gateApproved(state, run, round, approvalTarget), HumanStageAnswered: humanAnswered}})
+	decision, err := table.Decide(router.Input{Summary: summary, Stage: stage, CompletedRounds: len(window), PreviousNoProgressRounds: noProgress, ProgressMade: progressMade, TerminationKind: termination, Completion: completion, Confirmation: router.ConfirmationInput{Categories: categories, GateApproved: gateApproved(state, run, round, approvalTarget), HumanStageAnswered: humanAnswered}})
 	if err != nil {
 		return Result{}, err
 	}
@@ -565,7 +593,15 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 		return e.finishCommit(ctx, state, p, stage, run, round)
 	}
 	if decision.Action == plan.Ask {
-		q := e.question(approvalTarget, "stage_confirmation", decision.Reason, stage.ID)
+		category := "stage_confirmation"
+		if slices.Contains(categories, config.MetaLoopEdit) {
+			category = config.MetaLoopEdit
+		}
+		text := decision.Reason
+		if category == config.MetaLoopEdit {
+			text = "Approve development loop edits before committing this stage? If rejected, the worker must undo the edits."
+		}
+		q := e.question(approvalTarget, category, text, stage.ID)
 		q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
 		next, err := p.Next(stage.ID, plan.Ask)
 		if err != nil {
@@ -577,7 +613,7 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 			return Result{}, err
 		}
 		// Keep a gate's evaluated round open so approval can complete the exact target.
-		if summary.Judgment == check.Pass && completion.ReadyToCommit && termination == form.TerminationCompleted && !premiseBroken {
+		if summary.Judgment == check.Pass && completion.ReadyToCommit && termination == form.TerminationCompleted {
 			update := *run
 			update.State = ledger.StageApprovalWait
 			update.NextActor = "human"
@@ -674,7 +710,7 @@ func (e *Engine) matches(ctx context.Context, tree string) (bool, error) {
 	return actual == tree, err
 }
 func changedCommand(request check.Request, output string, result *check.CommandResult) check.Judgment {
-	return check.Judgment{JudgmentResult: form.JudgmentResult{InstructionID: request.InstructionID, Aspect: request.Aspect.ID, TargetVersion: request.TargetVersion, Norms: normRefs(request.Norms), CompletionConditionIDs: []string{}, Judgment: check.Fail, Findings: []form.Finding{{ID: check.FindingID(request.Aspect.ID, request.InstructionID+":target-changed"), Blocking: true, Kind: form.AutoFixable, Scenario: "The command changed its target, or the working tree did not match before execution.\n" + output}}, CheckedScope: []string{}, UncheckedScope: []string{request.TargetPath}, Method: "Working tree comparison before and after command execution", Environment: "work checkout"}, Runner: request.Runner, Provenance: check.Provenance{Source: check.JudgeCommand, InstructionID: request.InstructionID, Runner: request.Runner}, Command: result}
+	return check.Judgment{JudgmentResult: form.JudgmentResult{InstructionID: request.InstructionID, Aspect: request.Aspect.ID, TargetVersion: request.TargetVersion, Norms: normRefs(request.Norms), CompletionConditionIDs: []string{}, Judgment: check.Fail, Findings: []form.Finding{{ID: check.FindingID(request.Aspect.ID, request.InstructionID+":target-changed"), Blocking: true, Kind: form.AutoFixable, Scenario: "The command changed its target, or the working tree did not match before execution. Configure generated command outputs to be ignored.\n" + output}}, CheckedScope: []string{}, UncheckedScope: []string{request.TargetPath}, Method: "Working tree comparison before and after command execution", Environment: "work checkout"}, Runner: request.Runner, Provenance: check.Provenance{Source: check.JudgeCommand, InstructionID: request.InstructionID, Runner: request.Runner}, Command: result}
 }
 func (e *Engine) runCheck(ctx context.Context, request check.Request, command config.Command, stage, tree string) (check.Judgment, error) {
 	match, err := e.matches(ctx, tree)
@@ -831,7 +867,7 @@ func (e *Engine) fixRound(ctx context.Context, state *ledger.State, p plan.Plan,
 func gateApproved(state *ledger.State, run *ledger.StageRun, round *ledger.Round, target form.ApprovalTarget) bool {
 	var gate *form.Question
 	for _, q := range state.Questions() {
-		if q.StopCategory != "stage_confirmation" || q.StoppedStage != run.StageID {
+		if q.StopCategory != "stage_confirmation" && q.StopCategory != config.MetaLoopEdit || q.StoppedStage != run.StageID {
 			continue
 		}
 		if slices.Contains(q.Evidence, form.Reference{RecordID: run.ID}) && slices.Contains(q.Evidence, form.Reference{RecordID: round.ID}) {

@@ -53,11 +53,12 @@ type Record struct {
 func (r Record) Kind() Kind { return r.Payload.recordKind() }
 
 type Work struct {
-	ID         string `json:"id"`
-	TaskRef    string `json:"task_ref"`
-	Branch     string `json:"branch"`
-	BaseCommit string `json:"base_commit"`
-	KitVersion string `json:"kit_version"`
+	ID              string  `json:"id"`
+	TaskRef         string  `json:"task_ref"`
+	OriginalRequest *string `json:"original_request"`
+	Branch          string  `json:"branch"`
+	BaseCommit      string  `json:"base_commit"`
+	KitVersion      string  `json:"kit_version"`
 }
 
 // Pause preserves a reference to the location before interruption.
@@ -252,13 +253,14 @@ type InstructionOutput struct {
 
 // InstructionContext keeps issuance-time facts, without storing rendered briefs.
 type InstructionContext struct {
-	Outputs           []InstructionOutput `json:"outputs"`
-	Findings          []check.Finding     `json:"findings"`
-	CurrentPlan       *plan.Plan          `json:"current_plan,omitempty"`
-	RemainingPlan     *plan.Plan          `json:"remaining_plan,omitempty"`
-	HumanInstructions string              `json:"human_instructions,omitempty"`
-	Commands          []check.Judgment    `json:"commands,omitempty"`
-	PreCommitOutput   string              `json:"pre_commit_output,omitempty"`
+	Outputs              []InstructionOutput `json:"outputs"`
+	Findings             []check.Finding     `json:"findings"`
+	CurrentPlan          *plan.Plan          `json:"current_plan,omitempty"`
+	RemainingPlan        *plan.Plan          `json:"remaining_plan,omitempty"`
+	HumanInstructions    string              `json:"human_instructions,omitempty"`
+	Commands             []check.Judgment    `json:"commands,omitempty"`
+	PreCommitOutput      string              `json:"pre_commit_output,omitempty"`
+	RetrospectiveContext string              `json:"retrospective_context,omitempty"`
 }
 
 type Artifact struct {

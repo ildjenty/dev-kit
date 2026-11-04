@@ -1,6 +1,5 @@
-// Package assets embeds everything devkit distributes: the kit assets and the principles.
-// init copies this tree as is into .devkit/kit/<version>/ in the using repository.
-// It does not depend on implementation packages; internal/kit supplies and verifies assets.
+// Package assets embeds the repository norms and binary-owned assets distributed by devkit.
+// It does not depend on implementation packages; internal/kit supplies these assets.
 // Source of truth: the assets section in docs/architecture/modules.md.
 package assets
 

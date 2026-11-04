@@ -2,6 +2,9 @@ package check
 
 import (
 	"fmt"
+	"path"
+	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/form"
@@ -9,6 +12,21 @@ import (
 
 // Aspect is a parsed form aspect template.
 type Aspect = form.AspectTemplate
+
+var aspectReference = regexp.MustCompile("`(principles/[^`\r\n]+\\.md|rules\\.md)`")
+
+// AspectReferences returns sorted, unique logical principle and rules references.
+func AspectReferences(source string) []string {
+	references := []string{}
+	for _, match := range aspectReference.FindAllStringSubmatch(source, -1) {
+		name := match[1]
+		if path.Clean(name) == name && !strings.ContainsAny(name, "\\\x00") && !slices.Contains(references, name) {
+			references = append(references, name)
+		}
+	}
+	slices.Sort(references)
+	return references
+}
 
 // ParseAspect parses the aspect heading and four fields without reading files.
 func ParseAspect(source string) (Aspect, error) {

@@ -43,7 +43,7 @@ func Difference(before, after Plan) Diff {
 		{"task", before.Task, after.Task},
 		{"completion_conditions", before.CompletionConditions, after.CompletionConditions},
 		{"start_stage", before.StartStage, after.StartStage},
-		{"meta_loop_stages", before.MetaLoopStages, after.MetaLoopStages},
+		{"open_questions", before.OpenQuestions, after.OpenQuestions},
 		{"irreversible_decisions", before.IrreversibleDecisions, after.IrreversibleDecisions},
 		{"external_operations", before.ExternalOperations, after.ExternalOperations},
 	} {
@@ -91,15 +91,15 @@ type VersionEvaluation struct {
 	Withdrawn bool
 }
 
-func (v VersionEvaluation) Executable(template PlanTemplate) bool {
+func (v VersionEvaluation) Executable(template PlanTemplate, policy string, lastApproved *Plan) bool {
 	return v.Judgment == PlanPass && !v.Rejected && !v.Withdrawn &&
-		(!(v.Origin == BackProposal || v.Plan.RequiresApproval(template)) || v.Approved)
+		(!v.Plan.RequiresApproval(template, policy, lastApproved) || v.Approved)
 }
 
 // ExecutableVersion is used only at stage start. The caller maintains the binding during execution.
 // replanAfterVersion is the old plan version awaiting replanning; normally pass zero.
 // It prevents returning to old plans and skips only voluntarily withdrawn human proposals.
-func ExecutableVersion(template PlanTemplate, versions []VersionEvaluation, replanAfterVersion int) (Plan, bool) {
+func ExecutableVersion(template PlanTemplate, versions []VersionEvaluation, replanAfterVersion int, policy string) (Plan, bool) {
 	ordered := slices.Clone(versions)
 	slices.SortFunc(ordered, func(a, b VersionEvaluation) int {
 		switch {
@@ -118,7 +118,14 @@ func ExecutableVersion(template PlanTemplate, versions []VersionEvaluation, repl
 		if version.Plan.Version <= replanAfterVersion {
 			return Plan{}, false
 		}
-		if version.Executable(template) && (replanAfterVersion == 0 || version.Approved) {
+		var lastApproved *Plan
+		for _, previous := range ordered {
+			if previous.Plan.Version < version.Plan.Version && previous.Approved && !previous.Rejected && !previous.Withdrawn {
+				lastApproved = &previous.Plan
+				break
+			}
+		}
+		if version.Executable(template, policy, lastApproved) {
 			return clonePlan(version.Plan), true
 		}
 		return Plan{}, false

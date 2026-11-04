@@ -1,21 +1,155 @@
 {
   "name": "default",
-  "start_stage": "implement",
-  "meta_loop_stages": [],
+  "start_stage": "purpose",
   "stages": [
     {
-      "id": "implement",
+      "id": "purpose",
       "assignee": "worker",
       "checks": [
         {
-          "aspect": "wording",
-          "runner": "review",
+          "aspect": "purpose",
+          "runner": "devkit-judge",
           "required": true
         }
       ],
       "gate": {
         "required": false,
-        "reason": "Wording changes that preserve the public contract"
+        "reason": "Review the results of work required for the task"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "purpose",
+        "ask": "purpose",
+        "back": "purpose",
+        "done": "replan"
+      }
+    },
+    {
+      "id": "scope",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "irreversible",
+          "runner": "devkit-judge",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": true,
+        "reason": "Review the scope, including hard-to-change decisions"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "scope",
+        "ask": "scope",
+        "back": "purpose",
+        "done": "structure"
+      }
+    },
+    {
+      "id": "structure",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "structure",
+          "runner": "devkit-judge",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "Review the results of work required for the task"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "structure",
+        "ask": "structure",
+        "back": "scope",
+        "done": "contract"
+      }
+    },
+    {
+      "id": "contract",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "contract",
+          "runner": "devkit-judge",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "Review the results of work required for the task"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "contract",
+        "ask": "contract",
+        "back": "structure",
+        "done": "steps"
+      }
+    },
+    {
+      "id": "steps",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "steps",
+          "runner": "devkit-judge",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "Review the results of work required for the task"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "steps",
+        "ask": "steps",
+        "back": "contract",
+        "done": "implement"
+      }
+    },
+    {
+      "id": "implement",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "command:test",
+          "runner": "command:test",
+          "required": true
+        },
+        {
+          "aspect": "test",
+          "runner": "devkit-judge",
+          "required": true
+        },
+        {
+          "aspect": "diff",
+          "runner": "devkit-judge",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "Review the results of work required for the task"
       },
       "limits": {
         "max_rounds": 3,
@@ -24,6 +158,36 @@
       "transitions": {
         "fix": "implement",
         "ask": "implement",
+        "back": "steps",
+        "done": "retrospective"
+      }
+    },
+    {
+      "id": "retrospective",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "command:test",
+          "runner": "command:test",
+          "required": true
+        },
+        {
+          "aspect": "harness",
+          "runner": "devkit-judge",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "Review lessons and preserve requirements and prevention measures"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "retrospective",
+        "ask": "retrospective",
         "back": "implement",
         "done": null
       }
@@ -46,7 +210,32 @@
         "fix": "research",
         "ask": "research",
         "back": "research",
-        "done": "implement"
+        "done": "purpose"
+      }
+    },
+    {
+      "id": "prototype",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "contract",
+          "runner": "devkit-judge",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "Test unverified assumptions and keep prototypes separate from production"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "prototype",
+        "ask": "prototype",
+        "back": "prototype",
+        "done": "purpose"
       }
     }
   ]

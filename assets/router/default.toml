@@ -1,15 +1,4 @@
-# Same-named classifications are overridden by additions in the consuming devkit.toml.
-# Ask a human about dependency manifest or lockfile diffs, undeclared meta-loop edits,
-# and another target change after refreshing the target around commit.
-human_confirmation = [
-  "dependency_changed",
-  "undeclared_meta_loop_edit",
-  "target_changed_again",
-]
-
-# Meta-loop edits include .devkit/ (except run/), devkit.toml, host settings,
-# instruction files, skills, and the active pre-commit hook.
-# Exclude edits in stages declaring them from undeclared_meta_loop_edit.
+# Human confirmation and lesson destination defaults belong to internal/config.
 
 # PASS does not finalize completion until the plan's completion conditions are met.
 # Limits, progress, return stages for broken premises, and termination kinds are also inputs.
@@ -24,6 +13,3 @@ worker = "Worker"
 human = "Human"
 judge = "Judge"
 planner = "Planner"
-
-[lessons]
-destinations = ["hook_lint_type", "plan_template", "principle", "skill", "kit"]

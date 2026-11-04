@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/plan"
@@ -219,8 +220,16 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 		}
 	}
 	if run, ok := state.LatestStageRun(); ok && question.StoppedStage == run.StageID {
+		if question.StopCategory == config.MetaLoopEdit && request.Interpretation != ledger.AnswerApproved {
+			update := *run
+			update.StopReason = "Undo the rejected development loop edits using the previously confirmed norms. Human instructions: " + request.Text
+			if _, err := e.append(&update); err != nil {
+				return Result{}, err
+			}
+			run = &update
+		}
 		if round, open := state.OpenRound(); open && run.State == ledger.StageApprovalWait && request.Interpretation != ledger.AnswerApproved {
-			if err = e.closeRound(state, run, round, router.Decision{Action: plan.Fix, Reason: "The human requested changes: " + request.Text}); err != nil {
+			if err = e.closeRound(state, run, round, router.Decision{Action: plan.Fix, Reason: "The human requested changes. Undo rejected development loop edits when applicable: " + request.Text}); err != nil {
 				return Result{}, err
 			}
 		}

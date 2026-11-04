@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"path"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -13,12 +15,204 @@ import (
 
 // Config represents validated devkit.toml settings.
 type Config struct {
-	KitVersion string                       `toml:"kit_version"`
-	Judges     map[string]Judge             `toml:"judges"`
-	Commands   map[string]Command           `toml:"commands"`
-	External   map[string]ExternalOperation `toml:"external"`
-	Deny       Deny                         `toml:"deny"`
-	Router     Router                       `toml:"router"`
+	KitVersion     string                       `toml:"kit_version"`
+	Judges         map[string]Judge             `toml:"judges"`
+	Commands       map[string]Command           `toml:"commands"`
+	External       map[string]ExternalOperation `toml:"external"`
+	Deny           Deny                         `toml:"deny"`
+	Router         Router                       `toml:"router"`
+	DefaultPlan    string                       `toml:"default_plan"`
+	Paths          Paths                        `toml:"paths"`
+	Approval       Approval                     `toml:"approval"`
+	Git            Git                          `toml:"git"`
+	Classification Classification               `toml:"classification"`
+	Limits         Limits                       `toml:"limits"`
+	Lessons        Lessons                      `toml:"lessons"`
+	Detection      Detection                    `toml:"detection"`
+}
+
+// Paths holds repository-relative locations for repository-owned files.
+type Paths struct {
+	Principles   string `toml:"principles"`
+	Stages       string `toml:"stages"`
+	Checks       string `toml:"checks"`
+	Plans        string `toml:"plans"`
+	Templates    string `toml:"templates"`
+	Rules        string `toml:"rules"`
+	Requirements string `toml:"requirements"`
+	Structure    string `toml:"structure"`
+	Detect       string `toml:"detect"`
+}
+
+// Approval controls when plans and edits to the development loop require approval.
+type Approval struct {
+	Plan         string `toml:"plan"`
+	MetaLoopEdit string `toml:"meta_loop_edit"`
+}
+
+// Git holds work branch and stage commit settings.
+type Git struct {
+	Branch           string `toml:"branch"`
+	CommitMessage    string `toml:"commit_message"`
+	AllowEmptyCommit *bool  `toml:"allow_empty_commit"`
+}
+
+// Classification holds dependency file glob patterns.
+type Classification struct {
+	DependencyFiles []string `toml:"dependency_files"`
+}
+
+// Limits holds continuation limits that cannot be disabled.
+type Limits struct {
+	StopContinuation int `toml:"stop_continuation"`
+}
+
+// Lessons holds the priority order of repository lesson destinations.
+type Lessons struct {
+	Destinations []string `toml:"destinations"`
+}
+
+// Detection controls whether required judge checks need passing detection tests.
+type Detection struct {
+	Required *bool `toml:"required"`
+}
+
+// DetectionRequired returns whether required judge checks need detection tests.
+func (c Config) DetectionRequired() bool {
+	return c.Detection.Required == nil || *c.Detection.Required
+}
+
+// Default human confirmation categories are also the complete set of known names.
+const (
+	DependencyChanged  = "dependency_changed"
+	MetaLoopEdit       = "meta_loop_edit"
+	TargetChangedAgain = "target_changed_again"
+)
+
+// DefaultPlanName returns the effective plan template name.
+func (c Config) DefaultPlanName() string {
+	if c.DefaultPlan == "" {
+		return "default"
+	}
+	return c.DefaultPlan
+}
+
+// RepositoryPaths returns effective repository-owned file locations.
+func (c Config) RepositoryPaths() Paths {
+	p := c.Paths
+	for _, field := range []struct {
+		value    *string
+		fallback string
+	}{
+		{&p.Principles, ".devkit/principles"},
+		{&p.Stages, ".devkit/stages"},
+		{&p.Checks, ".devkit/checks"},
+		{&p.Plans, ".devkit/plans"},
+		{&p.Templates, ".devkit/templates"},
+		{&p.Rules, ".devkit/rules.md"},
+		{&p.Requirements, ".devkit/requirements.md"},
+		{&p.Structure, ".devkit/structure.json"},
+		{&p.Detect, ".devkit/detect.json"},
+	} {
+		if *field.value == "" {
+			*field.value = field.fallback
+		}
+	}
+	return p
+}
+
+// PlanApproval returns the effective plan approval policy.
+func (c Config) PlanApproval() string {
+	if c.Approval.Plan == "" {
+		return "requirements"
+	}
+	return c.Approval.Plan
+}
+
+// MetaLoopEditApproval returns the effective development loop edit policy.
+func (c Config) MetaLoopEditApproval() string {
+	if c.Approval.MetaLoopEdit == "" {
+		return "confirm"
+	}
+	return c.Approval.MetaLoopEdit
+}
+
+func (c Config) branchPattern() string {
+	if c.Git.Branch == "" {
+		return "devkit/{work_id}"
+	}
+	return c.Git.Branch
+}
+
+// BranchName renders and validates the work branch name.
+func (c Config) BranchName(workID string) (string, error) {
+	name := strings.ReplaceAll(c.branchPattern(), "{work_id}", workID)
+	if !validBranchName(name) {
+		return "", fmt.Errorf("git.branch renders an invalid branch name: %q", name)
+	}
+	return name, nil
+}
+
+func (c Config) commitMessagePattern() string {
+	if c.Git.CommitMessage == "" {
+		return "devkit: {stage} ({work_id})"
+	}
+	return c.Git.CommitMessage
+}
+
+// CommitMessage renders the stage commit message without interpreting replacement values.
+func (c Config) CommitMessage(stage, workID, task string) string {
+	return strings.NewReplacer("{stage}", stage, "{work_id}", workID, "{task}", task).Replace(c.commitMessagePattern())
+}
+
+// AllowEmptyCommit returns whether stages without changes create empty commits.
+func (c Config) AllowEmptyCommit() bool {
+	return c.Git.AllowEmptyCommit == nil || *c.Git.AllowEmptyCommit
+}
+
+// DependencyFiles returns effective dependency globs, preserving an explicitly empty list.
+func (c Config) DependencyFiles() []string {
+	if c.Classification.DependencyFiles != nil {
+		return slices.Clone(c.Classification.DependencyFiles)
+	}
+	return []string{"go.mod", "go.sum", "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "uv.lock", "composer.json", "composer.lock"}
+}
+
+// IsDependencyFile matches dependency globs against a slash path and its base name.
+func (c Config) IsDependencyFile(name string) bool {
+	for _, pattern := range c.DependencyFiles() {
+		if matched, _ := path.Match(pattern, name); matched {
+			return true
+		}
+		if matched, _ := path.Match(pattern, path.Base(name)); matched {
+			return true
+		}
+	}
+	return false
+}
+
+// HumanConfirmation returns effective confirmation categories, replacing defaults when set.
+func (c Config) HumanConfirmation() []string {
+	if c.Router.HumanConfirmation != nil {
+		return slices.Clone(c.Router.HumanConfirmation)
+	}
+	return []string{DependencyChanged, MetaLoopEdit, TargetChangedAgain}
+}
+
+// StopContinuation returns the effective Stop continuation limit.
+func (c Config) StopContinuation() int {
+	if c.Limits.StopContinuation == 0 {
+		return 3
+	}
+	return c.Limits.StopContinuation
+}
+
+// LessonDestinations returns the effective lesson destination priority order.
+func (c Config) LessonDestinations() []string {
+	if c.Lessons.Destinations != nil {
+		return slices.Clone(c.Lessons.Destinations)
+	}
+	return []string{"hook_lint_type", "plan_template", "aspect", "principle", "skill"}
 }
 
 // Command registers a command to execute without shell expansion.
@@ -53,14 +247,23 @@ type Deny struct {
 	Judge []string `toml:"judge"`
 }
 
-// Router holds additions to the default classification table.
+// Router holds a replacement for the default human confirmation categories.
 type Router struct {
 	HumanConfirmation []string `toml:"human_confirmation"`
 }
 
 // Parse parses and validates supplied TOML without reading files.
 func Parse(data []byte) (Config, error) {
-	var c Config
+	c := Config{}
+	c.DefaultPlan = c.DefaultPlanName()
+	c.Paths = c.RepositoryPaths()
+	c.Approval = Approval{Plan: c.PlanApproval(), MetaLoopEdit: c.MetaLoopEditApproval()}
+	allowEmpty := c.AllowEmptyCommit()
+	c.Git = Git{Branch: c.branchPattern(), CommitMessage: c.commitMessagePattern(), AllowEmptyCommit: &allowEmpty}
+	c.Classification.DependencyFiles = c.DependencyFiles()
+	c.Router.HumanConfirmation = c.HumanConfirmation()
+	c.Limits.StopContinuation = c.StopContinuation()
+	c.Lessons.Destinations = c.LessonDestinations()
 	metadata, err := toml.NewDecoder(bytes.NewReader(data)).Decode(&c)
 	if err != nil {
 		return Config{}, fmt.Errorf("parse configuration: %w", err)
@@ -116,11 +319,102 @@ func (c Config) Validate() error {
 		}
 	}
 	for _, item := range c.Router.HumanConfirmation {
-		if strings.TrimSpace(item) == "" {
-			return fmt.Errorf("router.human_confirmation entries must not be empty")
+		switch item {
+		case DependencyChanged, MetaLoopEdit, TargetChangedAgain:
+		default:
+			return fmt.Errorf("unknown router.human_confirmation category: %q", item)
 		}
 	}
+	if strings.TrimSpace(c.DefaultPlan) == "" {
+		return fmt.Errorf("default_plan must not be empty")
+	}
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"principles", c.Paths.Principles},
+		{"stages", c.Paths.Stages},
+		{"checks", c.Paths.Checks},
+		{"plans", c.Paths.Plans},
+		{"templates", c.Paths.Templates},
+		{"rules", c.Paths.Rules},
+		{"requirements", c.Paths.Requirements},
+		{"structure", c.Paths.Structure},
+		{"detect", c.Paths.Detect},
+	} {
+		if !validRepositoryPath(field.value) {
+			return fmt.Errorf("paths.%s must be a clean repository-relative slash path outside .devkit/run: %q", field.name, field.value)
+		}
+	}
+	switch c.Approval.Plan {
+	case "requirements", "always", "deviation":
+	default:
+		return fmt.Errorf("approval.plan must be requirements, always, or deviation")
+	}
+	switch c.Approval.MetaLoopEdit {
+	case "confirm", "allow":
+	default:
+		return fmt.Errorf("approval.meta_loop_edit must be confirm or allow")
+	}
+	if !strings.Contains(c.Git.Branch, "{work_id}") || !validBranchName(strings.ReplaceAll(c.Git.Branch, "{work_id}", "work")) {
+		return fmt.Errorf("git.branch must contain {work_id} and render a valid git branch name")
+	}
+	if strings.TrimSpace(c.Git.CommitMessage) == "" {
+		return fmt.Errorf("git.commit_message must not be empty")
+	}
+	placeholders := strings.NewReplacer("{stage}", "", "{work_id}", "", "{task}", "").Replace(c.Git.CommitMessage)
+	if strings.ContainsAny(placeholders, "{}") {
+		return fmt.Errorf("git.commit_message contains an unknown or malformed placeholder")
+	}
+	for _, pattern := range c.Classification.DependencyFiles {
+		if _, err := path.Match(pattern, ""); err != nil {
+			return fmt.Errorf("invalid classification.dependency_files pattern %q: %w", pattern, err)
+		}
+	}
+	if c.Limits.StopContinuation < 1 {
+		return fmt.Errorf("limits.stop_continuation must be at least 1")
+	}
+	seen := make(map[string]bool)
+	for _, destination := range c.Lessons.Destinations {
+		switch destination {
+		case "hook_lint_type", "plan_template", "aspect", "principle", "skill":
+		default:
+			return fmt.Errorf("unknown lessons.destinations value: %q", destination)
+		}
+		if seen[destination] {
+			return fmt.Errorf("duplicate lessons.destinations value: %q", destination)
+		}
+		seen[destination] = true
+	}
 	return nil
+}
+
+func validRepositoryPath(value string) bool {
+	if value == "" || value == "." || path.IsAbs(value) || strings.ContainsAny(value, "\\\x00") || path.Clean(value) != value {
+		return false
+	}
+	if len(value) >= 3 && value[1] == ':' && value[2] == '/' {
+		return false
+	}
+	if slices.Contains(strings.Split(value, "/"), "..") {
+		return false
+	}
+	return value != ".devkit/run" && !strings.HasPrefix(value, ".devkit/run/")
+}
+
+func validBranchName(name string) bool {
+	if name == "" || name == "HEAD" || strings.HasPrefix(name, "-") || strings.HasSuffix(name, ".") || strings.Contains(name, "..") || strings.Contains(name, "@{") || strings.ContainsAny(name, " ~^:?*[\\") {
+		return false
+	}
+	if strings.IndexFunc(name, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
+		return false
+	}
+	for _, component := range strings.Split(name, "/") {
+		if component == "" || strings.HasPrefix(component, ".") || strings.HasSuffix(component, ".lock") {
+			return false
+		}
+	}
+	return true
 }
 
 func validateCommand(section, name string, command Command) error {

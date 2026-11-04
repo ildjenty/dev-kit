@@ -240,7 +240,10 @@ func TestPlanAndJudgmentQueries(t *testing.T) {
 		}, Runner: "judge"}})
 	}
 	pass(1)
-	if executable, ok := loadState(t, store).ExecutablePlan(template, norms); !ok || executable.Version != 1 {
+	initialTarget := form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: 1}
+	appendRecord(t, store, &Question{Question: form.Question{ID: "plan-1", ApprovalTarget: initialTarget}})
+	appendRecord(t, store, &Approval{Answer: Answer{QuestionID: "plan-1", Target: initialTarget, Interpretation: AnswerApproved}})
+	if executable, ok := loadState(t, store).ExecutablePlan(template, norms, "always"); !ok || executable.Version != 1 {
 		t.Fatalf("initial plan: %+v, %v", executable, ok)
 	}
 	run := &StageRun{StageID: stage.ID, PlanVersion: 1, State: StageWorking}
@@ -249,14 +252,14 @@ func TestPlanAndJudgmentQueries(t *testing.T) {
 	appendRecord(t, store, round)
 	proposal.Version = 2
 	appendRecord(t, store, &PlanVersion{Plan: proposal, Origin: plan.HumanProposal})
-	if _, ok := loadState(t, store).ExecutablePlan(template, norms); ok {
+	if _, ok := loadState(t, store).ExecutablePlan(template, norms, "always"); ok {
 		t.Fatal("pending proposal allowed old plan execution")
 	}
 	if position := loadState(t, store).CurrentPosition(); position.Plan.Plan.Version != 1 {
 		t.Fatal("proposal changed the running stage binding")
 	}
 	appendRecord(t, store, &Withdrawal{PlanVersion: 2})
-	if executable, ok := loadState(t, store).ExecutablePlan(template, norms); !ok || executable.Version != 1 {
+	if executable, ok := loadState(t, store).ExecutablePlan(template, norms, "always"); !ok || executable.Version != 1 {
 		t.Fatal("voluntary withdrawal blocked old plan")
 	}
 	closed := *round
@@ -265,23 +268,23 @@ func TestPlanAndJudgmentQueries(t *testing.T) {
 	if _, ok := loadState(t, store).OpenRound(); ok {
 		t.Fatal("decided round remained open")
 	}
-	if _, ok := loadState(t, store).ExecutablePlan(template, norms); ok {
+	if _, ok := loadState(t, store).ExecutablePlan(template, norms, "always"); ok {
 		t.Fatal("back transition allowed old plan")
 	}
 	proposal.Version = 3
 	appendRecord(t, store, &PlanVersion{Plan: proposal, Origin: plan.BackProposal})
 	pass(3)
-	if _, ok := loadState(t, store).ExecutablePlan(template, norms); ok {
+	if _, ok := loadState(t, store).ExecutablePlan(template, norms, "always"); ok {
 		t.Fatal("replanning proceeded without approval")
 	}
 	target := form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: 3}
 	appendRecord(t, store, &Question{Question: form.Question{ID: "plan-3", ApprovalTarget: target}})
 	appendRecord(t, store, &Approval{Answer: Answer{QuestionID: "plan-3", Target: target, Interpretation: AnswerApproved}})
-	if executable, ok := loadState(t, store).ExecutablePlan(template, norms); !ok || executable.Version != 3 {
+	if executable, ok := loadState(t, store).ExecutablePlan(template, norms, "always"); !ok || executable.Version != 3 {
 		t.Fatalf("approved replan: %+v, %v", executable, ok)
 	}
 	changedNorms := []form.NormReference{{Path: "rules", BlobID: "changed"}}
-	if _, ok := loadState(t, store).ExecutablePlan(template, changedNorms); ok {
+	if _, ok := loadState(t, store).ExecutablePlan(template, changedNorms, "requirements"); ok {
 		t.Fatal("changed norms did not invalidate judgment")
 	}
 }

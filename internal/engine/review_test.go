@@ -235,7 +235,7 @@ func TestCommitRecoveryAfterPauseInHook(t *testing.T) {
 }
 
 func TestPauseAndStatusWithoutForwardAssets(t *testing.T) {
-	for _, broken := range []string{"devkit.toml", ".devkit/kit/v1/schemas/progress.json"} {
+	for _, broken := range []string{"devkit.toml"} {
 		t.Run(filepath.Base(broken), func(t *testing.T) {
 			e, ctx := fixture(t)
 			working(t, e, ctx)
@@ -442,7 +442,9 @@ func TestDetectionCommandRetriesAfterHumanAnswer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, e.Root(), "devkit.toml", string(settings)+"\n[judges.devkit-judge]\nexecutable = '/bin/sh'\nargs = ['-c', \"printf 'attempt\\\\n' >> .devkit/run/attempts; if test ! -f .devkit/run/retry; then touch .devkit/run/retry; exit 7; fi; cat .devkit/run/detection-result.json\"]\ntimeout_seconds = 5\noutput_schema = '.devkit/kit/v1/schemas/judgment.json'\n")
+	write(t, e.Root(), "devkit.toml", string(settings)+"\n[judges.devkit-judge]\nexecutable = '/bin/sh'\nargs = ['-c', \"printf 'attempt\\\\n' >> .devkit/run/attempts; if test ! -f .devkit/run/retry; then touch .devkit/run/retry; exit 7; fi; cat .devkit/run/detection-result.json\"]\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n")
+	git(t, e.Root(), "add", ".")
+	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Register detection command")
 	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
@@ -475,7 +477,7 @@ func TestDetectionCommandRetriesAfterHumanAnswer(t *testing.T) {
 		if example.Kind == check.Violation {
 			judgment.Findings = []form.Finding{{ID: "example-violation", Blocking: true, Kind: form.AutoFixable, Scenario: "The example violates the blocking condition"}}
 		}
-		output.Observations = append(output.Observations, form.DetectionObservation{File: example.File, Judgment: judgment, Reason: "The observation distinguishes the example", MatchesBlocking: example.Kind == check.Violation, RespectsDifference: example.Kind != check.Violation})
+		output.Observations = append(output.Observations, form.DetectionObservation{File: example.ID, Judgment: judgment, Reason: "The observation distinguishes the example"})
 	}
 	write(t, e.Root(), ".devkit/run/detection-result.json", string(marshal(t, output)))
 	observeAnswer(t, e, "Retry the registered detection command.")
@@ -674,6 +676,14 @@ func TestRoundOpeningTestsUncommittedAspect(t *testing.T) {
 	}
 	write(t, e.Root(), path, string(aspect)+"\nUpdated detection criteria.\n")
 	result, err := e.Next(ctx)
+	if err != nil || result.Instruction == nil || result.Instruction.Question == nil || result.Instruction.Question.StopCategory != config.MetaLoopEdit {
+		t.Fatalf("uncommitted aspect did not require confirmation: %+v, %v", result, err)
+	}
+	observeAnswer(t, e, "Approve the updated aspect.")
+	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: result.Instruction.Question.ID, Interpretation: ledger.AnswerApproved}); err != nil {
+		t.Fatal(err)
+	}
+	result, err = e.Next(ctx)
 	if err != nil || result.Instruction == nil || result.Instruction.Kind != form.InstructionDetectionTest {
 		t.Fatalf("uncommitted aspect used an old detection pass: %+v, %v", result, err)
 	}

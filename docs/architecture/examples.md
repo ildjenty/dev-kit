@@ -1,27 +1,70 @@
 # 最小の例
 
-雛形・計画・設定は [PlanTemplate と Plan](data.md#ループの雛形-plantemplate)、[config](modules.md#config)、[検出試験](guarantees.md#検出試験)に従う。
+雛形・計画・設定は [PlanTemplate と Plan](data.md#ループの雛形-plantemplate)、[config](modules.md#config)、[検出試験](guarantees.md#検出試験)に従う。利用側の資産は `[paths]` の既定の場所で示し、設定で変更できる。
 
 ## 雛形と計画
 
-`init` が用意する既定の雛形を、利用側の `.devkit/plans/default.json` に置く例。`assignee` の `worker` は作業者(セッション自身)、`human` は人を表す。遷移の `fix`・`ask`・`back`・`done` は、それぞれ修正する・人に確認する・前のステージに戻る・完了するを表し、`done` の `null` は最後のステージを示す。
+既定の雛形は次の構成である。
+
+- `default`: purpose → scope → structure → contract → steps → implement → retrospective。候補は research と prototype であり、scope にゲートを置く。implement の必須 check は `command:test`・`test`・`diff` である。
+- `fix`: implement → retrospective。候補は research と prototype であり、implement の必須 check は `command:test`・`test`・`diff` である。
+- `docs`: implement → retrospective。implement の必須 check は `wording` である。
+
+`default` は、要件定義を先に行い、合意した完了条件で残りの計画を作る形にする。`.devkit/plans/default.json` の `purpose` に置く遷移表は次のとおりである。
 
 ```json
 {
-  "name": "default",
+  "fix": "purpose",
+  "ask": "purpose",
+  "back": "purpose",
+  "done": "replan"
+}
+```
+
+最初の計画は `purpose` から始め、`completion_conditions` には要件と完了条件の合意に関する条件を文章で書く。
+
+```json
+[
+  { "id": "R1", "description": "人に確かめた要件が requirements に記録されている" },
+  { "id": "R2", "description": "残りの作業の完了条件の案が人と合意できている" }
+]
+```
+
+最初の計画を人が承認してから、`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md` に書き、完了条件の案を作る。置き場所は `[paths] requirements` で変更できる。`purpose` の完了後、`done: "replan"` により既存の再計画の経路へ進み、計画者が合意した完了条件で残りの計画を作り直す。作り直した計画は計画の check を通し、完了条件が変わるため既定では人が承認してから残りのステージを始める。
+
+遷移 `done` は、次のステージ ID、作業の終了を表す `null`、ステージの完了後に残りを再計画する `"replan"` を取る。要件定義を先に行って再計画するかは雛形の組み方で決まり、kit は要件定義を特別扱いしない。`fix` と `docs` は `purpose` の後に再計画する形を使わない。
+
+retrospective は作業者が担当し、必須 check は `command:test` と `harness` である。判定者の runner は `init` が配るサブエージェント `devkit-judge` とする。`--plan` の省略時は `default_plan` の値(既定 `"default"`)を使う。不要なステージを外す場合は、逸脱として承認の問いに示す。
+
+`init` が用意する `.devkit/plans/fix.json` の例である。`assignee` の `worker` は作業者(セッション自身)を表す。遷移の `fix`・`ask`・`back`・`done` は、修正・人への確認・前のステージへの戻り・完了を表し、`done` の `null` は最後のステージを示す。
+
+```json
+{
+  "name": "fix",
   "start_stage": "implement",
-  "meta_loop_stages": [],
   "stages": [
     {
       "id": "implement",
       "assignee": "worker",
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true },
-        { "aspect": "wording", "runner": "review", "required": true }
+        { "aspect": "test", "runner": "devkit-judge", "required": true },
+        { "aspect": "diff", "runner": "devkit-judge", "required": true }
       ],
-      "gate": { "required": false, "reason": "公開契約を変えない文言の修正" },
+      "gate": { "required": false, "reason": "公開契約を保つ修正" },
       "limits": { "max_rounds": 3, "max_no_progress": 2 },
-      "transitions": { "fix": "implement", "ask": "implement", "back": "implement", "done": null }
+      "transitions": { "fix": "implement", "ask": "implement", "back": "implement", "done": "retrospective" }
+    },
+    {
+      "id": "retrospective",
+      "assignee": "worker",
+      "checks": [
+        { "aspect": "command:test", "runner": "command:test", "required": true },
+        { "aspect": "harness", "runner": "devkit-judge", "required": true }
+      ],
+      "gate": { "required": false, "reason": "作業の問題と再発防止を確認する" },
+      "limits": { "max_rounds": 3, "max_no_progress": 2 },
+      "transitions": { "fix": "retrospective", "ask": "retrospective", "back": "implement", "done": null }
     }
   ],
   "optional_stages": [
@@ -29,23 +72,34 @@
       "id": "research",
       "assignee": "worker",
       "checks": [],
-      "gate": { "required": false, "reason": "調査結果を次のステージに渡す" },
+      "gate": { "required": false, "reason": "調査結果を実装に渡す" },
       "limits": { "max_rounds": 1, "max_no_progress": 1 },
       "transitions": { "fix": "research", "ask": "research", "back": "research", "done": "implement" }
+    },
+    {
+      "id": "prototype",
+      "assignee": "worker",
+      "checks": [
+        { "aspect": "contract", "runner": "devkit-judge", "required": true }
+      ],
+      "gate": { "required": false, "reason": "未確認の前提を試作で確かめる" },
+      "limits": { "max_rounds": 3, "max_no_progress": 2 },
+      "transitions": { "fix": "prototype", "ask": "prototype", "back": "prototype", "done": "implement" }
     }
-  ]
+  ],
+  "plan_limits": { "max_rounds": 3 }
 }
 ```
 
-課題「保存ボタンの文言の修正」から作った計画の例。調査は不要なので候補の `research` は足さず、`implement` を選ぶ。`template.content_hash` は、上の JSON に末尾の改行を含めた雛形ファイルの SHA-256 の例である。
+課題「保存ボタンの文言の修正」から作る計画の例である。候補の research と prototype は使わず、implement と retrospective を採用する。`template.content_hash` は、雛形の JSON に末尾の改行を含めた SHA-256 である。完了条件ごとの確認手段は[計画](data.md#計画-plan)に従う。
 
 ```json
 {
   "version": 1,
-  "template": { "name": "default", "content_hash": "ad129ad29196a75002c26666388190219abb207bc4b79b69d1aa23da211e9ee5" },
-  "task": "保存ボタンの文言を『登録』から『保存』に変える",
+  "template": { "name": "fix", "content_hash": "2b6eb6bff421d47ee988e7b7fe649c456916677b09217be1ef7a73d430079c9d" },
+  "task": "保存ボタンの文言を「登録」から「保存」に変える",
   "completion_conditions": [
-    { "id": "C1", "description": "保存ボタンに『保存』と表示され、既存のテストが通る" }
+    { "id": "C1", "description": "保存ボタンに「保存」と表示され、その表示を確かめるテストが登録済みのコマンドから実行されて通る" }
   ],
   "start_stage": "implement",
   "stages": [
@@ -54,25 +108,44 @@
       "assignee": "worker",
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "返却後のツリー" },
-        { "aspect": "wording", "runner": "review", "required": true, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示とそのテスト" }
+        { "aspect": "test", "runner": "devkit-judge", "required": true, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示と、その表示を確かめるテスト" },
+        { "aspect": "diff", "runner": "devkit-judge", "required": true, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示と、その表示を確かめるテスト" }
       ],
-      "gate": { "required": false, "reason": "公開契約を変えない文言の修正" },
+      "gate": { "required": false, "reason": "公開契約を保つ修正" },
       "limits": { "max_rounds": 3, "max_no_progress": 2 },
-      "transitions": { "fix": "implement", "ask": "implement", "back": "implement", "done": null }
+      "transitions": { "fix": "implement", "ask": "implement", "back": "implement", "done": "retrospective" }
+    },
+    {
+      "id": "retrospective",
+      "assignee": "worker",
+      "checks": [
+        { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "返却後のツリー" },
+        { "aspect": "harness", "runner": "devkit-judge", "required": true, "completion_condition_ids": ["C1"], "target": "その作業の判定と指摘、要件への反映、規範の不足と再発防止" }
+      ],
+      "gate": { "required": false, "reason": "作業の問題と再発防止を確認する" },
+      "limits": { "max_rounds": 3, "max_no_progress": 2 },
+      "transitions": { "fix": "retrospective", "ask": "retrospective", "back": "implement", "done": null }
     }
   ],
-  "external_operations": []
+  "external_operations": [],
+  "open_questions": []
 }
 ```
 
-上の計画で作業した[終了ブロック](data.md#進捗-progress)の例。`instruction_id` には作業の指示で受け取った ID を入れる。提出は[作業結果の提出](flow.md#作業結果の提出)、受理は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
+`open_questions` は任意の文字列配列であり、計画者が決められなかった要求を入れる。人が承認した完了条件が作業の完了基準となる。既定の `[approval] plan = "requirements"` では最初の計画を確認する。同じ完了条件で逸脱も外部操作もない再計画には再確認を求めない。未決事項への回答は、計画の却下と作り直しの指示として計画者に渡す。
+
+implement の終了ブロックの例である。`instruction_id` は作業の指示で受け取った ID とする。提出は[作業結果の提出](flow.md#作業結果の提出)、受理は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
 
 ```json
 {
   "instruction_id": "<作業指示 ID>",
   "termination_kind": "完了を主張",
-  "work_performed": ["保存ボタンの文言を『登録』から『保存』に変更した"],
-  "confirmed": ["保存ボタンに『保存』と表示され、既存のテストが通る"],
+  "work_performed": [
+    "保存ボタンの文言を「登録」から「保存」に変更し、表示を確かめるテストを追加した"
+  ],
+  "confirmed": [
+    "保存ボタンに「保存」と表示され、登録済みのコマンドから表示のテストが実行されて通る"
+  ],
   "unconfirmed": [],
   "obstacles": [],
   "temporary_state": [],
@@ -80,31 +153,68 @@
 }
 ```
 
+retrospective は、その作業の判定と指摘、人の回答や教訓を確認して再発防止を反映し、purpose で反映していない要件を `.devkit/requirements.md` に残す。要件と構造の変更はステージの判定で確認し、規範を変更した場合はループ自身の変更として人に確認する。
+
 ## 設定
 
-`devkit.toml` の例。実行ファイル・固定引数・期限を登録する。`review` は上の雛形と計画で画面を起動・確認する[実行主体(runner)](data.md#計画-plan)(check の担当)であり、`[judges]` の判定コマンドとして登録する。スクリプトと出力スキーマのパスは利用側で用意するものに合わせる。
+`devkit.toml` の例である。`devkit-judge` はサブエージェント定義を使うため、判定コマンドの登録は不要である。検証コマンド `test` の実行ファイルは利用側で用意する。
 
 ```toml
 kit_version = "v1"
+default_plan = "default"
 
-[commands]
-test = { executable = "./scripts/test", args = [], timeout_seconds = 120 }
+[paths]
+principles = ".devkit/principles"
+stages = ".devkit/stages"
+checks = ".devkit/checks"
+plans = ".devkit/plans"
+templates = ".devkit/templates"
+rules = ".devkit/rules.md"
+requirements = ".devkit/requirements.md"
+structure = ".devkit/structure.json"
+detect = ".devkit/detect.json"
 
-[judges]
-review = { executable = "./scripts/judge", args = [], timeout_seconds = 120, output_schema = ".devkit/kit/v1/schemas/judgment.json" }
+[approval]
+plan = "requirements"
+meta_loop_edit = "confirm"
+
+[git]
+branch = "devkit/{work_id}"
+commit_message = "devkit: {stage} ({work_id})"
+allow_empty_commit = true
+
+[classification]
+dependency_files = ["go.mod", "go.sum", "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "uv.lock", "composer.json", "composer.lock"]
+
+[limits]
+stop_continuation = 3
+
+[detection]
+required = true
+
+[lessons]
+destinations = ["hook_lint_type", "plan_template", "aspect", "principle", "skill"]
+
+[commands.test]
+executable = "./scripts/test"
+args = []
+timeout_seconds = 120
 
 [deny]
 rules = ["Bash(git push *)", "Agent(fork)"]
-
-[router]
-human_confirmation = ["billing_changed"]
 ```
 
-`[router]` は課金に関わる変更を人への確認の分類に追記する例であり、[分類表の既定](guarantees.md#人への確認対象)に従う。`[deny]` の構文は [PreToolUse](hooks.md#pretooluse)、結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)に従う。
+`kit_version` は記録形式とバイナリの互換性を識別する値であり、作業にも記録する。`[paths]` の値は変更できる。実行の記録と生成物の `.devkit/run/` は固定である。`[detection] required` は既定 `true` であり、`false` なら検出試験を指示せず、合格記録なしで判定を受理する。`[lessons] destinations` は、機械の検査 → 雛形 → 観点 → 原則 → skill の優先順を表す。
+
+分類表は既定を上書き・追加・削除でき、未知の分類名を指定すると設定エラーになる。`[classification] dependency_files` は依存の宣言として扱うファイルの glob である。`[deny]` の構文は [PreToolUse](hooks.md#pretooluse)、結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)に従う。
+
+検証コマンドの期限は登録ごとに必須である。ラウンド開始時に `test` が未登録なら、`command:test` は `FAIL` となり、検証の手段を作って `[commands.test]` に登録するよう `auto-fixable` の指摘を返す。登録はループ自身の変更として `[approval] meta_loop_edit` に従い確認し、次のラウンドのスナップショットから使う。
+
+`devkit init` は人が導入内容を確認したあと、導入したファイルをコミットする。`devkit init --no-commit` で省略した場合は手動でコミットする。HEAD がない場合、または導入したファイルが未コミットの場合は `start` を拒否し、理由と直し方を返す。
 
 ## 観点と検出試験
 
-観点ファイル `.devkit/checks/wording.md` の例。[Judgment](data.md#check-の結果-judgment)(観点ごとの判定結果)を返し、`NOT ASSESSED`(未評価)の判定値は同じ定義に従う。
+観点ファイル `.devkit/checks/wording.md` の例である。[Judgment](data.md#check-の結果-judgment)(観点ごとの判定結果)を返し、`NOT ASSESSED`(未評価)の判定値は同じ定義に従う。
 
 ```markdown
 # wording
@@ -122,25 +232,25 @@ human_confirmation = ["billing_changed"]
   wording.md
   wording/
     spec.json
-    violation.html
-    conforming.html
-    allowed.html
+    case-a.html
+    case-b.html
+    case-c.html
 ```
 
-`checks/wording/spec.json` は例のファイル名と期待判定を持つ。
+`.devkit/checks/wording/spec.json` は例のファイル名と期待判定を持つ。
 
 ```json
 {
   "aspect": "wording",
   "cases": [
-    { "kind": "violation", "file": "violation.html", "expected": "FAIL" },
-    { "kind": "conforming", "file": "conforming.html", "expected": "PASS" },
-    { "kind": "allowed", "file": "allowed.html", "expected": "PASS" }
+    { "kind": "violation", "file": "case-a.html", "expected": "FAIL" },
+    { "kind": "conforming", "file": "case-b.html", "expected": "PASS" },
+    { "kind": "allowed", "file": "case-c.html", "expected": "PASS" }
   ]
 }
 ```
 
-各 HTML の最小の内容は、違反例が `<button id="save">登録</button>`、適合例が `<button id="save">保存</button>`、許容例が `<button id="save">保存</button><button id="other">登録</button>`。試験の完了条件は「`save` の文言が『保存』」とする。起動と画面の確認方法も依頼に含め、上の計画と同じ判定コマンド `review` で実行する。合格の扱いは[検出試験](guarantees.md#検出試験)に従う。
+各 HTML の最小の内容は、case-a.html が `<button id="save">登録</button>`、case-b.html が `<button id="save">保存</button>`、case-c.html が `<button id="save">保存</button><button id="other">登録</button>`である。試験の完了条件は「`save` の文言が『保存』」とする。起動と画面の確認方法も依頼に含め、サブエージェント `devkit-judge` に判定を依頼する。例は本文だけを渡し、種別と期待判定は渡さない。spec.json は判定者に渡さず、期待との照合は devkit が行う。合格の識別には観点・試験仕様・担当の定義に加え、観点が参照する原則と規則の内容ハッシュを含める。原則や規則が変われば、それを参照する観点の合格記録は再利用できない。合格の扱いは[検出試験](guarantees.md#検出試験)に従う。
 
 ## pre-commit
 

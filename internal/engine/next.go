@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/check"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/external"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/ledger"
@@ -128,7 +130,7 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		}
 		if run, ok := state.LatestStageRun(); ok && run.State != ledger.StageInvalidated {
 			if recovered, r, err := e.recoverCommit(ctx, state, run); err != nil || recovered {
-				if err != nil || r.Instruction != nil || r.Paused {
+				if err != nil || r.Instruction != nil || r.Paused || r.Message != "" {
 					return r, err
 				}
 				continue
@@ -224,15 +226,30 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 			}
 			return e.issueQuestion(state, q)
 		}
-		if !latest.Executable(t) {
-			q := e.question(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: latest.Plan.Version}, "plan_approval", "Approve this checked plan?", latest.Plan.StartStage)
+		settings, err := e.settings(ctx, head)
+		if err != nil {
+			return result, err
+		}
+		var lastApproved *plan.Plan
+		for _, previous := range state.PlanEvaluations(nil) {
+			if previous.Plan.Version < latest.Plan.Version && previous.Approved && !previous.Rejected && !previous.Withdrawn {
+				p := previous.Plan
+				lastApproved = &p
+			}
+		}
+		if !latest.Executable(t, settings.PlanApproval(), lastApproved) {
+			text, err := e.planApprovalText(state, t, latest.Plan)
+			if err != nil {
+				return result, err
+			}
+			q := e.question(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: latest.Plan.Version}, "plan_approval", text, latest.Plan.StartStage)
 			q, err = e.saveQuestion(state, q, "")
 			if err != nil {
 				return result, err
 			}
 			return e.issueQuestion(state, q)
 		}
-		p, executable := state.ExecutablePlan(t, norms)
+		p, executable := state.ExecutablePlan(t, norms, settings.PlanApproval())
 		if !executable {
 			n, err := e.highestPlan()
 			if err != nil {
@@ -279,7 +296,11 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 					}
 					continue
 				}
-				stageID = *target
+				if *target == "replan" {
+					stageID = p.StartStage
+				} else {
+					stageID = *target
+				}
 			} else {
 				old, ok, err := e.boundPlan(run.PlanVersion)
 				if err != nil {
@@ -321,7 +342,7 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		if round, ok := state.OpenRound(); ok {
 			if round.ReturnedTarget != nil {
 				r, err := e.judgeRound(ctx, state, p, stage, run, round)
-				if err != nil || r.Instruction != nil || r.Paused {
+				if err != nil || r.Instruction != nil || r.Paused || r.Message != "" {
 					return r, err
 				}
 				continue
@@ -359,17 +380,24 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		if err != nil {
 			return result, err
 		}
-		if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), snapshot.Tree); err != nil || pending {
+		startRef, question, err := e.confirmRoundNorms(ctx, state, run, snapshot.Tree)
+		if err != nil {
+			return result, err
+		}
+		if question != nil {
+			return e.issueQuestion(state, *question)
+		}
+		if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), startRef); err != nil || pending {
 			if err != nil || r.Instruction != nil || r.Paused {
 				return r, err
 			}
 			continue
 		}
-		norms, err = e.norms(ctx, snapshot.Tree)
+		norms, err = e.norms(ctx, startRef)
 		if err != nil {
 			return result, err
 		}
-		round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: snapshot.Tree}, Norms: norms}
+		round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: startRef}, Norms: norms}
 		if _, err = e.append(round); err != nil {
 			return result, err
 		}
@@ -669,7 +697,7 @@ func (e *Engine) refreshTarget(ctx context.Context, state *ledger.State, run *le
 		}
 	}
 	if count > 0 {
-		q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: round.ReturnedTarget.Tree}, router.TargetChangedAgain, "The target changed again after its one permitted refresh. Confirm how to continue.", run.StageID)
+		q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: round.ReturnedTarget.Tree}, config.TargetChangedAgain, "The target changed again after its one permitted refresh. Confirm how to continue.", run.StageID)
 		q, err = e.saveQuestion(state, q, "")
 		if err != nil {
 			return Result{}, err
@@ -710,19 +738,136 @@ func (e *Engine) refreshTarget(ctx context.Context, state *ledger.State, run *le
 	return e.judgeRound(ctx, state, p, stage, run, &copy)
 }
 
-func differenceCategories(paths []string, meta bool) []string {
+func differenceCategories(paths []string, settings config.Config) []string {
 	categories := []string{}
+	p := settings.RepositoryPaths()
+	roots := []string{p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, "devkit.toml", ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md", ".claude/settings.json", ".codex/hooks.json", ".codex/config.toml", ".codex/rules", ".agents/skills", ".husky", ".pre-commit-config.yaml"}
 	for _, path := range paths {
-		base := filepath.Base(path)
-		if slices.Contains([]string{"go.mod", "go.sum", "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "uv.lock", "composer.json", "composer.lock"}, base) {
-			categories = append(categories, router.DependencyChanged)
+		if settings.IsDependencyFile(path) {
+			categories = append(categories, config.DependencyChanged)
 		}
-		if !meta && (strings.HasPrefix(path, ".devkit/") && !strings.HasPrefix(path, ".devkit/run/") || path == "devkit.toml" || path == "AGENTS.md" || path == "CLAUDE.md" || strings.HasPrefix(path, ".claude/") || strings.HasPrefix(path, ".codex/") || strings.HasPrefix(path, ".agents/skills/") || strings.HasPrefix(path, ".husky/") || path == ".pre-commit-config.yaml") {
-			categories = append(categories, router.UndeclaredMetaLoopEdit)
+		for _, root := range roots {
+			if path == root || strings.HasPrefix(path, root+"/") {
+				categories = append(categories, config.MetaLoopEdit)
+				break
+			}
 		}
 	}
 	slices.Sort(categories)
 	return slices.Compact(categories)
+}
+
+func (e *Engine) metaLoopChanged(ctx context.Context, before, after string) (bool, error) {
+	paths, err := e.workspace.ChangedFiles(ctx, before, after)
+	if err != nil {
+		return false, err
+	}
+	for _, ref := range []string{before, after} {
+		settings, err := e.settings(ctx, ref)
+		if err != nil {
+			return false, err
+		}
+		if slices.Contains(differenceCategories(paths, settings), config.MetaLoopEdit) {
+			return true, nil
+		}
+	}
+	hookPath, err := e.workspace.PreCommitPath(ctx)
+	return slices.Contains(paths, hookPath), err
+}
+
+func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run *ledger.StageRun, tree string) (string, *form.Question, error) {
+	work, _ := state.Work()
+	base := work.BaseCommit
+	var rejected *form.Question
+	lastApproval, lastRejection := "", ""
+	answers := state.AnsweredQuestions()
+	for _, q := range state.Questions() {
+		if q.StopCategory != config.MetaLoopEdit || q.ApprovalTarget.Kind != form.ApprovalTree {
+			continue
+		}
+		answer, ok := answers[q.ID]
+		if !ok {
+			continue
+		}
+		if effective, ok := state.ResolveAnswer(q.ApprovalTarget); !ok || effective.RecordID != answer.RecordID {
+			continue
+		}
+		if answer.Answer.Interpretation == ledger.AnswerApproved {
+			if answer.RecordID > lastApproval {
+				base, lastApproval = q.ApprovalTarget.Tree, answer.RecordID
+			}
+		} else if answer.RecordID > lastRejection {
+			copy := q
+			rejected, lastRejection = &copy, answer.RecordID
+		}
+	}
+	if lastRejection < lastApproval {
+		rejected = nil
+	}
+	settings, err := e.settings(ctx, base)
+	if err != nil {
+		return "", nil, err
+	}
+	if settings.MetaLoopEditApproval() == "allow" {
+		return tree, nil, nil
+	}
+	changed, err := e.metaLoopChanged(ctx, base, tree)
+	if err != nil || !changed {
+		return tree, nil, err
+	}
+	if rejected != nil {
+		changed, err := e.metaLoopChanged(ctx, rejected.ApprovalTarget.Tree, tree)
+		if err != nil {
+			return "", nil, err
+		}
+		if !changed {
+			fixed, err := e.workspace.CommitTree(ctx, base)
+			if err != nil {
+				fixed = base
+			}
+			return fixed, nil, nil
+		}
+	}
+	q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: tree}, config.MetaLoopEdit, "Approve development loop edits before opening the next round? If rejected, the worker must undo the edits.", run.StageID)
+	q.Evidence = []form.Reference{{RecordID: run.ID}}
+	q, err = e.saveQuestion(state, q, "")
+	return tree, &q, err
+}
+
+func (e *Engine) planApprovalText(state *ledger.State, template plan.PlanTemplate, p plan.Plan) (string, error) {
+	work, _ := state.Work()
+	original := originalRequest(work)
+	if work.OriginalRequest == nil {
+		original = "No original user request was observed."
+	}
+	task, err := os.ReadFile(filepath.Join(e.workRoot(), work.TaskRef))
+	if err != nil {
+		return "", err
+	}
+	var text strings.Builder
+	fmt.Fprintf(&text, "Approve this checked plan?\n\nOriginal user request:\n%s\n\nTask supplied to start:\n%s\n\nCompletion conditions:\n", original, task)
+	for _, condition := range p.CompletionConditions {
+		fmt.Fprintf(&text, "- %s: %s\n", condition.ID, condition.Description)
+	}
+	text.WriteString("\nAdopted stages and required checks:\n")
+	for _, stage := range p.Stages {
+		fmt.Fprintf(&text, "- %s\n", stage.ID)
+		for _, item := range stage.RequiredChecks() {
+			fmt.Fprintf(&text, "  - %s (%s), conditions: %s; target: %s\n", item.Aspect, item.Runner, strings.Join(item.CompletionConditionIDs, ", "), item.Target)
+		}
+	}
+	text.WriteString("\nRemoved stages (deviations):\n")
+	for _, stage := range template.Stages {
+		if _, ok := p.Stage(stage.ID); !ok {
+			fmt.Fprintf(&text, "- %s (deviation)\n", stage.ID)
+		}
+	}
+	deviations, _ := json.MarshalIndent(plan.Deviations(template, p), "", "  ")
+	irreversible, _ := json.MarshalIndent(p.IrreversibleDecisions, "", "  ")
+	external, _ := json.MarshalIndent(p.ExternalOperations, "", "  ")
+	questions, _ := json.MarshalIndent(p.OpenQuestions, "", "  ")
+	fmt.Fprintf(&text, "\nDeviations:\n%s\n\nIrreversible items:\n%s\n\nExternal operations:\n%s\n\nOpen questions (answer with revision instructions):\n%s", deviations, irreversible, external, questions)
+	return text.String(), nil
 }
 
 func (e *Engine) commitBase(round *ledger.Round) (string, error) {
@@ -842,7 +987,26 @@ func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.P
 		if err := e.active(); err != nil {
 			return Result{}, err
 		}
-		commit, err = e.workspace.Commit(ctx, round.ReturnedTarget.Tree, e.workID, stage.ID, "devkit: complete "+stage.ID)
+		settings, settingsErr := e.settings(ctx, round.StartTarget.Tree)
+		if settingsErr != nil {
+			return Result{}, settingsErr
+		}
+		tree, treeErr := e.workspace.CommitTree(ctx, head)
+		if treeErr != nil {
+			return Result{}, treeErr
+		}
+		if !settings.AllowEmptyCommit() && tree == round.ReturnedTarget.Tree {
+			matches, matchErr := e.matches(ctx, tree)
+			if matchErr != nil {
+				return Result{}, matchErr
+			}
+			if !matches {
+				return e.refreshTarget(ctx, state, run, round, "")
+			}
+			commit = workspace.CommitResult{Commit: head, Tree: tree}
+		} else {
+			commit, err = e.workspace.Commit(ctx, round.ReturnedTarget.Tree, e.workID, stage.ID, settings.CommitMessage(stage.ID, e.workID, p.Task))
+		}
 	}
 	if errors.Is(err, workspace.ErrTargetChanged) {
 		return e.refreshTarget(ctx, state, run, round, commit.Commit)
@@ -879,7 +1043,7 @@ func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.P
 	}
 	if round.Decision == nil {
 		copy := *round
-		copy.Decision = &router.Decision{Action: plan.Done, Reason: "All completion conditions passed and git commit succeeded."}
+		copy.Decision = &router.Decision{Action: plan.Done, Reason: "All completion conditions passed and the stage completion was recorded at HEAD."}
 		if _, err = e.append(&copy); err != nil {
 			return Result{}, err
 		}

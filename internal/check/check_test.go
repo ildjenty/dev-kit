@@ -226,11 +226,15 @@ func TestDetection(t *testing.T) {
 			findings = append(findings, Finding{ID: "violation", Blocking: true, Kind: AutoFixable, Scenario: "completion cannot be determined"})
 		}
 		observations = append(observations, DetectionObservation{
-			File: example.File, Judgment: Judgment{JudgmentResult: form.JudgmentResult{Aspect: "purpose", Judgment: example.Expected, Findings: findings}, Runner: "review"},
-			Reason: "compared the intended condition and result", MatchesBlocking: true, RespectsDifference: true,
+			File: example.ID, Judgment: Judgment{JudgmentResult: form.JudgmentResult{Aspect: "purpose", Judgment: example.Expected, Findings: findings}, Runner: "review"},
+			Reason: "compared the intended condition and result",
 		})
 	}
-	identity, err := NewDetectionIdentity(asset(t, "checks/purpose.md"), source, []byte("runner definition"), examples)
+	references := map[string][]byte{}
+	for _, name := range AspectReferences(string(asset(t, "checks/purpose.md"))) {
+		references[name] = []byte("fixed norm content")
+	}
+	identity, err := NewDetectionIdentity(asset(t, "checks/purpose.md"), source, []byte("runner definition"), examples, references)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,17 +242,17 @@ func TestDetection(t *testing.T) {
 	if err != nil || !record.Passed {
 		t.Fatalf("detection test: %+v, %v", record, err)
 	}
-	observations[0].MatchesBlocking = false
+	observations[0].Reason = ""
 	failed, err := AssessDetection(spec, "review", identity, observations)
 	if err != nil || failed.Passed {
-		t.Fatalf("FAIL for a different reason passed: %+v, %v", failed, err)
+		t.Fatalf("FAIL without a reason passed: %+v, %v", failed, err)
 	}
 	required := []DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}}
 	if len(MissingDetection(required, []DetectionTest{record})) != 0 {
 		t.Fatal("could not reuse a passing record for identical content")
 	}
 	examples["allowed.md"] = append(examples["allowed.md"], '\n')
-	changed, err := NewDetectionIdentity(asset(t, "checks/purpose.md"), source, []byte("runner definition"), examples)
+	changed, err := NewDetectionIdentity(asset(t, "checks/purpose.md"), source, []byte("runner definition"), examples, references)
 	if err != nil {
 		t.Fatal(err)
 	}

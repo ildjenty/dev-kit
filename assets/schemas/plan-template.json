@@ -9,14 +9,6 @@
       "type": "string",
       "minLength": 1
     },
-    "meta_loop_stages": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      },
-      "uniqueItems": true
-    },
     "stages": {
       "type": "array",
       "minItems": 1,
@@ -47,7 +39,6 @@
   "required": [
     "name",
     "start_stage",
-    "meta_loop_stages",
     "stages",
     "optional_stages"
   ],
@@ -89,7 +80,10 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "not": {
+            "const": "replan"
+          }
         },
         "assignee": {
           "enum": [
@@ -154,6 +148,7 @@
               "minLength": 1
             },
             "done": {
+              "description": "A stage ID to continue, null to finish, or replan to have the planner rebuild the remaining plan after this stage completes.",
               "type": [
                 "string",
                 "null"

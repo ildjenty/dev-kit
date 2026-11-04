@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/ildjenty/dev-kit/internal/check"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
@@ -25,20 +26,14 @@ const (
 	NoConfirm   ConfirmationMode = "none"
 )
 
-const (
-	DependencyChanged      = "dependency_changed"
-	UndeclaredMetaLoopEdit = "undeclared_meta_loop_edit"
-	TargetChangedAgain     = "target_changed_again"
-)
-
 type LessonDestination string
 
 const (
 	HookLintType LessonDestination = "hook_lint_type"
 	PlanTemplate LessonDestination = "plan_template"
+	Aspect       LessonDestination = "aspect"
 	Principle    LessonDestination = "principle"
 	Skill        LessonDestination = "skill"
-	Kit          LessonDestination = "kit"
 )
 
 type Lessons struct {
@@ -56,7 +51,7 @@ type Table struct {
 }
 
 // MergeTables overrides classifications by name with repository values without modifying the originals.
-// HumanConfirmation additions extend the existing categories without duplicates.
+// A non-nil HumanConfirmation list replaces the existing categories.
 func MergeTables(base, additions Table) Table {
 	result := Table{
 		HumanConfirmation: slices.Clone(base.HumanConfirmation),
@@ -64,10 +59,8 @@ func MergeTables(base, additions Table) Table {
 		Lessons:           Lessons{Destinations: slices.Clone(base.Lessons.Destinations)},
 		ConfirmationRules: maps.Clone(base.ConfirmationRules),
 	}
-	for _, category := range additions.HumanConfirmation {
-		if !slices.Contains(result.HumanConfirmation, category) {
-			result.HumanConfirmation = append(result.HumanConfirmation, category)
-		}
+	if additions.HumanConfirmation != nil {
+		result.HumanConfirmation = slices.Clone(additions.HumanConfirmation)
 	}
 	if result.CheckResults == nil {
 		result.CheckResults = make(map[check.JudgmentValue]plan.Transition)
@@ -83,6 +76,22 @@ func MergeTables(base, additions Table) Table {
 	maps.Copy(result.ConfirmationRules, additions.ConfirmationRules)
 	if additions.Lessons.Destinations != nil {
 		result.Lessons.Destinations = slices.Clone(additions.Lessons.Destinations)
+	}
+	return result
+}
+
+// WithConfig applies effective repository confirmation and lesson settings.
+func (t Table) WithConfig(settings config.Config) Table {
+	destinations := []LessonDestination{}
+	for _, destination := range settings.LessonDestinations() {
+		destinations = append(destinations, LessonDestination(destination))
+	}
+	result := MergeTables(t, Table{
+		HumanConfirmation: settings.HumanConfirmation(),
+		Lessons:           Lessons{Destinations: destinations},
+	})
+	if settings.MetaLoopEditApproval() == "allow" {
+		result.ConfirmationRules[config.MetaLoopEdit] = NoConfirm
 	}
 	return result
 }

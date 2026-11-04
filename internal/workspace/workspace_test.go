@@ -313,6 +313,8 @@ func TestStructureHistory(t *testing.T) {
 	w := newWorkspace(t)
 	ctx := context.Background()
 	const path = ".devkit/structure.json"
+	write(t, w.Root(), "devkit.toml", "kit_version = 'v1'\n")
+	git(t, w.Root(), "add", "devkit.toml")
 	for _, content := range []string{"{\"modules\": []}\n", "{\"modules\": [\"workspace\"]}\n"} {
 		write(t, w.Root(), path, content)
 		git(t, w.Root(), "add", path)

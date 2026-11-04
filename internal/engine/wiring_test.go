@@ -2,13 +2,15 @@ package engine
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/hook"
 	"github.com/ildjenty/dev-kit/internal/kit"
+	"github.com/ildjenty/dev-kit/internal/ledger"
+	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 	"github.com/ildjenty/dev-kit/internal/workspace"
 	"github.com/oklog/ulid/v2"
 )
@@ -32,8 +34,30 @@ func newTestEngine(ctx context.Context, root, session string) (*Engine, error) {
 		if err != nil {
 			return nil, err
 		}
-		if strings.HasPrefix(branch, "devkit/") {
-			id = strings.TrimPrefix(branch, "devkit/")
+		entries, err := os.ReadDir(filepath.Join(runRoot, "work"))
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			records, err := fsstore.New(filepath.Join(runRoot, "work", entry.Name())).List()
+			if err != nil {
+				return nil, err
+			}
+			for _, record := range records {
+				if record.Kind != string(ledger.KindWork) {
+					continue
+				}
+				var work ledger.Work
+				if err := fsstore.DecodePayload(record.Payload, &work); err != nil {
+					return nil, err
+				}
+				if work.Branch == branch {
+					id = work.ID
+				}
+			}
 		}
 	}
 	return New(Options{
@@ -51,21 +75,20 @@ func newTestEngine(ctx context.Context, root, session string) (*Engine, error) {
 			return config.Parse(data)
 		},
 		LoadSchemas: func() (map[string][]byte, error) {
-			data, err := os.ReadFile(filepath.Join(w.Root(), "devkit.toml"))
+			source, err := os.ReadFile(filepath.Join(w.Root(), "devkit.toml"))
 			if err != nil {
 				return nil, err
 			}
-			settings, err := config.Parse(data)
+			settings, err := config.Parse(source)
 			if err != nil {
 				return nil, err
 			}
-			k, err := kit.Open(w.Root(), settings.KitVersion)
-			if err != nil {
-				return nil, err
+			if settings.KitVersion != kit.Version {
+				return nil, fmt.Errorf("configuration and binary kit versions do not match")
 			}
 			schemas := map[string][]byte{}
 			for _, name := range SchemaNames() {
-				schemas[name], err = k.ReadFile("schemas/" + name + ".json")
+				schemas[name], err = kit.Schema(name)
 				if err != nil {
 					return nil, err
 				}

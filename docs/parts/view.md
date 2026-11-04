@@ -8,7 +8,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 ### 入力
 
-対象の作業の ledger を受け取り、[構造ステージ](../stages.md#2-構造)(責務・配置・依存を決める段階)を使う場合は `.devkit/structure.json` の解析済みの値と、その構造の git の履歴も受け取る。履歴の取得と受け渡しは [view の契約](../architecture/modules.md#view)に従う。
+対象の作業の ledger を受け取り、[構造ステージ](../stages.md#2-構造)(責務・配置・依存を決める段階)を使う場合は構造の記録(既定 `.devkit/structure.json`、`[paths] structure` で変更可能)の解析済みの値と、その構造の git の履歴も受け取る。履歴の取得と受け渡しは [view の契約](../architecture/modules.md#view)に従う。
 
 ### 出力
 

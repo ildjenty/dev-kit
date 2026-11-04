@@ -16,6 +16,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/external"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/hook"
+	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 	"github.com/ildjenty/dev-kit/internal/plan"
@@ -41,7 +42,7 @@ type Engine struct {
 }
 
 // Options supplies checkout, work, storage, configuration, and kit values resolved by the caller.
-// LoadSchemas is deferred until a forward operation needs the working kit copy.
+// LoadSchemas is deferred until a forward operation needs the embedded schemas.
 type Options struct {
 	Workspace   *workspace.Workspace
 	SessionID   string
@@ -112,6 +113,9 @@ func (e *Engine) initialize() error {
 	resources := map[string][]byte{}
 	for name, data := range e.schemas {
 		resources["urn:devkit:form:"+name] = data
+		if name == "plan" || name == "plan-template" {
+			resources["https://devkit.invalid/schemas/v1/"+name+".json"] = data
+		}
 	}
 	forms := map[string]*form.Schema{}
 	for _, name := range []string{"progress", "planner-result", "judgment", "detection-result"} {
@@ -130,7 +134,7 @@ func SchemaNames() []string {
 }
 
 // Historical record validation remains available while forward assets are edited.
-// Forward operations replace this validator with the working kit schemas.
+// Forward operations replace this validator with the embedded schemas.
 func (e *Engine) recordValidator() error {
 	if e.validator != nil {
 		return nil
@@ -155,7 +159,7 @@ func (e *Engine) recordValidator() error {
 			if name == "planner-result" || name == "detection-result" {
 				continue
 			}
-			sources[name], err = e.asset(context.Background(), work.BaseCommit, "schemas/"+name+".json")
+			sources[name], err = kit.Schema(name)
 			if err != nil {
 				return err
 			}
@@ -327,9 +331,6 @@ func (e *Engine) mutation(ctx context.Context) (*fsstore.Lock, error) {
 
 // Start creates a work branch and a planner instruction from a repository template.
 func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error) {
-	if err := e.initialize(); err != nil {
-		return Result{}, err
-	}
 	if err := e.checkSession(); err != nil {
 		return Result{}, err
 	}
@@ -337,9 +338,29 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	if err != nil {
 		return Result{}, err
 	}
+	head, err := e.workspace.Head(ctx)
+	if err != nil {
+		return Result{}, errors.New("HEAD does not exist; commit the devkit init changes first")
+	}
+	if err := e.workspace.RequireCommitted(ctx, "devkit.toml"); err != nil {
+		return Result{}, err
+	}
+	settings, err := e.settings(ctx, head)
+	if err != nil {
+		return Result{}, err
+	}
+	if settings.KitVersion != e.version {
+		return Result{}, errors.New("configuration and binary kit versions do not match")
+	}
+	if err := e.workspace.RequireCommitted(ctx, settings.RepositoryPaths().Plans); err != nil {
+		return Result{}, err
+	}
+	if err := e.initialize(); err != nil {
+		return Result{}, err
+	}
 	name := request.Template
 	if name == "" {
-		name = "default"
+		name = settings.DefaultPlanName()
 	}
 	if !localName(name) || strings.TrimSpace(request.Task) == "" {
 		return Result{}, errors.New("a template name and task are required")
@@ -395,11 +416,7 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 			return e.planner(ctx, template, source, 1, plan.InitialProposal)
 		}
 	}
-	head, err := e.workspace.Head(ctx)
-	if err != nil {
-		return Result{}, err
-	}
-	source, err := e.workspace.ReadFile(ctx, head, ".devkit/plans/"+name+".json")
+	source, err := e.asset(ctx, head, "plans/"+name+".json")
 	if err != nil {
 		return Result{}, err
 	}
@@ -416,14 +433,21 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 		return Result{}, err
 	}
 	defer lock.Close()
-	branch := "devkit/" + e.workID
+	branch, err := settings.BranchName(e.workID)
+	if err != nil {
+		return Result{}, err
+	}
 	if err = e.workspace.CreateBranch(ctx, branch); err != nil {
 		return Result{}, err
 	}
 	if err = e.store().Publish("inbox/task.txt", []byte(request.Task)); err != nil {
 		return Result{}, err
 	}
-	_, err = e.append(&ledger.Work{ID: e.workID, TaskRef: "inbox/task.txt", Branch: branch, BaseCommit: head, KitVersion: e.version})
+	original, err := hook.ReadOriginalRequest(e.runRoot(), e.sessionID)
+	if err != nil {
+		return Result{}, err
+	}
+	_, err = e.append(&ledger.Work{OriginalRequest: original, ID: e.workID, TaskRef: "inbox/task.txt", Branch: branch, BaseCommit: head, KitVersion: e.version})
 	if err != nil {
 		return Result{}, err
 	}
@@ -661,7 +685,7 @@ func (e *Engine) acceptPlan(ctx context.Context, state *ledger.State, p plan.Pla
 	if !localName(p.Template.Name) {
 		return errors.New("invalid plan template name")
 	}
-	source, err := e.workspace.ReadFile(ctx, reference, ".devkit/plans/"+p.Template.Name+".json")
+	source, err := e.asset(ctx, reference, "plans/"+p.Template.Name+".json")
 	if err != nil {
 		return err
 	}
@@ -701,7 +725,7 @@ func (e *Engine) External(ctx context.Context, request external.Request) (Result
 		if err != nil {
 			return Result{}, err
 		}
-		if selected, ok := state.ExecutablePlan(template, norms); ok {
+		if selected, ok := state.ExecutablePlan(template, norms, settings.PlanApproval()); ok {
 			request.Plan = &selected
 		}
 	}
@@ -748,7 +772,7 @@ func (e *Engine) template(ctx context.Context, ref, name string) (plan.PlanTempl
 	if !localName(name) {
 		return plan.PlanTemplate{}, nil, errors.New("invalid template name")
 	}
-	source, err := e.workspace.ReadFile(ctx, ref, ".devkit/plans/"+name+".json")
+	source, err := e.asset(ctx, ref, "plans/"+name+".json")
 	if err != nil {
 		return plan.PlanTemplate{}, nil, err
 	}
@@ -779,10 +803,19 @@ func NormativeReferences(ctx context.Context, w *workspace.Workspace, ref string
 		paths = append(paths, path)
 	}
 	slices.Sort(paths)
+	source, err := w.ReadFile(ctx, ref, "devkit.toml")
+	if err != nil {
+		return nil, err
+	}
+	settings, err := config.Parse(source)
+	if err != nil {
+		return nil, err
+	}
+	p := settings.RepositoryPaths()
 	norms := []form.NormReference{}
 	for _, path := range paths {
 		norm := form.NormReference{Path: path}
-		if path == ".devkit" || strings.HasSuffix(path, "/agents") {
+		if slices.Contains([]string{p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, ".claude/agents", ".codex/agents"}, path) {
 			norm.TreeID = ids[path]
 		} else {
 			norm.BlobID = ids[path]

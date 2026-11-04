@@ -63,7 +63,7 @@ func (v *Validator) ParseTemplate(data []byte) (PlanTemplate, error) {
 	if err := decode(data, v.template, &template); err != nil {
 		return PlanTemplate{}, err
 	}
-	if err := validateStages(template.StartStage, template.Stages, template.OptionalStages, template.MetaLoopStages, nil); err != nil {
+	if err := validateStages(template.StartStage, template.Stages, template.OptionalStages, nil); err != nil {
 		return PlanTemplate{}, err
 	}
 	return template, nil
@@ -81,7 +81,7 @@ func (v *Validator) ParsePlan(data []byte) (Plan, error) {
 		}
 		conditions[condition.ID] = true
 	}
-	if err := validateStages(plan.StartStage, plan.Stages, nil, plan.MetaLoopStages, conditions); err != nil {
+	if err := validateStages(plan.StartStage, plan.Stages, nil, conditions); err != nil {
 		return Plan{}, err
 	}
 	return plan, nil
@@ -105,10 +105,13 @@ func (v *Validator) ValidatePlan(plan Plan) error {
 	return err
 }
 
-func validateStages(start string, stages, optional []Stage, meta []string, conditions map[string]bool) error {
+func validateStages(start string, stages, optional []Stage, conditions map[string]bool) error {
 	all := append(slices.Clone(stages), optional...)
 	ids := make(map[string]bool)
 	for _, stage := range all {
+		if stage.ID == "replan" {
+			return fmt.Errorf("stage ID replan is reserved")
+		}
 		if ids[stage.ID] {
 			return fmt.Errorf("duplicate stage ID: %q", stage.ID)
 		}
@@ -117,14 +120,12 @@ func validateStages(start string, stages, optional []Stage, meta []string, condi
 	if !slices.ContainsFunc(stages, func(s Stage) bool { return s.ID == start }) {
 		return fmt.Errorf("start stage is not selected: %q", start)
 	}
-	for _, id := range meta {
-		if !ids[id] {
-			return fmt.Errorf("meta-loop stage not found: %q", id)
-		}
-	}
 	for _, stage := range all {
 		for _, action := range []Transition{Fix, Ask, Back, Done} {
 			target, _ := stage.Transitions.Next(action)
+			if action == Done && target != nil && *target == "replan" {
+				continue
+			}
 			if target != nil && !ids[*target] {
 				return fmt.Errorf("%s: %s transition target not found: %q", stage.ID, action, *target)
 			}

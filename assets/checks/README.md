@@ -1,30 +1,36 @@
-Aspect files define checks, blocking conditions, exclusions, and judgment output requirements. Repository-owned aspects are in `.devkit/checks/`; kit-provided aspects are in this directory.
+Aspect files define checks, blocking conditions, exclusions, and judgment output requirements. The repository owns and maintains its aspects and detection examples.
 
-An aspect file is named `<aspect_id>.md`. After the first line, `# <aspect_id>`, it contains one line each for `- Checks: `, `- blocking: `, `- Do not report: `, and `- Output format: `, in that order. Values are Markdown through the end of the line; the field names and first line are machine-readable. Keep an aspect and its detection examples in `examples/<aspect_id>/` consistent. Code-formatted references starting with `principles/` or a kit directory such as `schemas/`, `checks/`, or `rules/` are relative to the installed kit copy root. In the source repository, kit directories are under `kit/`, while `principles/` is at the repository root. Follow [Detection test examples](../examples/README.md) for the test format.
+An aspect file is named `<aspect_id>.md`. After the first line, `# <aspect_id>`, it contains one line each for `- Checks: `, `- blocking: `, `- Do not report: `, and `- Output format: `, in that order. Values are Markdown through the end of the line; the field names and first line are machine-readable. Keep an aspect and its detection examples in `checks/<aspect_id>/` consistent. References such as `principles/…`, `stages/…`, `checks/…`, `plans/…`, `templates/…`, `rules.md`, `requirements.md`, and `structure.json` are logical names resolved through `[paths]` in `devkit.toml`; briefs supply the mapping to snapshot paths. For `schemas/…`, devkit supplies the output schema body in the brief.
 
-- `purpose.md`: Purpose.
-- `irreversible.md`: Irreversible items.
-- `structure.md`: Structure.
-- `consistency.md`: Consistency.
-- `wording.md`: Wording.
-- `contract.md`: Contracts.
-- `steps.md`: Steps.
-- `diff.md`: Diff.
-- `behavior.md`: Behavior verification.
-- `completion.md`: State at termination.
-- `plan.md`: Plan.
-- `premise.md`: Premise critique.
-- `harness.md`: Harness.
-- `skill-test.md`: Skill tests.
+- `checks/purpose.md`: Purpose.
+- `checks/irreversible.md`: Irreversible items.
+- `checks/structure.md`: Structure.
+- `checks/consistency.md`: Consistency.
+- `checks/wording.md`: Wording.
+- `checks/contract.md`: Contracts.
+- `checks/steps.md`: Steps.
+- `checks/diff.md`: Diff.
+- `checks/test.md`: Tests of completion conditions and public contracts.
+- `checks/behavior.md`: Behavior verification.
+- `checks/completion.md`: State at termination.
+- `checks/plan.md`: Plan.
+- `checks/harness.md`: Harness, retrospective, and mechanism selection.
+- `checks/skill-test.md`: Skill tests.
 
 ## Judgment and findings
 
-Return judgments using `schemas/judgment.json` and findings using `schemas/finding.json`, or the output schema supplied in the request. Use the requested instruction ID, aspect, target version, frozen norms, and completion condition IDs. A judgment is valid only for its matching target version and norms. The target version identifies a tree snapshot, plan version, or structure content hash; use the supplied value rather than substituting the current working tree.
+Return judgments using `schemas/judgment.json` and findings using `schemas/finding.json`, or the output schema supplied in the request. Use the requested instruction ID, aspect, target version, frozen norms, and completion condition IDs. A judgment is valid only for its matching target version and norms. The target version identifies a tree snapshot, plan version, or structure content hash; use the supplied value rather than substituting the current working tree. Read norms from the supplied snapshot paths, not from norms being edited in the working tree.
 
 Return `NOT ASSESSED` when necessary criteria or required verification are unavailable. Record checked and unchecked scope, method, and environment. Findings need a failure scenario and carry no severity. Use `auto-fixable` for findings that need no human decision and `needs-decision` for those that do. Retain all findings; nonblocking findings are reference information and do not require fixes. Compare exemption claims with their grounds and waive only the requirements covered by the exemption. Aggregate results in the order `FAIL`, `NOT ASSESSED`, then `PASS`. The author's report does not replace independent judgment. For diff checks, compare the supplied valid approvals and delegations with the target and scope.
 
+## Command checks
+
+If `command:<name>` is absent from the round-start `devkit.toml`, return `FAIL` for that check with an `auto-fixable` finding: "Verification command `<name>` is not registered. Create a verification method and register it in `[commands.<name>]` in `devkit.toml`." Registration is a loop edit, follows the human confirmation policy, and takes effect from the next round's snapshot. If a command changes the tree, its finding must also instruct the worker to add generated output paths to the repository's Git ignore rules.
+
 ## Detection tests
 
-Only aspects handled by judge subagents or judgment commands require detection tests; `command:` checks do not. A required aspect needs a pass for the runner assigned by the plan. Test violation, conforming, and allowed examples using `examples/README.md`; return observations using `schemas/detection-result.json`. Expected results alone are not passes.
+Only aspects handled by judge subagents or judgment commands require detection tests; `command:` checks do not. A required aspect needs a pass for the runner assigned by the plan. Test violation, conforming, and allowed examples described below; return observations using `schemas/detection-result.json`. Expected results alone are not passes. Principle 2 of `principles/harness.md` has no manual-test exemption.
 
-Pass identity consists of the content hashes of the aspect, specification including example bodies and expected judgments, and assigned runner definition. Store the pass index in `.devkit/detect.json`; execution records retain the execution facts. Any change to those hashes requires another test, including wording changes. Model or effort observations are provenance, not pass identity. Devkit requests missing tests before opening a round; failed tests stop for a decision to revise the aspect or remove its required status. The manual-test exemption in principle 2 of `principles/harness.md` applies only to human-run tests.
+`checks/<aspect_id>/spec.json` contains `aspect` and `cases`. Each case contains `kind` (`violation`, `conforming`, or `allowed`), `file` relative to the specification, and `expected` (`FAIL`, `PASS`, or `PASS`, respectively). Each example body contains `## Request` and `## Target`. Give the judge only opaque example IDs and bodies as test input, together with frozen norms and the supplied output schema; withhold the specification, case kind, file name, and expected judgment. Return each opaque ID in the observation's `file` field. Devkit keeps the ID-to-specification mapping and compares the returned judgment with the expectation. Violation findings must cite the intended blocking condition; conforming and allowed examples must not be blocked by ignoring relevant differences or supported exemptions.
+
+Pass identity consists of the content hashes of the aspect, the `principles/<name>.md` files and `rules.md` it references, the specification including example bodies and expected judgments, and the assigned runner definition. Store the pass index at the configured detection index path; execution records retain the execution facts. Any change to those hashes requires another test, including wording changes. Model or effort observations are provenance, not pass identity. Devkit requests missing tests before opening a round; failed tests stop for a decision to revise the aspect or remove its required status.

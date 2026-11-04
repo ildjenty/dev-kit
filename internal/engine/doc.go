@@ -15,7 +15,7 @@
 // Plan checks use the plan aspect and devkit-judge. Detection instructions ask
 // the same runner as the required check for form.DetectionResult.
 // Options defers forward-asset loading so pause, resume, and status can use the
-// schemas in the work base commit while configuration is being edited.
+// embedded schemas while configuration is being edited.
 // Instruction records retain issuance facts for rebuilding deleted briefs.
 // Commit recovery records the starting HEAD in a commit_base artifact before
 // committing, then compares the current HEAD tree with the evaluated target. The passing

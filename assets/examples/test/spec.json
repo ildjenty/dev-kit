@@ -1,0 +1,35 @@
+{
+  "aspect": "test",
+  "cases": [
+    {
+      "kind": "violation",
+      "file": "violation.md",
+      "expected": "FAIL"
+    },
+    {
+      "kind": "conforming",
+      "file": "conforming.md",
+      "expected": "PASS"
+    },
+    {
+      "kind": "allowed",
+      "file": "allowed.md",
+      "expected": "PASS"
+    },
+    {
+      "kind": "violation",
+      "file": "command-violation.md",
+      "expected": "FAIL"
+    },
+    {
+      "kind": "violation",
+      "file": "entrypoint-violation.md",
+      "expected": "FAIL"
+    },
+    {
+      "kind": "violation",
+      "file": "expectation-violation.md",
+      "expected": "FAIL"
+    }
+  ]
+}

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
+	"github.com/ildjenty/dev-kit/assets"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/ledger"
@@ -27,6 +29,16 @@ func repository(t *testing.T) string {
 	cmd := exec.Command("git", "init", "--quiet", root)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v: %s", err, output)
+	}
+	for _, args := range [][]string{
+		{"config", "user.name", "Devkit test"},
+		{"config", "user.email", "devkit@example.test"},
+		{"config", "commit.gpgsign", "false"},
+		{"config", "core.hooksPath", t.TempDir()},
+	} {
+		if output, err := exec.Command("git", append([]string{"-C", root}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v: %s", args, err, output)
+		}
 	}
 	return root
 }
@@ -97,13 +109,20 @@ func TestInitAndDoctor(t *testing.T) {
 		t.Fatalf("missing installation result: %+v", result)
 	}
 	for _, pair := range [][2]string{
+		{"principles/harness.md", ".devkit/principles/harness.md"},
+		{"stages/implement.md", ".devkit/stages/implement.md"},
+		{"templates/brief/work.md.tmpl", ".devkit/templates/brief/work.md.tmpl"},
 		{"plans/default.json", ".devkit/plans/default.json"},
 		{"checks/contract.md", ".devkit/checks/contract.md"},
 		{"examples/contract/spec.json", ".devkit/checks/contract/spec.json"},
 		{"rules/rules.md", ".devkit/rules.md"},
 		{"skills/devkit/SKILL.md", ".agents/skills/devkit/SKILL.md"},
 	} {
-		if !bytes.Equal(readFile(t, root, ".devkit/kit/"+kit.Version+"/"+pair[0]), readFile(t, root, pair[1])) {
+		want, err := fs.ReadFile(assets.FS(), pair[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(want, readFile(t, root, pair[1])) {
 			t.Errorf("copied asset differs: %s", pair[1])
 		}
 	}
@@ -134,17 +153,30 @@ func TestInitAndDoctor(t *testing.T) {
 	if err != nil || len(result.Changes) != 0 {
 		t.Fatalf("second init is not idempotent: %+v, %v", result.Changes, err)
 	}
-	writeFile(t, root, ".devkit/kit/"+kit.Version+"/rules/rules.md", "Modified fixed asset.\n")
+	writeFile(t, root, ".devkit/rules.md", "Repository-owned rules.\n")
 	report, err = Doctor(ctx, root, "current-session")
-	if err != nil || checkNamed(t, report, "kit_copy").OK {
-		t.Fatalf("modified kit was accepted: %+v, %v", report, err)
+	if err != nil || !report.Healthy() {
+		t.Fatalf("repository-owned norm edit was rejected: %+v, %v", report, err)
+	}
+	for _, check := range report.Checks {
+		if check.Name == "kit_copy" {
+			t.Fatal("doctor still checks a kit copy")
+		}
+	}
+	for _, name := range []string{".devkit/kit", ".devkit/requirements.md", ".devkit/structure.json", ".devkit/detect.json"} {
+		if _, err := os.Stat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("init created a non-distributable path: %s: %v", name, err)
+		}
+	}
+	if bytes.Contains(readFile(t, root, "devkit.toml"), []byte("[paths]")) {
+		t.Fatal("init wrote path defaults explicitly")
 	}
 }
 
 func TestInitPreservesExistingFilesAndSettings(t *testing.T) {
 	root := repository(t)
 	preserved := map[string]string{
-		"devkit.toml":                       "kit_version = 'v1'\n[router]\nhuman_confirmation = ['custom']\n",
+		"devkit.toml":                       "kit_version = 'v1'\n[router]\nhuman_confirmation = ['dependency_changed']\n",
 		".agents/skills/devkit/SKILL.md":    "Custom skill.\n",
 		".devkit/plans/default.json":        `{"custom":true}`,
 		".devkit/checks/contract.md":        "Custom aspect.\n",
@@ -165,7 +197,7 @@ func TestInitPreservesExistingFilesAndSettings(t *testing.T) {
 	for name, body := range preserved {
 		if name == "devkit.toml" {
 			configuration, err := config.Parse(readFile(t, root, name))
-			if err != nil || !slices.Equal(configuration.Router.HumanConfirmation, []string{"custom"}) {
+			if err != nil || !slices.Equal(configuration.Router.HumanConfirmation, []string{"dependency_changed"}) {
 				t.Fatalf("existing devkit settings were lost: %+v, %v", configuration, err)
 			}
 			continue
@@ -205,7 +237,7 @@ func TestInitDeclinedAndConflictingSettings(t *testing.T) {
 		if !errors.Is(err, declined) {
 			t.Fatalf("confirmation error was lost: %v", err)
 		}
-		for _, name := range []string{"devkit.toml", ".claude/settings.json", ".agents/skills/devkit/SKILL.md", ".gitignore"} {
+		for _, name := range []string{"devkit.toml", ".devkit/kit", ".devkit/principles", ".claude/settings.json", ".agents/skills/devkit/SKILL.md", ".gitignore"} {
 			if _, err := os.Stat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
 				t.Errorf("declined change was applied: %s: %v", name, err)
 			}
@@ -521,7 +553,7 @@ func TestUninstallReversesInit(t *testing.T) {
 	if got := string(readFile(t, root, ".gitignore")); got != "node_modules/\n" {
 		t.Fatalf(".gitignore = %q", got)
 	}
-	for _, name := range []string{"devkit.toml", ".devkit/kit", ".devkit/run", ".devkit/plans", ".agents", ".codex", ".claude/skills", ".claude/agents"} {
+	for _, name := range []string{"devkit.toml", ".devkit/kit", ".devkit/run", ".devkit/plans", ".devkit/principles", ".devkit/stages", ".devkit/templates", ".devkit/checks", ".agents", ".codex", ".claude/skills", ".claude/agents"} {
 		if _, err := os.Lstat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("%s remains after uninstall: %v", name, err)
 		}
@@ -538,7 +570,7 @@ func TestUninstallKeepsUserConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	config := string(readFile(t, root, "devkit.toml"))
-	writeFile(t, root, "devkit.toml", config+"\n[router]\nhuman_confirmation = [\"release\"]\n")
+	writeFile(t, root, "devkit.toml", config+"\n[router]\nhuman_confirmation = [\"dependency_changed\"]\n")
 	result, err := Uninstall(context.Background(), root, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -548,5 +580,184 @@ func TestUninstallKeepsUserConfig(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "devkit.toml")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestInitCommitsOnlyWrittenPaths(t *testing.T) {
+	for _, existingHead := range []bool{false, true} {
+		t.Run(fmt.Sprint(existingHead), func(t *testing.T) {
+			ctx := context.Background()
+			root := repository(t)
+			git := func(args ...string) string {
+				t.Helper()
+				output, err := runGit(ctx, root, args...)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return strings.TrimSpace(string(output))
+			}
+			if existingHead {
+				writeFile(t, root, "README.md", "Existing repository.\n")
+				git("add", "README.md")
+				git("commit", "-m", "Existing commit")
+			}
+			writeFile(t, root, "staged.txt", "Unrelated staged content.\n")
+			writeFile(t, root, "untracked.txt", "Unrelated untracked content.\n")
+			writeFile(t, root, ".devkit/principles/harness.md", "Repository-owned principle.\n")
+			git("add", "staged.txt")
+			result, err := Init(ctx, root, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := git("log", "-1", "--format=%s"); got != "devkit: init" {
+				t.Fatalf("unexpected init commit message: %q", got)
+			}
+			paths := strings.Split(git("diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "HEAD"), "\n")
+			want := make([]string, 0, len(result.Changes))
+			for _, change := range result.Changes {
+				want = append(want, change.Path)
+			}
+			slices.Sort(want)
+			if !slices.Equal(paths, want) {
+				t.Fatalf("init committed paths it did not write: got %v, want %v", paths, want)
+			}
+			if got := git("diff", "--cached", "--name-only"); got != "staged.txt" {
+				t.Fatalf("unrelated staged content changed: %q", got)
+			}
+			before := git("rev-parse", "HEAD")
+			if _, err := Init(ctx, root, nil); err != nil {
+				t.Fatal(err)
+			}
+			if after := git("rev-parse", "HEAD"); before != after {
+				t.Fatal("unchanged init created another commit")
+			}
+		})
+	}
+}
+
+func TestInitNoCommitAndDoctorCommitState(t *testing.T) {
+	ctx := context.Background()
+	root := repository(t)
+	if _, err := Init(ctx, root, nil, InitOptions{NoCommit: true}); err != nil {
+		t.Fatal(err)
+	}
+	report, err := Doctor(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checkNamed(t, report, "HEAD").OK || checkNamed(t, report, "init_committed").OK {
+		t.Fatal("doctor accepted initialization without a commit")
+	}
+	if _, err := runGit(ctx, root, "add", "--", "devkit.toml", ".devkit/plans"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := runGit(ctx, root, "commit", "-m", "Commit initialization files"); err != nil {
+		t.Fatal(err)
+	}
+	report, err = Doctor(ctx, root, "")
+	if err != nil || !checkNamed(t, report, "HEAD").OK || !checkNamed(t, report, "init_committed").OK {
+		t.Fatalf("doctor rejected committed initialization files: %+v, %v", report, err)
+	}
+	for _, name := range []string{"devkit.toml", ".devkit/plans/default.json", ".devkit/plans/custom.json"} {
+		t.Run(name, func(t *testing.T) {
+			before, err := readOptional(filepath.Join(root, name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeFile(t, root, name, string(before)+"\n")
+			report, err := Doctor(ctx, root, "")
+			if err != nil || checkNamed(t, report, "init_committed").OK {
+				t.Fatalf("doctor accepted uncommitted initialization file %s: %+v, %v", name, report, err)
+			}
+			if before == nil {
+				if err := os.Remove(filepath.Join(root, name)); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				writeFile(t, root, name, string(before))
+			}
+		})
+	}
+}
+
+func TestConfiguredNormPathsAndUninstall(t *testing.T) {
+	ctx := context.Background()
+	root := repository(t)
+	writeFile(t, root, "devkit.toml", `kit_version = "v1"
+[paths]
+principles = "norms/principles"
+stages = "norms/stages"
+checks = "norms/checks"
+plans = "norms/plans"
+templates = "norms/templates"
+rules = "norms/rules.md"
+requirements = "records/requirements.md"
+structure = "records/structure.json"
+detect = "records/detect.json"
+`)
+	writeFile(t, root, "norms/principles/harness.md", "Custom principle.\n")
+	if _, err := Init(ctx, root, nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, pair := range [][2]string{
+		{"principles/testing.md", "norms/principles/testing.md"},
+		{"stages/implement.md", "norms/stages/implement.md"},
+		{"checks/contract.md", "norms/checks/contract.md"},
+		{"examples/contract/spec.json", "norms/checks/contract/spec.json"},
+		{"plans/default.json", "norms/plans/default.json"},
+		{"templates/brief/work.md.tmpl", "norms/templates/brief/work.md.tmpl"},
+		{"rules/rules.md", "norms/rules.md"},
+	} {
+		want, err := fs.ReadFile(assets.FS(), pair[0])
+		if err != nil || !bytes.Equal(want, readFile(t, root, pair[1])) {
+			t.Fatalf("configured norm differs: %s: %v", pair[1], err)
+		}
+	}
+	for _, name := range []string{".devkit/principles", ".devkit/stages", ".devkit/checks", ".devkit/plans", ".devkit/templates", ".devkit/rules.md", "records"} {
+		if _, err := os.Stat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("init created an unconfigured or stage-owned path: %s: %v", name, err)
+		}
+	}
+	report, err := Doctor(ctx, root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"norms/principles", "norms/stages", "norms/checks", "norms/plans", "norms/templates", "norms/rules.md", "HEAD", "init_committed"} {
+		if check := checkNamed(t, report, name); !check.OK {
+			t.Fatalf("configured norm was rejected: %+v", check)
+		}
+	}
+	writeFile(t, root, "norms/plans/local.json", "{}\n")
+	report, err = Doctor(ctx, root, "")
+	if err != nil || checkNamed(t, report, "init_committed").OK {
+		t.Fatalf("untracked configured plan was accepted: %+v, %v", report, err)
+	}
+	for _, name := range []string{"records/requirements.md", "records/structure.json", "records/detect.json"} {
+		writeFile(t, root, name, "Stage-owned content.\n")
+	}
+	before, err := runGit(ctx, root, "rev-parse", "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Uninstall(ctx, root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(result.Preserved, "norms/principles/harness.md") || !slices.Contains(result.Preserved, "devkit.toml") {
+		t.Fatalf("repository-owned norms or config were not preserved: %v", result.Preserved)
+	}
+	for _, name := range []string{"norms/stages", "norms/checks", "norms/templates", "norms/rules.md"} {
+		if _, err := os.Stat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("unmodified norm remains: %s: %v", name, err)
+		}
+	}
+	for _, name := range []string{"records/requirements.md", "records/structure.json", "records/detect.json"} {
+		if got := string(readFile(t, root, name)); got != "Stage-owned content.\n" {
+			t.Errorf("stage-owned content changed: %s", name)
+		}
+	}
+	after, err := runGit(ctx, root, "rev-parse", "HEAD")
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("uninstall changed HEAD: %v", err)
 	}
 }

@@ -3,12 +3,12 @@ package router
 import (
 	"slices"
 
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
 // ConfirmationInput receives category names from the caller after inspecting actual differences.
 // Include an empty category for each unclassified decision item.
-// Exclude meta-loop edits in declared stages from UndeclaredMetaLoopEdit.
 type ConfirmationInput struct {
 	Categories         []string
 	NeedsDecision      bool
@@ -33,6 +33,9 @@ func (t Table) ClassifyConfirmation(input ConfirmationInput) Confirmation {
 		mode, ok := t.ConfirmationRules[category]
 		if !ok && slices.Contains(t.HumanConfirmation, category) {
 			mode, ok = ConfirmNow, true
+		}
+		if !ok && (category == config.DependencyChanged || category == config.MetaLoopEdit || category == config.TargetChangedAgain) {
+			mode, ok = NoConfirm, true
 		}
 		if !ok {
 			unclassified = true

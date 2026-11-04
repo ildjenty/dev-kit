@@ -131,3 +131,16 @@ func readJSONFiles[T any](dir string) ([]T, error) {
 	}
 	return values, nil
 }
+
+// ReadOriginalRequest returns the latest unbound human prompt, or nil when absent.
+func ReadOriginalRequest(runRoot, sessionID string) (*string, error) {
+	data, err := os.ReadFile(filepath.Join(runRoot, "sessions", sessionID, "latest-prompt.txt"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	text := string(data)
+	return &text, nil
+}

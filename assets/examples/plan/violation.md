@@ -7,7 +7,7 @@ The template is purpose → implement. C1 requires the save button text to be "S
 # Plan
 
 - Adopted: purpose → implement. Preserve the template's transitions, gates, and required checks.
-- Checks in implement: behavior verifies rendering and interaction on the C1 target screen.
-- Check corresponding to C2: None.
-- Gate: Not required. The reason is a text correction that changes no public contract, external operation, or convention. It does not require human confirmation.
+- Checks in implement: behavior verifies rendering and interaction on the C1 target screen; command:test verifies existing storage behavior for C2.
+- Plan approval: This is the first plan under the default approval policy. Start work without human approval because this is only a text correction.
+- Stage gate: No additional gate is required by this template.
 - Size: Confirm the request's purpose in purpose, then change the text in implement.

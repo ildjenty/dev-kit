@@ -4,21 +4,51 @@
 
 ## 作業の開始
 
-人は通常どおりセッションを開き、kit の skill で課題を伝える。エージェントは `devkit start --plan <name> <課題>` で[ループの雛形](data.md#ループの雛形-plantemplate)(再利用するループの定義)を指定する。開始の条件は [hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)に従う。`start --plan <name>` の解決先は `.devkit/plans/` だけとし、`--plan` の省略時はリポジトリ側の `.devkit/plans/default.json` を使う。[engine](modules.md#engine)(進行を担うモジュール)は作業 ID とブランチ `devkit/<作業 ID>` を作ってチェックアウトを切り替え、基点コミットと kit のバージョンを記録して[セッションを束縛](data.md#セッションとブランチ)する。返すのは計画者への指示 ID と `brief/<指示 ID>.md` のパスである。
+`devkit init` は導入するファイルを示して人の確認を受け、導入したファイルをコミットする。`--no-commit` でコミットを省ける。`HEAD` がない場合、または導入したファイルがコミットされていない場合、`start` は理由と直し方を返して拒否する。
 
-エージェントは `devkit-planner` を、[定型の prompt](guarantees.md#判定結果の受理)で起動する。計画者は[計画](data.md#計画-plan)(雛形から作る課題ごとの実行内容)の項目を記入する。通常の取捨では、完了条件を書き、課題に関係のないステージ(作業を区切る単位)を外し、[check](modules.md#check)(評価と判定)の対象を指定し、必要なら調査・試作のステージを雛形の候補から足す。課題固有の元に戻せないものと外部操作(リポジトリ外への書き込み行為)の宣言も計画者が記入する。構成の変更が逸脱に当たる条件と承認は[計画の定義](data.md#計画-plan)に従う。計画者が最終メッセージで計画を返すと、[SubagentStop](hooks.md#subagentstop)が結果を保存する。次の `devkit next` で engine が結果を受理し、JSON Schema で検証して提案中の計画として記録する。
+人は通常どおりセッションを開き、kit の skill で課題を伝える。エージェントは `devkit start --plan <name> <課題>` で[ループの雛形](data.md#ループの雛形-plantemplate)(再利用するループの定義)を指定する。開始の条件は [hook の稼働確認](guarantees.md#再開と-hook-の稼働確認)にも従う。雛形の解決先は既定 `.devkit/plans/` であり、`devkit.toml` の `[paths] plans` で変更できる。`--plan` の省略時は `default_plan` の値(既定 `"default"`)を使う。[engine](modules.md#engine)(進行を担うモジュール)は作業 ID と作業ブランチを作ってチェックアウトを切り替え、基点コミットと `kit_version` を記録して[セッションを束縛](data.md#セッションとブランチ)する。ブランチ名は `[git] branch` の既定 `"devkit/{work_id}"` に従い、設定値には `{work_id}` を必ず含める。返すのは計画者への指示 ID と、`.devkit/run/work/<作業 ID>/` 内の `brief/<指示 ID>.md` のパスである。実行の記録と生成物の場所 `.devkit/run/` は固定である。
+
+[UserPromptSubmit](hooks.md#userpromptsubmit)は、束縛前のセッションでも人の最新の入力をセッションごとに1件保持する。`start` はその原文を作業に結び付け、観測がなければ原文なしと記録する。計画者の brief には原文と `start` に渡された課題の両方を載せる。
+
+既定の雛形は次の構成であり、check の判定者には `init` が配る `devkit-judge` を使う。
+
+- `default`: purpose → scope → structure → contract → steps → implement → retrospective。候補は research と prototype、scope にゲートを置く。implement の check は必須の `command:test` と観点 `test`・`diff` である。不要なステージは外せるが、外したことは逸脱として承認の問いに載せる。
+- `fix`: implement → retrospective。候補は research と prototype、implement の check は必須の `command:test` と観点 `test`・`diff` である。
+- `docs`: implement → retrospective。implement の check は観点 `wording` である。
+
+`default` は `purpose` の遷移 `done` を `"replan"` にする。最初の計画の完了条件は、要件と完了条件の合意に関するものとする。`purpose` で人に確かめながら要件を詰め、requirements に書き、完了条件の案を作る。`purpose` の完了後、計画者が合意した完了条件で残りを作り直し、人が承認する。`fix` と `docs` はこの形を使わない。
+
+エージェントは `devkit-planner` を、[定型の prompt](guarantees.md#判定結果の受理)で起動する。計画者は[計画](data.md#計画-plan)(雛形から作る課題ごとの実行内容)の項目を記入する。通常の取捨では、完了条件を ID 付きの文章で書き、課題に関係のないステージ(作業を区切る単位)を外し、[check](modules.md#check)(評価と判定)の対象を指定し、必要なら調査・試作のステージを雛形の候補から足す。課題固有の元に戻せないものと外部操作(リポジトリ外への書き込み行為)の宣言も計画者が記入する。要求の曖昧な点を推測で埋めず、決められなかった点は任意の文字列配列 `open_questions` に記入する。構成の変更が逸脱に当たる条件と承認は[計画の定義](data.md#計画-plan)に従う。計画者が最終メッセージで計画を返すと、[SubagentStop](hooks.md#subagentstop)が結果を保存する。次の `devkit next` で engine が結果を JSON Schema で検証し、受理した計画を提案中として記録する。
 
 ## 計画の check と承認ゲート
 
-`devkit next` は計画の check の指示 ID と判定依頼のパスを返す。エージェントは `devkit-judge` を起動し、hook を経由した結果を次の `next` が受理して集約する。[判定値](data.md#check-の結果-judgment)が `FAIL` の場合の再提案と人への確認は[計画のバージョン](data.md#計画のバージョン)に従う。`PASS` でゲート(人の承認を待つ関門)が必要なら問いを記録し、承認待ちにする。雛形からの逸脱と外部操作の宣言に対する承認条件は[計画](data.md#計画-plan)、宣言した外部操作に計画の承認を使える条件は[外部操作の承認](guarantees.md#外部操作の承認)に従う。
+`devkit next` は計画の check の指示 ID と判定依頼のパスを返す。エージェントは `devkit-judge` を起動し、hook を経由した結果を次の `next` が受理して集約する。[判定値](data.md#check-の結果-judgment)が `FAIL` の場合の再提案と人への確認は[計画のバージョン](data.md#計画のバージョン)に従う。計画の判定のやり直しの上限は雛形の値(既定3)とする。
 
-承認待ちからは[人の回答と再開](#人の回答と再開)に従って進める。実行可能になる条件と作り直しは[計画のバージョン](data.md#計画のバージョン)に従う。必要な[検出試験](guarantees.md#検出試験)(観点ファイルの判定能力を確かめる試験)も、作業のラウンドを開く前に `next` の指示で済ませる。
+完了条件ごとの確認手段と、その妥当性・網羅性の判断は[計画](data.md#計画-plan)に従う。
+
+`PASS` の計画に対する人の承認は `[approval] plan = "requirements" | "always" | "deviation"` で設定する。既定の `requirements` では、作業の最初の計画、完了条件の ID または文面が直前に人が承認した計画から変わった計画、雛形からの逸脱がある計画、外部操作を宣言した計画に承認を必須とする。完了条件が同じで逸脱も外部操作もない作り直しは、承認済みの合意の範囲として再確認しない。`always` はすべてのバージョンで承認し、`deviation` は逸脱または外部操作の宣言があるときに承認する。宣言した外部操作に計画の承認を使える条件は[外部操作の承認](guarantees.md#外部操作の承認)に従う。
+
+承認の問いは、エージェントの要約に頼らず `devkit` が計画から組み立て、次を載せる。
+
+- 要求の原文と `start` の課題。
+- ID 付きの完了条件。
+- 採用したステージと外したステージ。逸脱は逸脱と明示する。
+- 各ステージの必須 check。
+- 課題固有の元に戻せないもの。
+- 宣言した外部操作。
+- `open_questions` にある、計画者が人に確かめたい未決事項。
+
+未決事項への人の回答は、計画の却下と作り直しの指示として計画者に渡す。この再提案の回数に上限は設けない。人が承認した完了条件を作業の完了の基準とする。
+
+承認待ちからは[人の回答と再開](#人の回答と再開)に従って進める。実行可能になる条件と作り直しは[計画のバージョン](data.md#計画のバージョン)に従う。必要な[検出試験](guarantees.md#検出試験)(観点ファイルの判定能力を確かめる試験)も、作業のラウンドを開く前に `next` の指示で済ませる。判定者には例の本文だけを渡し、種別と期待判定は渡さず、`devkit` が期待との照合を行う。
 
 ## 作業の指示
 
-`devkit next` は現在の [StageRun](data.md#ステージの実行-stagerun)(ステージの実行記録)と[ラウンド](data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)を特定する。[hook の稼働](guarantees.md#再開と-hook-の稼働確認)を確認し、[対象のバージョン](data.md#対象のバージョン-targetversion)(評価対象を識別する値)を取得して、識別したセッション ID をラウンドに結び付ける。engine は [brief](modules.md#brief)(作業や判定の依頼文)をファイルに書き、[出力上限](guarantees.md#性能と出力の上限)に応じて返す。人が担当するステージの扱いは[計画の担当](data.md#計画-plan)に従う。
+`devkit next` は現在の [StageRun](data.md#ステージの実行-stagerun)(ステージの実行記録)と[ラウンド](data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)を特定する。[hook の稼働](guarantees.md#再開と-hook-の稼働確認)を確認し、[対象のバージョン](data.md#対象のバージョン-targetversion)(評価対象を識別する値)を取得して、識別したセッション ID をラウンドに結び付ける。既定ではラウンドを開く前に、その開始時のスナップショットに未確認のループ自身の変更がないかを確かめ、あれば[人への確認](guarantees.md#人への確認対象)を受けるまで止める。engine は [brief](modules.md#brief)(作業や判定の依頼文)をファイルに書き、[出力上限](guarantees.md#性能と出力の上限)に応じて返す。人が担当するステージの扱いは[計画の担当](data.md#計画-plan)に従う。
 
-engine は [brief の責務](modules.md#brief)で定める入力を解決して brief を組み立てる。観点ファイル(check の確認事項を定めるファイル)の参照元と、規範全体の読み出しは[規範の固定](guarantees.md#規範の固定)に従う。
+engine は [brief の責務](modules.md#brief)で定める入力を解決して brief を組み立てる。本文には、そのステージ定義、その判定の観点ファイルと観点が参照する原則、rules、requirements、関係する構造の記録を入れる。計画者・作業者・判定者の brief に requirements を必ず入れる。それ以外の規範は論理名とパスの一覧を渡し、必要に応じて読ませる。パスはラウンド開始時、ラウンド外の判定では指示を出す時点のスナップショットを `snap/` に展開した場所を指す。作業ツリーで編集中の規範は読ませない。論理名と実際のパスの対応、出力スキーマの本文は[規範の固定](guarantees.md#規範の固定)に従う。変更の範囲は scope の出力と rules で渡す。
+
+requirements はリポジトリが満たすべき要件の正本であり、既定 `.devkit/requirements.md` に置く。purpose が承認された完了条件と既存の要件を照らして更新する。structure は構造のステージが既定 `.devkit/structure.json` に記録する。複数の作業で守る変更困難な決定は既定 `.devkit/rules.md` に置き、ループ自身の変更として[確認の設定と時点](guarantees.md#人への確認対象)に従う。これらの場所は `[paths] requirements`・`structure`・`rules` で変更できる。実行の記録は git 管理しない。各ステージは後の作業に効かせる決定を requirements・structure・rules のいずれかに残す。
 
 エージェントはセッション内で作業し、他の skill や plugin も使える。途中の決定や調査結果は `devkit note`、作業の[終了ブロック](data.md#進捗-progress)(作業結果を固定形式で返す JSON)は `devkit submit <ファイル>` で渡す。教訓も `note` で渡し、記録は [engine の責務](modules.md#engine)に従う。入力 JSON の場所と受理の条件は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。コミットは[完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に委ねる。
 
@@ -28,7 +58,7 @@ engine は `submit` で[状態遷移と受理条件](data.md#状態遷移と受�
 
 ## 作業結果の判定
 
-engine は `next` の中で、ステージに置いた `command:` の check(終了コードによる検証)をすべて判定者の check より先に実行する。雛形の列挙順は同じ種類の中だけ有効とする。コマンドの実行場所と照合、不一致時の進行は[判定対象の展開と完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に従う。環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。照合を通った実行結果は、終了コードと出力を [Judgment](data.md#check-の結果-judgment)(check の結果)に変換し、終了コードが0なら `PASS`、0以外なら `FAIL`、期限超過は `NOT ASSESSED` とする。必須の `command:` の check が `FAIL` なら、判定者を実行せず、engine が「修正する」として記録して出力を次の brief に含める。
+engine は `next` の中で、ステージに置いた `command:` の check(終了コードによる検証)をすべて判定者の check より先に実行する。雛形の列挙順は同じ種類の中だけ有効とする。コマンドの実行場所と照合、不一致時の進行は[判定対象の展開と完了時の永続化](guarantees.md#判定対象の展開と完了時の永続化)に従う。環境変数 `DEVKIT_STAGE=<ステージ名>` と `DEVKIT_WORK=<作業 ID>` を渡す。照合を通った実行結果は、終了コードと出力を [Judgment](data.md#check-の結果-judgment)(check の結果)に変換し、終了コードが0なら `PASS`、0以外なら `FAIL`、期限超過は `NOT ASSESSED` とする。ラウンド開始時の `devkit.toml` に `command:<name>` が登録されていなければ、エラーで停止せず、その check を `FAIL` にする。auto-fixable の指摘として「検証コマンド `<name>` が登録されていない。検証の手段を作り `devkit.toml` の `[commands.<name>]` に登録する」を返す。作業者は検証の仕組みとコマンドを作って登録する。登録はループ自身の変更として[確認の設定と時点](guarantees.md#人への確認対象)に従い、次のラウンド開始時のスナップショットから使う。検証コマンドの期限は登録ごとに必須とし、共通の既定の期限は設けない。必須の `command:` の check が `FAIL` なら、判定者を実行せず、engine が「修正する」として記録して出力と指摘を次の brief に含める。
 
 `devkit next` は判定依頼を `brief/<指示 ID>.md` に書き、[対象を展開](guarantees.md#判定対象の展開と完了時の永続化)して、指示 ID と展開先のパスを返す。そのラウンドの終了ブロックを含む判定依頼の内容は [check の契約](modules.md#check)、観点「差分」の有効な承認・委任の一覧は[判定結果の受理](guarantees.md#判定結果の受理)に従う。
 
@@ -36,12 +66,18 @@ engine は `next` の中で、ステージに置いた `command:` の check(終�
 
 ## router の判断
 
-engine は [Finding と完了条件 ID](data.md#指摘-finding)の差分から進展を計算し、[router の入力](modules.md#router)を渡して判断を呼び出し、結果を記録する。終了ブロックの終了の種別の定義は[進捗](data.md#進捗-progress)に従う。
+engine は [Finding と完了条件 ID](data.md#指摘-finding)の差分から進展を計算し、[router の入力](modules.md#router)を渡して判断を呼び出し、結果を記録する。終了ブロックの終了の種別の定義は[進捗](data.md#進捗-progress)に従う。前提に関する `FAIL` も通常の指摘として扱い、それだけで前のステージへ戻す扱いは設けない。
 
 - **修正する**: 次の `next` が指摘を取り込んだ brief を返す。
 - **人に確認する**: 問いを記録し、StageRun を回答待ちにして、`next` が問いの指示を返す。[既定の分類](guarantees.md#人への確認対象)を使う。
 - **前のステージに戻る**: [再計画の扱い](data.md#計画のバージョン)に従って旧 StageRun を再計画待ちにし、`next` が計画者への指示を返す。
-- **完了する**: [workspace](modules.md#workspace)(git 操作を担うモジュール)に完了処理を依頼する。確定と失敗時の扱いは[完了条件](guarantees.md#完了条件)に従い、完了が確定したら次のステージへ進む。最後のステージなら作業完了を記録して、`next` が完了の指示を返す。
+- **完了する**: 既定では最後のラウンドで行った未確認のループ自身の変更は、判定後に人が確認してから完了時のコミットへ進む。[workspace](modules.md#workspace)(git 操作を担うモジュール)に完了処理を依頼する。確定と失敗時の扱いは[完了条件](guarantees.md#完了条件)に従う。ステージの完了が確定したら遷移 `done` に従い、ステージ ID ならそのステージへ進み、`null` なら作業完了を記録して `next` が完了の指示を返す。`"replan"` なら完了したステージの記録を残し、既存の再計画の経路で `next` が計画者への指示を返す。計画者が残りを作り直し、計画の check と承認の条件を満たしてから続ける。kit は要件定義を特別扱いしない。
+
+既定の雛形は最後に作業者が担当する retrospective を置く。入力は、その作業のすべての判定と指摘(blocking でないものを含む)、`FAIL` と `NOT ASSESSED` の経緯、ラウンド数、人の回答(却下・訂正・作り直しの指示)、人が `note` の教訓で伝えた見逃し、規範の一覧である。
+
+振り返りでは各問題をどこで捕まえるべきだったか、再発を防ぐ反映先を決め、反映しない場合は理由を記録する。[教訓の反映先](guarantees.md#教訓の反映先)の優先順でリポジトリの規範に反映し、観点を変えたら検出試験の例も更新する。規範が目的を果たしているか、原則がどの観点・雛形で使われているか、使われない仕組みや負担に見合わない仕組みがないかも確かめる。対象はその作業で起きた問題・見逃し・規範の不足や負担とし、規範全体の棚卸しは必要が見えたときだけ行う。
+
+purpose がない計画でも、承認された完了条件のうち要件に当たるものを振り返りで requirements に反映する。purpose で反映済みなら重ねて更新しない。retrospective の必須 `command:test` は振り返り後の最終のツリーで実行し、観点 `harness` は振り返りと前提の確認事項を判定する。既定では規範を変えた場合に人の確認を通し、変えなければ確認なしで終わる。
 
 ## 人の回答と再開
 

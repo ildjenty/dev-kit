@@ -4,7 +4,7 @@
 
 The plan's completion conditions with IDs, scope, structure, contract type signatures, and available verification methods.
 
-Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in rules.md and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required command: check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
+Common inputs are `requirements.md`, the frozen norms, plan limits, relevant records from `structure.json`, placement guides for the change targets, difficult-to-change decisions in `rules.md` and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required `command:` check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
 ## Decisions
 
@@ -20,10 +20,10 @@ None.
 
 ## Artifacts
 
-A list showing each step's purpose, completion conditions, grounds, and scope. Pass the list unchanged to later-stage briefs as previous stage output, following `stages/README.md#work-inputs-and-submission`.
+A list showing each step's purpose, completion conditions, grounds, and scope. Pass the list unchanged to later-stage briefs as previous stage output, following `stages/README.md#work-inputs-and-submission`. Preserve decisions needed by future tasks following `stages/README.md#decisions-for-later-work`.
 
 ## Completion conditions
 
 Show each step's purpose, completion conditions, grounds, scope, and verification method. Each step can be verified independently and is small enough for a human to read in one pass.
 
-All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully checked the target and run `git commit`. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.
+All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.

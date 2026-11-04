@@ -27,6 +27,12 @@
       "type": "string",
       "minLength": 1
     },
+    "open_questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "completion_conditions": {
       "type": "array",
       "minItems": 1,
@@ -52,14 +58,6 @@
     "start_stage": {
       "type": "string",
       "minLength": 1
-    },
-    "meta_loop_stages": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      },
-      "uniqueItems": true
     },
     "stages": {
       "type": "array",

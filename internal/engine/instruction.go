@@ -15,6 +15,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/brief"
 	"github.com/ildjenty/dev-kit/internal/check"
 	"github.com/ildjenty/dev-kit/internal/form"
+	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 	"github.com/ildjenty/dev-kit/internal/plan"
 	"github.com/ildjenty/dev-kit/internal/router"
@@ -31,9 +32,34 @@ type instructionData struct {
 	BriefText    string              `json:"brief_text,omitempty"`
 }
 
-func (e *Engine) kitPath(name string) string { return ".devkit/kit/" + e.version + "/" + name }
+func (e *Engine) assetPath(ctx context.Context, ref, name string) (string, error) {
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+	p := settings.RepositoryPaths()
+	for _, mapping := range []struct{ logical, actual string }{
+		{"principles", p.Principles}, {"stages", p.Stages}, {"checks", p.Checks}, {"plans", p.Plans}, {"templates", p.Templates},
+		{"rules.md", p.Rules}, {"requirements.md", p.Requirements}, {"structure.json", p.Structure},
+	} {
+		if name == mapping.logical {
+			return mapping.actual, nil
+		}
+		if strings.HasPrefix(name, mapping.logical+"/") {
+			return mapping.actual + strings.TrimPrefix(name, mapping.logical), nil
+		}
+	}
+	return "", fmt.Errorf("unknown logical norm: %s", name)
+}
 func (e *Engine) asset(ctx context.Context, ref, name string) ([]byte, error) {
-	return e.workspace.ReadFile(ctx, ref, e.kitPath(name))
+	if strings.HasPrefix(name, "schemas/") {
+		return kit.Schema(strings.TrimSuffix(strings.TrimPrefix(name, "schemas/"), ".json"))
+	}
+	path, err := e.assetPath(ctx, ref, name)
+	if err != nil {
+		return nil, err
+	}
+	return e.workspace.ReadFile(ctx, ref, path)
 }
 func (e *Engine) expanded(ctx context.Context, ref string) (string, error) {
 	tree, err := e.workspace.CommitTree(ctx, ref)
@@ -93,88 +119,97 @@ func (e *Engine) normDocuments(ctx context.Context, ref string) ([]check.Norm, [
 	if err != nil {
 		return nil, nil, err
 	}
-	path, err := e.expanded(ctx, ref)
-	if err != nil {
-		return nil, nil, err
-	}
 	norms := []check.Norm{}
-	docs := []brief.Document{}
 	for _, norm := range refs {
-		var content strings.Builder
-		absolute := filepath.Join(path, filepath.FromSlash(norm.Path))
-		err = filepath.WalkDir(absolute, func(name string, entry fs.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if entry.IsDir() {
-				if entry.Name() == "run" && name == filepath.Join(path, ".devkit/run") {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			if entry.Type()&os.ModeSymlink != 0 {
-				return nil
-			}
-			data, err := os.ReadFile(name)
-			if err != nil {
-				return err
-			}
-			rel, err := filepath.Rel(path, name)
-			if err != nil {
-				return err
-			}
-			doc := brief.Document{Path: filepath.ToSlash(rel), Content: string(data)}
-			docs = append(docs, doc)
-			fmt.Fprintf(&content, "\nReference: %s\n\n%s\n", doc.Path, doc.Content)
-			return nil
-		})
-		if err != nil {
-			return nil, nil, err
-		}
-		norms = append(norms, check.Norm{Reference: norm, Content: content.String()})
+		norms = append(norms, check.Norm{Reference: norm})
 	}
-	return norms, docs, nil
+	return norms, nil, nil
 }
+
+func (e *Engine) normPaths(ctx context.Context, ref string) ([]brief.NormPath, error) {
+	refs, err := e.norms(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	expanded, err := e.expanded(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	p := settings.RepositoryPaths()
+	logical := map[string]string{p.Principles: "principles/", p.Stages: "stages/", p.Checks: "checks/", p.Plans: "plans/", p.Templates: "templates/", p.Rules: "rules.md"}
+	paths := []brief.NormPath{}
+	for _, norm := range refs {
+		name := logical[norm.Path]
+		if name == "" {
+			name = norm.Path
+		}
+		paths = append(paths, brief.NormPath{Path: name, SnapshotPath: filepath.Join(expanded, filepath.FromSlash(norm.Path))})
+	}
+	return paths, nil
+}
+
+func (e *Engine) aspectDocuments(ctx context.Context, ref string, items []plan.Check) ([]brief.Document, error) {
+	docs := []brief.Document{}
+	seen := map[string]bool{}
+	for _, item := range items {
+		if item.Runner.IsCommand() {
+			continue
+		}
+		name := "checks/" + item.Aspect + ".md"
+		source, err := e.asset(ctx, ref, name)
+		if err != nil {
+			return nil, err
+		}
+		names := append([]string{name}, check.AspectReferences(string(source))...)
+		for _, name := range names {
+			if name == "rules.md" || seen[name] {
+				continue
+			}
+			data, err := e.asset(ctx, ref, name)
+			if err != nil {
+				return nil, err
+			}
+			docs = append(docs, brief.Document{Path: name, Content: string(data)})
+			seen[name] = true
+		}
+	}
+	return docs, nil
+}
+
 func (e *Engine) repository(ctx context.Context, ref string) (brief.RepositoryFacts, error) {
-	path, err := e.expanded(ctx, ref)
+	settings, err := e.settings(ctx, ref)
 	if err != nil {
 		return brief.RepositoryFacts{}, err
 	}
+	expanded, err := e.expanded(ctx, ref)
+	if err != nil {
+		return brief.RepositoryFacts{}, err
+	}
+	p := settings.RepositoryPaths()
 	facts := brief.RepositoryFacts{LayoutGuides: []brief.Document{}, AvailableChecks: []plan.Check{}}
-	err = filepath.WalkDir(path, func(name string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
+	for _, item := range []struct {
+		path   string
+		target *brief.Document
+	}{{p.Rules, &facts.Rules}, {p.Requirements, &facts.Requirements}} {
+		data, err := os.ReadFile(filepath.Join(expanded, filepath.FromSlash(item.path)))
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return facts, err
 		}
-		if entry.IsDir() {
-			if entry.Name() == ".git" || name == filepath.Join(path, ".devkit/run") {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.Type()&os.ModeSymlink != 0 {
-			return nil
-		}
-		rel, err := filepath.Rel(path, name)
-		if err != nil {
-			return err
-		}
-		rel = filepath.ToSlash(rel)
-		if entry.Name() == "README.md" || entry.Name() == "doc.go" || rel == ".devkit/rules.md" {
-			data, err := os.ReadFile(name)
-			if err != nil {
-				return err
-			}
-			doc := brief.Document{Path: rel, Content: string(data)}
-			if rel == ".devkit/rules.md" {
-				facts.Rules = doc
-				facts.IrreversibleDecisions = []string{doc.Content}
-			} else {
-				facts.LayoutGuides = append(facts.LayoutGuides, doc)
-			}
-		}
-		return nil
-	})
-	return facts, err
+		*item.target = brief.Document{Path: item.path, Content: string(data)}
+	}
+	data, err := os.ReadFile(filepath.Join(expanded, filepath.FromSlash(p.Structure)))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return facts, err
+	}
+	if err == nil {
+		facts.LayoutGuides = append(facts.LayoutGuides, brief.Document{Path: p.Structure, Content: string(data)})
+	}
+	facts.IrreversibleDecisions = []string{facts.Rules.Content}
+	return facts, nil
 }
 func (e *Engine) outputs(state *ledger.State) ([]brief.StageOutput, error) {
 	records, err := e.records()
@@ -229,6 +264,13 @@ func (e *Engine) outputs(state *ledger.State) ([]brief.StageOutput, error) {
 	}
 	return outputs, nil
 }
+func originalRequest(work *ledger.Work) string {
+	if work.OriginalRequest == nil {
+		return ""
+	}
+	return *work.OriginalRequest
+}
+
 func instructionID(workID string, kind form.InstructionKind, key string, reissue int) string {
 	return fmt.Sprintf("%s-%s-%s-%d", workID, kind, hash([]byte(key))[:24], reissue)
 }
@@ -495,7 +537,7 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	_, docs, err := e.normDocuments(ctx, ref)
+	paths, err := e.normPaths(ctx, ref)
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -509,7 +551,7 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 		if err != nil {
 			return brief.Brief{}, err
 		}
-		definitions = append(definitions, brief.Document{Path: e.kitPath("stages/" + stage.ID + ".md"), Content: string(data)})
+		definitions = append(definitions, brief.Document{Path: "stages/" + stage.ID + ".md", Content: string(data)})
 		facts.AvailableChecks = append(facts.AvailableChecks, stage.Checks...)
 	}
 	work, _ := state.Work()
@@ -525,14 +567,22 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	input := brief.PlannerInput{RequestTemplate: string(template), InstructionID: meta.ID, Version: version, Template: t, TemplateHash: plan.ContentHash(source), Task: string(task), StageDefinitions: definitions, Repository: facts, Norms: docs, PreviousOutputs: outputs, OutputSchema: string(outputSchema)}
+	input := brief.PlannerInput{RequestTemplate: string(template), InstructionID: meta.ID, Version: version, Template: t, TemplateHash: plan.ContentHash(source), Task: string(task), OriginalRequest: originalRequest(work), StageDefinitions: definitions, Repository: facts, NormPaths: paths, PreviousOutputs: outputs, OutputSchema: string(outputSchema)}
 	if p, ok := latestPlan(state); ok {
 		input.CurrentPlan = &p.Plan
 		if origin == plan.BackProposal {
 			remaining := p.Plan
 			remaining.Stages = nil
 			start := p.Plan.StartStage
-			if run, ok := state.LatestStageRun(); ok {
+			if run, ok := state.LatestStageRun(); ok && run.State == ledger.StageCompleted {
+				start = ""
+				for i, stage := range p.Plan.Stages {
+					if stage.ID == run.StageID && i+1 < len(p.Plan.Stages) {
+						start = p.Plan.Stages[i+1].ID
+						break
+					}
+				}
+			} else if run, ok := state.LatestStageRun(); ok {
 				if target, err := p.Plan.Next(run.StageID, plan.Back); err == nil && target != nil {
 					start = *target
 				}
@@ -632,7 +682,7 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	_, docs, err := e.normDocuments(ctx, ref)
+	paths, err := e.normPaths(ctx, ref)
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -641,6 +691,10 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 		return brief.Brief{}, err
 	}
 	facts.AvailableChecks = stage.Checks
+	docs, err := e.aspectDocuments(ctx, ref, stage.Checks)
+	if err != nil {
+		return brief.Brief{}, err
+	}
 	outputs, err := e.outputs(state)
 	if err != nil {
 		return brief.Brief{}, err
@@ -649,7 +703,7 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	input := brief.WorkInput{RequestTemplate: string(template), InstructionID: meta.ID, Stage: stage, StageDefinition: string(definition), Plan: p, Purpose: p.Task, Repository: facts, Norms: docs, PreviousOutputs: outputs, PreviousFindings: state.UnresolvedBlocking(round.StageRunID), OutputSchema: string(outputSchema)}
+	input := brief.WorkInput{RequestTemplate: string(template), InstructionID: meta.ID, Stage: stage, StageDefinition: string(definition), Plan: p, Purpose: p.Task, Repository: facts, Norms: docs, NormPaths: paths, PreviousOutputs: outputs, PreviousFindings: state.UnresolvedBlocking(round.StageRunID), OutputSchema: string(outputSchema)}
 	for _, condition := range p.CompletionConditions {
 		input.Verification = append(input.Verification, condition.ID+": "+condition.Description)
 	}
@@ -676,7 +730,24 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 		}
 	}
 	if meta.Context == nil {
-		meta.Context = &ledger.InstructionContext{Findings: input.PreviousFindings, Commands: commands, PreCommitOutput: input.PreCommitOutput}
+		if stage.ID == "retrospective" {
+			var context strings.Builder
+			for _, record := range records {
+				switch record.Payload.(type) {
+				case *ledger.Judgment, *ledger.Answer, *ledger.Approval, *ledger.Lesson:
+					data, err := json.MarshalIndent(record.Payload, "", "  ")
+					if err != nil {
+						return brief.Brief{}, err
+					}
+					fmt.Fprintf(&context, "%s %s\n%s\n\n", record.ID, record.Kind(), data)
+				}
+			}
+			for _, run := range state.StageRuns() {
+				fmt.Fprintf(&context, "Stage %s: %d rounds\n", run.StageID, len(state.Rounds(run.ID)))
+			}
+			input.RetrospectiveContext = context.String()
+		}
+		meta.Context = &ledger.InstructionContext{RetrospectiveContext: input.RetrospectiveContext, Findings: input.PreviousFindings, Commands: commands, PreCommitOutput: input.PreCommitOutput}
 		for _, output := range input.PreviousOutputs {
 			meta.Context.Outputs = append(meta.Context.Outputs, ledger.InstructionOutput{StageID: output.StageID, Content: output.Content})
 		}
@@ -684,6 +755,7 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 		input.PreviousOutputs = instructionOutputs(meta.Context)
 		input.PreviousFindings = meta.Context.Findings
 		input.PreCommitOutput = meta.Context.PreCommitOutput
+		input.RetrospectiveContext = meta.Context.RetrospectiveContext
 		input.CommandOutputs = nil
 		for _, command := range meta.Context.Commands {
 			input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: command.Aspect, Runner: plan.Runner(command.Runner)}, ExitCode: command.Command.ExitCode, Output: command.Command.Output})
@@ -701,7 +773,7 @@ func instructionOutputs(context *ledger.InstructionContext) []brief.StageOutput 
 }
 
 func (e *Engine) table(ctx context.Context, ref string) (router.Table, error) {
-	data, err := e.asset(ctx, ref, "router/default.toml")
+	data, err := kit.RouterDefaults()
 	if err != nil {
 		return router.Table{}, err
 	}
@@ -713,7 +785,7 @@ func (e *Engine) table(ctx context.Context, ref string) (router.Table, error) {
 	if err != nil {
 		return table, err
 	}
-	return router.MergeTables(table, router.Table{HumanConfirmation: settings.Router.HumanConfirmation}), nil
+	return table.WithConfig(settings), nil
 }
 func (e *Engine) question(target form.ApprovalTarget, category, text, stage string) form.Question {
 	return form.Question{ID: ulidString(), Text: text, ApprovalTarget: target, Options: []string{"approve", "reject", "defer"}, Recommendation: "defer", StopCategory: category, NextStage: stage, StoppedStage: stage, StopReason: text, Evidence: []form.Reference{}}

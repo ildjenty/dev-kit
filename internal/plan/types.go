@@ -118,7 +118,6 @@ func (s Stage) CompletionRule() CompletionRule {
 type PlanTemplate struct {
 	Name           string      `json:"name"`
 	StartStage     string      `json:"start_stage"`
-	MetaLoopStages []string    `json:"meta_loop_stages"`
 	Stages         []Stage     `json:"stages"`
 	OptionalStages []Stage     `json:"optional_stages"`
 	PlanLimits     *PlanLimits `json:"plan_limits,omitempty"`
@@ -157,9 +156,9 @@ type Plan struct {
 	Version               int                   `json:"version"`
 	Template              TemplateRef           `json:"template"`
 	Task                  string                `json:"task"`
+	OpenQuestions         []string              `json:"open_questions,omitempty"`
 	CompletionConditions  []CompletionCondition `json:"completion_conditions"`
 	StartStage            string                `json:"start_stage"`
-	MetaLoopStages        []string              `json:"meta_loop_stages,omitempty"`
 	Stages                []Stage               `json:"stages"`
 	IrreversibleDecisions []string              `json:"irreversible_decisions,omitempty"`
 	ExternalOperations    []ExternalOperation   `json:"external_operations"`
@@ -205,7 +204,7 @@ func cloneStage(s Stage) Stage {
 
 func clonePlan(p Plan) Plan {
 	p.CompletionConditions = slices.Clone(p.CompletionConditions)
-	p.MetaLoopStages = slices.Clone(p.MetaLoopStages)
+	p.OpenQuestions = slices.Clone(p.OpenQuestions)
 	p.IrreversibleDecisions = slices.Clone(p.IrreversibleDecisions)
 	p.ExternalOperations = slices.Clone(p.ExternalOperations)
 	p.Stages = slices.Clone(p.Stages)

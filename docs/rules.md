@@ -1,15 +1,15 @@
 # 規則と強制手段
 
-規則は対象のコードと文書に適用する。「手段: 未実装」は、その規則を強制する実装がまだないことを示す。ループの仕組みとの分担は[基本方針](design.md#基本方針)に従う。
+規則は対象のコードと文書に適用する。「手段: 未実装」は、その規則を強制する実装がまだないことを示す。毎回の振り返りで、これらの項目と繰り返し見つかる違反を、テスト・lint・型・pre-commit・検証コマンドに移す候補にする。ループの仕組みとの分担は[基本方針](design.md#基本方針)に従う。
 
-利用側の規則の正本は[規則と強制手段](architecture/data.md#規則と強制手段-rules)、既定の配置は [dev-kit のリポジトリ](architecture/layout.md#dev-kit-のリポジトリ)、初期化は [install](architecture/modules.md#install) に従う。
+利用側の規則の正本は `.devkit/rules.md` であり、`devkit.toml` の `[paths] rules` で配置を変更できる。`init` がどのリポジトリにも当てはまる規則の既定をコピーし、以後はリポジトリが所有して育てる。複数の作業で守る変更困難な決定と強制手段を残し、ローカルの作業記録だけに依存させない。規則はラウンド開始時に固定する判定の規範に含め、更新はループ自身の変更として、既定では効力を持つ前に人が確認する。
 
 ## コードの構造
 
 - **通信の型(リクエスト・レスポンス)を内部で再利用しない**。 [`assets/principles/structure.md`](../assets/principles/structure.md) の原則6。手段: 未実装。
 - **提供側と下位レイヤーは、利用側と上位レイヤーの具体的な実装に依存しない。利用側に定義した抽象(ポート)への依存は許す**。 [`assets/principles/structure.md`](../assets/principles/structure.md) の原則3。手段: 未実装。
 - **ドメインからフレームワーク・インフラ・アプリの設定の型を import しない**。 [`assets/principles/structure.md`](../assets/principles/structure.md) の原則5・6。手段: 未実装。
-- **静的な依存関係に循環参照を含めない**。 [`assets/principles/structure.md`](../assets/principles/structure.md) の原則3。手段: Go パッケージ間の import 循環はビルド check に任せる。設計上の依存の妥当性は別に確認する。
+- **静的な依存関係に循環参照を含めない**。 [`assets/principles/structure.md`](../assets/principles/structure.md) の原則3。手段: 未実装。
 - **ドメインの型にフレームワークの型やアノテーションを含めない**。 [`assets/principles/structure.md`](../assets/principles/structure.md) の原則5。手段: 未実装。
 - **モジュールの公開入口を経由せずに内部のパスを直接 import しない**。 [`assets/principles/structure.md`](../assets/principles/structure.md) の原則6。手段: 未実装。
 - **引数をそのまま渡すだけの関数を置かない**。 [`assets/principles/structure.md`](../assets/principles/structure.md) の原則7。手段: 未実装。

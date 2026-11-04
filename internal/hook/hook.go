@@ -67,6 +67,9 @@ func (h Handler) Process(e event.Event) (result event.Result, err error) {
 		return result, nil
 	}
 	if h.WorkID == "" {
+		if e.Name == event.UserPromptSubmit && !(e.Host == event.ClaudeCode && strings.HasPrefix(e.Prompt, "<task-notification>")) {
+			return event.Result{}, fsstore.New(h.runRoot()).Publish(filepath.Join("sessions", e.SessionID, "latest-prompt.txt"), []byte(e.Prompt))
+		}
 		return event.Result{}, nil
 	}
 	switch e.Name {
@@ -215,7 +218,20 @@ func (h Handler) stop(e event.Event, state *ledger.State, now time.Time) (event.
 				}
 			} else if !stopAllowed(state) {
 				observation.Continuations++
-				if observation.Continuations >= 3 {
+				limit := 3
+				if h.ReadConfig != nil {
+					work, _ := state.Work()
+					ref := work.Branch
+					if round, ok := state.OpenRound(); ok {
+						ref = round.StartTarget.Tree
+					}
+					settings, err := h.ReadConfig(ref)
+					if err != nil {
+						return result, err
+					}
+					limit = settings.StopContinuation()
+				}
+				if observation.Continuations >= limit {
 					observation.LimitReached = true
 					question := continuationQuestion(h.WorkID, observation, state.CurrentPosition())
 					observation.Question = &question
@@ -253,7 +269,7 @@ func stopAllowed(state *ledger.State) bool {
 func continuationQuestion(workID string, stop ledger.StopObservation, position ledger.Position) form.Question {
 	question := form.Question{
 		ID:             workID + "-stop-" + stop.LastRecordID,
-		Text:           "No ledger records have been added after three continuation decisions. Should this work continue?",
+		Text:           "No ledger records have been added within the continuation limit. Should this work continue?",
 		ApprovalTarget: form.ApprovalTarget{Kind: form.ApprovalWork, WorkID: workID},
 		Options:        []string{"continue", "pause"}, Recommendation: "pause",
 		RecommendationReason: "Check why the work has made no recorded progress before continuing.",
