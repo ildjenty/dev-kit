@@ -98,9 +98,13 @@ func (e *Engine) runnerDefinition(ctx context.Context, ref string, runner plan.R
 	if obs == nil {
 		return nil, errors.New("session observation is required for detection tests")
 	}
-	name := ".claude/agents/" + string(runner) + ".md"
+	agent, err := e.runnerAgent(ctx, ref, string(runner))
+	if err != nil {
+		return nil, err
+	}
+	name := ".claude/agents/" + agent + ".md"
 	if obs.Host == "codex" {
-		name = ".codex/agents/" + string(runner) + ".toml"
+		name = ".codex/agents/" + agent + ".toml"
 	}
 	return e.workspace.ReadFile(ctx, gitReference(ref), name)
 }
@@ -200,7 +204,11 @@ func (e *Engine) issueDetection(ctx context.Context, state *ledger.State, input 
 	if err != nil {
 		return Result{}, false, err
 	}
-	data := instructionData{Reference: ref, Context: meta.Context, Instruction: form.Instruction{ID: meta.ID, Kind: form.InstructionDetectionTest, Runner: string(item.Runner), TargetPath: path, Text: "Run the detection test with the assigned judge: devkit-instruction " + meta.ID}, Request: &request, Detection: &input}
+	runner, err := e.runnerAgent(ctx, ref, string(item.Runner))
+	if err != nil {
+		return Result{}, false, err
+	}
+	data := instructionData{Reference: ref, Context: meta.Context, Instruction: form.Instruction{ID: meta.ID, Kind: form.InstructionDetectionTest, Runner: runner, TargetPath: path, Text: "Run the detection test with the assigned judge: devkit-instruction " + meta.ID}, Request: &request, Detection: &input}
 	b, err := e.detectionBrief(ctx, data)
 	if err != nil {
 		return Result{}, false, err
@@ -254,7 +262,7 @@ func (e *Engine) executeDetection(ctx context.Context, state *ledger.State, meta
 	if err != nil {
 		return Result{}, false, err
 	}
-	if command, ok := settings.Judges[data.Instruction.Runner]; ok {
+	if command, ok := settings.Judges[data.Request.Runner]; ok {
 		expected, err := e.workspace.SnapshotTree(ctx)
 		if err != nil {
 			return Result{}, false, err
@@ -284,7 +292,7 @@ func (e *Engine) executeDetection(ctx context.Context, state *ledger.State, meta
 			r, err = e.issueQuestion(state, q)
 			return r, true, err
 		}
-		if err = e.acceptDetection(ctx, state, meta, data, stdout, check.Provenance{Source: check.JudgeCommand, InstructionID: meta.ID, Runner: data.Instruction.Runner}); err != nil {
+		if err = e.acceptDetection(ctx, state, meta, data, stdout, check.Provenance{Source: check.JudgeCommand, InstructionID: meta.ID, Runner: data.Request.Runner}); err != nil {
 			return Result{}, false, err
 		}
 		state, err = e.load()
@@ -325,7 +333,7 @@ func (e *Engine) validateDetection(meta ledger.Instruction, data instructionData
 		}
 		observations = append(observations, check.DetectionObservation{File: observation.File, Judgment: judgment, Reason: observation.Reason})
 	}
-	test, err := check.AssessDetection(data.Detection.Spec, data.Instruction.Runner, data.Detection.Identity, observations)
+	test, err := check.AssessDetection(data.Detection.Spec, data.Request.Runner, data.Detection.Identity, observations)
 	if err != nil {
 		return check.DetectionTest{}, err
 	}

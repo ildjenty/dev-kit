@@ -8,7 +8,7 @@
       "checks": [
         {
           "aspect": "wording",
-          "runner": "devkit-judge",
+          "runner": "judge",
           "required": true,
           "criteria": [
             {
@@ -61,7 +61,7 @@
       "checks": [
         {
           "aspect": "harness",
-          "runner": "devkit-judge",
+          "runner": "judge",
           "required": true,
           "criteria": [
             {
@@ -177,7 +177,7 @@
       "checks": [
         {
           "aspect": "contract",
-          "runner": "devkit-judge",
+          "runner": "judge",
           "required": true,
           "criteria": [
             {

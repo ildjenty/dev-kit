@@ -41,7 +41,7 @@ func newHandler(t *testing.T) Handler {
 			}}, nil
 		},
 		ReadAgent: func(_ string, _ event.Host, name string) (AgentDefinition, error) {
-			return AgentDefinition{Name: name, Model: "inherit", Effort: "high"}, nil
+			return AgentDefinition{Name: name, Model: "inherit", Effort: "high", Tools: []string{"Read", "Glob", "Grep"}}, nil
 		},
 		InstructionRunner: func(instruction ledger.Instruction) (string, error) {
 			if instruction.Kind == form.InstructionPlan {
@@ -390,7 +390,7 @@ func TestNormativeReference(t *testing.T) {
 	}
 	e := event.Event{Host: event.ClaudeCode, Name: event.PreToolUse, SessionID: "session", ToolName: "Agent", Agent: &event.AgentInvocation{Type: "devkit-judge", Prompt: "devkit-instruction issued"}}
 	process(t, h, e)
-	if reference != "devkit/"+h.WorkID || agentReference != reference {
+	if reference != "HEAD" || agentReference != reference {
 		t.Fatalf("outside-round references: config %q, agent %q", reference, agentReference)
 	}
 	store := fsstore.New(h.workRoot())

@@ -15,7 +15,7 @@ For detection tests, evaluate each example body independently without case kinds
 
 Treat the author's explanation and termination block as hypotheses to verify; do not base judgment on self-evaluation. Compare exemption claims and grounds only for the requirements concerned. Return `NOT ASSESSED` when necessary criteria or verification capabilities are unavailable, and identify the unverified scope. Even if startup or interaction is needed, do not compensate by writing or delegating to another runner.
 
-Judgments are `PASS`, `FAIL`, and `NOT ASSESSED`, with aggregation priority `FAIL`, `NOT ASSESSED`, then `PASS`. Findings include a finding ID, whether they are blocking, `auto-fixable` or `needs-decision`, a failure scenario and grounds, exemption comparisons, and references to resolved findings.
+Judgments are `PASS`, `FAIL`, and `NOT ASSESSED`, with aggregation priority `FAIL`, `NOT ASSESSED`, then `PASS`. Findings include a finding ID, whether they are blocking, `auto-fixable` or `needs-decision`, a failure scenario and grounds, exemption comparisons, and references to resolved findings. Set premise_broken to true on a blocking finding when an earlier stage premise is broken; devkit asks the human and recommends back, rather than returning automatically.
 
 Return only JSON in the final message, following the request's JSON Schema. Accurately include `instruction_id`, aspect, target version, norm identity, checked completion condition IDs, judgment and findings, verified and unverified scope, method, and environment. Do not record model or effort values as observed unless obtained.
 

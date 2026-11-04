@@ -24,9 +24,13 @@ type Input struct {
 }
 
 type Decision struct {
-	Action       plan.Transition
-	Reason       string
-	Confirmation Confirmation
+	Assignee         plan.Assignee `json:"assignee,omitempty"`
+	FixRule          int           `json:"fix_rule,omitempty"`
+	PreserveAssignee bool          `json:"preserve_assignee,omitempty"`
+	RecommendBack    bool          `json:"recommend_back,omitempty"`
+	Action           plan.Transition
+	Reason           string
+	Confirmation     Confirmation
 }
 
 // Decide only classifies. Engine handles transitions and records questions and provisional decisions.
@@ -51,6 +55,12 @@ func (t Table) Decide(input Input) (Decision, error) {
 		confirmation.Categories = append(confirmation.Categories, item.Categories...)
 	}
 	decision := Decision{Confirmation: confirmation}
+	for _, finding := range input.Summary.Findings {
+		if finding.Blocking && finding.PremiseBroken {
+			decision.Action, decision.Reason, decision.RecommendBack = plan.Ask, "A blocking finding reports a broken premise. Ask the human whether to return to an earlier stage.", true
+			return decision, nil
+		}
+	}
 	if input.TerminationKind == form.TerminationQuestion || input.TerminationKind == form.TerminationStopped || confirmation.Required {
 		decision.Action, decision.Reason = plan.Ask, "human confirmation is required"
 		decision.Confirmation.Provisional = false

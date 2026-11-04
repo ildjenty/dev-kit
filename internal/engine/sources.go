@@ -86,10 +86,10 @@ func (e *Engine) fixedAdapter(ctx context.Context, ref, name string, item config
 		if err != nil {
 			return nil, err
 		}
-		return source.NewFiles(e.Root(), location, tree, ref, false)
+		return source.NewFiles(e.Root(), location, tree, ref)
 	}
 	if e.workRoot() == "" {
-		return source.NewFiles(e.Root(), item.Path, nil, "", false)
+		return source.NewFiles(e.Root(), item.Path, nil, "")
 	}
 	pin, err := e.pin(ctx, ref, false)
 	if err != nil {
@@ -99,7 +99,7 @@ func (e *Engine) fixedAdapter(ctx context.Context, ref, name string, item config
 	if err != nil {
 		return nil, err
 	}
-	return source.NewFiles(directory, ".", os.DirFS(directory), "", false)
+	return source.NewFiles(directory, ".", os.DirFS(directory), "")
 }
 
 // document returns one document by ID from the snapshot fixed for ref.
@@ -266,7 +266,7 @@ func (e *Engine) refreshSources(ctx context.Context, ref string) (string, error)
 }
 
 func (e *Engine) fixExternal(name string, item config.Source) (sourceManifest, error) {
-	adapter, err := source.NewFiles(e.Root(), item.Path, nil, "", false)
+	adapter, err := source.NewFiles(e.Root(), item.Path, nil, "")
 	if err != nil {
 		return nil, err
 	}

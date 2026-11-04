@@ -95,6 +95,9 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 	if err := validateAmbiguousAnswer(state, question, request); err != nil {
 		return Result{}, err
 	}
+	if err := validateRoleContinuation(question, request); err != nil {
+		return Result{}, err
+	}
 	if err := e.recordAnswer(state, question, request, original, observedAt); err != nil {
 		return Result{}, err
 	}
@@ -339,18 +342,9 @@ func (e *Engine) applyStageAnswer(state *ledger.State, question *form.Question, 
 			}
 			return response(state), nil
 		}
-		if question.StopCategory == config.MetaLoopEdit && request.Interpretation != ledger.AnswerApproved {
-			update := *run
-			update.StopReason = "Undo the rejected development loop edits using the previously confirmed norms.\n" + question.Text + "\nHuman instructions: " + request.Text
-			if _, err := e.append(&update); err != nil {
-				return Result{}, err
-			}
-			run = &update
-		}
-		if round, open := state.OpenRound(); open && run.State == ledger.StageApprovalWait && request.Interpretation != ledger.AnswerApproved {
-			if err := e.closeRound(state, run, round, router.Decision{Action: plan.Fix, Reason: "The human requested changes. Undo rejected development loop edits when applicable: " + request.Text}); err != nil {
-				return Result{}, err
-			}
+
+		if err := e.applyCorrectionAnswer(state, run, question, request); err != nil {
+			return Result{}, err
 		}
 	}
 	state, err := e.load()
@@ -380,4 +374,53 @@ func (e *Engine) deferQuestion(question *form.Question) (Result, error) {
 		return Result{}, err
 	}
 	return e.issueQuestion(state, replacement)
+}
+
+func validateRoleContinuation(question *form.Question, request AnswerRequest) error {
+	if question.StopCategory != "round_limit" || !strings.HasPrefix(request.Text, "continue:") {
+		return nil
+	}
+	for _, option := range question.Options {
+		if request.Interpretation == ledger.AnswerText && request.Text == option {
+			return nil
+		}
+	}
+	return errors.New("role continuation must select an offered continue:<role> option with a text interpretation")
+}
+
+func (e *Engine) applyCorrectionAnswer(state *ledger.State, run *ledger.StageRun, question *form.Question, request AnswerRequest) error {
+	rounds := state.Rounds(run.ID)
+	if len(rounds) > 0 && question.StopCategory == "round_limit" && request.Interpretation == ledger.AnswerText && strings.HasPrefix(request.Text, "continue:") {
+		role := plan.Assignee(strings.TrimPrefix(request.Text, "continue:"))
+		return e.closeRound(state, run, rounds[len(rounds)-1], router.Decision{Action: plan.Fix, Assignee: role, Reason: "The human chose continuation with role " + string(role)})
+	}
+	if question.StopCategory == config.MetaLoopEdit && request.Interpretation != ledger.AnswerApproved {
+		update := *run
+		update.StopReason = "Undo the rejected development loop edits using the previously confirmed norms.\n" + question.Text + "\nHuman instructions: " + request.Text
+		if _, err := e.append(&update); err != nil {
+			return err
+		}
+		run = &update
+	}
+	if needsCorrectionAnswer(rounds, run, question, request) {
+		round := rounds[len(rounds)-1]
+		if err := e.closeRound(state, run, round, router.Decision{Action: plan.Fix, PreserveAssignee: question.StopCategory == config.MetaLoopEdit, Reason: "The human requested changes. Undo rejected development loop edits when applicable: " + request.Text}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func needsCorrectionAnswer(rounds []*ledger.Round, run *ledger.StageRun, question *form.Question, request AnswerRequest) bool {
+	if len(rounds) == 0 {
+		return false
+	}
+	round := rounds[len(rounds)-1]
+	if round.ReturnedTarget == nil || round.Decision != nil && round.Decision.Action != plan.Ask {
+		return false
+	}
+	if round.Decision != nil {
+		return question.NextStage == run.StageID && question.StopCategory != "round_limit"
+	}
+	return request.Interpretation == ledger.AnswerRejected || run.State == ledger.StageApprovalWait && request.Interpretation != ledger.AnswerApproved
 }

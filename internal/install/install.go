@@ -277,7 +277,11 @@ func runGit(ctx context.Context, root string, args ...string) ([]byte, error) {
 }
 
 func (r *Result) addConfiguration() (map[string]config.Source, error) {
-	configuration := []byte(fmt.Sprintf("kit_version = %q\n", kit.Version))
+	roles, err := kit.HostFragment("roles.toml")
+	if err != nil {
+		return nil, err
+	}
+	configuration := append([]byte(fmt.Sprintf("kit_version = %q\n", kit.Version)), roles...)
 	existing, err := os.ReadFile(filepath.Join(r.Root, "devkit.toml"))
 	if err == nil {
 		configuration = existing

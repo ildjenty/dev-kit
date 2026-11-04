@@ -72,7 +72,7 @@ func TestPlanCheckSelections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := PlanCheck{Aspect: "plan", Runner: "devkit-judge", Criteria: []Selection{{Source: "rules", Select: ""}}, Examples: &Selection{Source: "examples", Select: "custom/spec.json"}}
+	want := PlanCheck{Aspect: "plan", Runner: "judge", Criteria: []Selection{{Source: "rules", Select: ""}}, Examples: &Selection{Source: "examples", Select: "custom/spec.json"}}
 	if !reflect.DeepEqual(c.PlanCheckSettings(), want) {
 		t.Fatalf("plan selections differ: %+v", c.PlanCheckSettings())
 	}

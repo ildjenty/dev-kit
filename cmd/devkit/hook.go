@@ -117,6 +117,7 @@ func processHook(ctx context.Context, e event.Event) (event.Result, error) {
 		return event.Result{}, err
 	}
 	normativeRef := func(ref string) string {
+		ref, _, _ = strings.Cut(ref, "@")
 		if round, ok := state.OpenRound(); ok && round.StartTarget.Tree == ref && round.NormReference != "" {
 			git, _, _ := strings.Cut(round.NormReference, "@")
 			return git
@@ -200,7 +201,15 @@ func readAgent(ctx context.Context, w *workspace.Workspace, ref string, host eve
 			continue
 		}
 		key = strings.TrimSpace(key)
-		if key != "name" && key != "model" && key != "effort" {
+		if key != "name" && key != "model" && key != "effort" && key != "tools" {
+			continue
+		}
+		if key == "tools" {
+			tools, err := agentTools(value)
+			if err != nil {
+				return hook.AgentDefinition{}, err
+			}
+			definition.Tools = tools
 			continue
 		}
 		value, err = frontmatterValue(value)
@@ -259,4 +268,47 @@ func frontmatterValue(value string) (string, error) {
 		}
 	}
 	return strings.TrimSpace(value), nil
+}
+
+func agentTools(value string) ([]string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, errors.New("agent tools must explicitly list read-only tools")
+	}
+	if strings.HasPrefix(value, "[") {
+		if !strings.HasSuffix(value, "]") {
+			return nil, errors.New("agent tools list is not terminated")
+		}
+		value = strings.TrimSuffix(strings.TrimPrefix(value, "["), "]")
+	} else if strings.HasPrefix(value, "\"") || strings.HasPrefix(value, "'") {
+		parsed, err := toolValue(value)
+		if err != nil {
+			return nil, err
+		}
+		value = parsed
+	}
+	tools := []string{}
+	for _, item := range strings.Split(value, ",") {
+		tool, err := toolValue(strings.TrimSpace(item))
+		if err != nil {
+			return nil, err
+		}
+		if tool != "" {
+			tools = append(tools, tool)
+		}
+	}
+	return tools, nil
+}
+
+func toolValue(value string) (string, error) {
+	if strings.HasPrefix(value, "\"") {
+		return strconv.Unquote(value)
+	}
+	if strings.HasPrefix(value, "'") {
+		if len(value) < 2 || !strings.HasSuffix(value, "'") {
+			return "", errors.New("agent tool contains an unterminated quoted value")
+		}
+		return strings.ReplaceAll(value[1:len(value)-1], "''", "'"), nil
+	}
+	return value, nil
 }

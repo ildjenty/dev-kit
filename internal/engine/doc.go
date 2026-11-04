@@ -16,8 +16,7 @@
 // Knowledge comes from the sources configured in devkit.toml. Sources inside the
 // repository are read from the fixed git tree. Sources outside it are copied under
 // the run directory when a round opens or an out-of-round instruction is issued;
-// workers edit a separate copy, and approved edits are written through the adapter
-// with the expected content hash and recorded as ledger.SourceWrite records.
+// outside sources are read-only and never written by devkit.
 //
 // Plan checks use the configured aspect, runner, criteria, and examples ([plan_check]). Detection instructions ask
 // the same runner as the required check for form.DetectionResult.

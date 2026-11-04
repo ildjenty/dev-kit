@@ -13,8 +13,8 @@ graph LR
   agent -- "devkit next / submit / answer / pause / resume" --> devkit[devkit CLI]
   devkit -- 指示と依頼文 --> agent
   devkit -- 記録 --> run[.devkit/run/]
-  agent -- 起動 --> sub[サブエージェント<br/>判定者・計画者]
-  agent -- 単位ごとに起動 --> worker[devkit-worker]
+  agent -- 起動 --> sub[役割の agent<br/>判定者・計画者]
+  agent -- 単位ごとに起動 --> worker[work の役割の agent]
   worker -- 単位の作業 --> trees[.devkit/worktrees/]
   devkit -- 作成・SHAの固定・合流 --> trees
   worker -- 終了ブロック --> hook
@@ -25,7 +25,7 @@ graph LR
   host[ホスト] -- イベント --> hook
 ```
 
-- **セッションのエージェント**は実行役である。[brief](architecture/modules.md#brief)(作業や判定の依頼文)を読み、コードを書き、[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定の形式で書いた JSON)を返す。単位の作業者 `devkit-worker` と判定者・計画者のサブエージェントは、[定型の1行の prompt](architecture/guarantees.md#判定結果の受理)で起動する。
+- **セッションのエージェント**は実行役である。[brief](architecture/modules.md#brief)(作業や判定の依頼文)を読み、コードを書き、[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定の形式で書いた JSON)を返す。単位の作業者と判定者・計画者のサブエージェントは、`devkit.toml` に定義した[役割](architecture/data.md#役割-role)の agent であり、[定型の1行の prompt](architecture/guarantees.md#判定結果の受理)で起動する。既定の役割は `worker`(セッション自身)・`unit_worker`(`devkit-worker`)・`judge`(`devkit-judge`)・`planner`(`devkit-planner`)・`human` である。
 - **`devkit`** は状態機械である。利用者が組んだ[ループの雛形](architecture/data.md#ループの雛形-plantemplate)(再利用するループの定義)から作る[計画](architecture/data.md#計画-plan)(課題ごとの実行内容)と記録から次の指示を計算し、[ステージの完了と設定に応じたコミットを確定し](architecture/guarantees.md#完了条件)、判定者の結果と人の答えを受理し、記録を書く。エージェントが Bash から呼ぶが、sandbox の外で動く。
 - **hook** は同じバイナリの別の呼び出し口である。セッションの開始時に状況を注入し、[Stop](architecture/hooks.md#stop)で停止の可否を判断し、危険な操作を拒み、サブエージェントの結果と人の入力を観測してファイルに書く。
 - **人**はチャットで問いに答える。`devkit answer` が hook の観測した入力をもとに回答を受理する条件は、[回答の受理](architecture/guarantees.md#回答の受理)で定める。
@@ -38,14 +38,14 @@ graph LR
 4. エージェントが作業し、終了ブロックを `devkit submit` で[提出する](architecture/flow.md#作業結果の提出)。目的のステージでは要件、構造のステージでは構造の記録を更新する。
 5. 判定待ちでは `devkit` が判定者に先立って `command:` の check を実行する。未登録のコマンドは修正可能な `FAIL` とし、作業者が検証の手段と登録を用意する。判定者サブエージェントの結果は[作業結果の判定](architecture/flow.md#作業結果の判定)に従って受理する。
 6. 判定後は [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)が判断し、[判断後の処理](architecture/flow.md#router-の判断)へ進む。ステージの遷移が `done: "replan"` なら、完了後に既存の再計画の経路で計画者が残りを作り直し、計画の check と承認の条件を適用する。問いへの回答は[人の回答](architecture/flow.md#人の回答と再開)、ステージの完了の確定は[完了条件](architecture/guarantees.md#完了条件)に従う。
-7. 最後の[振り返り](stages.md#振り返り)で、すべての判定・指摘と人の回答を見直し、再発防止をリポジトリの検査と書き込めるソースの規範に反映する。読み取り専用のソースへの改善は教訓として管理者へ引き継ぐ。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけで確認する。規範を変えた場合は、既定では効力を持つ前、最後のラウンドなら完了時のコミット前に人が確認する。変えなければループ自身の変更に対する確認は不要である。
+7. 最後の[振り返り](stages.md#振り返り)で、すべての判定・指摘と人の回答を見直し、再発防止をリポジトリの検査とリポジトリ内の書き込めるソースの規範に反映する。リポジトリ外のソースと読み取り専用のソースへの改善は教訓として管理者へ引き継ぐ。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけで確認する。規範を変えた場合は、既定では効力を持つ前、最後のラウンドなら完了時のコミット前に人が確認する。変えなければループ自身の変更に対する確認は不要である。
 8. セッションをまたぐ再開は、[人の回答と再開](architecture/flow.md#人の回答と再開)に従う。
 
 既定の `default` は `purpose` の遷移 `done` を `"replan"` とし、最初の計画に要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md`(`[sources.requirements]` で変更可能)に書き、完了条件の案を作る。`purpose` の完了後、合意した完了条件で残りを再計画し、人が承認する。`fix` と `docs` はこの形を使わない。kit は要件定義を特別扱いせず、雛形の遷移に従う。
 
 [ラウンド](architecture/data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)の判定待ちでは、[Judgment](architecture/data.md#check-の結果-judgment)(`command:` の check を含む判定結果)を受理して次の行動を決める。
 
-雛形のステージに `split: true` があり、計画に `units` があれば、`next` は単位ごとの作業指示を返す。`devkit-worker` は devkit が用意する `.devkit/worktrees/<単位の指示 ID>/` で作業し、終了ブロックを最終メッセージで返す。すべての単位の結果を受理したら、devkit がツリーを SHA で固定し、作業ブランチへコミットしないマージで合流する。合流後のツリーと、単位の終了ブロックをまとめた作業者の終了ブロックを通常のステージのラウンドとして判定する。ぶつかった場合の修正、記録と再開、中断・終了時の扱いは[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。作業者数は `[parallel] max_workers`(既定3、1以上)で制限する。既定の雛形は分割を使わない。
+雛形のステージに `split: true` があり、計画に `units` があれば、`next` は単位ごとの作業指示を返す。単位の役割(既定 `unit_worker`、agent `devkit-worker`)の agent は devkit が用意する `.devkit/worktrees/<単位の指示 ID>/` で作業し、終了ブロックを最終メッセージで返す。すべての単位の結果を受理したら、devkit がツリーを SHA で固定し、作業ブランチへコミットしないマージで合流する。合流後のツリーと、単位の終了ブロックをまとめた作業者の終了ブロックを通常のステージのラウンドとして判定する。ぶつかった場合の修正、記録と再開、中断・終了時の扱いは[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。作業者数は `[parallel] max_workers`(既定3、1以上)で制限する。既定の雛形は分割を使わない。agent のある `work` の役割がステージの担当になったラウンドも、単位が1つの同じ手順で動かす。修正ラウンドの担当は `fix` の遷移の[修正の担当の規則](architecture/data.md#修正の担当の規則)で変えられ、ラウンドの上限は規則より先に効く。
 
 ループ自体は別の worktree で新しいセッションを開いて並行して回せる。作業中のチェックアウトでの2つ目の `start` は拒否する。再計画で完了済みのステージを残りの計画に含めないことは雛形からの逸脱に数えない。
 
@@ -53,7 +53,7 @@ graph LR
 
 ## 利用者が組むもの
 
-利用者は `init` が配る既定を起点に、リポジトリが所有する規範と検査を育てる。知識の接続先と配置は `devkit.toml` の `[sources.<名前>]` で変更できる。必須の「選ぶ」と任意の「書く」を持つアダプタで接続し、規範はソース全体を固定する。既定は `files` である。検出試験の索引は `[state] detect`(既定 `.devkit/detect.json`)で設定する。
+利用者は `init` が配る既定を起点に、リポジトリが所有する規範と検査を育てる。知識の接続先と配置は `devkit.toml` の `[sources.<名前>]` で変更できる。必須の「選ぶ」を持つアダプタで接続し、規範はソース全体を固定する。リポジトリ外のソースは読み取り専用である。既定は `files` である。検出試験の索引は `[state] detect`(既定 `.devkit/detect.json`)で設定する。
 
 1. **雛形**: `.devkit/plans/<name>.json` を編集する。既定は `default`・`fix`・`docs` であり、[既定の雛形](loop-plan.md#既定の雛形)から選ぶ。
 2. **判定の基準と例**: `.devkit/principles/` の原則と用途別文書、`.devkit/examples/<観点ID>/` の検出試験の例と仕様を育てる。check は `criteria` と `examples` で文書を明示して選ぶ。[検出試験](architecture/guarantees.md#検出試験)で観点の判定能力を確かめる。

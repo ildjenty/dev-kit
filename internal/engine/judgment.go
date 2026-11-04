@@ -134,7 +134,11 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 	if err != nil {
 		return meta, instructionData{}, false, err
 	}
-	data := instructionData{Reference: ref, Inputs: inputs, Request: &request, Context: meta.Context, Instruction: form.Instruction{ID: meta.ID, Kind: kind, TargetPath: path, Runner: string(item.Runner), Text: "Launch the assigned judge with: devkit-instruction " + meta.ID}}
+	runner, err := e.runnerAgent(ctx, ref, string(item.Runner))
+	if err != nil {
+		return meta, instructionData{}, false, err
+	}
+	data := instructionData{Reference: ref, Inputs: inputs, Request: &request, Context: meta.Context, Instruction: form.Instruction{ID: meta.ID, Kind: kind, TargetPath: path, Runner: runner, Text: "Launch the assigned judge with: devkit-instruction " + meta.ID}}
 	return meta, data, fresh, nil
 }
 func (e *Engine) roundNorms(ctx context.Context, state *ledger.State, roundID string, version int, norms []check.Norm) error {
@@ -283,7 +287,7 @@ func (e *Engine) judgmentBrief(ctx context.Context, data instructionData) (brief
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	schema, err := e.judgmentSchema(ctx, data.Reference, data.Instruction.Runner)
+	schema, err := e.judgmentSchema(ctx, data.Reference, data.Request.Runner)
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -408,7 +412,7 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 			return e.issueQuestion(state, *question)
 		}
 		if gitReference(ref) != round.ReturnedTarget.Tree {
-			return e.fixRound(ctx, state, p, stage, run, round, "Undo the rejected development loop edits listed in the previous human question.")
+			return e.preserveFixRound(ctx, state, p, stage, run, round, "Undo the rejected development loop edits listed in the previous human question.")
 		}
 	}
 	target := *round.ReturnedTarget
@@ -627,6 +631,14 @@ func (e *Engine) roundWindow(state *ledger.State, runID string, current *ledger.
 	return rounds, nil
 }
 func (e *Engine) fixRound(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, reason string) (Result, error) {
+	return e.requestFix(ctx, state, p, stage, run, round, reason, false)
+}
+
+func (e *Engine) preserveFixRound(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, reason string) (Result, error) {
+	return e.requestFix(ctx, state, p, stage, run, round, reason, true)
+}
+
+func (e *Engine) requestFix(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, reason string, preserve bool) (Result, error) {
 	state, err := e.load()
 	if err != nil {
 		return Result{}, err
@@ -660,6 +672,8 @@ func (e *Engine) fixRound(ctx context.Context, state *ledger.State, p plan.Plan,
 			return Result{}, err
 		}
 		q.NextStage = *next
+		q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
+		roleContinuationOptions(&q, stage)
 		q, err = e.saveQuestion(state, q, "")
 		if err != nil {
 			return Result{}, err
@@ -669,7 +683,7 @@ func (e *Engine) fixRound(ctx context.Context, state *ledger.State, p plan.Plan,
 		}
 		return e.issueQuestion(state, q)
 	}
-	err = e.closeRound(state, run, round, router.Decision{Action: plan.Fix, Reason: reason})
+	err = e.closeRound(state, run, round, router.Decision{Action: plan.Fix, Reason: reason, PreserveAssignee: preserve})
 	return Result{}, err
 }
 
@@ -898,10 +912,13 @@ func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, 
 	if instruction.Kind == form.InstructionUnitWork {
 		return e.acceptUnitResult(instruction, obs)
 	}
-	provenance := check.Provenance{Source: check.SubagentResult, InstructionID: instruction.ID, Runner: result.Runner, AgentID: result.AgentID, Effort: result.Effort, Model: result.Model, ResultPath: obs.path}
 	if instruction.Kind == form.InstructionPlan {
 		return e.acceptPlannerResult(ctx, state, instruction, request, obs)
 	}
+	if request.Request == nil {
+		return false, errors.New("judgment request is missing")
+	}
+	provenance := check.Provenance{Source: check.SubagentResult, InstructionID: instruction.ID, Runner: request.Request.Runner, AgentID: result.AgentID, Effort: result.Effort, Model: result.Model, ResultPath: obs.path}
 	if request.Detection != nil {
 		test, err := e.validateDetection(instruction, request, result.Content, provenance)
 		if err != nil {
@@ -909,10 +926,7 @@ func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, 
 		}
 		return true, e.recordDetection(ctx, state, instruction, request, test)
 	}
-	if request.Request == nil {
-		return false, errors.New("judgment request is missing")
-	}
-	_, schema, err := e.outputSchema(ctx, request.Reference, result.Runner)
+	_, schema, err := e.outputSchema(ctx, request.Reference, request.Request.Runner)
 	if err != nil {
 		return false, err
 	}
@@ -1019,7 +1033,7 @@ func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p pla
 		}
 		return Result{}, false, nil
 	}
-	if !strings.HasPrefix(string(item.Runner), "devkit-") {
+	if role, ok := settings.RoleSettings()[string(item.Runner)]; !ok || role.Kind != "judge" {
 		return Result{}, false, fmt.Errorf("judge %q is neither a registered command nor a devkit subagent", item.Runner)
 	}
 	return issued, true, nil
@@ -1084,6 +1098,14 @@ func (e *Engine) askRoundApproval(ctx context.Context, state *ledger.State, p pl
 		return Result{}, err
 	}
 	q.NextStage = *next
+	if decision.RecommendBack {
+		q.Options = append(q.Options, "back")
+		q.Recommendation, q.RecommendationReason = "back", decision.Reason
+	}
+	if decision.Reason == "round or consecutive no-progress limit reached" {
+		q.StopCategory = "round_limit"
+		roleContinuationOptions(&q, stage)
+	}
 	q, err = e.saveQuestion(state, q, "")
 	if err != nil {
 		return Result{}, err
@@ -1114,11 +1136,6 @@ func (e *Engine) roundConfirmationCategories(ctx context.Context, state *ledger.
 	}
 	categories := differenceCategories(e.Root(), paths, settings)
 	categories = slices.DeleteFunc(categories, func(category string) bool { return category == config.MetaLoopEdit })
-	if edits, err := e.sourceChanges(ctx, roundReference(round), true); err != nil {
-		return nil, err
-	} else if len(edits) > 0 {
-		categories = append(categories, config.MetaLoopEdit)
-	}
 	// Loop edits a human already approved before this round need no second confirmation.
 	work, _ := state.Work()
 	if confirmed, _ := confirmedLoopEdits(state); confirmed != work.BaseCommit {
@@ -1234,7 +1251,7 @@ func (e *Engine) rejectReadOnlyEdits(ctx context.Context, state *ledger.State, p
 		return Result{}, false, nil
 	}
 	reason := "Read-only sources were edited: " + strings.Join(blocked, ", ") + ". Undo these edits and record each improvement as a lesson with devkit note lesson so that the source maintainers can apply it."
-	r, err := e.fixRound(ctx, state, p, stage, run, round, reason)
+	r, err := e.preserveFixRound(ctx, state, p, stage, run, round, reason)
 	return r, true, err
 }
 

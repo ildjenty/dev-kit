@@ -85,13 +85,14 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 		_, err := os.Stat(sourceLocation(r.Root, location))
 		r.add(location, "Knowledge source path is present.", err)
 	}
-	for _, name := range []string{
-		".agents/skills/devkit/SKILL.md",
-		".claude/agents/devkit-judge.md", ".claude/agents/devkit-planner.md",
-		".claude/agents/devkit-worker.md",
-		".codex/agents/devkit-judge.toml", ".codex/agents/devkit-planner.toml",
-		".codex/agents/devkit-worker.toml",
-	} {
+	agents := []string{".agents/skills/devkit/SKILL.md"}
+	for _, role := range c.RoleSettings() {
+		if role.Agent != "" {
+			agents = append(agents, ".claude/agents/"+role.Agent+".md", ".codex/agents/"+role.Agent+".toml")
+		}
+	}
+	slices.Sort(agents)
+	for _, name := range slices.Compact(agents) {
 		r.add(name, "File is present.", requireFile(filepath.Join(r.Root, name)))
 	}
 	for _, name := range []string{".devkit/run/sessions", ".devkit/run/work"} {
@@ -120,7 +121,7 @@ func Doctor(ctx context.Context, cwd, sessionID string) (Report, error) {
 		headErr = fmt.Errorf("HEAD is unavailable; commit the installed initialization files before starting work: %w", headErr)
 	}
 	r.add("HEAD", "HEAD exists.", headErr)
-	committed := []string{"devkit.toml"}
+	committed := append([]string{"devkit.toml"}, agents...)
 	plans, pathErr := filepath.Rel(r.Root, sourceLocation(r.Root, sources["plans"].Path))
 	if pathErr == nil && plans != ".." && !strings.HasPrefix(plans, ".."+string(filepath.Separator)) {
 		committed = append(committed, filepath.ToSlash(plans))

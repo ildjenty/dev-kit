@@ -63,6 +63,8 @@ func (v *Validator) ParseTemplate(data []byte) (PlanTemplate, error) {
 	if err := decode(data, v.template, &template); err != nil {
 		return PlanTemplate{}, err
 	}
+	normalizeFixTargets(template.Stages)
+	normalizeFixTargets(template.OptionalStages)
 	if err := validateStages(template.StartStage, template.Stages, template.OptionalStages, nil); err != nil {
 		return PlanTemplate{}, err
 	}
@@ -74,10 +76,11 @@ func (v *Validator) ParsePlan(data []byte) (Plan, error) {
 	if err := decode(data, v.plan, &plan); err != nil {
 		return Plan{}, err
 	}
+	normalizeFixTargets(plan.Stages)
 	conditions := make(map[string]bool)
 	units := make(map[string]bool)
 	for _, stage := range plan.Stages {
-		if len(stage.Units) > 0 && (!stage.Split || stage.Assignee != Worker) {
+		if len(stage.Units) > 0 && !stage.Split {
 			return Plan{}, fmt.Errorf("%s: units require a split worker stage", stage.ID)
 		}
 		for _, unit := range stage.Units {
@@ -144,7 +147,13 @@ func validateStages(start string, stages, optional []Stage, conditions map[strin
 }
 
 func validateStageTransitions(stage Stage, stages []Stage, ids map[string]bool, plannedBack bool) error {
+	if stage.Transitions.FixRules == nil && stage.Transitions.Fix != stage.ID {
+		return fmt.Errorf("%s: fix must target the current stage", stage.ID)
+	}
 	for _, action := range []Transition{Fix, Ask, Back, Done} {
+		if action == Fix && stage.Transitions.FixRules != nil {
+			continue
+		}
 		target, _ := stage.Transitions.Next(action)
 		if action == Done && target != nil && *target == "replan" {
 			continue
@@ -233,4 +242,12 @@ func equalSelection(a, b *Selection) bool {
 		return a == b
 	}
 	return *a == *b
+}
+
+func normalizeFixTargets(stages []Stage) {
+	for i := range stages {
+		if stages[i].Transitions.FixRules != nil {
+			stages[i].Transitions.Fix = stages[i].ID
+		}
+	}
 }

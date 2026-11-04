@@ -311,8 +311,8 @@ func (e *Engine) saveWorkerConfirmation(state *ledger.State, run *ledger.StageRu
 	}
 	q := e.question(approvalTree(target), "worker_confirmation", text, run.StageID)
 	q.NextStage = *next
+	q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
 	if source := unitResultRound(state, run.ID); source != nil {
-		q.Evidence = []form.Reference{{RecordID: run.ID}, {RecordID: round.ID}}
 		if source.ID != round.ID {
 			q.Evidence = append(q.Evidence, form.Reference{RecordID: source.ID})
 		}
@@ -354,6 +354,24 @@ func (e *Engine) recoverSubmission(ctx context.Context, state *ledger.State) (bo
 func (e *Engine) closeRound(state *ledger.State, run *ledger.StageRun, round *ledger.Round, decision router.Decision) error {
 	if err := e.active(); err != nil {
 		return err
+	}
+	if decision.Action == plan.Fix {
+		current, err := e.load()
+		if err != nil {
+			return err
+		}
+		p, ok, err := e.boundPlan(run.PlanVersion)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return errors.New("bound plan is missing")
+		}
+		stage, _ := p.Stage(run.StageID)
+		decision, err = e.correctionDecision(current, stage, round, decision)
+		if err != nil {
+			return err
+		}
 	}
 	copy := *round
 	copy.Decision = &decision
@@ -579,7 +597,7 @@ func (e *Engine) planApprovalText(state *ledger.State, template plan.PlanTemplat
 	}
 	deviations := plan.Deviations(template, p)
 	fmt.Fprintf(&text, "\nDeviations:\n%s\n%s\nIrreversible items:\n%s\n\nExternal operations:\n%s\n\nOpen questions (answer with revision instructions):\n%s",
-		approvalJSON(deviations, len(deviations)), selectionDifferences(template, p, deviations), approvalList(p.IrreversibleDecisions), approvalJSON(p.ExternalOperations, len(p.ExternalOperations)), approvalList(p.OpenQuestions))
+		approvalJSON(deviations, len(deviations)), selectionDifferences(template, p, deviations)+roleDifferences(template, p, deviations), approvalList(p.IrreversibleDecisions), approvalJSON(p.ExternalOperations, len(p.ExternalOperations)), approvalList(p.OpenQuestions))
 	return text.String(), nil
 }
 
@@ -762,7 +780,7 @@ func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.P
 	return e.recordStageCommit(p, stage, run, round, commit)
 }
 
-// prepareCommit checks the session and writes approved edits of outside sources before commit.
+// prepareCommit checks the session before commit.
 func (e *Engine) prepareCommit(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round) (Result, bool, error) {
 	if err := e.active(); err != nil {
 		return Result{}, false, err
@@ -770,7 +788,7 @@ func (e *Engine) prepareCommit(ctx context.Context, state *ledger.State, p plan.
 	if err := e.checkCommitSession(ctx, state); err != nil {
 		return Result{}, false, err
 	}
-	return e.applySourceWrites(ctx, state, p, stage, run, round)
+	return Result{}, false, nil
 }
 
 // RecoverExternal queries an interrupted external operation without repeating its write.
@@ -1187,6 +1205,10 @@ func (e *Engine) advanceActiveStage(ctx context.Context, state *ledger.State, ru
 }
 
 func (e *Engine) advanceOpenRound(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round) (Result, bool, error) {
+	stage, err := e.roundStage(ctx, stage, round)
+	if err != nil {
+		return Result{}, false, err
+	}
 	if merge, ok := state.RoundMerge(round.ID); ok && merge.Status == "conflict" {
 		return e.mergeUnits(ctx, state, p, stage, run, round)
 	}
@@ -1249,9 +1271,6 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 		r, err := e.issueQuestion(state, *question)
 		return r, true, err
 	}
-	if err := e.prepareEditCopies(ctx, startRef); err != nil {
-		return Result{}, false, err
-	}
 	if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), startRef, run.ID); err != nil || pending {
 		if err != nil || r.Instruction != nil || r.Paused {
 			return r, true, err
@@ -1267,8 +1286,28 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 	if err != nil {
 		return Result{}, false, err
 	}
-	round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: start, NormReference: startRef, Norms: norms}
-	if stage.Split && len(stage.Units) > 0 {
+	round := &ledger.Round{Assignee: stage.Assignee, StageRunID: run.ID, SessionID: e.sessionID, StartTarget: start, NormReference: startRef, Norms: norms}
+
+	previous := state.Rounds(run.ID)
+	if len(previous) > 0 {
+		last := previous[len(previous)-1]
+		round.Assignee = roundAssignee(stage, last)
+		if last.Decision != nil && last.Decision.Assignee != "" {
+			round.Assignee = last.Decision.Assignee
+		}
+	}
+	effective, err := e.roundStage(ctx, stage, round)
+	if err != nil {
+		return Result{}, false, err
+	}
+	settings, err := e.settings(ctx, startRef)
+	if err != nil {
+		return Result{}, false, err
+	}
+	if err := validateRoles([]plan.Stage{stage}, settings); err != nil {
+		return Result{}, false, err
+	}
+	if effective.Split && len(effective.Units) > 0 {
 		head, err := e.workspace.Head(ctx)
 		if err != nil {
 			return Result{}, false, err
@@ -1281,7 +1320,7 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 		previous := state.Rounds(run.ID)
 		if len(previous) > 0 {
 			merge, ok := state.RoundMerge(previous[len(previous)-1].ID)
-			round.MergeFix = previous[len(previous)-1].MergeFix || ok && merge.Status == "conflict"
+			round.MergeFix = stage.Split && (previous[len(previous)-1].MergeFix || ok && merge.Status == "conflict")
 		}
 	}
 	if _, err = e.append(round); err != nil {

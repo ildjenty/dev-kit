@@ -10,9 +10,11 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 
 雛形と計画の形式、検証の方式と責務は [plan](architecture/modules.md#plan)、項目は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)と[計画](architecture/data.md#計画-plan)に従う。
 
-ステージ(作業を区切る単位)の担当と [check](architecture/modules.md#check)(観点やコマンドによる確認)の実行主体(runner)は[計画](architecture/data.md#計画-plan)で定める。
+ステージ(作業を区切る単位)の担当と [check](architecture/modules.md#check)(観点やコマンドによる確認)の実行主体(runner)は[計画](architecture/data.md#計画-plan)で定め、`devkit.toml` に定義した[役割](architecture/data.md#役割-role)の ID で書く。runner には役割のほか、`[judges]` の判定コマンド名と `command:<name>` も書ける。
 
-雛形のステージに `split: true` を書くと、そのステージの作業を単位に分けてよい。計画者は、そのステージの `units` に、計画内の ID、説明、担当する範囲を持つ単位の一覧を書く。範囲はファイルやディレクトリを文章で示してよい。単位がなければ通常のステージとして作業する。単位の ID の重複は検証で拒否し、範囲の重なりは計画の観点の判定者が指摘する。分割の追加・削除は雛形からの逸脱である。再計画で完了済みのステージを残りの計画に含めないことは逸脱に数えない。
+ステージの遷移 `fix` には、同じステージの次のラウンドの担当を変える規則の一覧を書ける。条件は記録から決まる事実(`check`・`failures_at_least`・`human_rejected`)だけであり、条件式の言語は持たない。形式と当てはめ方は[修正の担当の規則](architecture/data.md#修正の担当の規則)に従う。
+
+雛形のステージに `split: true` を書くと、そのステージの作業を単位に分けてよい。計画者は、そのステージの `units` に、計画内の ID、説明、担当する範囲、任意の役割 `role`(既定 `unit_worker`)を持つ単位の一覧を書く。範囲はファイルやディレクトリを文章で示してよい。単位がなければ通常のステージとして作業する。単位の ID の重複は検証で拒否し、範囲の重なりは計画の観点の判定者が指摘する。分割の追加・削除は雛形からの逸脱である。再計画で完了済みのステージを残りの計画に含めないことは逸脱に数えない。
 
 個別の承認なしに計画の承認だけで実行してよい[外部操作](architecture/flow.md#外部操作)(リポジトリ外への書き込み行為)は、[計画の宣言](architecture/data.md#計画-plan)と[外部操作の承認](architecture/guarantees.md#外部操作の承認)に従って扱う。
 
@@ -36,7 +38,7 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 
 `default` は `purpose` の遷移 `done` を `"replan"` にする。最初の計画には、要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md` に書き、完了条件の案を作る。置き場所は `[sources.requirements]` で変更できる。`purpose` の完了後、計画者が合意した完了条件で残りの計画を作り直し、人が承認する。`fix` と `docs` はこの形を使わない。
 
-すべての既定の雛形の `retrospective` は作業者が担当する。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけを置く。観点の判定者(runner)は、`init` が配る `devkit-judge` である。`--plan` の省略時は `default_plan` の値を使い、既定は `"default"` である。計画者は不要なステージを外してよく、外したステージは逸脱として承認の問いに載せる。
+すべての既定の雛形の `retrospective` は作業者が担当する。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけを置く。ステージの担当は既定の役割 `worker`、観点の判定者(runner)は既定の役割 `judge` であり、その agent は `init` が配る `devkit-judge` である。`--plan` の省略時は `default_plan` の値を使い、既定は `"default"` である。計画者は不要なステージを外してよく、外したステージは逸脱として承認の問いに載せる。
 
 ## 例
 
@@ -64,9 +66,11 @@ check とゲート(人の承認を待つ関門)は、次の規則で組む。
 - 画面・データ・外部との通信を変えるステージには、観点[「動作検証」](checks.md#動作検証)の check を置く。
 - 人によるレビューゲートの理由の書き方は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。人に確認する条件は[人への確認対象](architecture/guarantees.md#人への確認対象)で定める。
 - 画面のデザインを始める前のレビューゲートの承認対象は、[問いの定義](architecture/data.md#問い-question)に従う。
-- check の追加・必須化の判断は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-choose-mechanisms-based-on-the-failures-they-prevent-and-their-operational-burden)に従う。[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は、[検出試験](architecture/guarantees.md#検出試験)(選んだ基準で期待する判定を出せるかの試験)に従う。
+- check の追加・必須化の判断は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-choose-mechanisms-based-on-the-failures-they-prevent-and-their-operational-burden)に従う。[判定者](architecture/data.md#役割-role)(check を担当する `judge` の種類の役割)が担当する観点を必須にする条件は、[検出試験](architecture/guarantees.md#検出試験)(選んだ基準で期待する判定を出せるかの試験)に従う。
 
-ステージ間の前提と戻り先の設計は [`assets/principles/harness.md` の原則3](../assets/principles/harness.md#3-define-which-stage-to-return-to-when-assumptions-fail)に従う。戻り先の表現は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)、入力の組み立ては[作業の指示](architecture/flow.md#作業の指示)、再計画は[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
+ステージ間の前提と戻り先の設計は [`assets/principles/harness.md` の原則3](../assets/principles/harness.md#3-define-which-stage-to-return-to-when-assumptions-fail)に従う。戻り先の表現は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)、入力の組み立ては[作業の指示](architecture/flow.md#作業の指示)、再計画は[計画のバージョン](architecture/data.md#計画のバージョン)に従う。判定者が指摘に `premise_broken` を付けた場合は、人への問いで戻りを推奨として示し、戻るかどうかは人が決める。
+
+修正が続いたときに別の役割へ担当を移すなら、`fix` の遷移に規則を書く。規則が変えるのは担当だけであり、ラウンドの上限は規則より先に効く。担当にする役割は `devkit.toml` に定義し、その agent の定義をリポジトリに置く。
 
 ### 計画を作る規則
 
@@ -82,7 +86,7 @@ check とゲート(人の承認を待つ関門)は、次の規則で組む。
 
 計画の判定依頼には、作業に記録した要求の原文と `start` の課題を固定入力として渡す。完了条件と `open_questions` が原文の要求を漏らさず扱い、要求を追加していないかを確かめる。
 
-観点と実行主体は `[plan_check] aspect = "plan"`・`runner = "devkit-judge"` が既定である。登録済みの判定コマンドは devkit が実行し、それ以外はサブエージェントへ指示する。
+観点と実行主体は `[plan_check] aspect = "plan"`・`runner = "judge"` が既定である。runner は `judge` の種類の役割か登録済みの判定コマンドであり、判定コマンドは devkit が実行し、役割ならその agent へ指示する。runner の agent は、`[planning] role`(既定 `planner`)の agent と違うものにする。
 
 要件の合意として、既定では最初の計画、直前に人が承認した完了条件の ID または文面を変える計画、雛形から逸脱する計画、外部操作を宣言する計画を人が承認する。完了条件が同じで逸脱も外部操作も未決事項もない作り直しは再確認しない。`[approval] plan` は `"requirements"`(既定)、`"always"`(すべての計画を確認)、`"deviation"`(逸脱か外部操作の宣言があるときに確認)から選ぶ。
 
@@ -93,7 +97,7 @@ check とゲート(人の承認を待つ関門)は、次の規則で組む。
 - 人の要求の原文と `start` の課題。
 - ID 付きの完了条件。
 - 採用したステージと外したステージ、雛形からの逸脱の明示。
-- 各ステージの必須 check と、雛形から変えた `criteria`・`examples` の選び方の差分。
+- 各ステージの必須 check と、雛形から変えた `criteria`・`examples` の選び方、担当、`fix` の規則の一覧、単位の役割の差分。
 - 課題固有の元に戻せないものと、宣言した外部操作。
 - `open_questions` に記入した未決事項。
 
@@ -105,7 +109,7 @@ check と必要なゲートの進行は[計画の check と承認ゲート](arch
 
 次の行動を選ぶ入力は [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)、必須 check とコミットの関係は[完了条件](architecture/guarantees.md#完了条件)に従う。起動・操作を要する check の実行主体は[操作の禁止とサブエージェントの制限](architecture/guarantees.md#操作の禁止とサブエージェントの制限)で定める。
 
-分割した作業は `devkit-worker` が単位ごとの worktree で進め、固定した SHA を作業ブランチへコミットしないマージで合流する。単位ごとの判定はせず、合流後のツリーを通常のステージのラウンドとして判定する。ゲート・確認・上限・戻り・再計画・問いもステージ単位である。作業者数は `[parallel] max_workers`(既定3、1以上)で制限し、1でも同じ作業場所と合流の手順を使う。実行・中断・中止・作業完了の扱いは[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。
+分割した作業は単位の役割(既定 `unit_worker`、agent `devkit-worker`)が単位ごとの worktree で進め、固定した SHA を作業ブランチへコミットしないマージで合流する。単位ごとの判定はせず、合流後のツリーを通常のステージのラウンドとして判定する。ゲート・確認・上限・戻り・再計画・問いもステージ単位である。作業者数は `[parallel] max_workers`(既定3、1以上)で制限し、1でも同じ作業場所と合流の手順を使う。分割するステージの担当はセッションの `work` の役割であり、合流の修正を担う。agent のある `work` の役割がステージの担当になったラウンドも、単位が1つの同じ手順で動かす。実行・中断・中止・作業完了の扱いは[分割した作業と合流](architecture/flow.md#分割した作業と合流)に従う。
 
 計画で使う `command:<name>` がラウンド開始時の `devkit.toml` に登録されていなければ、その check を `FAIL` とする。指摘は `auto-fixable` とし、「検証コマンド `<name>` が登録されていない。検証の手段を作り `devkit.toml` の `[commands.<name>]` に登録する」と伝える。作業者が用意したコマンドは、次のラウンド開始時のスナップショットから使う。登録はループ自身の変更として人が確認する。
 

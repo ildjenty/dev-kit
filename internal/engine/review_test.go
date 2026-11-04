@@ -445,7 +445,7 @@ func TestDetectionCommandRetriesAfterHumanAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, e.Root(), "judge.sh", "#!/bin/sh\ninput=$(cat)\ncase \"$input\" in\n*'\"Kind\":\"plan\"'*) cat .devkit/run/plan-result.json ;;\n*) printf 'attempt\\n' >> .devkit/run/attempts; if test ! -f .devkit/run/retry; then touch .devkit/run/retry; exit 7; fi; cat .devkit/run/detection-result.json ;;\nesac\n")
-	write(t, e.Root(), "devkit.toml", string(settings)+"\n[judges.devkit-judge]\nexecutable = '/bin/sh'\nargs = ['judge.sh']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n")
+	write(t, e.Root(), "devkit.toml", strings.ReplaceAll(string(settings), `runner = "judge"`, `runner = "devkit-judge"`)+"\n[judges.devkit-judge]\nexecutable = '/bin/sh'\nargs = ['judge.sh']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n")
 	git(t, e.Root(), "add", ".")
 	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
 	git(t, e.Root(), "add", ".")

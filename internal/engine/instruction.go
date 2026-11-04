@@ -164,7 +164,7 @@ func (e *Engine) normPaths(ctx context.Context, ref string) ([]brief.NormPath, e
 }
 
 // selectionDocuments resolves selections into documents for a brief. Norm sources are read
-// from the snapshot fixed for ref and products from productRef, or from their editable copy.
+// from the snapshot fixed for ref and products from productRef, from their fixed outside copy.
 func (e *Engine) selectionDocuments(ctx context.Context, ref, productRef string, selections []plan.Selection) ([]brief.Document, error) {
 	sources, err := e.knowledgeSources(ctx, ref)
 	if err != nil {
@@ -191,14 +191,6 @@ func (e *Engine) selectionDocuments(ctx context.Context, ref, productRef string,
 func (e *Engine) productDocuments(ctx context.Context, ref, productRef string, selection plan.Selection, item config.Source) ([]source.Document, error) {
 	if item.Norm {
 		return e.selectDocuments(ctx, ref, selection.Source, selection.Select)
-	}
-	if _, err := os.Stat(e.editBasePath(selection.Source)); err == nil && e.workRoot() != "" {
-		directory := e.editDirectory(selection.Source)
-		adapter, err := source.NewFiles(directory, ".", os.DirFS(directory), "", false)
-		if err != nil {
-			return nil, err
-		}
-		return adapter.Select(selection.Select)
 	}
 	if _, inside := e.repositoryLocation(item); !inside {
 		productRef = ref
@@ -244,18 +236,26 @@ func (e *Engine) repository(ctx context.Context, ref string, inputs []plan.Selec
 }
 
 func (e *Engine) productFact(ctx context.Context, ref, productRef, name string, item config.Source) (brief.Document, error) {
-	location := e.editLocation(name, item.Path)
+	location := item.Path
 	documents, err := e.productDocuments(ctx, ref, productRef, plan.Selection{Source: name}, item)
 	if err != nil {
 		return brief.Document{}, err
 	}
 	if len(documents) == 0 {
+		if !item.CanWrite() {
+			return brief.Document{Path: location, Content: "Read-only source; no documents were found. Record improvements as lessons for its maintainers."}, nil
+		}
 		return brief.Document{Path: location, Content: "not created yet; create it at " + location}, nil
 	}
+	notice := ""
+	if !item.CanWrite() {
+		notice = "Read-only source; do not edit it or write it back. Record improvements as lessons for its maintainers.\n\n"
+	}
 	if len(documents) == 1 {
-		return brief.Document{Path: location, Content: documents[0].Body, Exists: true}, nil
+		return brief.Document{Path: location, Content: notice + documents[0].Body, Exists: true}, nil
 	}
 	var text strings.Builder
+	text.WriteString(notice)
 	for _, document := range documents {
 		fmt.Fprintf(&text, "## %s/%s\n\n%s\n\n", name, document.ID, document.Body)
 	}
@@ -556,7 +556,15 @@ func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte
 	if err != nil {
 		return Result{}, err
 	}
-	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Runner: "devkit-planner", Text: "Launch the planner with: devkit-instruction " + meta.ID}, Reference: ref, Origin: origin, TemplateName: t.Name}, b.Text)
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return Result{}, err
+	}
+	runner, err := e.runnerAgent(ctx, ref, settings.PlanningRole())
+	if err != nil {
+		return Result{}, err
+	}
+	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Runner: runner, Text: "Launch the planner with: devkit-instruction " + meta.ID}, Reference: ref, Origin: origin, TemplateName: t.Name}, b.Text)
 }
 
 func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.PlanTemplate, source []byte, version int, origin plan.ProposalOrigin, ref string, meta *ledger.Instruction) (brief.Brief, error) {
@@ -653,6 +661,7 @@ func (e *Engine) workInstruction(ctx context.Context, state *ledger.State, p pla
 }
 
 func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, round *ledger.Round, meta *ledger.Instruction) (brief.Brief, error) {
+	stage.Assignee = roundAssignee(stage, round)
 	ref := roundReference(round)
 	name := "templates/brief/work.md.tmpl"
 	if meta.Unit != nil {

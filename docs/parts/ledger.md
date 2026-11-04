@@ -10,7 +10,7 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 ### 作業
 
-作業の単位と識別は [Work](../architecture/data.md#作業-work)(課題単位のループ)の定義に従う。`kit_version` は記録形式とバイナリの互換性の識別として保存し、バイナリと `init` の設定値は `"v2"` である。`start` に渡した課題と、UserPromptSubmit で観測した人の要求の原文を結び付け、観測がなければ原文なしと記録する。
+作業の単位と識別は [Work](../architecture/data.md#作業-work)(課題単位のループ)の定義に従う。`kit_version` は記録形式とバイナリの互換性の識別として保存し、バイナリと `init` の設定値は `"v3"` である。`start` に渡した課題と、UserPromptSubmit で観測した人の要求の原文を結び付け、観測がなければ原文なしと記録する。
 
 作業の中断・再開と現在地の関係は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)、受理条件は[中断](../architecture/guarantees.md#中断)に従う。
 

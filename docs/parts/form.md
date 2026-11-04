@@ -10,11 +10,11 @@ form は固定フォーマットの型と、[スキーマ・テンプレート](
 
 ### 固定フォーマット
 
-スキーマの適用対象と形式は [form の定義](../architecture/modules.md#form)、各データの項目は[エンティティの定義](../architecture/data.md#エンティティ)に従う。[判定者](../architecture/data.md#計画-plan)(評価を担うロール)の結果の項目は、[判定結果](../architecture/data.md#check-の結果-judgment)(観点から対象を判定した記録)と[指摘](../architecture/data.md#指摘-finding)(失敗や判断を要する点)に従う。
+スキーマの適用対象と形式は [form の定義](../architecture/modules.md#form)、各データの項目は[エンティティの定義](../architecture/data.md#エンティティ)に従う。[判定者](../architecture/data.md#役割-role)(評価を担う `judge` の種類の役割)の結果の項目は、[判定結果](../architecture/data.md#check-の結果-judgment)(観点から対象を判定した記録)と[指摘](../architecture/data.md#指摘-finding)(失敗や判断を要する点)に従う。指摘には任意の真偽値 `premise_broken` を含められる。
 
 終了ブロックのスキーマは[進捗](../architecture/data.md#進捗-progress)の必須項目を含めて定義する。入力ファイルの場所と受理条件は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
 
-単位の作業者 `devkit-worker` の最終メッセージにも、`schemas/progress.json` の終了ブロックを使う。単位の結果は SubagentStop が保存し、合流後は単位の終了ブロックをまとめた作業者の終了ブロックをステージのラウンドとして扱う。
+`work` の種類の役割の agent の最終メッセージにも、`schemas/progress.json` の終了ブロックを使う。単位の結果は SubagentStop が保存し、合流後は単位の終了ブロックをまとめた作業者の終了ブロックをステージのラウンドとして扱う。
 
 テンプレートの既定の置き場所は `.devkit/templates/` であり、`devkit.toml` の `[sources.templates]` で変更できる。JSON Schema はバイナリと記録の約束であり、リポジトリで育てる対象にはしない。
 
@@ -24,9 +24,11 @@ form は固定フォーマットの型と、[スキーマ・テンプレート](
 
 問い(人への確認事項)の文面に添える回答の案内は[問いの定義](../architecture/data.md#問い-question)に従う。回答の受理と訂正は[回答の受理](../architecture/guarantees.md#回答の受理)、停止しているステージと理由の表示は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)に従う。
 
-計画承認の問いは、要求の原文、`start` の課題、ID 付きの文章で書かれた完了条件、採用・除外したステージと逸脱、各ステージの必須 check、課題固有の元に戻せないもの、外部操作、任意の文字列配列 `open_questions` を記録から描画する。完了条件ごとの確認手段は[計画](../architecture/data.md#計画-plan)に従う。未決事項に対する人の回答は、計画の却下と作り直しの指示として計画者に渡す。
+計画承認の問いは、要求の原文、`start` の課題、ID 付きの文章で書かれた完了条件、採用・除外したステージと逸脱(担当・`fix` の規則の一覧・単位の役割の差分を含む)、各ステージの必須 check、課題固有の元に戻せないもの、外部操作、任意の文字列配列 `open_questions` を記録から描画する。完了条件ごとの確認手段は[計画](../architecture/data.md#計画-plan)に従う。未決事項に対する人の回答は、計画の却下と作り直しの指示として計画者に渡す。
 
 画面のデザインの承認時の表示要件は[問いの定義](../architecture/data.md#問い-question)に従う。
+
+`premise_broken` の指摘による問いは、指摘と前のステージへの戻りの推奨を示す。ラウンドの上限に達した問いは、そのステージに[修正の担当の規則](../architecture/data.md#修正の担当の規則)があれば、規則に書いた役割で続ける選択肢を含める。
 
 ゲートの問いは、計画のゲート理由、終了ブロックの実施内容・確認済み事項・未確認事項、差分ファイルのパスを記録から描画する。ループ自身の変更の問いは、変更したソース名・文書 ID と、規範・ホスト設定・skill のファイル一覧と差分ファイルへの参照を描画する。エージェントの要約には依存しない。
 

@@ -90,7 +90,7 @@ func TestReadOnlyOutsideProductsIdentifyEveryRound(t *testing.T) {
 	if first.StartTarget.Sources == "" {
 		t.Fatal("read-only outside products were omitted from target identity")
 	}
-	if _, err := os.Stat(e.editBasePath("requirements")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(e.workRoot(), "sources", "edit")); !os.IsNotExist(err) {
 		t.Fatalf("read-only source has an editable copy: %v", err)
 	}
 	write(t, outside, "requirements.md", "Second read-only requirements.\n")
@@ -355,19 +355,5 @@ func TestPlannerUsesPinnedOutsideTemplateAtIssuance(t *testing.T) {
 	restored, err := e.instructionBrief(start.Instruction.ID)
 	if err != nil || string(restored) != original {
 		t.Fatalf("planner instruction changed after an outside refresh: %v", err)
-	}
-}
-
-func TestOutsideNormEditsRetainTargetIdentity(t *testing.T) {
-	e, _, _, work := outsideSourceWork(t)
-	write(t, e.editDirectory("guides"), "style.md", "An outside norm edited through its existing copy.\n")
-	submitWork(t, e, work)
-	state, err := e.load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	round, _ := state.OpenRound()
-	if round.StartTarget.Tree != round.ReturnedTarget.Tree || round.StartTarget.Sources == round.ReturnedTarget.Sources {
-		t.Fatal("adding read-only product identity removed the existing editable-copy identity")
 	}
 }

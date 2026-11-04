@@ -402,13 +402,3 @@ func (s *State) ExecutablePlan(template plan.PlanTemplate, norms []form.NormRefe
 	}
 	return plan.ExecutableVersion(template, versions, replanAfter, policy)
 }
-
-// SourceWrite returns the latest record of a source write operation.
-func (s *State) SourceWrite(operationID string) (*SourceWrite, bool) {
-	for i := len(s.records) - 1; i >= 0; i-- {
-		if write, ok := s.records[i].Payload.(*SourceWrite); ok && write.OperationID == operationID {
-			return write, true
-		}
-	}
-	return nil, false
-}

@@ -104,7 +104,7 @@ func (e *Engine) advanceUnits(ctx context.Context, state *ledger.State, p plan.P
 		r.Instructions = append(r.Instructions, *published.Instruction)
 		pending[unit.ID] = ledger.Instruction{}
 	}
-	r.Message = "Launch each issued devkit-worker once, then wait for its result before calling devkit next."
+	r.Message = "Launch each assigned worker once, then wait for its result before calling devkit next."
 	return r, true, nil
 }
 
@@ -137,7 +137,11 @@ func (e *Engine) unitInstruction(ctx context.Context, state *ledger.State, p pla
 	if err != nil {
 		return Result{}, err
 	}
-	data := instructionData{Reference: roundReference(round), Instruction: form.Instruction{Runner: "devkit-worker", TargetPath: meta.TargetPath, Text: "Launch the worker with: devkit-instruction " + meta.ID}}
+	runner, err := e.runnerAgent(ctx, roundReference(round), unit.WorkRole())
+	if err != nil {
+		return Result{}, err
+	}
+	data := instructionData{Reference: roundReference(round), Instruction: form.Instruction{Runner: runner, TargetPath: meta.TargetPath, Text: "Launch the worker with: devkit-instruction " + meta.ID}}
 	return e.publishInstruction(meta, fresh, data, b.Text)
 }
 

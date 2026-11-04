@@ -58,6 +58,9 @@ func (p Plan) SelectStages(template PlanTemplate, ids []string) (Plan, error) {
 		stage, _ := result.Stage(id)
 		for _, action := range []Transition{Fix, Ask, Back, Done} {
 			target, _ := stage.Transitions.Next(action)
+			if action == Fix && stage.Transitions.FixRules != nil {
+				continue
+			}
 			if target != nil && !(action == Done && *target == "replan") && !selected[*target] {
 				return Plan{}, fmt.Errorf("%s: %s transition target not found: %q", id, action, *target)
 			}
@@ -113,6 +116,9 @@ const (
 	ChangedTransition    DeviationKind = "changed_transition"
 	ChangedStartStage    DeviationKind = "changed_start_stage"
 	ChangedSplit         DeviationKind = "changed_split"
+	ChangedAssignee      DeviationKind = "changed_assignee"
+	ChangedFixRules      DeviationKind = "changed_fix_rules"
+	ChangedUnitRole      DeviationKind = "changed_unit_role"
 	RemovedRequiredCheck DeviationKind = "removed_required_check"
 	ChangedCriteria      DeviationKind = "changed_criteria"
 	ChangedExamples      DeviationKind = "changed_examples"
@@ -221,6 +227,7 @@ func (p *Plan) insertOptionalStages(template PlanTemplate, ids []string) {
 
 func stageDeviations(original, stage Stage) []Deviation {
 	var result []Deviation
+	result = append(result, roleDeviations(original, stage)...)
 	if original.Split != stage.Split {
 		result = append(result, Deviation{Kind: ChangedSplit, StageID: stage.ID})
 	}
@@ -228,6 +235,9 @@ func stageDeviations(original, stage Stage) []Deviation {
 		result = append(result, Deviation{Kind: RemovedGate, StageID: stage.ID})
 	}
 	for _, action := range []Transition{Fix, Ask, Back, Done} {
+		if action == Fix && (original.Transitions.FixRules != nil || stage.Transitions.FixRules != nil) {
+			continue
+		}
 		before, _ := original.Transitions.Next(action)
 		after, _ := stage.Transitions.Next(action)
 		if !reflect.DeepEqual(before, after) {
@@ -252,6 +262,28 @@ func stageDeviations(original, stage Stage) []Deviation {
 			if !reflect.DeepEqual(before.Examples, after.Examples) {
 				result = append(result, Deviation{Kind: ChangedExamples, StageID: stage.ID, Aspect: before.Aspect, Runner: before.Runner})
 			}
+		}
+	}
+	return result
+}
+
+func roleDeviations(original, stage Stage) []Deviation {
+	var result []Deviation
+	if original.Assignee != stage.Assignee {
+		result = append(result, Deviation{Kind: ChangedAssignee, StageID: stage.ID})
+	}
+	if !reflect.DeepEqual(original.Transitions.FixRules, stage.Transitions.FixRules) {
+		result = append(result, Deviation{Kind: ChangedFixRules, StageID: stage.ID, Transition: Fix})
+	}
+	for _, unit := range stage.Units {
+		before := "unit_worker"
+		for _, previous := range original.Units {
+			if previous.ID == unit.ID {
+				before = previous.WorkRole()
+			}
+		}
+		if before != unit.WorkRole() {
+			result = append(result, Deviation{Kind: ChangedUnitRole, StageID: stage.ID, Aspect: unit.ID})
 		}
 	}
 	return result

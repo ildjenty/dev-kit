@@ -6,10 +6,3 @@
 "FAIL" = "fix"
 "NOT ASSESSED" = "ask"
 "PASS" = "done"
-
-# Roles do not select runners. Assign runners in the template's checks.
-[roles]
-worker = "Worker"
-human = "Human"
-judge = "Judge"
-planner = "Planner"

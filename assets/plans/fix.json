@@ -13,7 +13,7 @@
         },
         {
           "aspect": "test",
-          "runner": "devkit-judge",
+          "runner": "judge",
           "required": true,
           "criteria": [
             {
@@ -32,7 +32,7 @@
         },
         {
           "aspect": "diff",
-          "runner": "devkit-judge",
+          "runner": "judge",
           "required": true,
           "criteria": [
             {
@@ -114,7 +114,7 @@
         },
         {
           "aspect": "test",
-          "runner": "devkit-judge",
+          "runner": "judge",
           "required": true,
           "criteria": [
             {
@@ -133,7 +133,7 @@
         },
         {
           "aspect": "harness",
-          "runner": "devkit-judge",
+          "runner": "judge",
           "required": true,
           "criteria": [
             {
@@ -249,7 +249,7 @@
       "checks": [
         {
           "aspect": "contract",
-          "runner": "devkit-judge",
+          "runner": "judge",
           "required": true,
           "criteria": [
             {

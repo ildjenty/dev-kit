@@ -2,9 +2,11 @@ package hook
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"unicode"
 
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/host/event"
 	"github.com/ildjenty/dev-kit/internal/ledger"
 )
@@ -13,14 +15,7 @@ func (h Handler) preToolUse(e event.Event, state *ledger.State) (event.Result, e
 	if h.ReadConfig == nil {
 		return event.Result{}, fmt.Errorf("normative configuration reader is required")
 	}
-	work, ok := state.Work()
-	if !ok {
-		return event.Result{}, fmt.Errorf("work record is required")
-	}
-	reference := work.Branch
-	if round, ok := state.OpenRound(); ok {
-		reference = round.StartTarget.Tree
-	}
+	reference := hookReference(state)
 	settings, err := h.ReadConfig(reference)
 	if err != nil {
 		return event.Result{}, err
@@ -30,15 +25,23 @@ func (h Handler) preToolUse(e event.Event, state *ledger.State) (event.Result, e
 			return denied("Operation matches deny rule: " + rule), nil
 		}
 	}
-	if e.AgentID != "" && strings.HasPrefix(e.AgentType, "devkit-") && e.AgentType != "devkit-worker" {
+	if role, ok := settings.AgentRole(e.AgentType); e.AgentID != "" && ok && (role.Kind == "judge" || role.Kind == "plan") {
 		for _, tool := range settings.Deny.Judge {
 			if e.ToolName == tool {
 				return denied("Operation matches judge deny tool: " + tool), nil
 			}
 		}
 	}
+	return h.agentLaunch(e, settings, reference)
+}
+
+func (h Handler) agentLaunch(e event.Event, settings config.Config, reference string) (event.Result, error) {
 	if e.Agent == nil || !strings.HasPrefix(e.Agent.Type, "devkit-") {
 		return event.Result{}, nil
+	}
+	role, ok := settings.AgentRole(e.Agent.Type)
+	if !ok {
+		return denied("The devkit agent is not registered in roles."), nil
 	}
 	if e.Host == event.Codex {
 		if e.Agent.ForkTurns != "none" {
@@ -60,6 +63,11 @@ func (h Handler) preToolUse(e event.Event, state *ledger.State) (event.Result, e
 	}
 	if definition.Name != e.Agent.Type {
 		return denied("The subagent name does not match its normative definition."), nil
+	}
+	if e.Host != event.Codex && (role.Kind == "judge" || role.Kind == "plan") {
+		if err := readOnlyDefinition(definition, settings); err != nil {
+			return denied(err.Error()), nil
+		}
 	}
 	if e.Agent.Model != "" && e.Agent.Model != definition.Model {
 		return denied("The model override changes the normative subagent definition."), nil
@@ -128,4 +136,16 @@ func commandParts(command string) []string {
 		}
 	}
 	return append(parts, command[start:])
+}
+
+func readOnlyDefinition(definition AgentDefinition, settings config.Config) error {
+	if definition.Tools == nil {
+		return fmt.Errorf("Read-only agents must explicitly restrict tools to roles.read_only_tools.")
+	}
+	for _, tool := range definition.Tools {
+		if !slices.Contains(settings.ReadOnlyTools(), tool) {
+			return fmt.Errorf("Read-only agent tool %q is not permitted by roles.read_only_tools.", tool)
+		}
+	}
+	return nil
 }

@@ -21,7 +21,7 @@ type Source struct {
 
 // CanWrite reports the files adapter's effective write capability.
 func (s Source) CanWrite() bool {
-	return s.Writable == nil || *s.Writable
+	return s.Writable == nil && !path.IsAbs(s.Path) || s.Writable != nil && *s.Writable
 }
 
 // Selection names a source and an adapter-specific selector.
@@ -188,6 +188,9 @@ func (c Config) ValidateSourcePaths(repositoryRoot string) error {
 			source.Path = filepath.Join(root, filepath.FromSlash(source.Path))
 		}
 		source.Path = filepath.ToSlash(source.Path)
+		if !strings.HasPrefix(source.Path, filepath.ToSlash(root)+"/") && source.CanWrite() {
+			return fmt.Errorf("sources.%s.writable must be false: sources outside the repository are read-only", name)
+		}
 		if pathsOverlap(source.Path, filepath.ToSlash(filepath.Join(root, ".devkit/run"))) {
 			return fmt.Errorf("sources.%s.path must be outside .devkit/run", name)
 		}

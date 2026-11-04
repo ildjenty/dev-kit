@@ -15,6 +15,8 @@ import (
 
 // Config represents validated devkit.toml settings.
 type Config struct {
+	Roles          Roles                        `toml:"roles"`
+	Planning       Planning                     `toml:"planning"`
 	KitVersion     string                       `toml:"kit_version"`
 	Judges         map[string]Judge             `toml:"judges"`
 	Commands       map[string]Command           `toml:"commands"`
@@ -68,7 +70,7 @@ func (c Config) PlanCheckSettings() PlanCheck {
 		settings.Aspect = "plan"
 	}
 	if settings.Runner == "" {
-		settings.Runner = "devkit-judge"
+		settings.Runner = "judge"
 	}
 	if settings.Criteria == nil {
 		settings.Criteria = []Selection{{Source: "principles", Select: "review/plan.md"}, {Source: "plans", Select: "README.md"}}
@@ -311,6 +313,9 @@ func (c Config) Validate() error {
 		return err
 	}
 	if err := c.validateRouter(); err != nil {
+		return err
+	}
+	if err := c.validateRoles(); err != nil {
 		return err
 	}
 	if err := c.validatePlanSettings(); err != nil {

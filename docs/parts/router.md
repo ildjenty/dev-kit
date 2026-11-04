@@ -25,18 +25,22 @@ router は、分類表に基づいて次の行動を分類する。
 
 判定後の依存の宣言とループ自身の変更の分類は、そのステージ実行の最初のラウンド開始時のスナップショットと返却後のツリー、および規範のソース全体の文書の集合と内容ハッシュを比較する。修正ラウンドでも比較元を保ち、不合格のラウンドで行った変更を含める。規範は各ラウンドの開始時に固定する。
 
-`[router] human_confirmation` で変更できる分類名は `dependency_changed` と `target_changed_again` だけである。`meta_loop_edit` の確認は `[approval] meta_loop_edit` だけに従い、分類表から削除できない。check の結果から次の行動への対応とロールは固定であり、計画の check は `[plan_check] aspect`・`runner` で指定する。
+`[router] human_confirmation` で変更できる分類名は `dependency_changed` と `target_changed_again` だけである。`meta_loop_edit` の確認は `[approval] meta_loop_edit` だけに従い、分類表から削除できない。check の結果から次の行動への対応は固定であり、計画の check は `[plan_check] aspect`・`runner` で指定する。
 
 #### check の結果
 
 - **返す値**: [check](../architecture/modules.md#check)(評価と判定)の集約結果から次の行動を返す。分類値と判断後の進行は [router の判断](../architecture/flow.md#router-の判断)に従う。
 - **対象**: 各[ステージ](../stages.md)(作業を分ける段階)の check が終わった後。
 
+blocking の指摘に `premise_broken` が付いていれば、「人に確認する」を選び、前のステージへの戻りを推奨として問いに示す。戻るかどうかは人が `back` の答えで決める。
+
+「修正する」を選んだ後の担当は router では決めない。engine が修正ラウンドを開く処理で[修正の担当の規則](../architecture/data.md#修正の担当の規則)を当てはめる。ラウンドの上限は規則より先に照合し、達したら人に確認する。
+
 分割した作業も、合流後のツリーに対するステージの check から次の行動を選ぶ。単位ごとの判定はせず、ゲート・ループ自身の変更の確認・上限・戻り・再計画・問いはステージのラウンドで扱う。
 
 #### 教訓の反映先
 
-教訓の記録と反映先の提案は[メタループ](../meta-loop.md#メタループ)、反映先の優先順は `[lessons] destinations` で設定する。既定は、機械の検査(hook・lint・型・検証コマンド) → 雛形 → 用途別の判定基準 → 原則 → skill であり、リポジトリの資産に反映する。ソースへの改善は書き込めるものに限り、読み取り専用のソースへの改善は教訓として管理者へ引き継ぐ。
+教訓の記録と反映先の提案は[メタループ](../meta-loop.md#メタループ)、反映先の優先順は `[lessons] destinations` で設定する。既定は、機械の検査(hook・lint・型・検証コマンド) → 雛形 → 用途別の判定基準 → 原則 → skill であり、リポジトリの資産に反映する。ソースへの改善はリポジトリ内の書き込めるものに限り、リポジトリ外のソースと読み取り専用のソースへの改善は教訓として管理者へ引き継ぐ。
 
 #### 振り返りの判定
 
@@ -52,4 +56,4 @@ router による[完了条件](../architecture/guarantees.md#完了条件)(ス�
 
 ### ロールと実行主体
 
-[ロール](../architecture/data.md#計画-plan)(ループ内の担当区分)と[実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する相手)の境界は [router の契約](../architecture/modules.md#router)に従う。
+[役割](../architecture/data.md#役割-role)(`devkit.toml` で定義するループ内の担当)と[実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する相手)は、雛形と計画に書いた役割の ID とコマンド名で決まる。router の分類表は役割を持たない。境界は [router の契約](../architecture/modules.md#router)に従う。

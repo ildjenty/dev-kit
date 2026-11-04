@@ -33,7 +33,6 @@ func TestSplitUnitsValidationAndDeviation(t *testing.T) {
 			p.Stages[1].Units = []Unit{{ID: "one", Description: "Duplicate across stages", Scope: "other/"}}
 		},
 		func(p *Plan) { p.Stages[0].Split = false },
-		func(p *Plan) { p.Stages[0].Assignee = Human },
 		func(p *Plan) { p.Stages[0].Units[0].Description = "" },
 		func(p *Plan) { p.Stages[0].Units[0].Scope = "" },
 	} {

@@ -5,7 +5,7 @@ description: Advance the devkit planning, work, and judgment loop. Use when star
 
 # Using devkit
 
-Carry out the instructions returned by `devkit`. It determines stage order, judgment, approval, and completion. Follow repository-owned norms through the logical names in the brief: `principles/…`, `stages/…`, `examples/…`, `plans/…`, `templates/…`, and `rules.md`. Read the supplied self-contained output schemas identified by `schemas/…`; they include all referenced definitions and are owned by the binary. Work briefs also include the supported note kinds and their schemas, and `schemas/structure.json`. Read `requirements.md` as the repository's requirements source and use relevant records from `structure.json`. Use the actual working-tree paths and existence information shown for these products in the brief; create a missing product at its indicated path.
+Carry out the instructions returned by `devkit`. It determines stage order, judgment, approval, and completion. Follow repository-owned norms through the logical names in the brief: `principles/…`, `stages/…`, `examples/…`, `plans/…`, `templates/…`, and `rules.md`. Read the supplied self-contained output schemas identified by `schemas/…`; they include all referenced definitions and are owned by the binary. Work briefs also include the supported note kinds and their schemas, and `schemas/structure.json`. Read `requirements.md` as the repository's requirements source and use relevant records from `structure.json`. Use the actual working-tree paths and existence information shown for these products in the brief; create a missing writable product inside the repository at its indicated path. Outside sources are read-only; record needed improvements as lessons for their maintainers.
 
 The brief supplies the current stage definition, the criteria documents selected by the check being judged, rules, requirements, and relevant structure records. For other norms, use the listed paths under the frozen `snap/` snapshot for that round. Plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time. Do not replace frozen inputs with norms being edited in the working tree. Work records retain `kit_version` (`v3`) to identify compatibility with the binary's record format. Every work brief and judgment request references a work-history file fixed at instruction issue time; use it as required by the stage or the check's criteria. Round judgments also include the expanded first-round start comparison base for the stage run, changed-file list, and patch to the returned target.
 
@@ -18,7 +18,7 @@ When `next` runs verification commands or the completion commit, set the host ti
 ## Starting and locating work
 
 1. Start a new task with `devkit start --plan <name> <task>`. If the human has not specified a plan, omit `--plan` to use `default_plan` in `devkit.toml`, whose default is `default`. Select templates only from `plans/`. Devkit binds the latest human input observed by UserPromptSubmit for the session to the work; if none was observed, the record states that the original request is unavailable. Do not substitute the agent-written task for the original request.
-2. Launch `devkit-planner` with the planner instruction ID returned by `start`. Call `devkit next` after its result arrives.
+2. Launch the returned planner agent with the planner instruction ID returned by `start`. Call `devkit next` after its result arrives.
 3. For ongoing work, locate the current state from the SessionStart checkpoint and `devkit status`, then call `devkit next`. If warned of a branch mismatch, check the work branch and do not proceed to writes or completion. If paused, wait for the human to request resume.
 
 If start is refused because no SessionStart observation exists, use `devkit doctor` to check what is missing. After Codex installation, the human must trust the project in interactive mode and trust each hook through `/hooks`. Do not substitute temporary configuration overrides.
@@ -31,9 +31,9 @@ Run each loop in its own git worktree and host session. Do not start a new task 
 
 ## Following next instructions
 
-- **Planning**: Launch the specified `devkit-planner`. When instructed to replan, launch the specified planner through the same procedure. For plan checks, detection tests, and judgments, launch the assigned judge. After results arrive, call `devkit next` to accept results captured by the hook.
+- **Planning**: Launch the specified planner agent. When instructed to replan, launch the specified planner through the same procedure. For plan checks, detection tests, and judgments, launch the assigned judge. After results arrive, call `devkit next` to accept results captured by the hook.
 - **Work**: Read the brief and its references and carry out the agreed scope. Record unread inputs and their impact as unverified matters. Other skills and plugins may be used within the request's scope.
-- **Split work**: For each item in the returned `instructions` array, launch the assigned `devkit-worker` once using the single-line launch message below. Its brief gives an absolute detached worktree path and unit scope; the worker must edit only there and return progress JSON as its final message. Do not edit or submit the unit results yourself. Respect `[parallel] max_workers`; devkit issues eligible units as capacity becomes available. After results arrive, call `devkit next`; devkit fixes SHAs and merges units before one stage judgment with a cumulative diff. Resolve reported merge conflicts in the session worker fix round.
+- **Split work**: For each item in the returned `instructions` array, launch the assigned worker agent once using the single-line launch message below. Its brief gives an absolute detached worktree path and unit scope; the worker must edit only there and return progress JSON as its final message. Do not edit or submit the unit results yourself. Respect `[parallel] max_workers`; devkit issues eligible units as capacity becomes available. After results arrive, call `devkit next`; devkit fixes SHAs and merges units before one stage judgment with a cumulative diff. Resolve reported merge conflicts in the session worker fix round.
 - **Awaiting judgment**: Wait for results from judges or planners already launched. Do not launch duplicates for the same instruction ID; call `devkit next` after results arrive.
 - **Questions and external operation confirmation**: Present them in chat using the next section's procedure, end the turn, and wait for a human answer. Treat human-assigned stages the same way.
 - **Completion or abort**: Report the recorded state, actual remaining work, and any changed unit worktrees devkit retained, then finish. A worker's completion claim does not finalize completion.
@@ -50,8 +50,8 @@ devkit-instruction <instruction_id>
 
 This is not a command to execute. The subagent resolves the request by reading `.devkit/run/work/<work_id>/brief/<instruction_id>.md`, using the work ID contained in the instruction ID.
 
-- In Claude Code, use the assigned `devkit-judge`, `devkit-planner`, or `devkit-worker` as Agent's `subagent_type`. Do not inherit the parent's history or override the model or effort in the role definition.
-- In Codex, use the assigned role as `spawn_agent`'s `agent_type` and always specify `fork_turns: "none"`. Use only the single line above as `message`.
+- In Claude Code, use the returned agent name as Agent's `subagent_type`. Do not inherit the parent's history or override the model or effort in the role definition.
+- In Codex, use the returned agent name as `spawn_agent`'s `agent_type` and always specify `fork_turns: "none"`. Use only the single line above as `message`.
 
 Subagents return results in their final messages. The parent must not transcribe, modify, or submit their results. Do not write `.devkit/run/**/results/` or `records/` through ordinary file editing. When a judgment or verification command is the runner, devkit executes it; do not launch a substitute judge.
 
@@ -107,3 +107,5 @@ For each problem, identify where it should have been caught and where to prevent
 
 Check which principles are used by which review documents, check criteria, and templates, and whether any relevant mechanism is unused or costs more than it contributes. Focus on the task's problems, misses, gaps, and burdens; inventory all norms only when a need is evident. Reflect repository requirements from approved completion conditions in `requirements.md` if purpose did not already do so, including when purpose is absent. Follow the loop-edit confirmation policy for norm changes; without loop edits, no loop-edit confirmation is needed.
 
+
+Roles are configured in devkit.toml and resolved from the fixed instruction snapshot. Follow returned agent names instead of substituting defaults. Agent-backed work assignees run as one worktree unit. When a limit question offers continue:<role>, record the human-selected option exactly as text with interpretation text; do not choose it yourself. A premise_broken finding recommends back, and only a human back answer authorizes the return. Outside knowledge sources are read-only; do not edit or write them back. Record improvements as lessons for their maintainers.

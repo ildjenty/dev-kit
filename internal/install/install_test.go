@@ -661,7 +661,7 @@ func TestInitNoCommitAndDoctorCommitState(t *testing.T) {
 	if checkNamed(t, report, "HEAD").OK || checkNamed(t, report, "init_committed").OK {
 		t.Fatal("doctor accepted initialization without a commit")
 	}
-	if _, err := runGit(ctx, root, "add", "--", "devkit.toml", ".devkit/plans"); err != nil {
+	if _, err := runGit(ctx, root, "add", "--", "devkit.toml", ".devkit/plans", ".claude/agents", ".codex/agents", ".agents/skills"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := runGit(ctx, root, "commit", "-m", "Commit initialization files"); err != nil {
@@ -671,7 +671,7 @@ func TestInitNoCommitAndDoctorCommitState(t *testing.T) {
 	if err != nil || !checkNamed(t, report, "HEAD").OK || !checkNamed(t, report, "init_committed").OK {
 		t.Fatalf("doctor rejected committed initialization files: %+v, %v", report, err)
 	}
-	for _, name := range []string{"devkit.toml", ".devkit/plans/default.json", ".devkit/plans/custom.json"} {
+	for _, name := range []string{"devkit.toml", ".devkit/plans/default.json", ".devkit/plans/custom.json", ".claude/agents/devkit-judge.md", ".codex/agents/devkit-worker.toml"} {
 		t.Run(name, func(t *testing.T) {
 			before, err := readOptional(filepath.Join(root, name))
 			if err != nil {

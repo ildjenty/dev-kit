@@ -50,7 +50,7 @@ func Schema(name string) ([]byte, error) {
 	return fs.ReadFile(FS(), "schemas/"+name+".json")
 }
 
-// RouterDefaults returns the embedded default classification and role table.
+// RouterDefaults returns the embedded default classification table.
 func RouterDefaults() ([]byte, error) {
 	return fs.ReadFile(FS(), "router/default.toml")
 }

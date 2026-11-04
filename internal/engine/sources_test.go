@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -235,107 +234,6 @@ func outsideSourceWork(t *testing.T) (*Engine, string, string, Result) {
 	}
 	planResult(t, e, start)
 	return e, products, guides, checkedNext(t, e)
-}
-
-func sourceWrites(t *testing.T, e *Engine) []*ledger.SourceWrite {
-	t.Helper()
-	records, err := e.records()
-	if err != nil {
-		t.Fatal(err)
-	}
-	writes := []*ledger.SourceWrite{}
-	for _, record := range records {
-		if write, ok := record.Payload.(*ledger.SourceWrite); ok {
-			writes = append(writes, write)
-		}
-	}
-	return writes
-}
-
-func TestOutsideSourceIsFixedEditedConfirmedAndWritten(t *testing.T) {
-	e, products, guides, work := outsideSourceWork(t)
-	ctx := t.Context()
-	copy := e.editDirectory("requirements")
-	text := briefText(t, work.Instruction)
-	if !strings.Contains(text, copy) || !strings.Contains(text, "Initial outside requirements.") {
-		t.Fatalf("work brief did not show the fixed requirements and their editable copy")
-	}
-	// A change in the original after fixing is not visible through the fixed copy.
-	write(t, guides, "style.md", "Initial outside guide.\n")
-	write(t, copy, "requirements.md", "Edited outside requirements.\n")
-	write(t, e.editDirectory("guides"), "style.md", "Edited outside guide.\n")
-	submitWork(t, e, work)
-	state, err := e.load()
-	if err != nil {
-		t.Fatal(err)
-	}
-	round, _ := state.OpenRound()
-	if round.ReturnedTarget == nil || round.ReturnedTarget.Sources == "" || round.ReturnedTarget.Sources == round.StartTarget.Sources {
-		t.Fatalf("target identity did not include the edited outside documents: %+v", round)
-	}
-	if got, _ := os.ReadFile(filepath.Join(products, "requirements.md")); string(got) != "Initial outside requirements.\n" {
-		t.Fatal("the original changed before approval")
-	}
-	question := checkedNext(t, e)
-	if question.Instruction.Question == nil || question.Instruction.Question.StopCategory != "meta_loop_edit" || !strings.Contains(question.Instruction.Question.Text, "guides/style.md") {
-		t.Fatalf("an outside norm edit was not confirmed as a loop edit: %+v", question)
-	}
-	if question.Instruction.Question.ApprovalTarget.Sources != round.ReturnedTarget.Sources {
-		t.Fatal("the approval does not point to the judged target identity")
-	}
-	answerResult(t, e, question, ledger.AnswerApproved)
-	done, err := e.Next(ctx)
-	if err != nil || done.Status != ledger.WorkCompleted {
-		t.Fatalf("work did not complete after approval: %+v, %v", done, err)
-	}
-	for name, want := range map[string]string{filepath.Join(products, "requirements.md"): "Edited outside requirements.\n", filepath.Join(guides, "style.md"): "Edited outside guide.\n"} {
-		if got, err := os.ReadFile(name); err != nil || string(got) != want {
-			t.Fatalf("%s was not written: %q, %v", name, got, err)
-		}
-	}
-	writes := sourceWrites(t, e)
-	applied := map[string]*ledger.SourceWrite{}
-	for _, write := range writes {
-		if write.Status == ledger.SourceWriteApplied {
-			applied[write.Source] = write
-		}
-	}
-	if len(writes) != 4 || applied["requirements"] == nil || applied["guides"] == nil || applied["guides"].ApprovalID == "" || applied["guides"].BeforeID == "" || applied["guides"].Target != *round.ReturnedTarget {
-		t.Fatalf("writes were not recorded with their approval and before records: %+v", writes)
-	}
-}
-
-func TestOutsideSourceWriteRejectsChangedOriginal(t *testing.T) {
-	e, products, _, work := outsideSourceWork(t)
-	ctx := t.Context()
-	write(t, e.editDirectory("requirements"), "requirements.md", "Worker requirements.\n")
-	write(t, products, "requirements.md", "Concurrent outside requirements.\n")
-	submitWork(t, e, work)
-	fix := checkedNext(t, e)
-	if fix.Instruction.Kind != form.InstructionWork {
-		t.Fatalf("a conflicting write did not return the work for review: %+v", fix)
-	}
-	if got, _ := os.ReadFile(filepath.Join(products, "requirements.md")); string(got) != "Concurrent outside requirements.\n" {
-		t.Fatalf("a conflicting write replaced the changed original: %q", got)
-	}
-	writes := sourceWrites(t, e)
-	if len(writes) != 2 || writes[1].Status != ledger.SourceWriteConflict {
-		t.Fatalf("the conflict was not recorded: %+v", writes)
-	}
-	if !strings.Contains(briefText(t, fix.Instruction), "requirements/requirements.md") {
-		t.Fatal("the fix round did not name the changed document")
-	}
-	submitWork(t, e, fix)
-	done, err := e.Next(ctx)
-	if err != nil || done.Status != ledger.WorkCompleted {
-		t.Fatalf("reviewed edit did not complete: %+v, %v", done, err)
-	}
-	if got, _ := os.ReadFile(filepath.Join(products, "requirements.md")); string(got) != "Worker requirements.\n" {
-		t.Fatalf("reviewed edit was not written against the current original: %q", got)
-	}
-	if _, err := os.Stat(filepath.Join(products, "requirements.md")); errors.Is(err, os.ErrNotExist) {
-		t.Fatal("requirements were deleted")
-	}
 }
 
 func TestPlanApprovalShowsChangedCriteriaSelections(t *testing.T) {

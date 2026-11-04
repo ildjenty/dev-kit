@@ -382,6 +382,9 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	if err != nil {
 		return Result{}, err
 	}
+	if err := validateRoles(append(slices.Clone(template.Stages), template.OptionalStages...), settings); err != nil {
+		return Result{}, err
+	}
 	if template.Name != name {
 		return Result{}, errors.New("template name does not match its file name")
 	}
@@ -654,6 +657,13 @@ func (e *Engine) acceptPlan(ctx context.Context, state *ledger.State, p plan.Pla
 	if err != nil {
 		return err
 	}
+	settings, err := e.settings(ctx, reference)
+	if err != nil {
+		return err
+	}
+	if err := validateRoles(p.Stages, settings); err != nil {
+		return err
+	}
 	if err := plan.ValidateBackTargets(template, p); err != nil {
 		return err
 	}
@@ -751,7 +761,14 @@ func (e *Engine) reference(ctx context.Context, state *ledger.State) (string, er
 	return e.workspace.Head(ctx)
 }
 func (e *Engine) settings(ctx context.Context, ref string) (config.Config, error) {
-	return e.readConfig(ctx, gitReference(ref))
+	settings, err := e.readConfig(ctx, gitReference(ref))
+	if err != nil {
+		return config.Config{}, err
+	}
+	if err := settings.ValidateSourcePaths(e.Root()); err != nil {
+		return config.Config{}, err
+	}
+	return settings, nil
 }
 func (e *Engine) norms(ctx context.Context, ref string) ([]form.NormReference, error) {
 	norms, err := NormativeReferences(ctx, e.workspace, gitReference(ref))
@@ -780,7 +797,7 @@ func (e *Engine) norms(ctx context.Context, ref string) ([]form.NormReference, e
 // it reads the current documents without fixing them.
 func (e *Engine) fixedManifest(ctx context.Context, ref, name string, item config.Source) (sourceManifest, error) {
 	if e.workRoot() == "" {
-		adapter, err := source.NewFiles(e.Root(), item.Path, nil, "", false)
+		adapter, err := source.NewFiles(e.Root(), item.Path, nil, "")
 		if err != nil {
 			return nil, err
 		}
@@ -870,6 +887,16 @@ func (e *Engine) bundledSchema(source []byte) ([]byte, error) {
 
 func (e *Engine) requireStartNorms(ctx context.Context, head string, settings config.Config) error {
 	paths := []string{"devkit.toml"}
+	agents := []string{}
+	for _, role := range settings.RoleSettings() {
+		if role.Agent != "" {
+			agents = append(agents, ".claude/agents/"+role.Agent+".md", ".codex/agents/"+role.Agent+".toml")
+		}
+	}
+	slices.Sort(agents)
+	if err := e.workspace.RequireCommitted(ctx, slices.Compact(agents)...); err != nil {
+		return err
+	}
 	roots := repositoryNorms(e.Root(), settings)
 	roots = slices.DeleteFunc(roots, func(path string) bool { return path == "devkit.toml" })
 	committed, err := e.workspace.NormativeIDs(ctx, head, roots...)

@@ -114,7 +114,12 @@ func (r *Result) removeConfig(files fs.FS) error {
 	if err != nil {
 		return err
 	}
+	roles, err := fs.ReadFile(files, "hosts/roles.toml")
+	if err != nil {
+		return err
+	}
 	fragment := append([]byte(fmt.Sprintf("kit_version = %q\n", kit.Version)), deny...)
+	fragment = append(fragment, roles...)
 	after, err := stripTOML(before, fragment)
 	if err != nil {
 		return err

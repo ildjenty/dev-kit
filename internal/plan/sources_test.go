@@ -58,7 +58,7 @@ func TestSelectionChangesRequireApproval(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := clonePlan(original)
 			tc.change(&p.Stages[0].Checks[0])
-			want := []Deviation{{Kind: tc.kind, StageID: "implement", Aspect: "wording", Runner: "devkit-judge"}}
+			want := []Deviation{{Kind: tc.kind, StageID: "implement", Aspect: "wording", Runner: "judge"}}
 			if got := Deviations(template, p); !reflect.DeepEqual(got, want) {
 				t.Fatalf("deviations = %+v; want %+v", got, want)
 			}

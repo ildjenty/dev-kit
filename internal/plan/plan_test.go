@@ -108,7 +108,7 @@ func TestSchemaAndReferences(t *testing.T) {
 		},
 		func(p *Plan) { p.Stages = append(p.Stages, p.Stages[0]) },
 		func(p *Plan) { p.Stages[0].Limits.MaxRounds = 0 },
-		func(p *Plan) { p.Stages[0].Assignee = "judge" },
+		func(p *Plan) { p.Stages[0].Assignee = "" },
 	} {
 		bad := clonePlan(p)
 		change(&bad)

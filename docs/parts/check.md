@@ -18,7 +18,7 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 計画の判定依頼には、作業に記録した要求の原文と `start` の課題を固定入力として含める。観点 `plan` は、完了条件と `open_questions` が原文の要求を漏らさず扱い、要求を追加していないかを確かめる。
 
-[判定者](../architecture/data.md#計画-plan)(評価を担うロール)の結果ファイルまたはコマンド実行結果を受け取り、[受理境界](../architecture/guarantees.md#判定結果の受理)(結果を取り込む際の照合条件)で照合する。判定者サブエージェントの返却形式は [form](../architecture/modules.md#form)(スキーマとテンプレートを持つ部品)と[作業結果の判定](../architecture/flow.md#作業結果の判定)、判定コマンド(`[judges]`)(判定を返すコマンド)の出力スキーマは [config](../architecture/modules.md#config)(設定を解析する実装)に従う。
+[判定者](../architecture/data.md#役割-role)(評価を担う `judge` の種類の役割)の結果ファイルまたはコマンド実行結果を受け取り、[受理境界](../architecture/guarantees.md#判定結果の受理)(結果を取り込む際の照合条件)で照合する。判定者サブエージェントの返却形式は [form](../architecture/modules.md#form)(スキーマとテンプレートを持つ部品)と[作業結果の判定](../architecture/flow.md#作業結果の判定)、判定コマンド(`[judges]`)(判定を返すコマンド)の出力スキーマは [config](../architecture/modules.md#config)(設定を解析する実装)に従う。
 
 ### 出力
 
@@ -30,7 +30,7 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 check の `aspect` は判定の名前、`criteria` は基準の選び方、`examples` は検出試験の例の選び方である。基準は規範のソースから選ぶ。必須の基準の選び方が0件なら判定を始めず止める。基準の本文の構造は解析せず、参照する別の文書が必要なら選び方に明示する。選び方は check の約束であり、雛形と違う場合は逸脱として承認の問いに差分を示す。
 
-判定の値と結果・指摘の構成は [Judgment](../architecture/data.md#check-の結果-judgment)と [Finding](../architecture/data.md#指摘-finding)、適用除外と集約は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+判定の値と結果・指摘の構成は [Judgment](../architecture/data.md#check-の結果-judgment)と [Finding](../architecture/data.md#指摘-finding)、適用除外と集約は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。判定者は、前のステージの前提が崩れたと判断した指摘に任意の `premise_broken` を付けられる。blocking の指摘にこれがあれば、router は戻りを推奨する人への問いにし、判定者の指摘だけでは戻らない。
 
 判定の共通規則は判定依頼テンプレートに集約する。`NOT ASSESSED` の使い方、失敗のシナリオを示せない指摘を返さないこと、重大度を付けないこと、blocking でない指摘を参考情報として残すこと、指摘数に上限を設けないことを定める。判定の範囲・確認事項・blocking・報告しない事項・適用除外は原則のソースの用途別文書で定める。
 
@@ -42,7 +42,7 @@ check の `aspect` は判定の名前、`criteria` は基準の選び方、`exam
 
 ### 実行主体と受理
 
-[実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する担当)の指定は[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)の check、種類と必要な確認能力は[計画](../architecture/data.md#計画-plan)(雛形から作る課題ごとの実行内容)と[操作の禁止とサブエージェントの制限](../architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。検証コマンド(`[commands]`)(テストなどを実行するコマンド)を使う `command:` の check と判定コマンドの登録は [config](../architecture/modules.md#config)で定める。
+[実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する担当)の指定は[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)の check に従い、サブエージェントの runner は `judge` の種類の[役割](../architecture/data.md#役割-role)の ID に限る。runner の種類と必要な確認能力は[計画](../architecture/data.md#計画-plan)(雛形から作る課題ごとの実行内容)と[操作の禁止とサブエージェントの制限](../architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。検証コマンド(`[commands]`)(テストなどを実行するコマンド)を使う `command:` の check と判定コマンドの登録は [config](../architecture/modules.md#config)で定める。
 
 サブエージェントの設定は[リポジトリ内の定義](../architecture/layout.md#指示ファイルとホスト設定)、起動時の制限は [PreToolUse](../architecture/hooks.md#pretooluse)(ツール実行前の hook)に従う。起動と結果の来歴の照合、重複結果の扱いは[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 

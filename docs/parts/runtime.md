@@ -5,7 +5,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 ## 責務
 
 - **進行**: runtime は[計画](../architecture/data.md#計画-plan)(課題ごとの実行内容)と [ledger](../architecture/modules.md#ledger)(記録を扱う部品)を使ってループを進める。実装モジュールへの責務配分は [engine](../architecture/modules.md#engine)(進行を担うモジュール)を含む[モジュールごとの契約](../architecture/modules.md#モジュールごとの契約)に従う。
-- **作業者・判定者・計画者との接続**: サブエージェントの起動主体は[全体構成](../architecture.md#全体構成)、最終メッセージと来歴の採取・受け渡しは [SubagentStop](../architecture/hooks.md#subagentstop)(サブエージェント終了時のイベント)、起動の定型と結果の受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+- **作業者・判定者・計画者との接続**: 役割の agent であるサブエージェントの起動主体は[全体構成](../architecture.md#全体構成)、最終メッセージと来歴の採取・受け渡しは [SubagentStop](../architecture/hooks.md#subagentstop)(サブエージェント終了時のイベント)、起動の定型と結果の受理は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 - **git と外部操作**: git 操作と[外部操作](../architecture/flow.md#外部操作)(リポジトリ外への書き込み)の責務配分は [workspace](../architecture/modules.md#workspace) と [external](../architecture/modules.md#external) の契約に従う。
 - **組み立て**: 設定、リポジトリの規範、バイナリが供給するスキーマと既定値の受け渡しを含む組み立ては [cmd/devkit](../architecture/modules.md#cmddevkit) の契約に従う。
 - **導入**: バイナリの配布、利用側の配置と設定の準備は [install](../architecture/modules.md#install) の契約に従う。
@@ -33,15 +33,15 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 
 作業中のチェックアウトでの2つ目の `start` は拒否する。別の worktree で新しいセッションを開けば、チェックアウトごとの `.devkit/run/` で複数のループを並行して回せる。
 
-雛形のステージの `split` と計画の `units` に従う単位の作業は、`devkit-worker` が `.devkit/worktrees/<単位の指示 ID>/` で進める。devkit はラウンド開始時のスナップショットのコミットから detached の worktree を作り、全単位の結果受理後にツリーを SHA で固定して作業ブランチへコミットしないマージで合流する。単位の終了ブロックをまとめ、合流後のツリーを通常のステージのラウンドで判定する。単位ごとの判定はしない。作業者数は `[parallel] max_workers`(既定3、1以上)で制限し、1でも作業場所と合流の手順は変えない。
+雛形のステージの `split` と計画の `units` に従う単位の作業は、単位の役割(既定 `unit_worker`、agent `devkit-worker`)が `.devkit/worktrees/<単位の指示 ID>/` で進める。agent のある `work` の役割がステージの担当になったラウンドも、単位が1つの同じ手順で進める。devkit はラウンド開始時のスナップショットのコミットから detached の worktree を作り、全単位の結果受理後にツリーを SHA で固定して作業ブランチへコミットしないマージで合流する。単位の終了ブロックをまとめ、合流後のツリーを通常のステージのラウンドで判定する。単位ごとの判定はしない。作業者数は `[parallel] max_workers`(既定3、1以上)で制限し、1でも作業場所と合流の手順は変えない。
 
-合流がぶつかった場合の修正ラウンド、合流の記録と再開時の照合、結果を指示に結び付けられない場合の問い、中断・中止・作業完了時の worktree の扱いは[分割した作業と合流](../architecture/flow.md#分割した作業と合流)に従う。`devkit-worker` は判定者用の `[deny] judge` の書き込み禁止の対象外である。
+合流がぶつかった場合の修正ラウンド、合流の記録と再開時の照合、結果を指示に結び付けられない場合の問い、中断・中止・作業完了時の worktree の扱いは[分割した作業と合流](../architecture/flow.md#分割した作業と合流)に従う。`work` の役割の agent は判定者用の `[deny] judge` の書き込み禁止の対象外である。担当・runner・単位の担当は `devkit.toml` の[役割](../architecture/data.md#役割-role)の ID で決まり、devkit は種類ごとの規則と職務の分離を守らせる。修正ラウンドの担当は[修正の担当の規則](../architecture/data.md#修正の担当の規則)で変えられ、ラウンドの上限は規則より先に効く。
 
 ラウンド開始時に未登録の検証コマンドは、`auto-fixable` の指摘を伴う check の `FAIL` とする。作業者が検証の手段を作って登録し、既定では人の確認を経た次のラウンドから使う。
 
 既定の雛形は `default`・`fix`・`docs` であり、最後に作業者の retrospective を置く。検出試験を除くすべての作業の brief と判定依頼が指示発行時点の作業履歴ファイルを参照し、振り返りはそこからすべての判定と指摘、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、人の回答や note の見逃しを確認する。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。規範を変えた場合はループ自身の変更として確認する。
 
-ソースへの書き込みは任意の能力であり、`writable = true` のソースに限る。外部は編集用の写しから差分を求め、規範の確認後に外部操作の経路で反映する。元の内容ハッシュが一致するときだけ比較と更新を一体で行い、不一致なら取り直して見直す。リポジトリ内のファイルは直接編集して完了時のコミットで反映する。判定・承認・反映・完了は git のツリーと外部の成果の文書を合わせた同じ識別を指す。
+ソースへの書き込みはリポジトリ内の `writable = true` のソースに限り、直接編集して完了時のコミットで反映する。リポジトリ外のソースは読み取り専用であり、devkit は書き込まず、`writable = true` を書くと設定エラーになる。判定・承認・完了は git のツリーとリポジトリ外の成果の文書を合わせた同じ識別を指す。
 
 ### ホストの差分と共通の仕組み
 

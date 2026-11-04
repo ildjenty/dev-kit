@@ -9,7 +9,7 @@ Each check has a name (`aspect`), a runner, and a required status. A judge-run c
 ```json
 {
   "aspect": "test",
-  "runner": "devkit-judge",
+  "runner": "judge",
   "required": true,
   "criteria": [
     {"source": "principles", "select": "review/test.md"},
@@ -31,7 +31,7 @@ The `transitions.done` value is a stage ID to continue, `null` to finish, or `"r
 
 In `default`, the first plan's completion conditions concern agreement on requirements and completion conditions. During purpose, clarify requirements with the human, record them in `requirements.md`, and output an agreed proposal for completion conditions. After purpose completes, the planner rebuilds the remaining plan using those conditions, and the human approves it. The `fix` and `docs` templates do not use this initial agreement flow.
 
-Retrospective requires `command:test`, `test`, and `harness` in `default` and `fix`, and only `harness` in `docs`. Judge-run checks use `devkit-judge`; the `command:test` check uses the registered `command:test` runner. Each stage is assigned to the worker.
+Retrospective requires `command:test`, `test`, and `harness` in `default` and `fix`, and only `harness` in `docs`. Judge-run checks use the `judge` role (agent `devkit-judge`); the `command:test` check uses the registered `command:test` runner. Each stage is assigned to the worker.
 
 Build the smallest plan for what changes. Remove unrelated stages, select needed optional stages, write completion conditions in prose with IDs, and assign each check a target and completion condition IDs. Give each completion condition a way to verify it: a check run by a verification command, a judge, or a judgment command, or a human gate. Checks are not necessarily mechanical. Verify conditions during requirements definition through judges and human gates. The plan judge assesses the suitability and coverage of verification, and the human reviews it during plan approval; devkit does not enforce a formal assignment of verification to every condition. Preserve task-specific irreversible decisions in the plan; shared decisions and their enforcement and grounds belong in `rules.md`. Use `requirements.md` as the repository's requirements source. Stages changing UI, data, or external communication need behavior checks. Required judge-run checks follow `examples/README.md` for detection tests. If requirements are ambiguous, list unresolved points in the optional `open_questions` string array instead of guessing.
 
@@ -41,6 +41,27 @@ With the default `[approval] plan = "requirements"`, human approval is required 
 
 The approval question includes the original human request, the task passed to `start`, completion conditions with IDs, adopted and omitted stages with deviations identified, required checks per stage, task-specific irreversible items, external operation declarations, and `open_questions`. Present devkit's generated question without replacing it with an agent summary. Follow the installed devkit skill for answers and external operations.
 
-A template stage may opt into `split: true`. Its task plan may supply `units`, each with a unique plan-wide `id`, a `description`, and a prose `scope` naming the files or directories it owns. Units require a split stage assigned to `worker`; without units, work follows the ordinary stage path. Adding or removing `split` is a deviation. The plan judge reports overlapping unit scopes; devkit checks ID uniqueness, not scope overlap. The bundled templates do not use splitting.
+A template stage may opt into `split: true`. Its task plan may supply `units`, each with a unique plan-wide `id`, a `description`, and a prose `scope` naming the files or directories it owns. Units require a split stage assigned to a work role without an agent; without units, work follows the ordinary stage path. Adding or removing `split` is a deviation. The plan judge reports overlapping unit scopes; devkit checks ID uniqueness, not scope overlap. The bundled templates do not use splitting.
 
 Devkit limits outstanding workers with `[parallel] max_workers` (default 3, minimum 1), creates detached worktrees keyed by instruction ID, and merges the fixed unit SHAs before the usual stage judgment. Only work is parallel: gates, loop-edit confirmation, limits, back/replan, and questions remain in one stage round. Stages already completed in this work and absent from a rebuilt plan are not removed-stage deviations and are omitted from the approval question.
+
+## Roles and correction rules
+
+Assign `assignee`, judge-run check `runner`, and unit `role` using role IDs from `[roles.<id>]` in `devkit.toml`. Defaults are `worker` (session work), `unit_worker` (work with agent `devkit-worker`), `judge` (agent `devkit-judge`), `planner` (agent `devkit-planner`), and `human`. Unit `role` defaults to `unit_worker` and requires a work role with an agent. Human roles may be stage assignees; gates are always human. Judge and plan roles are read-only. `[planning] role` selects the planner and `[plan_check] runner` selects the independent plan judge. Agent names must start with `devkit-`.
+
+A work assignee with an agent runs in one devkit-created detached worktree as a single unit, using the same merge and judgment path as split work. A split stage requires a session work assignee, which also handles merge repairs.
+
+Only `transitions.fix` accepts an ordered rule array instead of the current stage ID:
+
+```json
+"fix": [
+  {"when": {"check": "diff", "failures_at_least": 2}, "assignee": "senior_worker"},
+  {"when": {"human_rejected": true}, "assignee": "senior_worker"}
+]
+```
+
+Conditions are combined with AND. `check` matches an aspect with FAIL or NOT ASSESSED in the current round, regardless of runner. `failures_at_least` counts rounds with any required FAIL in this StageRun, including command checks. `human_rejected` matches a rejected stage question. The first match changes the next correction round's assignee; no match returns to the stage's default assignee. Rules never change stage, comparison base, or cumulative diff. Limits take precedence. A limit question can offer `continue:<role>` for roles in the rules; only a human choice restarts the limit window. Undoing rejected loop edits or read-only source edits preserves the preceding assignee without applying rules.
+
+Changing assignees, the fix rule list, or unit roles is a deviation shown with its template and plan values in the approval question. A judge's blocking finding may set `premise_broken: true`; devkit recommends `back` in a human question, and only the human's back answer follows the back/replan path.
+
+Sources outside the repository are read-only: omit `writable` or set it to false. Devkit fixes their documents for each instruction; it does not create editable copies or write changes back. Apply improvements only to writable sources inside the repository, and record improvements to read-only sources as lessons for their maintainers.

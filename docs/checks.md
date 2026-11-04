@@ -93,7 +93,7 @@
 - **確認事項**:
   - 要求: 判定依頼の固定入力である要求の原文と `start` の課題に照らし、完了条件と `open_questions` が原文の要求を漏らさず扱い、要求を追加していないか。
   - ゲート: [ループの雛形](architecture/data.md#ループの雛形-plantemplate)の理由の書き方に従い、理由を示しているか。人への確認の判定は[人への確認対象](architecture/guarantees.md#人への確認対象)に従っているか。
-  - 逸脱: [計画の雛形からの逸脱](architecture/data.md#計画-plan)を確認し、`criteria` と `examples` の選び方の差分を含め、該当する指摘に [`needs-decision`](architecture/data.md#指摘-finding)(人の判断が必要な指摘)を付けているか。
+  - 逸脱: [計画の雛形からの逸脱](architecture/data.md#計画-plan)を確認し、`criteria` と `examples` の選び方、担当、`fix` の規則の一覧、単位の役割の差分を含め、該当する指摘に [`needs-decision`](architecture/data.md#指摘-finding)(人の判断が必要な指摘)を付けているか。
   - 分割: `split` の追加・削除を逸脱として扱っているか。`units` の担当する範囲が重なっていないか。範囲の重なりは機械では検査しない。再計画で完了済みのステージを残りに含めないことは逸脱に数えない。
   - 規模: ステージを減らせないか。
   - 完了条件: [計画](architecture/data.md#計画-plan)に従い、ID 付きの文章と、条件ごとの確認手段の妥当性・網羅性を確かめているか。
@@ -106,12 +106,12 @@
 
 - **確認事項**:
   - 原則と契約: [`assets/principles/harness.md`](../assets/principles/harness.md) の各原則と[モジュールごとの契約](architecture/modules.md#モジュールごとの契約)に従う。
-  - check の必須化: 仕組みの選定は同原則5、[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は[検出試験](architecture/guarantees.md#検出試験)(選んだ基準で期待する判定を出せるかの試験)に従う。
+  - check の必須化: 仕組みの選定は同原則5、[判定者](architecture/data.md#役割-role)(check を担当する `judge` の種類の役割)が担当する観点を必須にする条件は[検出試験](architecture/guarantees.md#検出試験)(選んだ基準で期待する判定を出せるかの試験)に従う。
   - skill: [`description`](https://agentskills.io/specification#description-field)(skill の説明項目)の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`assets/principles/working.md` の原則5](../assets/principles/working.md#5-turn-routine-processing-into-commands-and-call-them-from-procedures)に従う。
   - 判定: [check の結果](architecture/data.md#check-の結果-judgment)に従い、`NOT ASSESSED`(未評価)を返せるか。
   - 原則の内容: 適用条件・要求・例外・blocking の意味を判断できるか。用途別文書に判定の範囲、報告しない事項、適用除外も含まれるか。
   - 問題の捕捉: brief が参照する作業履歴ファイルから、作業全体の判定・指摘(blocking でないものも含む)、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、`FAIL`・`NOT ASSESSED` の経緯、ラウンド数、人の却下・訂正・作り直しの指示、`note` で伝えられた見逃しを確かめ、各問題をどこで捕まえるべきだったかを判断しているか。
-  - 再発防止: 機械の検査、雛形、用途別の判定基準、原則、skill の順(設定 `[lessons] destinations` で変更可能)で反映先を選び、書き込めるソースの規範へ反映しているか。読み取り専用のソースへの改善は教訓に記録して管理者へ引き継いでいるか。反映しない理由があるか。用途別の判定基準を変えたら検出試験の例も更新しているか。規則の「手段: 未実装」と繰り返す違反を、テスト・lint・型・pre-commit・検証コマンドへ移す候補にしているか。
+  - 再発防止: 機械の検査、雛形、用途別の判定基準、原則、skill の順(設定 `[lessons] destinations` で変更可能)で反映先を選び、リポジトリ内の書き込めるソースの規範へ反映しているか。リポジトリ外のソースと読み取り専用のソースへの改善は教訓に記録して管理者へ引き継いでいるか。反映しない理由があるか。用途別の判定基準を変えたら検出試験の例も更新しているか。規則の「手段: 未実装」と繰り返す違反を、テスト・lint・型・pre-commit・検証コマンドへ移す候補にしているか。
   - 規範の働き: どの原則がどの観点・雛形で使われるか、使われない仕組みや負担に見合わない仕組みがないか。その作業で見えた問題・不足・負担を扱い、規範全体の棚卸しは必要が見えたときだけ行っているか。
   - 単純さ: 部品・原則・記録・観点の数と形式に、より単純な対案があるか。比較と blocking の条件は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-choose-mechanisms-based-on-the-failures-they-prevent-and-their-operational-burden)に従う。
   - 新しいセッションによる確認: リポジトリと実行の記録を読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるか。

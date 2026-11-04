@@ -50,7 +50,7 @@ const (
 
 // TargetVersion identifies the target using the field corresponding to Kind.
 // For a tree, Sources hashes the set of source names, document IDs, and content hashes of
-// outside editable copies and fixed product documents, regardless of write capability.
+// fixed outside product documents.
 type TargetVersion struct {
 	Kind      TargetKind `json:"kind"`
 	Tree      string     `json:"tree,omitempty"`
@@ -91,6 +91,7 @@ type Exemption struct {
 
 // Finding is the format of a finding returned by a judge.
 type Finding struct {
+	PremiseBroken      bool        `json:"premise_broken,omitempty"`
 	ID                 string      `json:"id"`
 	Blocking           bool        `json:"blocking"`
 	Kind               FindingKind `json:"kind"`

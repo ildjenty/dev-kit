@@ -8,15 +8,6 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
-type Role string
-
-const (
-	Worker  Role = "worker"
-	Human   Role = "human"
-	Judge   Role = "judge"
-	Planner Role = "planner"
-)
-
 type ConfirmationMode string
 
 const (
@@ -44,7 +35,6 @@ type Lessons struct {
 type Table struct {
 	HumanConfirmation []string                                `toml:"human_confirmation"`
 	CheckResults      map[check.JudgmentValue]plan.Transition `toml:"check_results"`
-	Roles             map[Role]string                         `toml:"roles"`
 	Lessons           Lessons                                 `toml:"lessons"`
 	ConfirmationRules map[string]ConfirmationMode             `toml:"-"`
 }
@@ -54,7 +44,7 @@ type Table struct {
 func MergeTables(base, additions Table) Table {
 	result := Table{
 		HumanConfirmation: slices.Clone(base.HumanConfirmation),
-		CheckResults:      maps.Clone(base.CheckResults), Roles: maps.Clone(base.Roles),
+		CheckResults:      maps.Clone(base.CheckResults),
 		Lessons:           Lessons{Destinations: slices.Clone(base.Lessons.Destinations)},
 		ConfirmationRules: maps.Clone(base.ConfirmationRules),
 	}
@@ -65,10 +55,6 @@ func MergeTables(base, additions Table) Table {
 		result.CheckResults = make(map[check.JudgmentValue]plan.Transition)
 	}
 	maps.Copy(result.CheckResults, additions.CheckResults)
-	if result.Roles == nil {
-		result.Roles = make(map[Role]string)
-	}
-	maps.Copy(result.Roles, additions.Roles)
 	if result.ConfirmationRules == nil {
 		result.ConfirmationRules = make(map[string]ConfirmationMode)
 	}

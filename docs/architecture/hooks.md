@@ -41,17 +41,19 @@ Claude Code ではサブエージェントの終了時に Stop は発火せず�
 
 Claude Code の Agent では `tool_input` の `subagent_type`・`prompt`・`model` を読め、`-p` でも引数に基づく deny が効く。束縛のあるセッションで `subagent_type` が `devkit-` で始まる場合に限り、prompt が[判定結果の受理](guarantees.md#判定結果の受理)の定型でなければ deny する。履歴継承は `[deny]` の既定の `Agent(fork)` で禁止する。
 
-Codex の `spawn_agent` は `tool_name: collaborationspawn_agent` として捕捉でき、`tool_input` には `task_name`・`agent_type`・`fork_turns`・`message` が入る。`fork_turns` は `"all"` と `"none"` で、既定の `"all"` はカスタムの `agent_type` でも親の会話をすべて引き継ぐ。束縛のあるセッションで devkit の判定者・計画者を起動するときは `fork_turns: "none"` を必須とし、それ以外や省略は deny する。`message` は暗号化されて読めないため、起動時の本文は照合しない。
+hook は `subagent_type` の名前から、[規範の固定](guarantees.md#規範の固定)に従って読んだ `devkit.toml` の[役割](data.md#役割-role)を引き、その種類に応じた規則を効かせる。固定の定義名との比較はしない。Claude Code で `judge`・`plan` の種類の役割の agent を起動するとき、その agent の定義の `tools` が `[roles] read_only_tools`(既定 `Read`・`Glob`・`Grep`)の部分集合でなければ deny する。`tools` を書かない定義はすべてのツールを受け継ぐため、部分集合とみなさない。
 
-Claude Code では、束縛のあるセッションで `subagent_type` が `devkit-` で始まる起動について、[規範の固定](guarantees.md#規範の固定)で定める担当定義の `model`・[`effort`](data.md#check-の結果-judgment)(推論量の設定)を実際に変える上書きを deny する。定義と同じ値の明示と、隔離指定(`isolation`)の有無だけでは拒否しない。起動条件は担当定義との照合で制限する。両ホストとも、ここで定める起動の制限をリポジトリ全体の `permissions.deny` には足さない。
+Codex の `spawn_agent` は `tool_name: collaborationspawn_agent` として捕捉でき、`tool_input` には `task_name`・`agent_type`・`fork_turns`・`message` が入る。`fork_turns` は `"all"` と `"none"` で、既定の `"all"` はカスタムの `agent_type` でも親の会話をすべて引き継ぐ。束縛のあるセッションで `judge`・`plan` の種類の役割の agent を起動するときは `fork_turns: "none"` を必須とし、それ以外や省略は deny する。`message` は暗号化されて読めないため、起動時の本文は照合しない。
 
-Codex では、束縛のあるセッションで呼び出し元の `agent_type` が devkit の判定者・計画者である場合、`[deny] judge` に列挙した書き込みを行うツール(`apply_patch`、書き込みのできる MCP ツールなど)を deny する。ファイルの読み取りには exec や node の REPL などを使える。単位の作業者 `devkit-worker` はこの書き込み禁止の対象外であり、判定者・計画者への禁止は維持する。
+Claude Code では、束縛のあるセッションで `subagent_type` が `devkit-` で始まる役割の agent の起動について、[規範の固定](guarantees.md#規範の固定)で定める担当定義の `model`・[`effort`](data.md#check-の結果-judgment)(推論量の設定)を実際に変える上書きを deny する。定義と同じ値の明示と、隔離指定(`isolation`)の有無だけでは拒否しない。起動条件は担当定義との照合で制限する。両ホストとも、ここで定める起動の制限をリポジトリ全体の `permissions.deny` には足さない。
+
+Codex では、束縛のあるセッションで呼び出し元の `agent_type` が `judge`・`plan` の種類の役割の agent である場合、`[deny] judge` に列挙した書き込みを行うツール(`apply_patch`、書き込みのできる MCP ツールなど)を deny する。ファイルの読み取りには exec や node の REPL などを使える。Codex での読み取り専用の保証は列挙した書き込みのツールの禁止に留まり、exec などを通じた書き込みは防げないため、Claude Code の `tools` の照合より弱い。`work` の役割の agent はこの書き込み禁止の対象外であり、`judge`・`plan` の役割への禁止は維持する。
 
 ## SubagentStop
 
 - **入力**: `agent_type`、`agent_id`、`last_assistant_message`、`agent_transcript_path`、取得できる場合はホストから観測した effort または model、発行済みの[指示](data.md#指示-instruction)。
-- **判断**: `agent_type` が devkit の作業者・判定者・計画者の定義名であることを確かめ、[最終メッセージの結果](guarantees.md#判定結果の受理)から指示 ID を取る。束縛があり、発行済みのサブエージェントへの指示と指示 ID・担当名が一致すれば採取する。単位の作業、計画の check と検出試験の指示も対象とし、指示 ID・担当名の不一致なら何もしない。最終メッセージを JSON として解析できない場合は失敗の観測を残す。同じ runner の未受理の指示が複数あり、指示 ID のない不正な最終メッセージをどの指示にも結び付けられない場合も観測を残す。
-- **出力**: 最終メッセージに来歴を添えて結果ファイルとして公開し、[判定結果の受理](guarantees.md#判定結果の受理)に渡す。`devkit-worker` の最終メッセージは `schemas/progress.json` の終了ブロックである。JSON の解析失敗の観測も公開し、`next` が失敗の記録・結果の拒否・再指示と上限での人への問いを処理する。指示に結び付けられない不正な結果は、観測を残して人に問う。
+- **判断**: `agent_type` がいずれかの[役割](data.md#役割-role)の agent であることを確かめて役割の種類を引き、[最終メッセージの結果](guarantees.md#判定結果の受理)から指示 ID を取る。束縛があり、発行済みのサブエージェントへの指示と指示 ID・担当名が一致すれば採取する。単位の作業、計画の check と検出試験の指示も対象とし、指示 ID・担当名の不一致なら何もしない。最終メッセージを JSON として解析できない場合は失敗の観測を残す。同じ runner の未受理の指示が複数あり、指示 ID のない不正な最終メッセージをどの指示にも結び付けられない場合も観測を残す。
+- **出力**: 最終メッセージに来歴を添えて結果ファイルとして公開し、[判定結果の受理](guarantees.md#判定結果の受理)に渡す。`work` の役割の agent の最終メッセージは `schemas/progress.json` の終了ブロックである。JSON の解析失敗の観測も公開し、`next` が失敗の記録・結果の拒否・再指示と上限での人への問いを処理する。指示に結び付けられない不正な結果は、観測を残して人に問う。
 - **書く生成物**: 結果ファイル `results/<指示 ID>-<agent_id>.json`、または JSON の解析失敗の観測である。結果ファイルには検証済みの指示 ID・担当、SubagentStop の観測時刻を添える。effort・model の来歴は [Judgment](data.md#check-の結果-judgment)に従う。
 
 両ホストで `agent_type` は定義の `name` と一致し、`last_assistant_message` から最終メッセージの本文を取得できる。Claude Code の `agent_transcript_path` は `<session>/subagents/agent-<id>.jsonl` で、最初の user メッセージから起動時の prompt を読める。Codex は rollout の JSONL を指すが、起動時の `message` は平文で取り出せない。

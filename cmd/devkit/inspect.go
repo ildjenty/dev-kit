@@ -174,7 +174,7 @@ func viewStructures(ctx context.Context, w *workspace.Workspace, root, tree stri
 		return nil, nil, nil, err
 	}
 	item := settings.KnowledgeSources()["structure"]
-	adapter, err := source.NewFiles(root, item.Path, os.DirFS(root), "", false)
+	adapter, err := source.NewFiles(root, item.Path, os.DirFS(root), "")
 	if err != nil {
 		return nil, nil, nil, err
 	}

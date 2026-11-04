@@ -20,6 +20,7 @@ type AgentDefinition struct {
 	Name   string
 	Model  string
 	Effort string
+	Tools  []string
 }
 
 // Handler processes common host events. Root is the resolved checkout root, and
@@ -111,6 +112,9 @@ func (h Handler) workRoot() string { return filepath.Join(h.runRoot(), "work", h
 func (h Handler) subagentStop(e event.Event, state *ledger.State, now time.Time) error {
 	if !strings.HasPrefix(e.AgentType, "devkit-") || e.AgentID == "" {
 		return nil
+	}
+	if ok, err := h.collectableAgent(state, e.AgentType); err != nil || !ok {
+		return err
 	}
 	var identity struct {
 		InstructionID string `json:"instruction_id"`
@@ -379,4 +383,27 @@ func (h Handler) failedInstruction(e event.Event, state *ledger.State) (string, 
 		}
 	}
 	return id, false, nil
+}
+
+func hookReference(state *ledger.State) string {
+	if round, ok := state.OpenRound(); ok {
+		if round.NormReference != "" {
+			return round.NormReference
+		}
+		return round.StartTarget.Tree
+	}
+	return "HEAD"
+}
+
+func (h Handler) collectableAgent(state *ledger.State, agent string) (bool, error) {
+	if h.ReadConfig == nil {
+		_, ok := (config.Config{}).AgentRole(agent)
+		return ok, nil
+	}
+	settings, err := h.ReadConfig(hookReference(state))
+	if err != nil {
+		return false, err
+	}
+	_, ok := settings.AgentRole(agent)
+	return ok, nil
 }

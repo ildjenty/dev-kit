@@ -2,7 +2,7 @@
 
 ## 責務
 
-brief は、[作業者](../architecture/data.md#計画-plan)(作業を行うロール)への指示と、[判定者](../architecture/data.md#計画-plan)(評価を担うロール)・[計画者](../architecture/data.md#計画-plan)(計画を作るロール)への依頼文を組み立てる。公開する型と操作、他の部品との境界は [brief のモジュール契約](../architecture/modules.md#brief)に従い、計画の型と意味論は [plan](../architecture/modules.md#plan)(計画の意味論を扱う実装)が扱う。
+brief は、[作業者](../architecture/data.md#役割-role)(`work` の種類の役割)への指示と、[判定者](../architecture/data.md#役割-role)(`judge` の種類の役割)・[計画者](../architecture/data.md#役割-role)(`plan` の種類の役割)への依頼文を組み立てる。公開する型と操作、他の部品との境界は [brief のモジュール契約](../architecture/modules.md#brief)に従い、計画の型と意味論は [plan](../architecture/modules.md#plan)(計画の意味論を扱う実装)が扱う。
 
 ## 入力と出力
 
@@ -16,11 +16,11 @@ brief は、[作業者](../architecture/data.md#計画-plan)(作業を行うロ�
 
 リポジトリの事実として[配置ガイド](../architecture/layout.md#利用側のリポジトリ)(置き場所と役割の案内)と「元に戻せないもの」を受け取り、後者の取得元は[規則と強制手段](../architecture/data.md#規則と強制手段-rules)に従う。
 
-requirements と structure は固定した本文、ソース名・文書 ID、存在の有無、編集先を示す。要件が未作成なら作成先を案内する。リポジトリ内の `files` は設定したパスを編集先とし、外部は実行の記録の下の編集用の写しを示す。必須の基準の選び方が0件なら判定を始めず止める。計画者への規則の本文は一度だけ載せ、元に戻せないものは規則の共有する決定への参照と計画の項目に限る。計画者には未決事項を記入するよう指示する。
+requirements と structure は固定した本文、ソース名・文書 ID、存在の有無、編集先を示す。要件が未作成なら作成先を案内する。リポジトリ内の書き込める `files` は設定したパスを編集先とする。リポジトリ外のソースは読み取り専用であり、固定した写しだけを示して編集先は示さない。必須の基準の選び方が0件なら判定を始めず止める。計画者への規則の本文は一度だけ載せ、元に戻せないものは規則の共有する決定への参照と計画の項目に限る。計画者には未決事項を記入するよう指示する。
 
-修正[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)では、指摘と検証の失敗情報を受け取る。入力の構成は[指摘の参照](../architecture/data.md#指摘-finding)、[brief のモジュール契約](../architecture/modules.md#brief)と[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
+修正[ラウンド](../architecture/data.md#ラウンド-round)(作業と判定の往復)では、指摘と検証の失敗情報を受け取る。[修正の担当の規則](../architecture/data.md#修正の担当の規則)で担当が変わったラウンドも、同じ入力をその担当に渡す。入力の構成は[指摘の参照](../architecture/data.md#指摘-finding)、[brief のモジュール契約](../architecture/modules.md#brief)と[作業結果の判定](../architecture/flow.md#作業結果の判定)に従う。
 
-分割した単位の作業依頼では、計画の単位 ID・説明・担当する範囲と、`.devkit/worktrees/<単位の指示 ID>/` に作る作業場所の絶対パスを受け取る。作業者 `devkit-worker` には、そこでだけ編集し、`schemas/progress.json` の終了ブロックを最終メッセージで返すよう指示する。合流がぶつかった場合のセッションの作業者への修正ラウンドには、ぶつかったファイルと単位を載せる。
+分割した単位の作業依頼では、計画の単位 ID・説明・担当する範囲と、`.devkit/worktrees/<単位の指示 ID>/` に作る作業場所の絶対パスを受け取る。単位の役割の agent には、そこでだけ編集し、`schemas/progress.json` の終了ブロックを最終メッセージで返すよう指示する。agent のある `work` の役割がステージの担当になったラウンドも、単位が1つのこの形の依頼にする。合流がぶつかった場合のセッションの作業者への修正ラウンドには、ぶつかったファイルと単位を載せる。
 
 計画依頼の組み立てでは、[作業の開始](../architecture/flow.md#作業の開始)に従って[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)、人の要求の原文、`start` の課題、requirements を受け取り、再提案・再計画では[計画の check と承認ゲート](../architecture/flow.md#計画の-check-と承認ゲート)と[計画のバージョン](../architecture/data.md#計画のバージョン)に従って人の修正指示、check の指摘や残りの実行内容を受け取る。
 
@@ -46,7 +46,7 @@ brief の内容を返し、組み立て・書き出しの責務は [brief のモ
 
 決定の有効条件・適用条件と[一時状態](../architecture/data.md#進捗-progress)(再開まで引き継ぐ状況)の条件は、出典・参照とともにそのまま項目に添えて渡す。[ledger のモジュール契約](../architecture/modules.md#ledger)に従い、条件を評価して入力を除外することはせず、有効かどうかはエージェントと人が判断する。
 
-作業者・判定者・計画者のサブエージェントの起動方法と、[指示 ID](../architecture/data.md#指示-instruction)(依頼を識別する値)から依頼本文のファイルを特定して読む手順は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+役割の agent であるサブエージェントの起動方法と、[指示 ID](../architecture/data.md#指示-instruction)(依頼を識別する値)から依頼本文のファイルを特定して読む手順は[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
 
 停止の判断は [engine](../architecture/modules.md#engine) と [router](../architecture/modules.md#router)(次の行動を選ぶ部品)が担う。
 

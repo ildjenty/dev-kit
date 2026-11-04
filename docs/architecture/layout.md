@@ -22,7 +22,7 @@ dev-kit/
     workspace/           git の操作、単位の worktree、SHA の固定とコミットしないマージ
     config/              渡された TOML の解析と検証
     install/             導入・削除と doctor
-    kit/                 配布物、スキーマ、分類表とロールの既定値の供給
+    kit/                 配布物、スキーマ、分類表と役割の既定値の供給
     view/                HTML の生成
   assets/                配布する固定物の埋め込み元
     embed.go             固定物の埋め込みと公開(package assets)
@@ -52,14 +52,14 @@ dev-kit/
 
 ```text
 <repo>/
-  devkit.toml                互換性の識別、配置、承認、git、分類、上限、並列、教訓、雛形、コマンドの設定。git 管理
+  devkit.toml                互換性の識別、配置、役割、承認、git、分類、上限、並列、教訓、雛形、コマンドの設定。git 管理
   .claude/settings.json      hook の登録、excludedCommands、記録・結果への Edit の deny、Bash(devkit *) の allow の提案。init が項目を足す。git 管理
-  .claude/agents/devkit-*.md 作業者・判定者・計画者のサブエージェント定義。init が書く。git 管理
+  .claude/agents/devkit-*.md 役割の agent のサブエージェント定義。init が既定の3つを書く。git 管理
   .claude/skills/devkit -> ../../.agents/skills/devkit   skill 単位のリンク。git 管理
   .codex/hooks.json          hook の登録。init が項目を足す。git 管理
   .codex/config.toml         init が sandbox の項目を足す。git 管理
   .codex/rules/devkit.rules  devkit を sandbox の外で動かす allow。git 管理
-  .codex/agents/devkit-*.toml 作業者・判定者・計画者のサブエージェント定義。git 管理
+  .codex/agents/devkit-*.toml 役割の agent のサブエージェント定義。git 管理
   .agents/skills/devkit/     skill の正本。Codex の置き場所
   .devkit/                   既定の files ソースと状態。git 管理(run/・worktrees/ を除く)
     principles/              原則と review/test.md などの用途別の判定基準。principles ソース
@@ -82,7 +82,7 @@ dev-kit/
         stops/<ULID>.json    作業単位の継続回数と上限到達時の問い(Stop が書く)
         brief/               next が書く brief、判定依頼、差分ファイル
         snap/<対象のバージョン>/   git の判定対象と固定した規範・成果の写し
-        results/<指示ID>-<agent_id>.json   作業者・判定者・計画者のサブエージェントの結果(SubagentStop が書く)
+        results/<指示ID>-<agent_id>.json   役割の agent の結果(SubagentStop が書く)
         view.html
 ```
 
@@ -92,7 +92,7 @@ UserPromptSubmit は束縛の有無によらず、人の入力ごとにセッシ
 
 入力ファイルの場所と内容の保存は[状態遷移と受理条件](data.md#状態遷移と受理条件)、記録 ID の形式は[記録の範囲](data.md#記録の範囲)、停止の観測の保持条件は[停止の観測](data.md#停止の観測-stopobservation)に従う。
 
-外部のソースは固定した本文と編集用の写しを `.devkit/run/` の実行の記録の下に置く。判定者には読み取り用の写し、作業者には固定した本文と編集先を渡し、原本への反映は[書き込みの流れ](data.md#書き込みの流れ)に従う。
+リポジトリ外のソースは読み取り専用であり、固定した本文の写しを `.devkit/run/` の実行の記録の下に置いて、判定者と作業者に読み取り用として渡す。編集用の写しは作らず、devkit は原本に書き込まない([書き込みの流れ](data.md#書き込みの流れ))。
 
 配置ガイドは各ディレクトリの README に置き、[brief の入力](modules.md#brief)に使う。
 
@@ -100,7 +100,7 @@ UserPromptSubmit は束縛の有無によらず、人の入力ごとにセッシ
 
 単位の作業場所 `.devkit/worktrees/<単位の指示 ID>/` も ignore し、記録を守る deny の対象と重ならないよう `.devkit/run/` の外に置く。devkit がラウンド開始時のスナップショットのコミットから detached で作り、物理的な名前には計画者の単位 ID を使わない。中断中は保持する。中止・作業完了時は変更のない worktree だけを削除し、変更の残るものは保持して場所を知らせる。破棄は人が git で行う。
 
-規範の識別には `norm = true` のソースの全文書と、ソースの外の `devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md を含める。requirements・structure は成果であり、索引と実行の記録とともに規範の識別には含めない。成果の更新は規範の変更による失効を起こさないが、対象の識別では git のツリーに外部の成果の文書のソース名・ID・内容ハッシュの集合を加える。brief は固定した写しのパスを示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
+規範の識別には `norm = true` のソースの全文書と、ソースの外の `devkit.toml`(`[roles]` を含む)・サブエージェント定義・AGENTS.md・CLAUDE.md を含める。requirements・structure は成果であり、索引と実行の記録とともに規範の識別には含めない。成果の更新は規範の変更による失効を起こさないが、対象の識別では git のツリーに外部の成果の文書のソース名・ID・内容ハッシュの集合を加える。brief は固定した写しのパスを示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
 
 `init` は導入するファイルを人が確認したあとコミットする。`--no-commit` を指定した場合は手動でコミットする。HEAD がない場合、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合、`start` は理由と直し方を返して拒否する。
 
@@ -116,6 +116,6 @@ Claude Code が `.claude/skills/<name>` から `.agents/skills/<name>` へのシ
 
 人がチャットで止めるよう頼んだら `devkit pause`、再開を頼んだら `devkit resume` をエージェントが呼ぶ手順も skill に含め、条件は[中断](guarantees.md#中断)を参照する。
 
-作業者・判定者・計画者のサブエージェントは `.claude/agents/devkit-<ロール>.md`・`.codex/agents/devkit-<ロール>.toml` で定義し、`init` が既定の定義を書く。単位の作業者は `devkit-worker` とする。名前には `devkit-` の接頭辞を付け、Codex の組み込み名と重複させない。作業者には brief で作業場所の絶対パスを渡し、そこだけを編集させる。`[deny] judge` の書き込み禁止は判定者・計画者に適用し、`devkit-worker` は対象外とする。
+[役割](data.md#役割-role)の agent は `.claude/agents/<agent>.md`・`.codex/agents/<agent>.toml` で定義する。`init` は既定の役割の agent である `devkit-worker`・`devkit-judge`・`devkit-planner` の定義を書く。リポジトリが役割を足すときは、`devkit.toml` の `[roles.<id>]` とともに両ホストの定義を置く。agent の名前は `devkit-` で始め、Codex の組み込み名と重複させない。hook はこの接頭辞の名前から役割の種類を引いて保護を効かせる。`work` の役割の agent には brief で作業場所の絶対パスを渡し、そこだけを編集させる。`[deny] judge` の書き込み禁止は `judge`・`plan` の役割の agent に適用し、`work` の役割の agent は対象外とする。Claude Code の `judge`・`plan` の役割の agent の定義の `tools` は `[roles] read_only_tools` の範囲に限る。
 
 hook の登録では `init` が kit のバイナリを登録する。設定の正本と追記時の確認、Codex の導入後の信頼手順、インタプリタの指定は[ホスト設定と実行権限](guarantees.md#ホスト設定と実行権限)、束縛のないセッションでの扱いは [hook の共通処理](hooks.md#共通処理)、導入後の確認は [doctor](modules.md#doctor-の確認項目)に従う。

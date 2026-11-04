@@ -31,10 +31,11 @@ const (
 )
 
 type Transitions struct {
-	Fix  string  `json:"fix"`
-	Ask  string  `json:"ask"`
-	Back string  `json:"back"`
-	Done *string `json:"done"`
+	Fix      string    `json:"fix"`
+	FixRules []FixRule `json:"-"`
+	Ask      string    `json:"ask"`
+	Back     string    `json:"back"`
+	Done     *string   `json:"done"`
 }
 
 func (t Transitions) Next(action Transition) (*string, error) {
@@ -86,7 +87,7 @@ func DefaultInputs() []Selection {
 	return []Selection{{Source: "requirements", Select: ""}, {Source: "rules", Select: ""}, {Source: "structure", Select: ""}}
 }
 
-// The caller resolves judge subagent names and judgment command names.
+// The caller resolves judge role IDs and judgment command names.
 type Check struct {
 	Criteria               []Selection `json:"criteria,omitempty"`
 	Examples               *Selection  `json:"examples,omitempty"`
@@ -111,6 +112,7 @@ type Stage struct {
 
 // Unit describes one worker's share of a split stage.
 type Unit struct {
+	Role        string `json:"role,omitempty"`
 	ID          string `json:"id"`
 	Description string `json:"description"`
 	Scope       string `json:"scope"`
@@ -192,7 +194,11 @@ type Plan struct {
 func (p Plan) Stage(id string) (Stage, bool) {
 	for _, stage := range p.Stages {
 		if stage.ID == id {
-			return cloneStage(stage), true
+			stage = cloneStage(stage)
+			if stage.Transitions.FixRules != nil {
+				stage.Transitions.Fix = stage.ID
+			}
+			return stage, true
 		}
 	}
 	return Stage{}, false
@@ -237,6 +243,17 @@ func cloneCheck(c Check) Check {
 }
 
 func cloneStage(s Stage) Stage {
+	s.Transitions.FixRules = slices.Clone(s.Transitions.FixRules)
+	for i, rule := range s.Transitions.FixRules {
+		if rule.When != nil {
+			condition := *rule.When
+			if condition.HumanRejected != nil {
+				value := *condition.HumanRejected
+				condition.HumanRejected = &value
+			}
+			s.Transitions.FixRules[i].When = &condition
+		}
+	}
 	s.Inputs = slices.Clone(s.Inputs)
 	s.Units = slices.Clone(s.Units)
 	s.Checks = slices.Clone(s.Checks)
