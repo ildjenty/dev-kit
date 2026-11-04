@@ -1,73 +1,73 @@
-# 事実確認の原則
+# Fact verification principles
 
-## 1. 確かめていないことを、確かめたように書かない
+## 1. Do not present unverified matters as verified
 
-- **適用場面**: ツール・API・バージョン・動き・原因について述べるとき。
-- **適用除外**: なし。
-- **原則**: 確信のない実装、外部仕様の推測、未確認の前提は、その状態を明記し、確定事項として記述しない。事実は一次情報で確認する。一次情報であるかは、媒体ではなく、主張を直接観測・定義した情報であるか、対象のバージョン・条件に対応するかで判断する。公式文書であることだけで正しさを保証せず、ブログや Q&A サイトであることだけで除外しない。確認結果は、成立条件であるバージョン・環境・入力と参照先を記録して再利用する。記録のない調査結果や記憶だけを、確かな前提として扱わない。一度観測した出来事は発生の事実として扱えるが、それだけで頻度・再現性・原因・一般的な挙動を断定せず、一般化できる範囲を分けて記述する。文書と実際の挙動が異なる場合は、保証された契約と観測された挙動を分けて記録し、観測だけで契約を置き換えない。差異に依存する場合は、その条件とリスクを明示する。判定を出した後には、結論を覆しうる条件を挙げ、不足する証拠に応じて追加確認する。
-- **違反・兆候**:
-  - 確かめていない外部 API の仕様を、確定事項として実装する（存在しないメソッドやパラメータを書く）。
-  - ツールや依存のバージョンを、記憶や手元の環境のバージョンで決める。
-  - 「たぶんこう動く」を確定事項として扱い、それを前提に次の作業をする。
-  - エラーの原因を推測で「修正」し、効果を確かめずに解消したと断定する。
-  - 仮の実装やスタブに印がなく、本物の実装と見分けがつかない。
-  - 一度の観測から、頻度・再現性・原因・一般的な挙動を断定する。
-  - 仕組みが実際に確かめている範囲より広く書く（置き場所だけを制限する検査を「中身を検査している」と書く）。
-  - ほかでそうしていることを、正しいことの根拠にする。
-  - 判定を出したあと、反証を検討していない。
-  - 「前に調べた」という記憶だけを、確かな前提として扱っている。
-  - 公式文書であることだけで採用し、ブログや Q&A サイトであることだけで除外する。
-  - 観測された挙動で、文書が保証する契約を置き換える。
-- **変更前・変更後**: 「このライブラリは自動でリトライする」→「対象のバージョンの文書(URL)では、リトライの保証を確認できなかった。記録した環境と入力では、失敗後にリトライせず例外になった。他の条件での挙動は未確認である」
-- **blocking**: 未確認の前提を、検証用の仮説として明示せず、確定事項として扱う実装が差分に含まれる。
-- **根拠**: 主張に直接対応する一次情報の参照（ファイルと行、URL と該当する文、実験の手順と結果）と、対象のバージョン・環境・入力との対応。文書と実際の挙動が異なる場合は、保証された契約と観測された挙動を分けた記録。
+- **Applicability**: When making statements about tools, APIs, versions, behavior, or causes.
+- **Exemptions**: None.
+- **Principle**: Explicitly mark uncertain implementations, guesses about external specifications, and unverified assumptions as such; do not state them as established facts. Verify facts using primary information. Judge whether information is primary by whether it directly observes or defines the claim and matches the target version and conditions, not by its medium. Official documentation alone does not guarantee correctness, and a blog or Q&A site alone is not grounds for exclusion. Record verification results with the versions, environments, inputs, and references under which they hold, and reuse them. Do not treat unrecorded investigation results or memory alone as reliable assumptions. An event observed once may be treated as a fact of occurrence, but does not alone establish frequency, reproducibility, cause, or general behavior; separately describe the scope that can be generalized. When documentation and actual behavior differ, record guaranteed contracts separately from observed behavior; do not replace contracts with observations alone. If relying on a difference, state the conditions and risks. After issuing a judgment, identify conditions that could overturn it and perform additional checks according to missing evidence.
+- **Violations and signs**:
+  - Implementing unverified external API specifications as established facts (writing nonexistent methods or parameters).
+  - Deciding tool or dependency versions from memory or local environment versions.
+  - Treating "it probably behaves this way" as established and proceeding on that assumption.
+  - "Fixing" a guessed error cause and declaring resolution without checking the effect.
+  - Unmarked provisional implementations or stubs are indistinguishable from real implementations.
+  - Asserting frequency, reproducibility, cause, or general behavior from one observation.
+  - Describing more than a mechanism actually verifies (describing a location-only check as "checking contents").
+  - Using what is done elsewhere as evidence of correctness.
+  - Not considering counterevidence after issuing a judgment.
+  - Treating only a memory of "having investigated before" as a reliable assumption.
+  - Accepting information solely because it is official documentation, and excluding it solely because it is on a blog or Q&A site.
+  - Replacing documented guaranteed contracts with observed behavior.
+- **Before and after**: "This library retries automatically" → "The documentation for the target version (URL) did not establish a retry guarantee. In the recorded environment and input, failure raised an exception without a retry. Behavior under other conditions is unverified."
+- **blocking**: The diff includes implementations that treat unverified assumptions as established facts without explicitly marking them as hypotheses for verification.
+- **Evidence**: References to primary information directly corresponding to claims (files and lines, URLs and relevant sentences, experimental procedures and results), and correspondence to the target versions, environments, and inputs. When documentation and actual behavior differ, records separating guaranteed contracts from observed behavior.
 
-## 2. 観測と推論を分けて書く
+## 2. Write observations and inferences separately
 
-- **適用場面**: 原因や理由を書くとき。
-- **適用除外**: なし。
-- **原則**: 観測したことと、そこから導いた推論を分けて記述する。判断に使う推論には、どの証拠から、どのような理由で結論を導いたかと、残る別の説明を示す。同じ観測から作った資料を、独立した裏付けとして数えない。コードだけでは、その実装意図の根拠にはならない。質問に含まれる仮説は、候補であって結論ではない。
-- **違反・兆候**:
-  - 「ログに出ていないので原因は X だ」を、確かめた事実として書く。
-  - 証拠から結論に至る理由や、残る別の説明が示されていない。
-  - 同じログと、そのログから作ったグラフを、独立した裏付けとして数える。
-- **変更前・変更後**: 「キャッシュが原因でした」→「キャッシュを無効にすると再現しなくなった。キャッシュの利用を変えたため、キャッシュが関係する可能性がある。ただし、無効化によって処理が遅くなり、同時実行が減ったという説明も残る」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 証拠から結論に至る理由と、残る別の説明。同じ観測に由来する資料を独立した裏付けとして数えていないこと。
+- **Applicability**: When writing causes or reasons.
+- **Exemptions**: None.
+- **Principle**: Describe observations separately from inferences drawn from them. For inferences used in decisions, show which evidence led to the conclusion, the reasoning, and remaining alternative explanations. Do not count materials derived from the same observation as independent support. Code alone does not establish its implementation intent. A hypothesis in a question is a candidate, not a conclusion.
+- **Violations and signs**:
+  - Writing "It is not in the logs, so X is the cause" as a verified fact.
+  - Not showing reasoning from evidence to conclusions or remaining alternative explanations.
+  - Counting a log and a graph derived from it as independent support.
+- **Before and after**: "The cache was the cause" → "The problem stopped reproducing when the cache was disabled. Because cache use changed, the cache may be involved. However, disabling it may also have slowed processing and reduced concurrency."
+- **blocking**: None (record as reference information).
+- **Evidence**: Reasoning from evidence to conclusions and remaining alternative explanations. Materials derived from the same observation are not counted as independent support.
 
-## 3. 不具合の原因は、観測で確かめる
+## 3. Verify defect causes through observation
 
-- **適用場面**: 不具合の原因を探すとき。
-- **適用除外**: なし。
-- **原則**: 発生している事象を正確に記述する。エラーメッセージをすべて読み、発生時期と発生条件を記録し、再現手順を作成する。根治・暫定対処・仮説検証のための変更を区別する。「この仮説が正しければ、この結果が観測されるはずである」という形で仮説を立て、同じ結果を予測する別の説明も挙げ、それらを区別できる観測や介入を選ぶ。変更に伴って負荷・実行順序・入力なども変わる場合は、それらの影響を区別する。仮説を繰り返し検証しても原因が分からない場合は、推測をやめて観測を増やす。条件を個別に除き、問題が発生する最小条件を特定する。原因の確定や根治を主張する範囲は、得られた証拠に限定する。同じ前提に基づく修正が同じ検査で失敗し続ける場合は、修正を重ねず、前提を見直す。修正の有効性は、従来の発生条件と修正によって変わる因果関係に照らし、未修正の状態と修正後を区別できる方法で評価する。再現しなかったことだけで解消したと判断せず、確認できない範囲は未確認として残す。
-- **違反・兆候**:
-  - 同じ前提で修正を書き続けている。
-  - 暫定対処や仮説検証のための変更を、根治として扱う。
-  - 仮説と同じ結果を予測する別の説明を、観測や介入で区別していない。
-  - 修正前でも成功する確認方法で、再現しなかったことだけを解消の根拠にする。
-- **変更前・変更後**: 「タイムアウトを延ばしたら直った」→「注文処理のタイムアウトを抑える暫定対処である。影響は注文処理の待機時間である。従来の発生条件で、変更前後の完了状況と待機時間を比較して効果を確認する。原因は未確定であり、根治とは判断しない」
-- **blocking**: 原因や効果が未検証の変更を根治として扱う、または目的・影響範囲・効果の確認方法を示さずに暫定対処や実験を行っている。
-- **根拠**: 再現手順と発生条件、変更の目的・影響範囲・効果の確認方法、採用した説明を別の説明より支持する観測、修正前後を区別できる確認結果と未確認の範囲。
+- **Applicability**: When investigating defect causes.
+- **Exemptions**: None.
+- **Principle**: Describe the occurring phenomenon precisely. Read all error messages, record when and under what conditions it occurs, and create reproduction steps. Distinguish changes for root-cause fixes, temporary responses, and hypothesis testing. Form hypotheses as "If this hypothesis is correct, this result should be observed," list alternative explanations predicting the same result, and choose observations or interventions that distinguish them. If a change also alters load, execution order, inputs, or other factors, distinguish their effects. If repeated hypothesis testing does not reveal the cause, stop guessing and increase observation. Remove conditions individually to identify the minimum conditions that cause the problem. Limit claims of established causes or root-cause fixes to the evidence obtained. If fixes based on the same assumptions keep failing the same checks, revisit assumptions instead of adding more fixes. Evaluate fix effectiveness against previous occurrence conditions and the causal relationships the fix changes, using a method that distinguishes unfixed and fixed states. Do not judge resolution solely from failure to reproduce; leave unverifiable scope marked as unverified.
+- **Violations and signs**:
+  - Continuing to write fixes under the same assumptions.
+  - Treating temporary responses or hypothesis-testing changes as root-cause fixes.
+  - Not distinguishing alternative explanations predicting the same result through observation or intervention.
+  - Using a verification method that would succeed even before the fix, and relying only on non-reproduction as evidence of resolution.
+- **Before and after**: "Increasing the timeout fixed it" → "This is a temporary measure to reduce order-processing timeouts. It affects order-processing wait time. Compare completion status and wait time before and after under previous occurrence conditions to verify its effect. The cause remains unconfirmed, so this is not considered a root-cause fix."
+- **blocking**: A change with unverified cause or effect is treated as a root-cause fix, or temporary responses or experiments are performed without stating their purpose, affected scope, and method for verifying effects.
+- **Evidence**: Reproduction steps and occurrence conditions; the change's purpose, affected scope, and effect-verification method; observations supporting the chosen explanation over alternatives; and verification results distinguishing before and after, with unverified scope.
 
-## 4. 計測値の評価と、差の原因の説明を分ける
+## 4. Separate evaluation of measurements from explanations of the causes of differences
 
-- **適用場面**: 性能・速度・件数などの計測値を評価するとき、または差の原因や改善余地を説明するとき。
-- **適用除外**: なし。
-- **原則**: 計測値の評価と、差の原因の説明を分け、主張に応じて次の問いに答える。
-  1. 差の原因や改善余地を説明できるか: その説明と別の説明を区別できる観測や介入を示す。件数などの差は、入力と結果の対応で説明できればよい。処理時間や処理能力の原因を説明するときは、プロファイルやカウンタに基づいて制限要因（limiter）を特定する。コードを読んだ推測だけでは原因を特定したことにならない。
-  2. 条件の違いは結論を変えないか: 計測条件が、述べる結論の範囲を代表しているかを判断する。本番全体への一般化には本番の代表性を求め、限定した入力や環境での結果は、その範囲を明示する。
-  3. 改善上限のモデルを適用できるか: 上限は前提付きのモデルとして扱い、処理の直列・並列の関係や、変更が他の処理の費用に与える影響を確認する。予測を超える結果は直ちに否定せず、計測の誤りとモデルの前提の誤りを調べる。
-  4. 失敗していないか: 失敗の数と、出力の正しさ（拒否は速い、タイムアウトは遅い）。
-  5. 差を効果と見なせるか: 観測した差が、ばらつきで説明できないかを判断する。
-  6. 意味があるか: 全体の中での割合。
-  7. 実行の記録は主張を裏付けるか: 計測した処理が、性能を述べる対象に当たるかを判断する。
-  測定対象・条件・正しさ・ばらつきが、述べる主張を支えるかを判断する。必要な証拠が不足する範囲は「判定できない」とする。探索の計測ではばらつきや候補を把握し、そこで作った仮説や判断基準は、効果を確認する追加の計測で確かめる。探索結果だけで効果を確定しない。
-- **違反・兆候**:
-  - 探索結果から作った仮説や判断基準を、追加の計測で確かめずに効果を確定する。
-  - 限定した条件の結果を、その範囲を超える性能の主張に使う。
-  - 別の説明と区別できる観測や介入を示さずに、差の原因や改善余地を断定する。
-  - 制限要因を観測せずに、処理時間や処理能力の原因を断定する。
-  - 改善上限のモデルの前提を確かめず、予測を超えた計測値を退ける。
-- **変更前・変更後**: 「速くなりました」→「記録した入力と環境では、出力の正しさを確認し、ばらつきを考慮しても処理時間が短くなった。探索で得た仮説と判断基準は、追加の計測で確認した。本番全体への適用と、差の原因は未確認である」
-- **blocking**: 測定対象・条件・正しさ・ばらつきが主張を裏付けていない、差の原因や改善余地の説明を別の説明と区別できる観測や介入が示されていない、または処理時間や処理能力の原因の説明に必要な制限要因の観測がない。
-- **根拠**: 主張に対応する問いへの答えと、測定対象・条件・正しさ・ばらつきの記録。差の原因や改善余地を説明する場合は別の説明と区別できる観測や介入、処理時間や処理能力の原因を説明する場合は制限要因の観測、改善上限を用いる場合はモデルを適用できる理由。探索の計測と効果を確認する計測の区別。
+- **Applicability**: When evaluating measurements such as performance, speed, or counts, or explaining causes of differences or potential for improvement.
+- **Exemptions**: None.
+- **Principle**: Separate evaluation of measurements from explanations of the causes of differences, and answer the following questions according to the claim.
+  1. Can the cause of the difference or potential for improvement be explained? Show observations or interventions that distinguish that explanation from alternatives. Differences in counts and similar quantities may be explained by correspondence between inputs and results. When explaining processing time or throughput, identify limiting factors (limiters) from profiles or counters. Guesses from reading code alone do not establish causes.
+  2. Could different conditions change the conclusion? Judge whether measurement conditions represent the scope of the stated conclusion. Generalization to all of production requires production representativeness; state the limited scope of results from restricted inputs or environments.
+  3. Can an upper-bound model of improvement be applied? Treat the bound as a model with assumptions, and check serial and parallel relationships among processing and the effects of changes on the costs of other processing. Do not immediately reject results exceeding predictions; investigate measurement errors and errors in model assumptions.
+  4. Is processing failing? Check failure counts and output correctness (rejection is fast; timeouts are slow).
+  5. Can the difference be considered an effect? Judge whether variability can explain the observed difference.
+  6. Is it meaningful? Its proportion within the whole.
+  7. Do execution records support the claim? Judge whether the measured processing is the target whose performance is being described.
+  Judge whether the measured target, conditions, correctness, and variability support the claim. Mark scope lacking necessary evidence as "cannot determine." Use exploratory measurements to understand variability and candidates, then verify hypotheses and judgment criteria developed there through additional measurements confirming effects. Do not establish effects from exploratory results alone.
+- **Violations and signs**:
+  - Establishing effects from hypotheses or judgment criteria developed from exploratory results without additional measurements.
+  - Using results under limited conditions for performance claims beyond that scope.
+  - Asserting causes of differences or potential for improvement without observations or interventions distinguishing alternative explanations.
+  - Asserting causes of processing time or throughput without observing limiting factors.
+  - Dismissing measurements exceeding predictions without checking assumptions of the improvement upper-bound model.
+- **Before and after**: "It became faster" → "For the recorded inputs and environment, output correctness was verified and processing time decreased even after accounting for variability. Hypotheses and judgment criteria from exploration were confirmed through additional measurements. Applicability to all of production and the cause of the difference remain unverified."
+- **blocking**: The measured target, conditions, correctness, or variability do not support the claim; explanations of causes of differences or potential for improvement lack observations or interventions distinguishing alternatives; or observations of limiting factors necessary to explain processing time or throughput are missing.
+- **Evidence**: Answers to the questions relevant to the claim and records of measured targets, conditions, correctness, and variability. For explanations of causes of differences or potential for improvement, observations or interventions distinguishing alternatives; for explanations of processing time or throughput, observations of limiting factors; when using an improvement upper bound, reasons the model applies. A distinction between exploratory measurements and measurements confirming effects.

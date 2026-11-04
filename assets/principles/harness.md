@@ -1,63 +1,63 @@
-# ループの仕組みの原則
+# Principles for the loop mechanism
 
-## 1. 作成者の説明に依存せず、対象を合意条件と照合する
+## 1. Compare the target against agreed conditions independently of its author's explanation
 
-- **適用場面**: check を実行するとき。計画のレビューゲートで判定するとき。brief で委任した作業を受け入れるとき。
-- **適用除外**: 過去の独立した判定について、対象のバージョン・合意条件・観点と規範のバージョン・確認範囲・環境・入力が今回と一致し、判定を覆す新たな証拠がないと確認できるときは、一致した範囲の再照合だけを省略できる。一致を確認した項目と、再利用する判定記録への参照を成果物に示す。
-- **原則**: 作成者の推論や自己評価を引き継がず、対象の実際の内容を、brief やループ計画で合意した目的・完了条件・制約と独立に照合する。作成者の説明は検証すべき仮説として扱う。必要な判断基準を確認できない場合は `NOT ASSESSED` とする。
-- **違反・兆候**:
-  - 作成者の説明を対象と合意条件に照らして確かめず、判定の根拠にしている。
-  - 必要な判断基準を確認できないまま `PASS` や `FAIL` を返している。
-- **変更前・変更後**: 「作成者の説明に納得して判定した」→「対象の内容を観測し、brief やループ計画の合意条件との対応を確かめて判定した」
-- **blocking**: 判定が、作成者の未検証の説明に依存している。
-- **根拠**: 対象から得た観測結果と、合意済みの目的・完了条件・制約との対応。
+- **Applicability**: When running a check. When judging at a plan review gate. When accepting work delegated through a brief.
+- **Exemptions**: For a previous independent judgment, if the target version, agreed conditions, perspective and norm versions, verification scope, environment, and input can be confirmed to match the current case, and there is no new evidence overturning the judgment, omit only re-comparison within the matching scope. Show in the artifact the items confirmed to match and a reference to the reused judgment record.
+- **Principle**: Independently compare the target's actual contents against the purpose, completion criteria, and constraints agreed in the brief or loop plan, without adopting the author's reasoning or self-assessment. Treat the author's explanation as a hypothesis to verify. Use `NOT ASSESSED` if necessary judgment criteria cannot be confirmed.
+- **Violations and signs**:
+  - Using the author's explanation as the basis for judgment without checking it against the target and agreed conditions.
+  - Returning `PASS` or `FAIL` without being able to confirm necessary judgment criteria.
+- **Before and after**: "Judged after being convinced by the author's explanation" → "Observed the target's contents, checked how they correspond to the agreed conditions in the brief or loop plan, and judged."
+- **blocking**: The judgment depends on the author's unverified explanation.
+- **Evidence**: How observations from the target correspond to the agreed purpose, completion criteria, and constraints.
 
-## 2. 必須の観点の検出能力を例で確かめる
+## 2. Verify required perspectives' detection capability with examples
 
-- **適用場面**: 観点ファイルを追加・変更するとき。判定者が担当する check を必須として採用するとき。
-- **適用除外**: 検出試験の適用条件は `checks/README.md#detection-tests` に従う。
-- **原則**: 検出試験が必要な観点は、仕込んだ違反例と区別すべき適合例・許容例を試し、期待判定と実際の判定が一致することを確かめる。判定者には例の本文だけを渡し、種別と期待判定は渡さない。期待判定との照合は devkit が行う。この照合が確かめるのは判定値の一致であり、狙った理由で違反を検出したことまでは保証しない。指摘と根拠を記録し、試験した条件を超えて検出能力を主張しない。観点ファイル、参照する原則、`rules.md` の内容を変えた場合の再試験と合格の識別も `checks/README.md#detection-tests` に従う。各原則の適用除外に該当し、外した理由を成果物に示した対象は、その原則の違反として扱わない。製品のテスト自体の検証は `principles/testing.md` の原則4に従う。
-- **違反・兆候**:
-  - 必要な検出試験の合格がないまま、判定を受理している。
-  - check が対象を変えても常に `PASS` を返す。
-  - 適用除外の理由を示した変更も、理由のない違反例と同じ扱いで止めている。
-  - 判定値の一致だけを根拠に、狙った理由で検出したことも保証されたと述べている。
-- **変更前・変更後**: 「違反例で `FAIL` が返ったので、あらゆる違反を検出できるとした」→「違反例・適合例・許容例の判定値が期待と一致した条件と、指摘と根拠を記録し、確認した範囲を示した」
-- **blocking**: 適用条件に従う検出試験の合格がない、または適合例・許容例を、違反例との判断上の違いを無視して落とす。
-- **根拠**: 検出試験の適用条件、実行記録と期待判定との照合結果、各例の指摘と根拠、確認できた範囲。
+- **Applicability**: When adding or changing perspective files. When adopting checks performed by an evaluator as required checks.
+- **Exemptions**: Follow `checks/README.md#detection-tests` for detection test applicability conditions.
+- **Principle**: For perspectives requiring detection tests, try seeded violation examples and compliant and permitted examples that must be distinguished from them, and verify that actual judgments match expected judgments. Give the evaluator only example bodies, not their kinds or expected judgments. devkit compares the results with expected judgments. This comparison verifies agreement of judgment values; it does not guarantee that violations were detected for the intended reasons. Record findings and evidence, and do not claim detection capability beyond the tested conditions. Also follow `checks/README.md#detection-tests` for retesting and identifying passing results after changing perspective files, referenced principles, or `rules.md`. Do not treat a target as violating a principle when it qualifies for that principle's exemption and the artifact shows why the requirement was waived. Follow principle 4 of `principles/testing.md` for verification of product tests themselves.
+- **Violations and signs**:
+  - Accepting judgments without passing required detection tests.
+  - A check always returns `PASS` even when the target changes.
+  - Blocking changes with documented exemption reasons in the same way as violation examples without reasons.
+  - Claiming that detection for the intended reason is guaranteed based only on agreement of judgment values.
+- **Before and after**: "A violation example returned `FAIL`, so claimed all violations could be detected" → "Recorded the conditions under which judgment values for violation, compliant, and permitted examples matched expectations, along with findings and evidence, and stated the verified scope."
+- **blocking**: No passing detection test under the applicability conditions, or compliant or permitted examples are failed while ignoring the distinctions relevant to judgment between them and violation examples.
+- **Evidence**: Detection test applicability conditions, execution records and comparison results against expected judgments, findings and evidence for each example, and the verified scope.
 
-## 3. 前提が崩れたときに戻るステージを決める
+## 3. Define which stage to return to when assumptions fail
 
-- **適用場面**: ループ計画を作成するとき。router が「前のステージに戻る」と判断するとき。複数ステージを組み立てるとき。
-- **適用除外**: 変えるものだけを扱う最小の計画で、他のステージの出力を前提とせず、戻り先を定めるためだけにステージを足すと不要な計画になるとき。
-- **原則**: 複数ステージの計画では、各ステージの前提がどのステージの出力かを示し、前提が崩れたときの戻り先を定める。`principles/working.md` の原則4に従い、失敗が続いたら原因と共有する前提を調べる。上流の出力を前提にできないと確認した場合は、その出力を決めたステージに戻り、依存する後続判断を見直す。前提を維持でき、現在のステージの誤りと確認できた場合は、そのステージで修正する。変更困難な決定の特定と確定のタイミングは、`principles/designing.md` の原則1に従う。
-- **違反・兆候**:
-  - 前提が崩れたと確認しても、その前提を決めたステージを特定せず、下流の修正で対処している。
-  - 上流の前提を維持できると確認したのに、現在のステージの誤りを理由に上流へ戻っている。
-- **変更前・変更後**: 「実装が前提とする構造の誤りを、実装の修正で補い続けた」→「構造の出力を前提にできないと確認し、その出力を決めたステージに戻って、依存する後続判断を見直した」
-- **blocking**: 前提が崩れているのに、同じ前提のまま同じステージで修正を重ねている。
-- **根拠**: 前提を維持できるかを確かめた観測結果、崩れた前提と依存元の出力・ステージとの対応、戻り先と見直す後続判断を選んだ理由。現在のステージで修正する場合は、前提を維持でき、そのステージの誤りであると判断した理由。
+- **Applicability**: When creating a loop plan. When the router decides to "return to a previous stage." When assembling multiple stages.
+- **Exemptions**: When a minimal plan covers only what changes, does not depend on outputs from other stages, and adding a stage solely to define a return destination would create unnecessary planning.
+- **Principle**: In multistage plans, show which stage's output provides each stage's assumptions, and define where to return when an assumption fails. Follow principle 4 of `principles/working.md` to investigate causes and shared assumptions when failures continue. If an upstream output is confirmed unusable as an assumption, return to the stage that decided it and revisit dependent downstream decisions. If the assumption can be maintained and the error is confirmed to be in the current stage, fix it there. Follow principle 1 of `principles/designing.md` for identifying hard-to-change decisions and when to finalize them.
+- **Violations and signs**:
+  - Even after confirming an assumption has failed, continuing downstream fixes without identifying the stage that decided the assumption.
+  - Returning upstream because of a current-stage error despite confirming that upstream assumptions can be maintained.
+- **Before and after**: "Kept compensating for errors in the structure assumed by implementation through implementation fixes" → "Confirmed that the structure output could not be used as an assumption, returned to the stage that decided that output, and revisited dependent downstream decisions."
+- **blocking**: Repeatedly fixing the same stage under the same assumption even though that assumption has failed.
+- **Evidence**: Observations checking whether assumptions can be maintained, how failed assumptions correspond to the outputs and stages they depend on, and reasons for choosing the return destination and downstream decisions to revisit. When fixing in the current stage, why its assumptions can be maintained and the error belongs to that stage.
 
-## 4. 規則違反が再発したら、必要な保証に合う強制手段を選ぶ
+## 4. When rule violations recur, choose enforcement suited to the required guarantees
 
-- **適用場面**: 振り返り、指摘や失敗の反映先を決めるとき、規則と強制手段を見直すとき。
-- **適用除外**: 損失が進行中で、原因確認や強制手段の比較を待つと被害が広がるときは、既知の封じ込め手順の実行に限り、原因確認・比較を後回しにできる。恒久対策の選定には適用しない。成果物には、進行中の損失と待つと悪化する理由を示す観測結果、実行する封じ込め手順と完了条件、省略した原因確認・比較を再開する条件と引き継ぎ先を示す。
-- **原則**: 振り返りでは、`rules.md` の強制が未実装の項目と繰り返し見つかった違反を、機械の検査（テスト・lint・型・pre-commit・検証コマンド）に移す候補にする。規則違反が再発したら、規則の妥当性と違反の原因を確かめる。必要な性質を検出できるか、必要な経路で実行されるか、損失が起きる前に止められるかを分けて、強制手段を選ぶ。文章で指示しても防げなかった違反を、文章の追記だけで繰り返し対処しない。問題をどこで捕まえるべきだったかを定め、反映先は既定で機械の検査、雛形、観点、原則、skill の順に検討する。優先順は `devkit.toml` の `[lessons] destinations` に従う。反映はリポジトリの規範に行い、観点を変えたら検出試験の例も更新する。反映しない場合は理由を示す。
-- **違反・兆候**:
-  - 同じ違反が再び記録されているのに、文章の追記だけで済ませている。
-  - 強制手段の名前だけで強化したと判断し、検出範囲・実行経路・止められる時点を確かめていない。
-- **変更前・変更後**: 「同じ違反が再発したので、注意書きを足した」→「規則と原因を確かめ、検出できる条件、必ず検査を通る経路、損失前に止める時点を明らかにして強制手段を選んだ」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 規則の妥当性と違反原因の確認結果、変更前後の検出範囲・実行経路・防止できる時点、それによって保証がどう変わるか。
+- **Applicability**: During retrospectives, when deciding where to incorporate findings or failures, or when reviewing rules and enforcement mechanisms.
+- **Exemptions**: When loss is ongoing and waiting to confirm causes or compare enforcement mechanisms would increase damage, defer cause confirmation and comparison only for executing known containment procedures. This does not apply to choosing permanent measures. Show in the artifact observations establishing the ongoing loss and why waiting would worsen it, containment procedures and completion criteria, conditions for resuming omitted cause confirmation and comparison, and who receives the handoff.
+- **Principle**: In retrospectives, consider moving items in `rules.md` whose enforcement is not implemented and repeatedly found violations into machine checks (tests, lint, types, pre-commit, or validation commands). When rule violations recur, verify the rule's validity and the causes of violation. Choose enforcement by separately considering whether it detects the necessary property, runs on the required paths, and can stop processing before loss occurs. Do not repeatedly address violations that written instructions failed to prevent solely by adding more text. Define where the problem should have been caught; by default, consider incorporating lessons into machine checks, templates, perspectives, principles, and skills, in that order. Follow `[lessons] destinations` in `devkit.toml` for priority. Incorporate lessons into the repository's norms, and update detection test examples when changing a perspective. If not incorporating a lesson, state why.
+- **Violations and signs**:
+  - Addressing a violation only by adding text even though the same violation has been recorded again.
+  - Assuming enforcement is stronger from its name alone without checking detection scope, execution paths, or when it can stop processing.
+- **Before and after**: "The same violation recurred, so added a warning" → "Checked the rule and cause, identified conditions that can be detected, paths that must pass through checks, and the point where processing can stop before loss, then chose enforcement."
+- **blocking**: None (record as reference information).
+- **Evidence**: Verification results for the rule's validity and causes of violation, detection scope, execution paths, and prevention timing before and after the change, and how the guarantees change as a result.
 
-## 5. 防ぐ失敗と運用負担から仕組みを選ぶ
+## 5. Choose mechanisms based on the failures they prevent and their operational burden
 
-- **適用場面**: check・hook・手順の追加、必須化、適用範囲の拡大、整理・削減を決めるとき。
-- **適用除外**: 外部契約で手段と適用範囲が指定され、比較の結果によって変更できず、比較作業が義務の履行を遅らせるだけになるとき。
-- **原則**: 防ぎたい失敗の影響と再発可能性を、実行・保守・誤検出への対応負担と比べ、仕組みと適用範囲を選ぶ。再発時も、規則の妥当性と原因を確認し、既存手段の修正・代替・削除を含めて比較する。強制手段は、検出範囲・実行経路・防止できる時点から選び、必要な保証を保てる代案と負担を比べる。
-- **違反・兆候**:
-  - 違反を検出できたことや再発回数だけを根拠に、全作業への必須化を決めている。
-  - 必要な保証を保てる、負担の小さい代案と比較していない。
-- **変更前・変更後**: 「役立った check を全変更で必須にした」→「失敗の影響と運用負担を比べ、影響の大きい変更では必須にし、軽微な変更では既存の検証で必要な保証を満たす範囲に限定した」
-- **blocking**: 必要な保証を保ち、負担を減らせる具体的な代案があるのに、より負担の大きい必須手段を選ぶ理由がない。
-- **根拠**: 防ぐ失敗の影響と再発可能性、各手段が保つ保証と残すリスク、実行・保守・誤検出対応の負担、採用範囲を選んだ理由。
+- **Applicability**: When deciding to add checks, hooks, or procedures, make them required, expand their applicability, or organize and reduce them.
+- **Exemptions**: When an external contract specifies the mechanism and scope, comparison cannot change them, and comparison would only delay fulfilling the obligation.
+- **Principle**: Choose mechanisms and scope by comparing the impact and recurrence likelihood of failures to prevent against the burden of execution, maintenance, and handling false positives. On recurrence too, verify the rule's validity and causes, and compare options including correcting, replacing, or removing existing mechanisms. Choose enforcement from detection scope, execution paths, and prevention timing, and compare the burdens of alternatives that preserve the required guarantees.
+- **Violations and signs**:
+  - Making a mechanism required for all work based only on having detected a violation or on recurrence count.
+  - Not comparing lower-burden alternatives that preserve the required guarantees.
+- **Before and after**: "Made a useful check required for all changes" → "Compared failure impact and operational burden, required it for high-impact changes, and limited its scope for minor changes to where existing verification meets the required guarantees."
+- **blocking**: A concrete alternative preserves the required guarantees and reduces burden, but there is no reason for choosing a more burdensome required mechanism.
+- **Evidence**: Impact and recurrence likelihood of failures to prevent, guarantees preserved and risks left by each mechanism, execution, maintenance, and false-positive handling burdens, and reasons for the chosen scope.

@@ -95,13 +95,13 @@ brief が示す規範のパスは、上記のスナップショットを作業�
 
 適用除外の主張と根拠がある場合は、それによって対象から外れる要求に限って違反としない。判定は、`FAIL`、`NOT ASSESSED`、`PASS` の優先順で集約する。
 
-ラウンドの判定依頼には、そのラウンドの[終了ブロック](data.md#進捗-progress)(作業者の報告)を含める。作成者の説明は [Judgment](data.md#check-の結果-judgment)(判定者の結果)の代わりにならず、その扱いは [`assets/principles/harness.md` の原則1](../../assets/principles/harness.md#1-作成者の説明に依存せず対象を合意条件と照合する)に従う。
+ラウンドの判定依頼には、そのラウンドの[終了ブロック](data.md#進捗-progress)(作業者の報告)を含める。作成者の説明は [Judgment](data.md#check-の結果-judgment)(判定者の結果)の代わりにならず、その扱いは [`assets/principles/harness.md` の原則1](../../assets/principles/harness.md#1-compare-the-target-against-agreed-conditions-independently-of-its-authors-explanation)に従う。
 
 判定依頼には、そのステージ実行の最初のラウンド開始時の比較元の展開先、変更ファイル一覧、その比較元から返却後への累積差分ファイルのパス、指示発行時点の作業履歴ファイルを渡す。修正ラウンドでも比較元を変えず、不合格のラウンドで行った変更を含める。規範は各ラウンドの開始時に固定する。パッチは devkit が git で生成し、`brief/` 内に保存する。短い場合だけ本文にも載せる。
 
 計画の判定依頼には、作業に記録した要求の原文と `start` の課題を固定入力として渡す。完了条件と `open_questions` が原文の要求を漏らさず扱い、要求を追加していないかを観点 `plan` で確かめる。
 
-観点「差分」の判定依頼には、有効な[承認](data.md#回答承認-answer--approval)・委任(判断・操作を任せた範囲)の一覧を含め、判定者が対象と範囲を照合できるようにする。委任の判断基準は [`assets/principles/working.md` の原則6](../../assets/principles/working.md#6-合意と委任の範囲内で実行上の判断を進め必要な承認を求める)・[原則7](../../assets/principles/working.md#7-頼まれていない変更をしない)に従う。
+観点「差分」の判定依頼には、有効な[承認](data.md#回答承認-answer--approval)・委任(判断・操作を任せた範囲)の一覧を含め、判定者が対象と範囲を照合できるようにする。委任の判断基準は [`assets/principles/working.md` の原則6](../../assets/principles/working.md#6-proceed-with-execution-decisions-within-agreement-and-delegation-and-seek-necessary-approval)・[原則7](../../assets/principles/working.md#7-do-not-make-unrequested-changes)に従う。
 
 ### 検出試験
 

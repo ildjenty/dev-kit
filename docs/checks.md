@@ -19,7 +19,7 @@
 
 ## 元に戻せないもの
 
-- **確認事項**: 元に戻せないもの(変更困難な決定)の一覧に漏れがないか。判断と確定の時期は [`assets/principles/designing.md` の原則1](../assets/principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する)に従う。
+- **確認事項**: 元に戻せないもの(変更困難な決定)の一覧に漏れがないか。判断と確定の時期は [`assets/principles/designing.md` の原則1](../assets/principles/designing.md#1-identify-decisions-that-are-hard-to-change-early-and-finalize-them-after-obtaining-the-evidence-needed)に従う。
 - **blocking**: 一覧に漏れがある、または同原則1の blocking 条件に該当する。
 
 ## 構造
@@ -27,9 +27,9 @@
 - **確認事項**:
   - 配置: 各配置を責務に基づいて正当化できるか。
   - 原則との照合: [`assets/principles/designing.md`](../assets/principles/designing.md)、[`assets/principles/structure.md`](../assets/principles/structure.md)、[`assets/principles/data.md`](../assets/principles/data.md) の各原則の違反・兆候に該当するか。
-  - 単純さ: 対案との比較は [`assets/principles/structure.md` の原則7](../assets/principles/structure.md#7-たどるレイヤーと覚える状態を減らす)に従う。
-  - 境界: 外部入力の検証は [`assets/principles/structure.md` の原則2](../assets/principles/structure.md#2-成立条件が保たれる検証は繰り返さない)、更新時の整合性は [`assets/principles/data.md` の原則5](../assets/principles/data.md#5-データの所有と生存期間を定め不変条件を守る境界を決める)に従う。
-  - 流儀: 構造の揃え方は [`assets/principles/designing.md` の原則7](../assets/principles/designing.md#7-既存の流儀に揃える)に従う。
+  - 単純さ: 対案との比較は [`assets/principles/structure.md` の原則7](../assets/principles/structure.md#7-reduce-layers-to-traverse-and-state-to-remember)に従う。
+  - 境界: 外部入力の検証は [`assets/principles/structure.md` の原則2](../assets/principles/structure.md#2-do-not-repeat-validation-while-its-validity-conditions-remain-true)、更新時の整合性は [`assets/principles/data.md` の原則5](../assets/principles/data.md#5-define-data-ownership-and-lifetime-and-the-boundaries-that-protect-invariants)に従う。
+  - 流儀: 構造の揃え方は [`assets/principles/designing.md` の原則7](../assets/principles/designing.md#7-follow-existing-conventions)に従う。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## 整合
@@ -48,7 +48,7 @@
 
 ## 契約
 
-- **確認事項**: 状態と値の受け入れは [`assets/principles/data.md` の原則3](../assets/principles/data.md#3-不正な状態や値の受け入れを型と検証で防ぐ)、失敗の分類と公開応答は [`assets/principles/engineering.md` の原則1](../assets/principles/engineering.md#1-失敗を隠さない)に従う。
+- **確認事項**: 状態と値の受け入れは [`assets/principles/data.md` の原則3](../assets/principles/data.md#3-prevent-invalid-states-and-values-with-types-and-validation)、失敗の分類と公開応答は [`assets/principles/engineering.md` の原則1](../assets/principles/engineering.md#1-do-not-hide-failures)に従う。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## 手順
@@ -61,9 +61,9 @@
 - **確認事項**:
   - コード: 失敗と変更の影響は [`assets/principles/engineering.md`](../assets/principles/engineering.md) の原則1・5に従う。
   - 承認・委任: 判断と操作の範囲は [`assets/principles/working.md`](../assets/principles/working.md) の原則6・7に従い、判定依頼に含まれる有効な承認・委任の一覧と[対象・範囲を照合する](architecture/guarantees.md#判定結果の受理)。
-  - 流儀: 差分の揃え方は [`assets/principles/designing.md` の原則7](../assets/principles/designing.md#7-既存の流儀に揃える)に従う。
+  - 流儀: 差分の揃え方は [`assets/principles/designing.md` の原則7](../assets/principles/designing.md#7-follow-existing-conventions)に従う。
   - PR 本文: [form](architecture/modules.md#form)(形式と描画を扱う部品)の契約と[文章と記録の規則](rules.md#文章と記録)に従う。
-  - 報告: 判断に必要な記載は [`assets/principles/writing.md` の原則1](../assets/principles/writing.md#1-結論と人の判断に必要なことを先に書く)、検証の主張は [`assets/principles/verification.md` の原則1](../assets/principles/verification.md#1-確かめていないことを確かめたように書かない)に従う。PR 本文にも両原則を適用する。
+  - 報告: 判断に必要な記載は [`assets/principles/writing.md` の原則1](../assets/principles/writing.md#1-put-conclusions-and-information-needed-for-human-decisions-first)、検証の主張は [`assets/principles/verification.md` の原則1](../assets/principles/verification.md#1-do-not-present-unverified-matters-as-verified)に従う。PR 本文にも両原則を適用する。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
 ## テスト
@@ -82,12 +82,12 @@
   - 共通: 起動、操作、コンソールエラー、証拠の取得、後片付けを確認する。
   - データの変更: 保存した内容と読み出した結果が仕様どおりか。
   - 外部との通信の変更: 送受信の内容と失敗時の扱いが仕様どおりか。
-  - 画面を変える場合: [画面の規則](rules.md#画面)に従う。描画結果と操作の確認は [`assets/principles/ui.md` の原則9](../assets/principles/ui.md#9-描画結果と操作を確認する)に従い、長い名前、0件、大量のデータ、多言語など、問題が起きやすいデータも使う。
+  - 画面を変える場合: [画面の規則](rules.md#画面)に従う。描画結果と操作の確認は [`assets/principles/ui.md` の原則9](../assets/principles/ui.md#9-check-rendered-results-and-interactions)に従い、長い名前、0件、大量のデータ、多言語など、問題が起きやすいデータも使う。
 - **blocking**: 保存した内容や読み出した結果、送受信の内容、通信の失敗時の扱いが仕様と異なる。画面を変える場合は、同原則9の blocking 条件に該当する、または画面の規則に違反する場合も blocking とする。未確認の扱いは同原則9に従う。
 
 ## 終了時の状態
 
-- **確認事項**: 判定依頼に含まれるその[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から結果に対する判断までの往復)の[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定形式で返す記録)を、[計画に記載された完了条件](architecture/data.md#計画-plan)と [`assets/principles/context.md` の原則5](../assets/principles/context.md#5-完了条件を満たして終え中断時は安全に再開できる状態を残す)の中断時の引き継ぎ要件に照らして確認する。必須 check の集約と設定に応じた完了時のコミットの確認は、[完了条件](architecture/guarantees.md#完了条件)に従う `devkit` の完了の確定処理に委ねる。
+- **確認事項**: 判定依頼に含まれるその[ラウンド](architecture/data.md#ラウンド-round)(作業の指示から結果に対する判断までの往復)の[終了ブロック](architecture/data.md#進捗-progress)(作業の結果を固定形式で返す記録)を、[計画に記載された完了条件](architecture/data.md#計画-plan)と [`assets/principles/context.md` の原則5](../assets/principles/context.md#5-meet-completion-criteria-before-finishing-and-leave-interrupted-work-safe-to-resume)の中断時の引き継ぎ要件に照らして確認する。必須 check の集約と設定に応じた完了時のコミットの確認は、[完了条件](architecture/guarantees.md#完了条件)に従う `devkit` の完了の確定処理に委ねる。
 - **blocking**: 同原則5の blocking 条件に従う。必須の確認が残る場合の判定も同原則5に従う。
 
 ## 計画
@@ -109,13 +109,13 @@
 - **確認事項**:
   - 原則と契約: [`assets/principles/harness.md`](../assets/principles/harness.md) の各原則と[モジュールごとの契約](architecture/modules.md#モジュールごとの契約)に従う。
   - check の必須化: 仕組みの選定は同原則5、[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は[検出試験](architecture/guarantees.md#検出試験)(観点ファイルが期待する判定を出せるかの試験)に従う。
-  - skill: [`description`](https://agentskills.io/specification#description-field)(skill の説明項目)の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`assets/principles/working.md` の原則5](../assets/principles/working.md#5-定型処理はコマンドにし手順はそれを呼ぶ)に従う。
+  - skill: [`description`](https://agentskills.io/specification#description-field)(skill の説明項目)の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`assets/principles/working.md` の原則5](../assets/principles/working.md#5-turn-routine-processing-into-commands-and-call-them-from-procedures)に従う。
   - 判定: [check の結果](architecture/data.md#check-の結果-judgment)に従い、`NOT ASSESSED`(未評価)を返せるか。
   - 原則の内容: 適用条件・要求・例外・blocking の意味を判断できるか。
   - 問題の捕捉: brief が参照する作業履歴ファイルから、作業全体の判定・指摘(blocking でないものも含む)、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、`FAIL`・`NOT ASSESSED` の経緯、ラウンド数、人の却下・訂正・作り直しの指示、`note` で伝えられた見逃しを確かめ、各問題をどこで捕まえるべきだったかを判断しているか。
   - 再発防止: 機械の検査、雛形、観点、原則、skill の順(設定 `[lessons] destinations` で変更可能)で反映先を選び、リポジトリの規範へ反映しているか。反映しない理由があるか。観点を変えたら検出試験の例も更新しているか。規則の「手段: 未実装」と繰り返す違反を、テスト・lint・型・pre-commit・検証コマンドへ移す候補にしているか。
   - 規範の働き: どの原則がどの観点・雛形で使われるか、使われない仕組みや負担に見合わない仕組みがないか。その作業で見えた問題・不足・負担を扱い、規範全体の棚卸しは必要が見えたときだけ行っているか。
-  - 単純さ: 部品・原則・記録・観点の数と形式に、より単純な対案があるか。比較と blocking の条件は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-防ぐ失敗と運用負担から仕組みを選ぶ)に従う。
+  - 単純さ: 部品・原則・記録・観点の数と形式に、より単純な対案があるか。比較と blocking の条件は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-choose-mechanisms-based-on-the-failures-they-prevent-and-their-operational-burden)に従う。
   - 新しいセッションによる確認: リポジトリと実行の記録を読み、「何のシステムか」「どう動かすか」「どう確かめるか」「今どこか」に答えられるか。
 - **blocking**: 新しいセッションによる確認で答えられない問いがある、照合した原則の blocking 条件に該当する、または照合した契約に違反する。
 

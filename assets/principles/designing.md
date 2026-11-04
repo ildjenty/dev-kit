@@ -1,104 +1,104 @@
-# 設計の進め方
+# Design approach
 
-## 1. 変更困難な決定は先に特定し、判断材料を得てから確定する
+## 1. Identify decisions that are hard to change early, and finalize them after obtaining the evidence needed
 
-- **適用場面**: 設計で決める順番や、実装・公開・保存を始めてよいかを判断するとき。
-- **適用除外**: 損失が進行中で、未確認事項の解消を待つと被害が広がり、有効な承認・委任の範囲で封じ込めを先行させる必要があるとき。封じ込めに必要な決定に限り、選択を左右する未確認事項の解消前に確定してよい。進行中の損失、待つことの影響、対処の内容と影響、残る未確認事項、実施後の確認方法と期限を成果物に示す。根治や恒久設計まで確定した扱いにはしない。
-- **原則**: 変更困難な決定と、その判断に必要な未確認事項を先に洗い出す。選択を左右する未確認事項は小さな調査・試作で解消し、その決定に依存する実装・公開・保存を始めるまでに確定する。可逆・不可逆は対象の種類だけで決めず、保存済みデータ、実行中の処理、利用者と呼び出し元への影響、再生成と復旧の可否から判断する。DB スキーマ、識別子、公開する契約の型、イベントの内容、外部に公開するもの、データの保持・削除方針、ファイルフォーマットは、確認する対象の例である。内部の契約も同じ観点で判断する。後から変更できると確認したものは、実装を進めながら決めてよい。今決めるか、後で決めるかも、設計上の判断として明示する。
-- **違反・兆候**:
-  - 変更困難な決定が、影響や復旧の可否を確認せずに「後で直せる」扱いになっている。
-  - 選択を左右する未確認事項を残したまま確定している。
-  - 対象の種類だけで可逆・不可逆を決めている。
-  - 後で変更できるものの議論が先行し、変更困難な決定に依存する実装・公開・保存が、判断を終えないまま始まっている。
-- **変更前・変更後**: 「削除済みデータを取得できるかは後で調べ、履歴を保存しない設計で実装を始める」→「取得できる情報を小さな試作で確かめ、必要な履歴の保存方針を決めてから、それに依存する実装を始める」
-- **blocking**: 変更困難な決定が「後で直せる」扱いになっているか、選択を左右する未確認事項を残したまま確定している。
-- **根拠**: 変更困難な決定の一覧、影響と再生成・復旧の可否、判断に用いた調査・試作の結果、確定期限、それぞれを誰がいつ決めたか。
+- **Applicability**: When deciding the order of design decisions or whether implementation, publication, or storage may begin.
+- **Exemptions**: When loss is ongoing, waiting to resolve unverified matters would increase the damage, and containment must come first within valid approval or delegated authority. Only decisions necessary for containment may be finalized before resolving unverified matters that affect the choice. Show in the artifact the ongoing loss, the impact of waiting, the response and its effects, remaining unverified matters, and the method and deadline for verification after execution. Do not treat a root-cause fix or permanent design as finalized.
+- **Principle**: Identify decisions that are hard to change and the unverified matters needed to make them early. Resolve unverified matters that affect the choice through small investigations or prototypes, and finalize the decisions before starting implementation, publication, or storage that depends on them. Judge reversibility from stored data, running processes, effects on users and callers, and the ability to regenerate and recover, rather than from the kind of target alone. DB schemas, identifiers, types in public contracts, event contents, externally published items, data retention and deletion policies, and file formats are examples to examine. Assess internal contracts from the same perspectives. Decisions confirmed to be changeable later may be made as implementation proceeds. Explicitly state whether to decide now or later as a design decision too.
+- **Violations and signs**:
+  - Treating a decision that is hard to change as "fixable later" without checking its effects or recoverability.
+  - Finalizing a decision while leaving unverified matters that affect the choice unresolved.
+  - Deciding reversibility from the kind of target alone.
+  - Discussing decisions that can change later first, while starting implementation, publication, or storage dependent on hard-to-change decisions before those decisions are complete.
+- **Before and after**: "Investigate later whether deleted data can be retrieved, and start implementing a design that stores no history" → "Use a small prototype to check what information can be retrieved, decide the necessary history retention policy, then start implementation that depends on it."
+- **blocking**: A hard-to-change decision is treated as "fixable later" or finalized while unverified matters that affect the choice remain unresolved.
+- **Evidence**: A list of hard-to-change decisions, their effects and ability to be regenerated or recovered, investigation and prototype results used for the decisions, finalization deadlines, and who decided each one and when.
 
-## 2. 2つ目の実例が出るまで抽象化しない
+## 2. Do not abstract until there is a second concrete example
 
-- **適用場面**: 差し替えの仕組み、プラグイン、汎用化を作ろうとするとき。
-- **適用除外**: 外部の型が内側の設計を縛るのを防ぐため、`principles/structure.md` の原則5に従って境界で内部の型に変換するとき。変換は2つ目の実例を待たずに行う。差し替えの interface まで作る理由にはしない。
-- **原則**: 変更される部分と変更されない部分の境界を見極め、その位置とインターフェースだけを定める。差し替えやプラグインの仕組み、汎用化は、2つ目の実例が現れるまで実装しない。「将来必要になりそう」は実装の理由にならない。必要になった時点で実装できる構造を保てばよい。早すぎる抽象化より、類似した記述が複数あるほうがよい。
-- **違反・兆候**:
-  - 実装が1つしかない interface や抽象基底クラスがたくさんある。
-  - 使われていないオプション引数・設定項目・ジェネリクスがある。
-  - 「将来の拡張のため」のイベントフックやプラグインの仕組みがある。
-  - 汎用にしたせいで、唯一の使い道にとって不自然なインターフェースになっている。
-  - （設計案で）2つ目の実例がないまま、差し替えやプラグインの仕組みを作る計画になっている。
-- **変更前・変更後**: 「`interface Notifier` と `EmailNotifier` だけを作る」→「`sendEmail()` の関数を作り、別の通知先が必要になったときに interface を切る」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 抽象ごとの2つ目の実例、または外部の型を境界で変換する箇所とその理由。
+- **Applicability**: When about to build substitution mechanisms, plugins, or generalizations.
+- **Exemptions**: When converting external types to internal types at a boundary under principle 5 of `principles/structure.md` to prevent external types from constraining the internal design. Perform the conversion without waiting for a second concrete example. Do not use this as a reason to create an interface for substitution too.
+- **Principle**: Identify the boundary between what changes and what does not, and define only its location and interface. Do not implement substitution mechanisms, plugins, or generalizations until a second concrete example appears. "We may need it in the future" is not a reason to implement it. Keeping a structure that allows implementation when needed is sufficient. Multiple similar pieces of code are preferable to premature abstraction.
+- **Violations and signs**:
+  - Many interfaces or abstract base classes have only one implementation.
+  - Unused optional arguments, configuration fields, or generics exist.
+  - Event hooks or plugin mechanisms exist "for future extensibility."
+  - Generalization has made the interface unnatural for its only use.
+  - (In a design proposal) Substitution or plugin mechanisms are planned without a second concrete example.
+- **Before and after**: "Create only `interface Notifier` and `EmailNotifier`" → "Create a `sendEmail()` function, then introduce an interface when another notification destination is needed."
+- **blocking**: None (record as reference information).
+- **Evidence**: A second concrete example for each abstraction, or the locations and reasons for converting external types at boundaries.
 
-## 3. 新しい接続や変更する境界を利用の入口から結果まで早期に確かめる
+## 3. Verify new connections and changed boundaries early, from the entry point of use to the result
 
-- **適用場面**: 新しい機能や接続を作る、または境界を変更する際に、作る順番を決めるとき。
-- **適用除外**:
-  - 対象に存在しない層や、今回の接続・境界の入出力や成立条件に関与しない層まで通そうとするとき。それらの層を確認経路に含める要求だけを外し、そのための追加・再実装は行わない。外す層と今回の入出力・設定・認証・状態遷移などとの関係を成果物に示し、接続上の誤りを見落とさない理由を示す。コードを変更しないことだけを除外の理由にはしない。
-  - 実接続による確認が許可されない副作用や損失を生み、安全な検証環境も利用できないとき。その境界の実接続に限って早期確認を延期し、利用の入口から代替物を通して確認した範囲と、代替物では確認できない外部契約を成果物に分けて示す。安全に実接続できる条件、確認手順と期限、それまで進められる範囲も示す。実接続を確認済みとは扱わず、必須の確認が残る場合は `NOT ASSESSED` とする。
-- **原則**: 新しく作る接続や変更する境界を、実際の利用の入口から観測できる結果まで早期に通して確かめる。設計の成立を左右する接続や状態遷移を小さく動かし、構造上の誤りを早期に発見する。レイヤーごとに作り込むと、誤りは最後の結合時にまとめて表面化する。最初に動作させた機能は、前提が共通する機能に限って実装の見本とする。前提が異なる経路は、広げる前に別途確かめる。複数のステップで使う型やモジュールも、最初の利用箇所から結果まで動かす形で作る。
-- **違反・兆候**:
-  - 今回の接続を動かせないまま、複数のレイヤー・複数の機能を作り込んでいる。
-  - 新しい接続や変更する境界の結合を、最後にまとめて確かめる計画になっている。
-  - 今回作る層を、使う側から一度も呼ばずに「完成した」としている。
-  - （設計案で）最初のステップがレイヤー単位であり、利用の入口から結果まで確認できない。
-  - 前提の異なる機能にも、最初に動いた機能の構造を確認せずに広げている。
-- **変更前・変更後**: 「変換処理と出力処理をそれぞれ完成させ、最後に CLI から呼ぶ」→「まず小さな入力を CLI で読み込み、変換した結果が標準出力に出るところまで通してから、対応する入力を増やす」
-- **blocking**: なし（観点 `steps` で、各ステップを独立して検証できるかを確認する）。
-- **根拠**: 今回の接続を各ステップで独立して確認する方法、利用の入口と観測した結果、解消した未確認事項、見本にする機能と前提が共通する理由。確認から外した層がある場合は、その層と外した理由。
+- **Applicability**: When deciding the order of construction for a new feature or connection, or a boundary change.
+- **Exemptions**:
+  - When attempting to include layers that do not exist in the target or do not affect the inputs, outputs, or conditions needed for the current connection or boundary to work. Waive only the requirement to include those layers in the verification path; do not add or reimplement them for this purpose. Show in the artifact the excluded layers, their relationship to the current inputs, outputs, configuration, authentication, state transitions, and so on, and why connection errors will not be missed. Merely not changing code is not a reason for exemption.
+  - When verification through a real connection would cause unauthorized side effects or loss, and no safe verification environment is available. Defer early verification only of that boundary's real connection, and distinguish in the artifact the scope verified through substitutes from the entry point of use and the external contracts the substitutes cannot verify. Also show the conditions for safely using a real connection, verification procedures and deadlines, and the scope that may proceed until then. Do not treat the real connection as verified; use `NOT ASSESSED` if required verification remains.
+- **Principle**: Verify new connections and changed boundaries early by running them from the actual entry point of use through to observable results. Exercise small connections and state transitions that determine whether the design works, and find structural errors early. Building out each layer separately causes errors to surface together at final integration. Use the first working feature as an implementation example only for features that share its assumptions. Verify paths with different assumptions separately before extending the approach. Build types and modules used in multiple steps by running them from their first use through to the result too.
+- **Violations and signs**:
+  - Building out multiple layers or features while the current connection still cannot run.
+  - Planning to verify integration of new connections or changed boundaries all at once at the end.
+  - Calling a newly built layer "complete" without ever invoking it from a consumer.
+  - (In a design proposal) The first step is organized by layer and cannot be verified from the entry point of use to the result.
+  - Extending the structure of the first working feature to features with different assumptions without verification.
+- **Before and after**: "Complete conversion and output processing separately, then call them from the CLI at the end" → "First read a small input through the CLI and run it through until the converted result reaches standard output, then expand the supported inputs."
+- **blocking**: None (the `steps` perspective checks whether each step can be verified independently).
+- **Evidence**: How to verify the current connection independently at each step, the entry point of use and observed results, resolved unverified matters, the feature used as an example, and why its assumptions are shared. If any layers were excluded from verification, identify them and the reasons.
 
-## 4. 安全に一括で切り替えられる移行は互換レイヤーを残さず終える
+## 4. Finish migrations that can safely switch all at once without leaving compatibility layers
 
-- **適用場面**: 書き換え・移行・API の置き換えを計画するとき。
-- **適用除外**:
-  - 影響するコード・実行中の処理・保存済みデータに、安全に同時に切り替えられない対象があるとき。その対象との互換に必要な範囲だけ段階移行とし、同時に切り替えられない具体的な理由、一時互換の対象と撤去条件を成果物に示す。独立して安全に一括移行できる部分には適用しない。
-  - 旧 API や旧データ形式の継続サポート自体が、合意した要求または外部契約であるとき。その要求や契約に必要な互換処理は移行時に削除せず、一時互換と区別して維持し、要求・契約の参照先、対象のバージョン・操作、サポート終了条件の有無を成果物に示す。互換に不要な旧実装を残す理由にはしない。
-- **原則**: 一括か段階かは、影響するコード・実行中の処理・保存済みデータを安全に一括で切り替えられるかで選ぶ。一括で切り替えられる移行では、中間状態の維持よりも最終形を優先する。破壊的な変更を許容するスコープを明示し、各段階の終了時に全体を検証する。新しい API の導入、呼び出し元の移行、旧 API の削除を同じ変更で行い、互換レイヤーを残さない。一時コードの保守性は寿命に応じて抑えてよいが、正しさ・データ保全・中断後の回復に必要な品質は失敗の影響から決める。
-- **違反・兆候**:
-  - 「とりあえず互換のために」残した層が、移行後も消えない。
-  - 新旧の API が両方使われたまま、どちらが正本であるか分からない。
-  - （設計案で）安全に一括で切り替えられるのに、呼び出し元の移行と旧 API の削除が別の変更に分かれ、互換レイヤーを残す計画になっている。
-  - 旧バージョンの稼働や保存済み状態を確認せず、一括で切り替える計画になっている。
-  - 一時コードであることを理由に、データ保全や中断後の回復に必要な処理を省いている。
-- **変更前・変更後**: 「外部利用者がいないので、旧形式を読む処理をまとめて消す」→「旧バージョンの稼働終了と保存済み状態の移行・復旧方法を確認し、安全に一括で切り替えられる範囲の呼び出し元と旧 API を同じ変更で置き換える」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 一括・段階を選んだ理由、旧 API の参照が残っていないこと、旧バージョンの稼働終了、保存済み状態への対応と復旧方法。段階移行では、一時互換の対象と撤去条件。
+- **Applicability**: When planning rewrites, migrations, or API replacements.
+- **Exemptions**:
+  - When some affected code, running processes, or stored data cannot safely switch at the same time. Use a staged migration only to the extent necessary for compatibility with those targets, and show in the artifact the concrete reasons they cannot switch together, what temporary compatibility covers, and its removal conditions. Do not apply this to parts that can independently and safely migrate all at once.
+  - When continued support for an old API or data format is itself an agreed requirement or external contract. Retain compatibility processing needed for that requirement or contract during migration, distinguish it from temporary compatibility, and show in the artifact references to the requirement or contract, covered versions and operations, and whether support termination conditions exist. Do not use this as a reason to retain old implementations unnecessary for compatibility.
+- **Principle**: Choose an all-at-once or staged migration based on whether affected code, running processes, and stored data can safely switch all at once. For migrations that can, prioritize the final form over maintaining intermediate states. State the scope in which breaking changes are permitted, and verify the whole at the end of each stage. Introduce the new API, migrate callers, and remove the old API in the same change, leaving no compatibility layer. Maintainability work for temporary code may be limited according to its lifetime, but determine the quality required for correctness, data preservation, and recovery after interruption from the impact of failure.
+- **Violations and signs**:
+  - A layer left "for compatibility for now" remains after migration.
+  - Both old and new APIs remain in use, with no clear source of truth.
+  - (In a design proposal) Although a safe all-at-once switch is possible, caller migration and old API removal are split into separate changes, leaving a compatibility layer.
+  - Planning an all-at-once switch without checking running old versions or stored state.
+  - Omitting processing needed for data preservation or recovery after interruption because the code is temporary.
+- **Before and after**: "There are no external users, so remove all old-format readers at once" → "Confirm that old versions have stopped running and how stored state will be migrated and recovered, then replace callers and the old API in the same change within the scope that can safely switch all at once."
+- **blocking**: None (record as reference information).
+- **Evidence**: Reasons for choosing all-at-once or staged migration, absence of remaining references to the old API, cessation of old-version operation, handling of stored state, and recovery methods. For staged migration, what temporary compatibility covers and its removal conditions.
 
-## 5. 新しい仕組みを足す前に削除・置き換えを検討する
+## 5. Consider removal or replacement before adding a new mechanism
 
-- **適用場面**: 新しい仕組みを足そうとするとき。
-- **適用除外**: なし。
-- **原則**: 新しい仕組みを追加する前に、既存の仕組みの削除・置き換えで要求を満たせないかを検討する。デッドコード、重複した検証、スタブ、未使用のオプションなど、今回の変更で不要になるものや要求を満たすために削除が必要なものを対象とする。推測に基づくガードや、「エレガントな」ボイラープレートを追加しない。必要最小限の変更を選ぶ。
-- **違反・兆候**:
-  - 既存の仕組みを消す・置き換える案を検討していない。
-  - 使われない分岐・オプションが残ったまま、似た仕組みが隣に足される。
-- **変更前・変更後**: 「設定の読み込みに新しい層を足す」→「既存の読み込み経路を置き換える案を検討し、要求を満たせるなら新しい層を足さずに置き換える」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 検討した削除・置き換えの候補と結果。純粋な追加である場合は、置き換える既存の仕組みがない理由。
+- **Applicability**: When about to add a new mechanism.
+- **Exemptions**: None.
+- **Principle**: Before adding a new mechanism, consider whether removing or replacing an existing one can meet the requirements. Consider dead code, duplicate validation, stubs, unused options, and other things made unnecessary by the current change or whose removal is required to meet the requirements. Do not add speculative guards or "elegant" boilerplate. Choose the minimum necessary change.
+- **Violations and signs**:
+  - Not considering removal or replacement of existing mechanisms.
+  - Adding a similar mechanism alongside unused branches or options that remain.
+- **Before and after**: "Add a new layer for configuration loading" → "Consider replacing the existing loading path, and if it meets the requirements, replace it without adding a new layer."
+- **blocking**: None (record as reference information).
+- **Evidence**: Removal and replacement candidates considered and their outcomes. For a pure addition, why there is no existing mechanism to replace.
 
-## 6. 性能・観測性・ロールアウト・脅威モデルを確認し、必要な対策を選ぶ
+## 6. Review performance, observability, rollout, and the threat model, and choose necessary measures
 
-- **適用場面**: `scope`・`structure` のステージで設計するとき。
-- **適用除外**: `principles/designing.md` の原則1の緊急封じ込めの適用除外に該当し、性能・観測性・ロールアウト・脅威モデルに関する未確認事項の解消を待つと被害が広がるとき。封じ込めに必要な決定に限り、これらの未確認事項を確定前に解消・検証する要求だけを外すが、四つの観点の確認と影響の検討は省略せず、恒久設計の確定には適用しない。待つと広がる被害、承認・委任の範囲、先行する決定、残る未確認事項と実施後の確認方法・期限を成果物に示す。
-- **原則**: 性能（扱う量と待ち時間）、観測性（結果や失敗の確認方法）、ロールアウト（適用と戻し方）、脅威モデル（誰から何を守るか）を、構造と同じステージで確認する。観点を確認することと、専用の仕組みを導入することは分け、利用条件と失敗の影響に応じて対策を選ぶ。既存の仕組みや運用で満たせるならそれを使い、不足を説明できる場合に専用の仕組みを導入する。先送りできるのは、現在の設計の成立を左右しない事項か、確定前に検証する手順を定めた事項に限る。未決定でも進められる範囲を明示し、必要な保証を判断できないまま、その保証に依存する構造や公開を確定しない。
-- **違反・兆候**:
-  - 利用条件や失敗の影響を確認せず、「性能は後で」「失敗の確認方法は実装時に」としている。
-  - 既存の仕組みや運用で満たせるのに、専用の仕組みを導入している。
-  - 必要な保証の解消方法と期限がないまま、それに依存する設計を進めている。
-- **変更前・変更後**: 「入力の量や失敗の確認、配布方法、守る対象は実装してから考える」→「手元の CLI で想定する入力を試し、失敗理由は標準エラー出力で確認する。配布は実行ファイルの差し替えで行い、入力ファイルを上書きせず手元で処理する」
-- **blocking**: 合意した要求や安全性の成立を左右する事項を、解消方法も期限もなく先送りしている。
-- **根拠**: 四つの観点についての利用条件・要求・失敗の影響と対策の対応、既存の仕組みや運用で満たせる理由、専用の仕組みの要否。先送りした事項は、現在の設計の成立を左右しない理由、または確定前に検証する手順と期限、未決定でも進められる範囲。
+- **Applicability**: When designing in the `scope` and `structure` stages.
+- **Exemptions**: When the emergency containment exemption in principle 1 of `principles/designing.md` applies and waiting to resolve unverified matters about performance, observability, rollout, or the threat model would increase damage. Only for decisions necessary for containment, waive the requirement to resolve and verify these matters before finalization; do not omit reviewing the four perspectives or considering their effects, and do not apply this to finalizing permanent designs. Show in the artifact the damage that would increase while waiting, the approval or delegation scope, decisions made in advance, remaining unverified matters, and the method and deadline for verification after execution.
+- **Principle**: Review performance (volume handled and latency), observability (how to check results and failures), rollout (how to apply and roll back), and the threat model (what to protect from whom) in the same stage as structure. Distinguish reviewing these perspectives from introducing dedicated mechanisms, and choose measures according to usage conditions and the impact of failure. Use existing mechanisms or operations if they suffice; introduce dedicated mechanisms when the shortfall can be explained. Defer only matters that do not determine whether the current design works or for which a verification procedure before finalization has been defined. State what may proceed while decisions remain open, and do not finalize dependent structures or publication while unable to determine the necessary guarantees.
+- **Violations and signs**:
+  - Saying "Performance can wait" or "We will decide how to detect failures during implementation" without checking usage conditions or the impact of failure.
+  - Introducing dedicated mechanisms when existing mechanisms or operations suffice.
+  - Proceeding with dependent design without a method and deadline for resolving the required guarantees.
+- **Before and after**: "Consider input volume, failure detection, distribution, and what to protect after implementation" → "Try expected inputs in the local CLI and inspect failure reasons on standard error. Distribute by replacing the executable, and process inputs locally without overwriting input files."
+- **blocking**: Matters that determine whether agreed requirements or safety can be met are deferred without a resolution method or deadline.
+- **Evidence**: For the four perspectives, how usage conditions, requirements, and failure impacts correspond to measures; why existing mechanisms or operations suffice; and whether dedicated mechanisms are necessary. For deferred matters, why they do not determine whether the current design works, or the procedure and deadline for verification before finalization, and the scope that may proceed while undecided.
 
-## 7. 既存の流儀に揃える
+## 7. Follow existing conventions
 
-- **適用場面**: 既存のリポジトリに新しいコードや設計を足すとき。
-- **適用除外**: 既存の流儀が合意した要求や必要な保証を満たさず、揃えるとそれらを損なうとき。既存の流儀に揃える要求を外すのは、その要求や保証を満たすために必要な相違点だけである。要求・保証の参照先、比較した既存箇所、満たせない具体的な条件、別の方法で満たせる根拠を成果物に示す。それ以外の命名・エラー形式・ログ形式などは既存の流儀に揃える。
-- **原則**: 書く前に、同じ種類の処理がこのリポジトリでどう書かれているか（命名、エラー処理の形、レイヤーの切り方、既存のユーティリティと抽象、テストの書き方、使っているライブラリ）を探し、今回の要求と保証を満たす流儀に揃える。異なる方法を採る際に移行するのは、今回の変更に不可分な範囲だけである。全体の統一が独立した改善になるなら、別の課題にする。揃えた既存の箇所、または揃えなかった箇所と違い・理由を成果物に示す。
-- **違反・兆候**:
-  - 同じ種類の処理が、2つの書き方で存在する。
-  - 既存のユーティリティや抽象があるのに、同じ役割の新しいヘルパーを足している。
-  - エラー処理やログの形式が、周囲のコードと違う。
-  - 既存のライブラリと同じ役割の新しいライブラリを、並行して導入している。
-  - （設計案で）揃える既存の箇所も、揃えない理由も示されていない。
-- **変更前・変更後**: 「新しい API のエラーを独自の例外クラスで返した」→「既存の API が使っている `Result` 型の形を調べ、同じ形で返した。例外クラスは足さない」
-- **blocking**: 既存の同種の処理と違う流儀で書かれていて、理由が示されていない。
-- **根拠**: 揃えた既存の箇所への参照、または揃えなかった箇所と違い・理由。移行する場合は、今回の変更に不可分な範囲であること。
+- **Applicability**: When adding new code or designs to an existing repository.
+- **Exemptions**: When existing conventions do not meet agreed requirements or necessary guarantees, and following them would compromise those requirements or guarantees. Waive the requirement to follow existing conventions only for the differences necessary to meet those requirements or guarantees. Show in the artifact references to the requirements and guarantees, existing locations compared, concrete conditions that cannot be met, and evidence that another approach meets them. Follow existing conventions for other naming, error formats, log formats, and so on.
+- **Principle**: Before writing, find how the repository handles the same kind of processing (naming, error-handling forms, layer boundaries, existing utilities and abstractions, test style, and libraries), and follow conventions that meet the current requirements and guarantees. When adopting a different approach, migrate only the scope inseparable from the current change. If making everything consistent is an independent improvement, make it a separate issue. Show in the artifact the existing locations followed, or the locations not followed, differences, and reasons.
+- **Violations and signs**:
+  - The same kind of processing exists in two styles.
+  - Adding a new helper with the same role despite an existing utility or abstraction.
+  - Error handling or log formats differ from surrounding code.
+  - Introducing a new library alongside an existing library with the same role.
+  - (In a design proposal) Neither existing locations to follow nor reasons for not following them are shown.
+- **Before and after**: "Returned new API errors using a custom exception class" → "Examined the `Result` type used by existing APIs and returned the same form. No exception class is added."
+- **blocking**: The style differs from existing processing of the same kind without a stated reason.
+- **Evidence**: References to existing locations followed, or locations not followed, differences, and reasons. For migrations, why the scope is inseparable from the current change.

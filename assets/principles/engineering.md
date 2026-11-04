@@ -1,119 +1,119 @@
-# コードを書くときの原則
+# Principles for writing code
 
-## 1. 失敗を隠さない
+## 1. Do not hide failures
 
-- **適用場面**: エラー、空、0件、上限超過、値の欠如、重複が発生した場合の挙動や、内部での原因の記録と公開応答を決めるとき。
-- **適用除外**: なし。
-- **原則**: 正常な欠如、許容された機能の縮退、失敗は、処理の契約に照らして区別する。失敗を正常な欠如や既定値にすり替えない。失敗後に継続できるのは、成功として約束した結果を満たし、失敗した部分を契約に応じて通知・記録できる場合である。認可など、判定できなければ操作を許せない処理は拒否する（fail-closed）。復旧・調査・制御に必要な原因は、権限のある内部処理で区別できる形で残す。公開応答は、公開してよい情報と呼び出し元に必要な対応に基づいて決める。秘匿のために異なる原因を同じ公開エラーにまとめても、内部での区別は失わない。
-- **違反・兆候**:
-  - `catch` してログだけ出し、約束した結果を満たさないまま成功を返す。
-  - `catch { return null }` や `catch { return [] }` で、失敗を「データがなかった」にすり替える。
-  - 空の識別子を既定値で処理し、分かれているはずのデータが混ざる。
-  - 値の有無だけで分岐し、値がない場合の意味を定義していない。
-  - 公開応答をまとめる際に、復旧・調査・制御に必要な内部の原因の区別まで失う。
-  - 検査・認可の判定ができないのに、拒否すべき操作を許可する。
-  - 原因調査に必要な情報を残さない。または、機密情報をログやエラーに残す。
-  - 確保したリソース（ファイル・接続・タイマー・購読）を、失敗時に解放しない。
-  - 何にでもリトライを付ける（冪等でない処理や、やり直しても直らない失敗にも付ける）。
-  - 非同期処理の失敗を待ち受ける処理がなく、失敗しても検知されない。
-  - 契約上必要な設定や前提が不確かな状態で、外部への書き込みや処理の許可を行う。
-- **変更前・変更後**:
+- **Applicability**: When deciding behavior for errors, emptiness, zero results, exceeded limits, missing values, or duplicates, or deciding how to record causes internally and respond publicly.
+- **Exemptions**: None.
+- **Principle**: Distinguish normal absence, permitted degradation, and failure according to the operation's contract. Do not substitute normal absence or default values for failure. Continue after a failure only if the promised successful outcome is met and the failed portion can be reported and recorded according to the contract. Reject operations, such as authorization, that cannot be permitted when a decision cannot be made (fail-closed). Preserve causes needed for recovery, investigation, and control in a form that authorized internal processing can distinguish. Determine public responses from what may be disclosed and what callers need to do. Even when different causes share the same public error for confidentiality, preserve their internal distinction.
+- **Violations and signs**:
+  - Using `catch` to log an error and return success without meeting the promised outcome.
+  - Using `catch { return null }` or `catch { return [] }` to turn failure into "there was no data."
+  - Handling an empty identifier with a default value and mixing data that should remain separate.
+  - Branching only on whether a value exists without defining what its absence means.
+  - Losing internal distinctions among causes needed for recovery, investigation, or control when combining public responses.
+  - Allowing an operation that should be rejected when validation or authorization cannot be decided.
+  - Not retaining information needed to investigate causes. Or leaving confidential information in logs or errors.
+  - Not releasing allocated resources (files, connections, timers, or subscriptions) on failure.
+  - Adding retries to everything (including non-idempotent operations and failures that rerunning cannot fix).
+  - No handler awaits asynchronous failures, so failures go undetected.
+  - Allowing external writes or processing while contractually required configuration or prerequisites remain uncertain.
+- **Before and after**:
   ```ts
   // before
-  try { return await fetchPlan(id) } catch { return null }   // 失敗が「プランがない」になる
+  try { return await fetchPlan(id) } catch { return null }   // Failure becomes "no plan exists"
   // after
   try { return await fetchPlan(id) }
-  catch (e) { throw new PlanFetchError(id, { cause: e }) }   // 取得失敗を正常な欠如と区別する
+  catch (e) { throw new PlanFetchError(id, { cause: e }) }   // Distinguish fetch failure from normal absence
   ```
-- **blocking**: 約束した結果を満たしていないのに成功として扱う経路、または必要な拒否を行わない経路がある。
-- **根拠**: 成功として約束する範囲と、失敗後も継続できる理由。失敗の経路ごとに誰がどこで気づくか、必要な原因を内部で調査できること、公開応答が秘匿すべき情報を漏らさないことを示す。
+- **blocking**: A path treats an unmet promised outcome as success or fails to perform a required rejection.
+- **Evidence**: The scope promised as success and why continuation after failure is possible. Show who notices each failure path and where, that necessary causes can be investigated internally, and that public responses do not leak confidential information.
 
-## 2. 再実行で副作用を重複させず、同時実行で不変条件を守る
+## 2. Prevent duplicate side effects on reruns and preserve invariants during concurrent execution
 
-- **適用場面**: 再配信・再試行・タイムアウト後の再実行がある経路や、同じデータを同時に扱う処理を書くとき。
-- **適用除外**: 観測イベントの重複が後続の集計・判断に与える影響まで契約で許容され、重複防止によって本処理の要求を満たせなくなるときに限り、その記録・送信で生じる観測上の副作用について重複防止の要求を外す。成果物には、許容される重複の範囲と後続処理への影響、重複防止によって満たせなくなる要求とその根拠を示す。課金・認可などの操作や、同時実行の不変条件には適用しない。
-- **原則**: 再実行では、操作の契約で定めた識別方法により同一操作かを判断し、副作用を重複させない。入力値が同じでも別の操作であれば実行する。同一操作を識別できない場合は、再実行の安全性を保証したと扱わない。同じ識別子を受け取っても、操作の意味を決める入力が既存の記録と一致しなければ、正常な再実行と区別して明示的に扱う。競合する別操作の同時実行では、契約で定めた不変条件を守る。確認と更新は、整合性を保証する同じ境界で行い、結果の順序依存は契約が許す範囲で認める。境界の選択は `principles/data.md` の原則5・6に従い、実装ではその境界を守る。中断時に残るロック、一時ファイル、不完全なレコードは、次回の実行時に古い状態と判定できるようにする（一時ファイルへの書き込み後に rename する、内容を比較する）。
-- **違反・兆候**:
-  - 同一操作の再配信を無条件に登録・送信し、副作用が重複する。
-  - 入力値が同じことだけで重複とみなし、正当な別操作を実行しない。
-  - 同じ識別子で意味の異なる入力を受けても、処理済みとして無視する。
-  - 再実行される経路で、実行が重複しないことを前提に時刻を計算する。
-  - 一連の更新が途中で止まると、中途半端な状態が残る（トランザクションやロールバック処理がない）。
-  - 読んで確かめてから書くまでの間に、別の処理が割り込める（確認と更新が分かれている）。
-- **変更前・変更後**: 「残高を確認してから別の処理で引き落とし、識別子の重複は無視する」→「同じ整合性の境界で操作識別子と入力を確認し、同一操作は再度引き落とさず、入力の不一致は拒否する。未処理なら残高の確認、引き落とし、処理済みの記録を行う」
-- **blocking**: 同一操作の再実行で副作用が重複する、同じ識別子で意味の異なる入力を正常な再実行として扱う、または競合する操作の同時実行で不変条件が破られる。
-- **根拠**: 契約で定めた同一操作の識別方法。同一操作の再実行で副作用が重複せず、同じ内容の別操作は実行され、同じ識別子で意味の異なる入力は区別されることを示す。競合する処理が確認と更新の間へ割り込もうとする場合にも、不変条件が保たれることをテストか実行で示す。
+- **Applicability**: When writing paths with redelivery, retries, or reruns after timeout, or processing that handles the same data concurrently.
+- **Exemptions**: Only when the contract permits duplicate observation events, including their effects on subsequent aggregation and decisions, and preventing duplication would prevent the main processing from meeting its requirements, waive duplicate prevention for observational side effects caused by that recording or transmission. Show in the artifact the permitted scope of duplication, its effects on subsequent processing, and the requirements that duplicate prevention would make impossible to meet, with supporting evidence. This does not apply to operations such as billing or authorization, or to concurrency invariants.
+- **Principle**: On reruns, identify the same operation using the identification method defined by its contract, and do not duplicate side effects. Execute distinct operations even if their input values are identical. If the same operation cannot be identified, do not treat rerun safety as guaranteed. Even with the same identifier, explicitly distinguish inputs that determine the operation's meaning but do not match existing records from normal reruns. Preserve contractually defined invariants when distinct, conflicting operations execute concurrently. Perform checks and updates within the same boundary that guarantees consistency, and permit order-dependent results only as allowed by the contract. Choose boundaries under principles 5 and 6 of `principles/data.md`, and respect them in implementation. Make locks, temporary files, and incomplete records left by interruption identifiable as stale on the next execution (write to a temporary file and then rename, or compare contents).
+- **Violations and signs**:
+  - Unconditionally registering or sending redeliveries of the same operation, duplicating side effects.
+  - Treating identical input values alone as duplication and not executing legitimate distinct operations.
+  - Ignoring inputs with different meanings under the same identifier as already processed.
+  - Calculating times on a rerunnable path on the assumption that execution will not be duplicated.
+  - A sequence of updates leaves an incomplete state if stopped partway through (no transaction or rollback).
+  - Another process can intervene between reading and checking and then writing (checks and updates are separate).
+- **Before and after**: "Check the balance, debit it separately, and ignore duplicate identifiers" → "Check the operation identifier and inputs within the same consistency boundary; do not debit again for the same operation, and reject mismatched inputs. If unprocessed, check the balance, debit it, and record completion."
+- **blocking**: Rerunning the same operation duplicates side effects, inputs with different meanings under the same identifier are treated as normal reruns, or concurrent conflicting operations violate invariants.
+- **Evidence**: The contractually defined method for identifying the same operation. Show that rerunning the same operation does not duplicate side effects, distinct operations with identical contents execute, and inputs with different meanings under the same identifier are distinguished. Demonstrate through tests or execution that invariants hold even when conflicting processing attempts to intervene between checks and updates.
 
-## 3. 名前は初めて読む人に分かるように付ける
+## 3. Choose names that first-time readers can understand
 
-- **適用場面**: 変数・関数・型・ファイル・フォルダに名前を付けるとき。
-- **適用除外**:
-  - 外部との契約や保存済みデータに含まれる名前で、変更すると既存の呼び出しや読み出しが壊れるとき。外すのは契約上必要な名前の保持を妨げる命名の要求だけである。成果物には、保持する名前と、変更によって壊れる契約を示す。
-  - 利用者向けのエラーメッセージを要件で定められた提供言語で記述する必要があるとき、または維持対象と確認した既存の検証が英語以外の文面を契約とし、変更するとその契約を満たせなくなるとき。外すのは該当する文面を英語で記述する要求だけである。成果物には、保持する文面と、変更によって壊れる契約、提供言語の要件や検証の維持が必要な根拠を示す。
-- **原則**: コードと文書で使われている用語を使い、会話の中で作った用語を持ち込まない。同じものには一貫した名前を使い、内容が変わった場合は名前も変更する。名前は対象の責務の範囲を表すものとする。狭すぎる名前は、責務が広がると実態と合わなくなる。広すぎる名前は、責務を無制限に広げられてしまう。テスト名とエラーメッセージは英語で記述する。ログやエラーを調べる際の検索語を統一するためである。
-- **違反・兆候**:
-  - 配置と合わせても責務が分からない名前（`data` `info` `result` `item` `temp` `helper` `util` `manager` `handler`）。
-  - 同じものを指す名前の揺れ（customer / client / user が同じものを指す）。
-  - 実態に合わない boolean の名前（`isValid` が実際は「保存済みか」を表す）。
-  - `processData2` `newHelper` のように、既存の名前との違いだけで付けた名前。
-  - 全体を扱う処理やデータに、現在扱っている1件だけを表す名前を付ける。
-- **変更前・変更後**: `const data = await getUser(id)` → `const customer = await findCustomerById(id)`
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 名前から、受け持つ範囲が1文で言えること。
+- **Applicability**: When naming variables, functions, types, files, or folders.
+- **Exemptions**:
+  - When a name is part of an external contract or stored data and changing it would break existing calls or reads. Waive only naming requirements that prevent retaining contractually necessary names. Show in the artifact the retained names and the contracts their change would break.
+  - When user-facing error messages must use the language required for the product, or existing verification confirmed as requiring preservation treats non-English text as a contract and changing it would violate that contract. Waive only the requirement to write that text in English. Show in the artifact the retained text, the contract its change would break, and the basis for the language requirement or the need to preserve the verification.
+- **Principle**: Use terms from the code and documents; do not introduce terms invented in conversation. Use consistent names for the same things, and change names when their contents change. Names must express the scope of their subjects' responsibilities. Names that are too narrow cease to match when responsibilities expand. Names that are too broad allow responsibilities to expand without limit. Write test names and error messages in English to standardize search terms when investigating logs and errors.
+- **Violations and signs**:
+  - Names whose responsibilities are unclear even with their placement (`data` `info` `result` `item` `temp` `helper` `util` `manager` `handler`).
+  - Inconsistent names for the same thing (customer / client / user all refer to the same thing).
+  - Boolean names that do not match reality (`isValid` actually means "has been saved").
+  - Names chosen only for their difference from existing names, such as `processData2` or `newHelper`.
+  - Naming processing or data that covers the whole after only the single item currently being handled.
+- **Before and after**: `const data = await getUser(id)` → `const customer = await findCustomerById(id)`
+- **blocking**: None (record as reference information).
+- **Evidence**: The scope of responsibility can be stated in one sentence from the name.
 
-## 4. コメントは、コードだけでは判断に必要な情報が伝わらない場合に書く
+## 4. Write comments when code alone cannot convey information needed for decisions
 
-- **適用場面**: コメントを書くとき、コメントを残すかを決めるとき。
-- **適用除外**:
-  - ライセンス表示や自動生成処理との連携のために定められたコメントが必要で、削除や書き換えによって利用条件に反したり再生成が壊れたりするとき。外すのは利用条件・再生成に必要な部分に対する、読み手への説明として必要であるという要求だけである。成果物には、保持の根拠と必要な形式・位置を示す。
-  - コンパイラ・ビルドツール・解析ツールが入力として読む指示コメントで、削除や書き換えによって必要な処理結果が変わるとき。外すのはツールの入力として必要な部分に対する、読み手への説明として必要であるという要求だけであり、検査の抑制自体の妥当性は除外しない。成果物には、保持の根拠、必要な形式・位置、指示コメントを読み取るツールと削除時に失われる結果を示す。
-- **原則**: コードだけでは判断に必要な情報が伝わらない場合に、契約・制約や、局所的には妥当に見える変更が誤りになる理由を書く。型・名前・テストによる制約の表現や強制と、読み手への説明は役割が異なる。型やテストで制約を守っていても、変更者や呼び出し元の誤用を防ぐ説明が必要な場合はコメントを残す。コメントを制約の強制の代わりにしない。コードの言い換えや変更履歴は書かず、詳しい設計理由は正本の文書に残し、必要な箇所から参照する。外部ライブラリの不具合に対する回避策には、回避対象と削除できる条件（修正済みのバージョン、上流の Issue）を書く。コメントの読み手は、後でコードを読む人であり、今回の差分をレビューする人ではない。
-- **違反・兆候**:
-  - コードをそのまま言い換えたコメント（`// ユーザーを取得する` の下に `getUser()`）。
-  - 引数名を言い換えただけの docstring。
-  - 詳しい設計理由を正本への参照なしに書き写す。
-  - 型やテストで守っているという理由だけで、誤用を防ぐ契約の説明を削る。
-  - コメントに制約を書くだけで、必要な型やテストによる強制を省く。
-  - 「〜に変更」「〜を修正」という経緯のコメント。
-  - コメントアウトしたコードが残る。未解決の TODO が蓄積する。
-  - `IMPORTANT` や `do not remove` だけで、理由がない。
-- **変更前・変更後**:
+- **Applicability**: When writing comments or deciding whether to keep them.
+- **Exemptions**:
+  - When required comments provide license notices or integrate with code generation, and removing or rewriting them would violate usage terms or break regeneration. Waive only the requirement that portions necessary for usage terms or regeneration must also be necessary explanations for readers. Show in the artifact the basis for retention and the required format and location.
+  - When directive comments are read as input by compilers, build tools, or analysis tools, and removing or rewriting them would change required processing results. Waive only the requirement that portions necessary as tool input must also be necessary explanations for readers; this does not exempt the validity of suppressing checks itself. Show in the artifact the basis for retention, required format and location, tools that read the directives, and results lost upon removal.
+- **Principle**: When code alone cannot convey information needed for decisions, explain contracts, constraints, or why a change that looks locally reasonable would be wrong. Expressing or enforcing constraints through types, names, and tests serves a different role from explaining them to readers. Keep comments when an explanation is needed to prevent misuse by modifiers or callers, even if types or tests enforce the constraints. Do not substitute comments for enforcement. Do not restate code or write change history; keep detailed design reasons in the authoritative document and reference it where necessary. For workarounds for external library defects, state what is being worked around and the conditions for removal (a fixed version or upstream Issue). Comments are for future code readers, not reviewers of the current diff.
+- **Violations and signs**:
+  - Comments that merely restate code (`// Get the user` above `getUser()`).
+  - Docstrings that only rephrase argument names.
+  - Copying detailed design reasons without referencing the authoritative source.
+  - Removing contract explanations that prevent misuse merely because types or tests enforce the contract.
+  - Writing constraints only in comments while omitting necessary enforcement through types or tests.
+  - History comments such as "Changed to..." or "Fixed..."
+  - Commented-out code remains. Unresolved TODOs accumulate.
+  - Only `IMPORTANT` or `do not remove`, without a reason.
+- **Before and after**:
   ```ts
   // before
-  // 処理をキャンセルする
+  // Cancel processing
   export function cancel() { ... }
   // after
-  // 新規処理の開始を止める。実行中の処理の終了は待たない。
+  // Stop new processing from starting. Do not wait for running processing to finish.
   export function cancel() { ... }
   ```
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 足した・残したコメントごとに、コードだけでは伝わらない契約・制約と、説明がなければ起こる誤用や変更の誤りを示す。
+- **blocking**: None (record as reference information).
+- **Evidence**: For each added or retained comment, show the contract or constraint that code alone cannot convey, and the misuse or mistaken change that would occur without explanation.
 
-## 5. 変更の影響先と同じ原因の誤りを調べる
+## 5. Investigate affected uses and errors with the same cause
 
-- **適用場面**: 関数・型・契約を変えたとき。不具合を直すときや、ガード（値の検査）を足そうとするとき。
-- **適用除外**: なし。
-- **原則**: 確認した原因に基づき、利用箇所、変更前の前提に依存する箇所、保存済みデータ、同じ原因による誤りを調べる。再起動後にだけ現れる不具合では、保存された状態も調べる。原因の観測は `principles/verification.md` の原則3に従う。確認した原因のうち管理・変更できる箇所を修正し、変更後の契約や不変条件を成立させるために不可分な修正を特定する。修正範囲は、配置ではなく依頼の範囲と必要な整合性で決める。変更の許可は `principles/working.md` の原則6・7に従い、不可分な修正が依頼の範囲を超える場合は、範囲の変更を確認する。独立した不具合は、場所やセキュリティとの関連だけで同じ差分に含めず、影響とともに報告する。症状が消えたことだけを、原因を除去した証拠にしない。
-- **違反・兆候**:
-  - 気づいた箇所だけを直し、同じ関数を使う処理や同じ原因の誤りを調べない。
-  - 契約を変え、利用側と保存済みのデータへの影響を調べていない。
-  - 同じモジュールにある、またはセキュリティに関係するという理由だけで、独立した不具合を同じ差分に含める。
-  - 必要と分かった影響先を未対応のまま、契約の変更を完了とする。
-  - 原因を確かめずにガードで症状を消し、原因も除去できたと扱う。
-  - 回避策で残る制約や、撤去できる条件を示さない。
-- **変更前・変更後**: 「`parseDate` の戻り値を `Date | null` に変えた」→「呼び出し元と保存済みデータへの影響を調べ、変更後の契約に不可欠な対応を依頼の範囲で実施した。独立した不具合は影響を添えて報告した」
-- **blocking**: 契約を変えたのに利用側や保存済みデータへの影響を調べていない、または契約や不変条件の成立に必要と確認した影響先を未対応のまま完了としている。
-- **根拠**: 原因を確認した観測への参照、影響先と同じ原因の誤りの調査結果、それぞれの対応と修正範囲を決めた理由。回避策では、隔離できる影響、残る制約、撤去条件を示す。
+- **Applicability**: When changing functions, types, or contracts. When fixing defects or about to add guards (value checks).
+- **Exemptions**: None.
+- **Principle**: Based on confirmed causes, investigate uses, locations that depend on previous assumptions, stored data, and errors with the same cause. For defects appearing only after restart, investigate persisted state too. Follow principle 3 of `principles/verification.md` for observing causes. Fix the parts of confirmed causes that can be controlled or changed, and identify fixes inseparable from establishing the changed contract or invariants. Determine the fix scope from the request's scope and necessary consistency, rather than placement. Follow principles 6 and 7 of `principles/working.md` for permission to change; confirm a scope change if inseparable fixes exceed the request. Do not include independent defects in the same diff merely because of their location or relation to security; report them with their impact. Disappearance of symptoms alone is not evidence that a cause has been removed.
+- **Violations and signs**:
+  - Fixing only the noticed location without investigating uses of the same function or errors with the same cause.
+  - Changing a contract without investigating effects on consumers or stored data.
+  - Including independent defects in the same diff merely because they are in the same module or relate to security.
+  - Calling a contract change complete while leaving affected locations known to require changes unaddressed.
+  - Hiding symptoms with a guard without verifying the cause, and treating the cause as removed too.
+  - Not stating remaining limitations of workarounds or conditions for their removal.
+- **Before and after**: "Changed the return type of `parseDate` to `Date | null`" → "Investigated effects on callers and stored data, and made changes essential to the new contract within the request's scope. Reported independent defects with their impact."
+- **blocking**: A contract is changed without investigating effects on consumers or stored data, or work is called complete while affected locations confirmed as necessary for the contract or invariants remain unaddressed.
+- **Evidence**: References to observations confirming the cause, investigation results for affected uses and errors with the same cause, each response, and reasons for the fix scope. For workarounds, show effects that can be isolated, remaining limitations, and removal conditions.
 
-## 6. 権限と情報は必要な範囲だけ渡す
+## 6. Pass only the authority and information needed
 
-- **適用場面**: 外部サービス、クライアント、別プロセスなどへ情報や操作権限を渡すとき。
-- **適用除外**: なし。
-- **原則**: 受け手が行う処理に必要な情報と権限を特定し、その範囲に絞って渡す。内部で取得できるレコードや、利用できる強い資格情報を、そのまま渡す理由にはしない。情報には渡した後で回収・制限できないものもあるため、必要性は渡す前に判断する。
-- **違反・兆候**:
-  - 一部の項目で足りる外部処理へ、内部レコード全体を送る。
-  - 読み取りだけの処理へ、更新・削除の権限も渡す。
-  - 対象を限定できるのに、全体へアクセスできる資格情報を渡す。
-- **変更前・変更後**: `translate(customer)` → `translate({ displayName: customer.displayName })`
-- **blocking**: 受け手の処理に不要な機密情報、または必要性を説明できない権限を渡している。
-- **根拠**: 渡す情報・権限ごとに、必要とする処理との対応を示す。より狭い範囲では処理を満たせない場合は、その理由を示す。
+- **Applicability**: When passing information or operation authority to external services, clients, other processes, and so on.
+- **Exemptions**: None.
+- **Principle**: Identify the information and authority required for the recipient's processing, and limit what is passed to that scope. Internally accessible records or available powerful credentials are not reasons to pass them as-is. Some information cannot be retrieved or restricted after disclosure, so determine its necessity before passing it.
+- **Violations and signs**:
+  - Sending entire internal records to external processing that needs only some fields.
+  - Passing update and deletion permissions to read-only processing.
+  - Passing credentials with access to everything when access can be limited to the target.
+- **Before and after**: `translate(customer)` → `translate({ displayName: customer.displayName })`
+- **blocking**: Passing confidential information unnecessary for the recipient's processing, or authority whose necessity cannot be explained.
+- **Evidence**: For each piece of information or authority passed, show its relationship to the processing that requires it. If a narrower scope cannot satisfy the processing, explain why.

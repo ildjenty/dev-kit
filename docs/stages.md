@@ -8,7 +8,7 @@ kit は、利用者が[ループの雛形](architecture/data.md#ループの雛�
 
 ステージ定義はリポジトリが所有する `.devkit/stages/` に置く。要件の正本は `.devkit/requirements.md`、構造の記録は `.devkit/structure.json`、規則は `.devkit/rules.md` であり、これらの配置は `devkit.toml` の `[paths]` で変更できる。各ステージで決めたことのうち、後の作業に効かせたい要件は要件の正本へ、構造は構造の記録へ、複数の作業で守る変更困難な決定は規則へ残す。固定の `.devkit/run/` の記録は git 管理しない。
 
-元に戻せないもの(変更困難な決定)の判断は、[`assets/principles/designing.md` の原則1](../assets/principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する)に従う。
+元に戻せないもの(変更困難な決定)の判断は、[`assets/principles/designing.md` の原則1](../assets/principles/designing.md#1-identify-decisions-that-are-hard-to-change-early-and-finalize-them-after-obtaining-the-evidence-needed)に従う。
 
 ## 0 目的
 

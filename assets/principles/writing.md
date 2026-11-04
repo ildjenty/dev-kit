@@ -1,143 +1,143 @@
-# 文章の原則
+# Writing principles
 
-目的は、読み手が一度読んで理解できる文章にすることである。
+The purpose is text that readers can understand on the first reading.
 
-## 1. 結論と、人の判断に必要なことを先に書く
+## 1. Put conclusions and information needed for human decisions first
 
-- **適用場面**: 文書、報告、PR 本文を提示するとき、check の結果を記録・報告するとき。
-- **適用除外**:
-  - 発生順を保存する原記録を並べ替えると前後関係や証拠性を損なうとき。外すのは保存が必要な記録部分の記載順の要求だけであり、その部分の順序を保ち、判断に必要な情報と check の全件記録は残す。成果物には、保存が必要な記録部分と理由を示し、記録外に要約を添えられるときは、結論と判断に必要な情報を先に示す。
-  - 提出先が記載順を受理条件として指定し、結論の先行や要約の追加を認めないとき。外すのは指定された部分の記載順の要求だけであり、指定された順序に従い、判断に必要な情報と check の全件記録は残す。成果物には、指定書式の参照先とその条件を示す。
-- **原則**: 文書の目的に合わせ、結論と読み手に必要な情報を先に示す。報告と PR 本文には、変更の範囲、検証結果、採否や安全な利用を左右する判断・未確認事項・リスクを記載する。対応を求める場合は行動を明記し、対応不要の報告も提示する。check の出力と記録には指摘を全件残す。人向けの報告には、現在必要な判断と関連する結果を示し、全件の記録と省略した詳細をたどれるようにする。実装の詳細は、変更や検証結果、判断の理解に必要なものを記載する。Scope では変更に含めるものと含めないものを示し、Tradeoffs には読み手が採否を確認する必要のある却下案を記載する。判断に必要のない決定者は記載しない。
-- **違反・兆候**:
-  - 経緯から書き始め、結論や判断に必要な情報が末尾にある。
-  - 報告や PR 本文から、変更の範囲や検証結果を読み取れない。
-  - 変更の採否や安全な利用を左右する判断・未確認事項・リスクが省かれている。
-  - 判断に関係しない実装の詳細や指摘の列挙に埋もれ、必要な情報を見落とす。
-  - 見出しや箇条書きで伝わる内容を、本文で繰り返している。
-  - 対応が必要であるのに求める行動が分からない、または対応不要の報告に行動を求めている。
-  - check の記録に指摘が残っていない、または報告から全件の記録や省略した詳細をたどれない。
-- **変更前・変更後**: 「変えたファイルは次のとおりである。暫定判断は末尾に記載した」→「プランの機能制御を変更した。対象プランの検証は完了したが、既存契約での動作は未確認である。未確認の範囲を踏まえ、採否を判断してほしい」
-- **blocking**: 判断を左右する情報が欠けているか、読み手が見落とす配置にあり、誤判断につながる。
-- **根拠**: 読み手が結論と必要な情報を見つけ、変更の範囲・検証結果・対応の要否を判断でき、全件の記録と省略した詳細をたどれること。
+- **Applicability**: When presenting documents, reports, or PR descriptions, or recording or reporting check results.
+- **Exemptions**:
+  - When reordering original records that preserve event order would damage sequence or evidentiary value. Waive only ordering requirements for the portions that must be preserved; keep their order, information needed for decisions, and complete check records. Show in the artifact the portions requiring preservation and why; if a summary can be added outside the record, put conclusions and information needed for decisions first.
+  - When the recipient requires a specified order for acceptance and permits neither conclusions first nor added summaries. Waive only ordering requirements for the specified portions; follow the required order and retain information needed for decisions and complete check records. Show in the artifact a reference to the required format and its conditions.
+- **Principle**: Put conclusions and information readers need first, according to the document's purpose. Reports and PR descriptions must state the scope of changes, verification results, and decisions, unverified matters, and risks affecting acceptance or safe use. When requesting a response, state the action explicitly, and also present reports that require no response. Preserve all findings in check outputs and records. Reports for people must show decisions currently needed and relevant results, with access to complete records and omitted details. Include implementation details needed to understand changes, verification results, or decisions. In Scope, state what is and is not included; in Tradeoffs, state rejected options whose acceptance readers need to assess. Do not name decision-makers unnecessary for the decision.
+- **Violations and signs**:
+  - Starting with background and placing conclusions or information needed for decisions at the end.
+  - Change scope or verification results cannot be understood from reports or PR descriptions.
+  - Omitting decisions, unverified matters, or risks affecting change acceptance or safe use.
+  - Necessary information is missed amid implementation details or lists of findings unrelated to the decision.
+  - Repeating in body text what headings or bullets already convey.
+  - When action is needed, the requested action is unclear, or a report requiring no response asks for action.
+  - Check records lack findings, or complete records and omitted details cannot be reached from the report.
+- **Before and after**: "The changed files are listed below. The provisional judgment is at the end" → "Changed feature controls by plan. Verification of the target plan is complete, but behavior under existing contracts remains unverified. Please decide acceptance with that unverified scope in mind."
+- **blocking**: Information affecting a decision is missing or placed where readers miss it, leading to mistaken decisions.
+- **Evidence**: Readers can find conclusions and necessary information, judge change scope, verification results, and whether a response is needed, and access complete records and omitted details.
 
-## 2. 想定読者の前提を定め、会話に依存せず書く
+## 2. Define assumptions about readers and write independently of the conversation
 
-- **適用場面**: 読み手に合わせて名前や用語を選ぶとき、会話や資料の内容を文書・報告・PR 本文・レビューコメントにするとき。
-- **適用除外**: 発言や資料の原文を引用して照合する必要があり、用語の統一や一人称の言い換えによって、原文との差異や発言者の意図を確かめられなくなるとき。引用部分は原文を保ち、出典と理解に必要な前提を引用の外に示す。
-- **原則**: 想定読者と、前提にしてよい知識・参照資料を定める。その前提では意味が伝わらない関数名、作業中に付けた名前、番号だけの参照には、目的の説明や参照先を添えるか、意味が分かる表現に言い換える。文書とコードで使われている言葉を使い、同じものは同じ用語で呼ぶ。会話だけで共有した判断上の前提は本文に残すか、参照先を示す。作業を見ていない読み手が、必要な資料を使って対象の判断や作業を行えるかを確かめ、会話に出ていない同種のケースにも当てはめる。文章で述べる事実と推論の確認は、`principles/verification.md` の原則1・2に従う。依頼や資料の説明を補足する場合は、出典の内容と補足を区別し、根拠を示す。PR 本文とレビューコメントでは、一人称を使わず、変更や判断そのものを主語にする。
-- **違反・兆候**:
-  - 想定読者の知識や参照資料を定めず、説明を省いたり、既知の内容を説明し続けたりしている。
-  - 番号や名前だけで説明し、想定読者が目的を読み取れない。
-  - 会話中に付けた名前・略語・比喩や、会話を知らなければ分からない前提がある。
-  - 同じものを「配置」と「置き場所」の両方で呼んでいる。用語が異なり、別のものと解釈される。
-  - 通常カタカナで使う用語（テーブル、レイヤー、リトライ、フォーマット）を、無理に日本語へ置き換えている。
-  - 会話中の例だけに適用範囲が限定され、同種のケースの判断が読み取れない。
-  - 補足した説明を出典の内容として書いている。
-  - PR 本文やレビューコメントで一人称を使っている。
-- **変更前・変更後**: 「#48 に entitlements を追加」→「プランに応じて使える機能を制御する仕組みを追加(#48)」
-- **blocking**: 読み手が意味を取り違える名前や用語の揺れがある。事実確認については `principles/verification.md` の原則1を文章の主張にも適用し、未確認の内容を確認済みとして書いた場合も対象とする。
-- **根拠**: 想定読者が前提とする資料を使い、会話を知らなくても必要な区別を読み取り、対象の判断や作業を行えること。出典の内容と補足の対応、または観点 `wording` の check の結果。
+- **Applicability**: When choosing names or terms for readers, or turning conversation or source material into documents, reports, PR descriptions, or review comments.
+- **Exemptions**: When original statements or materials must be quoted for comparison, and standardizing terms or rephrasing first-person wording would prevent checking differences from the original or the speaker's intent. Preserve original text in quotations and give sources and assumptions needed for understanding outside the quote.
+- **Principle**: Define intended readers and the knowledge and reference materials that may be assumed. For function names, names created during work, or number-only references whose meaning those assumptions do not convey, add purpose explanations or references, or rephrase meaningfully. Use words from documents and code, and use the same terms for the same things. Preserve decision assumptions shared only in conversation in the text or provide references. Check whether readers who did not observe the work can make the relevant decisions or perform the work using necessary materials, and apply the same approach to similar cases not discussed in the conversation. Follow principles 1 and 2 of `principles/verification.md` for verifying facts and inferences stated in writing. When supplementing explanations of requests or materials, distinguish source contents from additions and give evidence. In PR descriptions and review comments, avoid first person and make the changes or decisions themselves the subject.
+- **Violations and signs**:
+  - Omitting explanations or continuing to explain known content without defining readers' knowledge or reference materials.
+  - Explaining through numbers or names alone, leaving intended readers unable to infer the purpose.
+  - Names, abbreviations, or metaphors created during conversation, or assumptions incomprehensible without it.
+  - Calling the same thing both "placement" and "location." Different terms suggest different things.
+  - Forcing terms normally used in katakana in Japanese (table, layer, retry, format) into native Japanese equivalents.
+  - Applicability is limited to examples from the conversation, leaving judgments for similar cases unclear.
+  - Writing supplementary explanations as though they were source contents.
+  - Using first person in PR descriptions or review comments.
+- **Before and after**: "Add entitlements to #48" → "Add a mechanism controlling available features by plan (#48)."
+- **blocking**: Names or inconsistent terms cause readers to misunderstand meanings. For fact verification, apply principle 1 of `principles/verification.md` to written claims too, including unverified content presented as verified.
+- **Evidence**: Intended readers can use the assumed materials to understand necessary distinctions and make relevant decisions or perform work without knowing the conversation. Correspondence between source contents and additions, or check results from the `wording` perspective.
 
-## 3. 誰が何をするかが分かる具体的な言葉で書く
+## 3. Use concrete language that makes clear who does what
 
-- **適用場面**: 動作、状態、判断基準を文章にするとき。
-- **適用除外**:
-  - 既に生じている誤解を正す必要があり、「〜ではなく〜」の対比を避けると、誤った理解と正しい理解の違いが伝わらなくなるとき。外すのは「〜ではなく〜」の対比の禁止だけである。成果物には、正す対象の誤解と正しい理解を示す。
-  - 複数の条件・操作とその結果を同じ項目順で対応づけて参照するとき。外すのは構文の反復の禁止だけであり、主語・動作・判断基準の具体性は保つ。成果物には、各文の条件・操作と結果の対応を示す。
-- **原則**: 誰が、または何が、どうするのか、どうなるのかを、具体的な主語と動詞で書く。比喩・擬人化・英語の直訳・名詞化で意味を曖昧にせず、判断基準を具体的に示す。「〜ではなく〜」の対比は使わず、同じ構文を繰り返さない。
-- **違反・兆候**:
-  - 「上に乗るもの」「名乗る」「守りを弱める」のような比喩や擬人化がある。「後のステップと、これを使うコード」「出力に明記する」「別の店のデータが読めるようになる」と具体的に書く。
-  - 物を主語にして人のように動作させる文や、「〜することができる」「〜を持つ」「〜することによって」といった直訳の形がある。「確かめることができる」は「確かめられる」とする。
-  - 「重複登録の対処」のように名詞化し、誰が何をするかが消えている。「同じ店が二重に登録されないように直す」と書く。
-  - 「適切に」「必要に応じて」「分かりやすいほう」のように、人によって判断が分かれる言い方がある。
-  - 抽象名詞と動詞を組み合わせただけの表現で済ませている。
-  - 誤解を正す目的のない対比や、同じ対比構文の繰り返しがある。
-- **変更前・変更後**: 「守りを弱める」→「アプリが別の店のデータを読めるようになる」
-- **blocking**: 比喩・直訳・名詞化・判断が分かれる言い方のうち、意味が取れなくなるものがある。
-- **根拠**: 観点 `wording` の check の結果。
+- **Applicability**: When describing actions, states, or judgment criteria.
+- **Exemptions**:
+  - When an existing misunderstanding needs correction, and avoiding "not X but Y" contrasts would obscure the difference between the mistaken and correct understanding. Waive only the ban on "not X but Y" contrasts. Show in the artifact the misunderstanding being corrected and the correct understanding.
+  - When multiple conditions or operations and their results are matched in the same item order for reference. Waive only the ban on repeated sentence structures; preserve concrete subjects, actions, and judgment criteria. Show in the artifact how each sentence's condition or operation corresponds to its result.
+- **Principle**: Use concrete subjects and verbs to state who or what acts, what they do, and what happens. Do not obscure meaning through metaphors, personification, literal translations from English, or nominalization; state judgment criteria concretely. Do not use "not X but Y" contrasts or repeat the same sentence structure.
+- **Violations and signs**:
+  - Metaphors or personification such as "what sits on top," "calls itself," or "weakens the defenses." Write concretely: "later steps and code using this," "state explicitly in the output," or "allows reading another store's data."
+  - Sentences make objects act like people, or use literal English-to-Japanese forms equivalent to "can do," "have," or "by doing." In Japanese, replace the verbose form of "can verify" with its concise potential form.
+  - Nominalizations such as "handling duplicate registration" obscure who does what. Write "Fix it so the same store cannot be registered twice."
+  - Wording such as "appropriately," "as needed," or "whichever is easier to understand" permits different judgments by different people.
+  - Relying on expressions that merely combine abstract nouns and verbs.
+  - Contrasts that do not correct misunderstandings, or repetition of the same contrast structure.
+- **Before and after**: "Weaken the defenses" → "The app becomes able to read another store's data."
+- **blocking**: Metaphors, literal translations, nominalizations, or wording allowing differing judgments make the meaning incomprehensible.
+- **Evidence**: Check results from the `wording` perspective.
 
-## 4. 理解・実行・参照に必要な長さと構成にする
+## 4. Use the length and structure needed for understanding, execution, and reference
 
-- **適用場面**: 説明の長さや構成、本文・箇条書き・表の使い分けを決めるとき。
-- **適用除外**: 表形式が提出先の受理条件であるとき、または識別子から同じ種類の項目を引く参照表を文章に展開すると項目の対応を追いにくくなるときは、比較以外の用途にも表を使ってよい。指定書式の参照先、または参照に使う識別子と対応する項目・検索のしかたを示す。外すのは表の用途の制限だけであり、理解・実行・参照に必要な情報量と説明は保つ。
-- **原則**: 読み手が理解・実行・参照の目的を果たせるように、必要な情報量と構成を選ぶ。抽象的な説明だけでは区別や適用を誤る場合に、具体例を添える。表は比較に使い、説明の列挙には使わない。
-- **違反・兆候**:
-  - 短さを優先して説明を圧縮し、理解や実行に必要な内容が省かれている。
-  - 情報はそろっているが、参照する箇所や実行する操作を見つけられない。
-  - 抽象的な説明だけでは区別や適用を誤る箇所に、具体例がない。
-  - 説明を列挙するために表を使っている。
-- **変更前・変更後**: 「具体例を省いて説明を短くする」→「適用を誤りやすい箇所に具体例を添え、読み手が操作を選べる構成にする」
-- **blocking**: なし。
-- **根拠**: 読み手が目的に必要な情報を見つけ、区別や適用、操作を読み取れること。
+- **Applicability**: When deciding explanation length or structure, or choosing prose, bullets, or tables.
+- **Exemptions**: Tables may be used for purposes other than comparison when the recipient requires a table for acceptance, or when converting a reference table that looks up the same kinds of items by identifier into prose would make correspondence hard to follow. Show a reference to the required format, or the lookup identifiers, corresponding items, and how to search. Waive only restrictions on table use; preserve the information and explanation needed for understanding, execution, and reference.
+- **Principle**: Choose information volume and structure that let readers accomplish understanding, execution, or reference. Add concrete examples where abstract explanations alone would cause mistaken distinctions or application. Use tables for comparison, not for listing explanations.
+- **Violations and signs**:
+  - Prioritizing brevity compresses explanations and omits content needed for understanding or execution.
+  - All information exists, but readers cannot find the relevant reference or action.
+  - No concrete examples where abstract explanations alone lead to mistaken distinctions or application.
+  - Using tables to list explanations.
+- **Before and after**: "Omit concrete examples to shorten the explanation" → "Add examples where application is easily mistaken, and structure the text so readers can choose operations."
+- **blocking**: None.
+- **Evidence**: Readers can find information needed for their purpose and understand distinctions, application, and operations.
 
-## 5. 正本と更新責任を定め、文書の競合と矛盾を防ぐ
+## 5. Define authoritative sources and update ownership to prevent conflicting or contradictory documents
 
-- **適用場面**: 文書を新しく作るとき、既存の文書を更新するとき、要約や例を再掲するとき。
-- **適用除外**: 利用目的・更新時期・分量が異なり、同じ文書にまとめると必要な情報を見つけにくくなるときは、説明を近くに置く要求だけを外し、文書を分けてよい。分ける理由と各文書の用途を示す。正本・更新責任・再掲内容との対応・更新方法を定め、同じ作業に必要な制約は実行箇所から参照できるようにする。
-- **原則**: 正本を定め、更新責任を一つにする。読み手の理解や実行に必要な要約・例・派生表示は、正本との対応と更新方法が分かる形で再掲する。コードや設定の説明にも、正本となるコードや設定を示す。同じ対象・バージョン・用途について、独立して更新される競合した説明を作らない。同じ作業や判断に必要な説明・制約・手順は近くに置く。見出しと内容、図と本文を一致させる。
-- **違反・兆候**:
-  - 記載した件数と列挙した件数が一致していない。
-  - 見出しと内容、図と本文が一致していない。
-  - 要約や例の正本、対応する箇所、更新方法が分からない。
-  - 同じ対象・バージョン・用途の説明が、別々の判断で更新されている。
-  - 異なるバージョンの契約や変更時点の記録に、適用対象や現行バージョンへの導線がない。
-  - 同じ作業に必要な制約と手順が離れ、手順だけでは制約を見落とす。
-- **変更前・変更後**: 「同じ設定例を別々に更新する」→「設定例の正本と更新責任を定め、手順には正本の該当箇所と更新方法を示して必要な例を再掲する」
-- **blocking**: なし（観点 `consistency` で検出する）。
-- **根拠**: 観点 `consistency` の check の結果と、正本・更新責任・再掲内容の対応。各文書の適用対象が明確で、同じ作業に必要な情報を参照できること。
+- **Applicability**: When creating or updating documents or republishing summaries or examples.
+- **Exemptions**: When usage purposes, update timing, or length differ and combining documents would make necessary information harder to find, waive only the requirement to place explanations close together and allow separate documents. State why they are separate and each document's use. Define authoritative sources, update ownership, correspondence to republished content, and update methods; make constraints needed for the same work accessible from where it is performed.
+- **Principle**: Define the authoritative source and assign update responsibility to one owner. Republish summaries, examples, or derived views needed for understanding or execution in a form that makes their correspondence to the authoritative source and update method clear. Identify authoritative code or configuration in explanations of code or configuration too. Do not create competing, independently updated explanations for the same subject, version, and purpose. Keep explanations, constraints, and procedures needed for the same work or decision close together. Match headings to content and diagrams to body text.
+- **Violations and signs**:
+  - Stated counts do not match listed counts.
+  - Headings do not match content, or diagrams do not match body text.
+  - Authoritative sources, corresponding portions, or update methods for summaries or examples are unclear.
+  - Explanations for the same subject, version, and purpose are updated through separate decisions.
+  - Contracts for different versions or records at the time of change lack applicability information or access to the current version.
+  - Constraints and procedures needed for the same work are far apart, so procedures alone allow constraints to be missed.
+- **Before and after**: "Update the same configuration example separately" → "Define the configuration example's authoritative source and update owner; republish necessary examples in procedures with references to the corresponding source portions and update methods."
+- **blocking**: None (detected by the `consistency` perspective).
+- **Evidence**: Check results from the `consistency` perspective and correspondence among authoritative sources, update ownership, and republished content. Each document's applicability is clear, and information needed for the same work is accessible.
 
-## 6. 現在有効な内容と、経緯・予定を区別する
+## 6. Distinguish current content from history and plans
 
-- **適用場面**: 現行仕様を説明するとき、調査報告や決定記録を残すとき、日程が実行や判断を左右する作業を記録するとき。
-- **適用除外**: 一次資料に年がなく、確認した範囲でも年を特定できないときは、年の記載の要求だけを外し、年を補わず原記載を保つ。出典と確認した範囲を示し、年が未確認であることを明記する。年の確定が必要な前後関係は断定しない。
-- **原則**: 現行仕様の文書では現在有効な内容と過去の内容を区別し、過去の記述を現行仕様として読ませない。調査報告や決定記録では、判断を支える経緯と観測時点を残す。日程が実行や判断を左右する作業には、必要な予定と判断期限を記載する。確定した制約、合意した目標、所要時間の見積もりを区別し、変更時に更新する。現行仕様の説明に無関係な途中経過は持ち込まない。日付は年から記載する。
-- **違反・兆候**:
-  - 過去の内容と現在有効な内容を区別できない。
-  - 調査報告や決定記録に、判断を支える経緯や観測時点がない。
-  - 作業の実行や判断に必要な予定・判断期限が記載されていない。
-  - 確定した制約、合意した目標、見積もりが混ざっている。
-  - 変更された予定が更新されていない、または日付に年がない。
-- **変更前・変更後**: 「当初の仕様と変更後の仕様を区別せず並べる」→「現行仕様を明示し、変更の経緯は決定記録に時点とともに残す」
-- **blocking**: なし。
-- **根拠**: 記述の時点と現在の有効性を区別でき、判断を支える経緯・観測時点、作業に必要な予定・判断期限を確認できること。
+- **Applicability**: When explaining current specifications, retaining investigation reports or decision records, or recording work whose execution or decisions depend on schedules.
+- **Exemptions**: When primary materials omit the year and it cannot be identified within the verified scope, waive only the requirement to state the year, preserving the original without supplying one. Show the source and verified scope, and explicitly state that the year is unverified. Do not assert chronology that requires the year to be established.
+- **Principle**: In current-specification documents, distinguish current content from past content so past descriptions are not read as current specifications. In investigation reports and decision records, retain the history supporting decisions and the time of observation. For work whose execution or decisions depend on schedules, state necessary plans and decision deadlines. Distinguish fixed constraints, agreed goals, and duration estimates, and update them when they change. Do not bring irrelevant intermediate history into explanations of current specifications. Write dates starting with the year.
+- **Violations and signs**:
+  - Past content and current content are indistinguishable.
+  - Investigation reports or decision records lack history or observation times supporting decisions.
+  - Plans or decision deadlines needed for execution or decisions are missing.
+  - Fixed constraints, agreed goals, and estimates are mixed.
+  - Changed schedules are not updated, or dates lack years.
+- **Before and after**: "List initial and revised specifications without distinction" → "Identify current specifications, and retain the history of changes with their times in decision records."
+- **blocking**: None.
+- **Evidence**: Readers can distinguish the time described and current validity, and check history and observation times supporting decisions, as well as schedules and decision deadlines needed for work.
 
-## 7. 判断を求めるときは、短い選択肢に推奨と理由を添える
+## 7. When asking for decisions, provide concise options with a recommendation and reasons
 
-- **適用場面**: 人に判断を求めるとき。
-- **適用除外**:
-  - 選択肢への独立した評価を集める必要があり、推奨を先に示すと回答が誘導され、懸念や代替案を見落とすとき。外すのは推奨の提示の要求だけである。成果物には、選択肢の違いと判断に必要な情報を示す。
-  - 選択肢や優劣を定める前提として、人が決める制約または人にしか分からない事実を確認する必要があるとき。外すのはその確認での選択肢と推奨の提示の要求だけであり、過去の回答から判断できる事項にはこの除外を適用しない。成果物には、不足する前提と回答によって変わる候補を示す。
-- **原則**: 選択肢の違いと推奨の理由が、人の判断に役立つものかを確かめる。一度に確認する事項は少数に絞る。過去の回答から判断できることは質問しない。
-- **違反・兆候**:
-  - 過去の回答から判断できることを再び質問している。
-  - 一度に多数の事項を確認している。
-- **変更前・変更後**: 「どうしますか?」→「既存の文書を修正するか、別の文書を作るか。更新箇所を1つに保つため、既存の文書を修正する案を推奨する」
-- **blocking**: なし。
-- **根拠**: 選択肢と推奨の記載。
+- **Applicability**: When asking people to decide.
+- **Exemptions**:
+  - When independent evaluations of options are needed and presenting a recommendation first would bias responses and hide concerns or alternatives. Waive only presentation of a recommendation. Show in the artifact differences between options and information needed for decisions.
+  - When defining options or preferences first requires confirming constraints decided by a person or facts only that person knows. Waive only presentation of options and recommendations in that confirmation; do not apply this exemption to matters decidable from previous answers. Show in the artifact the missing assumptions and candidates that change according to the answer.
+- **Principle**: Check that differences between options and reasons for recommendations help human decisions. Limit the number of matters asked about at once. Do not ask what can be decided from previous answers.
+- **Violations and signs**:
+  - Asking again about matters decidable from previous answers.
+  - Asking about many matters at once.
+- **Before and after**: "What should we do?" → "Revise the existing document or create a separate one? Revising the existing document is recommended to keep one place to update."
+- **blocking**: None.
+- **Evidence**: Stated options and recommendations.
 
-## 8. 図の目的を定め、関係の種類と向きを示す
+## 8. Define a diagram's purpose and show relationship kinds and directions
 
-- **適用場面**: 図で構造や動作を説明するとき。
-- **適用除外**: 記法や凡例で関係の意味が明確なときは、矢印ごとの同じラベルの繰り返しを省く。重複するラベルが矢印や他の記載に重なると、関係を追いにくくなるためである。
-- **原則**: 図で何を示すかを定め、関係の種類と向きを読み取れるようにする。動作を示す図には、動作とその理解に必要な条件を記載する。構造を示す図に未確認の動作を足さない。
-- **違反・兆候**:
-  - 箱や矢印が何を表すか分からず、依存関係と実行時の動作を区別できない。
-  - 関係の向きや、動作を成立させる条件が読み取れない。
-  - 依存関係の記録だけを根拠に、読む・書くなどの未確認の動作を足している。
-- **変更前・変更後**: 「依存関係だけを確認した矢印に『書く』と付ける」→「依存関係を示す図であることを明示し、依存先への向きを凡例に示す」
-- **blocking**: なし。
-- **根拠**: 図が根拠となる記録に対応し、関係の種類・向き・動作に必要な条件を区別できること。
+- **Applicability**: When explaining structure or behavior through diagrams.
+- **Exemptions**: When notation or a legend makes relationship meanings clear, omit repeated identical labels on each arrow. Duplicate labels overlapping arrows or other content make relationships hard to follow.
+- **Principle**: Define what the diagram shows and make relationship kinds and directions understandable. For behavior diagrams, include actions and conditions needed to understand them. Do not add unverified behavior to structure diagrams.
+- **Violations and signs**:
+  - Boxes or arrows have unclear meanings, making dependencies indistinguishable from runtime behavior.
+  - Relationship directions or conditions enabling behavior cannot be understood.
+  - Adding unverified behavior such as reading or writing based only on dependency records.
+- **Before and after**: "Label an arrow 'writes' when only the dependency was verified" → "State that the diagram shows dependencies, and show direction toward dependencies in the legend."
+- **blocking**: None.
+- **Evidence**: The diagram corresponds to its supporting records, and readers can distinguish relationship kinds, directions, and conditions needed for behavior.
 
-## 9. 読める情報と、伝えてよい情報を区別する
+## 9. Distinguish information you can read from information you may share
 
-- **適用場面**: 会話、ログ、実データ、非公開資料の内容を、報告・PR・文書へ移すとき。
-- **適用除外**: 開示が認められた実データを使う必要があり、置き換えると障害の再現条件や記録の照合に必要な証拠を失うとき。置き換えを省く範囲は目的に必要な情報に限る。
-- **原則**: 対象読者と公開範囲を確かめ、開示が認められた情報を、目的に必要な範囲で伝える。実データは、判断に必要な構造や条件を保って置き換える。非公開情報の開示可否を確認できない場合は、原文を転載しない。
-- **違反・兆候**:
-  - 原文を読めたことだけを根拠に転載している。
-  - 説明に不要な個人識別情報や認証情報が残っている。
-  - 情報を置き換えた際に、失敗を起こす条件まで変えている。
-- **変更前・変更後**: 「顧客の実名と注文本文をそのまま再現例に使う」→「実名を架空名に置き換え、問題を起こした文字数と入力条件を保つ」
-- **blocking**: 読み手への開示が認められていない情報、または開示可否を確認できない非公開情報を含む。
-- **根拠**: 転記元の扱い、対象読者と公開範囲、残す情報の必要性、置き換え後も説明・検証に必要な条件が保たれていること。
+- **Applicability**: When transferring content from conversations, logs, real data, or private materials into reports, PRs, or documents.
+- **Exemptions**: When real data authorized for disclosure must be used, and substitution would lose failure reproduction conditions or evidence needed to compare records. Limit the scope without substitution to information necessary for the purpose.
+- **Principle**: Check the target readers and disclosure scope, and communicate information authorized for disclosure only to the extent necessary for the purpose. Substitute real data while preserving structures and conditions needed for decisions. Do not reproduce original private information if permission to disclose it cannot be confirmed.
+- **Violations and signs**:
+  - Reproducing original text solely because it could be read.
+  - Personally identifying information or credentials unnecessary for the explanation remain.
+  - Substitution also changes conditions causing failure.
+- **Before and after**: "Use customers' real names and order text unchanged in a reproduction example" → "Replace real names with fictional ones while preserving the character count and input conditions that caused the problem."
+- **blocking**: Includes information not authorized for disclosure to readers, or private information whose disclosure permission cannot be confirmed.
+- **Evidence**: Handling of the source, target readers and disclosure scope, necessity of retained information, and preservation of conditions needed for explanation or verification after substitution.

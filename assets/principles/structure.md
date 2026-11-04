@@ -1,106 +1,106 @@
-# モジュールと依存
+# Modules and dependencies
 
-## 1. 名前と配置で役割が分かるようにする
+## 1. Make roles clear through names and placement
 
-- **適用場面**: モジュール・ファイル・フォルダを新しく作るとき、どこに置くかを決めるとき。
-- **適用除外**: 生成規則や外部仕様が名前・配置を固定しており、変更すると再生成や仕様との対応が壊れるときは、その固定された名前・配置に限って除外する。責務の分離と、契約・制約・設計理由への導線は除外しない。成果物には、固定される対象と、固定を要求する規則・仕様への参照を示す。
-- **原則**: 何をするモジュールで、なぜその場所にあるのかが、名前・配置・依存関係から分かる構造にする。構造だけでは表せない契約・制約・設計理由は、必要な箇所から参照できる形で残す。独立した変更理由を持つ処理を分け、常に一緒に変更・理解する必要がある知識はまとめる。配置は、リポジトリの「配置ガイド」（各パッケージの README または CLAUDE.md に記載した、配置するもの・配置しないもの）に従う。次の開発担当者は、開いたファイルしか参照しないエージェントであるという前提で確認する。
-- **違反・兆候**:
-  - 独立した変更理由を持つ処理が混在している。または、常に一緒に変更・理解する必要がある知識が分散している。
-  - どこに置けばよいか決められないコードがある。置きやすい場所に置かれている。
-  - 判断に必要な契約・制約・設計理由を、該当するコードから参照できない。
-  - （設計案で）新しいモジュールの配置を、責務から正当化できない。
-- **変更前・変更後**: `utils/helpers.ts` に `formatPrice` と `retryFetch` → `pricing/format.ts` と `http/retry.ts`
-- **blocking**: 配置を責務から正当化できない。
-- **根拠**: 新しく作ったモジュールごとの役割と配置の理由、理解に必要な契約・制約・設計理由への導線。分割する場合は、独立して変更できる処理と、分割後も共有する必要がある知識を示す。
+- **Applicability**: When creating modules, files, or folders, or deciding where to place them.
+- **Exemptions**: When generation rules or external specifications fix names or placement, and changing them would break regeneration or correspondence with the specifications, exempt only those fixed names and placements. Do not exempt separation of responsibilities or access to contracts, constraints, and design reasons. Show in the artifact the fixed items and references to the rules or specifications requiring them.
+- **Principle**: Structure modules so that names, placement, and dependencies show what each module does and why it belongs there. Preserve contracts, constraints, and design reasons that structure alone cannot express in a form accessible from where they are needed. Separate processing with independent reasons for change, and group knowledge that must always be changed and understood together. Follow the repository's "placement guide" (what belongs and does not belong, documented in each package's README or CLAUDE.md). Check on the assumption that the next developer is an agent that references only files it opens.
+- **Violations and signs**:
+  - Mixing processing with independent reasons for change. Or scattering knowledge that must always be changed and understood together.
+  - Code has no clear place to belong and is placed wherever convenient.
+  - Contracts, constraints, or design reasons needed for decisions cannot be referenced from the relevant code.
+  - (In a design proposal) A new module's placement cannot be justified by its responsibilities.
+- **Before and after**: `formatPrice` and `retryFetch` in `utils/helpers.ts` → `pricing/format.ts` and `http/retry.ts`
+- **blocking**: Placement cannot be justified by responsibilities.
+- **Evidence**: Each new module's role and placement rationale, and access to contracts, constraints, and design reasons needed to understand it. For splits, show processing that can change independently and knowledge that must remain shared afterward.
 
-## 2. 成立条件が保たれる検証は繰り返さない
+## 2. Do not repeat validation while its validity conditions remain true
 
-- **適用場面**: 外部（利用者の入力、API、ファイル、環境変数）から値を受け取る処理や、同じ条件を重複して検証する処理を設計するとき。
-- **適用除外**: なし。
-- **原則**: 外部と内部、信頼できないデータと信頼できるデータの境界を先に定め、境界で検証・変換・隔離を行う。同じ成立条件が保たれる検証は繰り返さず、内側では内部の型が保証する性質に依存する。型の保証と実行時の状態に依存する保証を区別し、主体・対象・権限・時点・可変状態に依存する条件は、それを必要とする操作の境界で確認する。検証済みであることを、コマンド・パス・SQL で安全に利用できる根拠にしない。利用先の解釈に応じて値と命令を分離し、対象を許可された範囲に限定する。
-- **違反・兆候**:
-  - 成立条件が保たれているのに、多くの関数の冒頭で同じ null チェック・型チェックを繰り返す。
-  - 欠損する可能性のある値が、内部処理の深い階層まで渡されている。
-  - 検証エラーの扱いが場所ごとに違う。
-  - 受付時に検証済みであることを理由に、実行時の権限や対象の状態を確認しない。
-  - 検証済みの外部入力を、命令との分離や対象範囲の制限なしにコマンド・パス・SQL に組み込む。
-  - （設計案で）外部入力を検証する境界と、内部の型に変換する箇所が書かれていない。
-- **変更前・変更後**: `handler` と `service` が同じ ID の形式を検証する → `handler` で `parsePlanRequest(req.body): PlanRequest` に変換し、`service` は形式を再検証せず、更新操作の境界で権限と対象の状態を確認する
-- **blocking**: 外部入力が命令や許可範囲外の対象として解釈されうる。
-- **根拠**: 保証の成立条件と、それを維持・再確認する場所。コマンド・パス・SQL の利用先で、値と命令の分離および対象範囲の制限を保つ方法を示す。
+- **Applicability**: When designing processing that receives external values (user input, APIs, files, or environment variables), or processing that validates the same conditions repeatedly.
+- **Exemptions**: None.
+- **Principle**: First define the boundaries between external and internal, and untrusted and trusted data; validate, convert, and isolate at those boundaries. Do not repeat validation while the same validity conditions remain true; internally, rely on properties guaranteed by internal types. Distinguish type guarantees from guarantees dependent on runtime state, and check conditions dependent on the actor, target, authority, time, or mutable state at the boundary of the operation that requires them. Being validated does not establish safe use in commands, paths, or SQL. Separate values from instructions according to how the destination interprets them, and limit targets to the permitted scope.
+- **Violations and signs**:
+  - Repeating the same null or type checks at the start of many functions despite preserved validity conditions.
+  - Passing potentially missing values deep into internal processing.
+  - Handling validation errors differently in different places.
+  - Skipping runtime authority or target-state checks because input was validated at intake.
+  - Incorporating validated external input into commands, paths, or SQL without separating instructions or restricting target scope.
+  - (In a design proposal) The external input validation boundary and conversion to internal types are not stated.
+- **Before and after**: Both `handler` and `service` validate the same ID format → Convert with `parsePlanRequest(req.body): PlanRequest` in `handler`; `service` does not revalidate the format, and checks authority and target state at the update operation's boundary
+- **blocking**: External input can be interpreted as instructions or as a target outside the permitted scope.
+- **Evidence**: The conditions under which guarantees hold and where they are maintained or rechecked. Show how separation of values from instructions and restrictions on target scope are preserved where commands, paths, or SQL are used.
 
-## 3. 下位レイヤーの契約と実装を特定の利用側に依存させない
+## 3. Keep lower-layer contracts and implementations independent of specific consumers
 
-- **適用場面**: モジュール間の import の向き、レイヤーの分け方を決めるとき。
-- **適用除外**: 契約の理解に必要な利用例や参照としてコメント・エラー・ログに利用側の名前を示すときは、その名前を含む文言が分岐・互換性・利用側固有の制約を担わない場合に限り、その参照表記を除外する。成果物には、参照を必要とする理由と、利用側の変更・削除が下位レイヤーの契約・挙動・判断の変更を必要としない理由を示す。
-- **原則**: 抽象（ポート）は利用側に定義し、実装側には置かない。下位レイヤーの契約と実装を、特定の利用側の事情に依存させない。依存の問題は回避策で処理せず、責務と境界を見直して修正する。コメント・エラー・ログの文言の依存は、利用側の変更によって下位レイヤーの契約・挙動・判断を変える必要があるかで評価する。
-- **違反・兆候**:
-  - 下位レイヤーのコメントが、特定の利用側の事情を下位の契約や制約として扱っている。
-  - 共有の部品が、特定の使う側の事情（フラグ、分岐）を持っている。
-  - 循環を re-export や遅延 import で回避している。
-  - 便利だからという理由で、下位レイヤーに上位レイヤーのためのヘルパがある。
-  - （設計案で）利用側固有の変更によって、下位レイヤーの契約・挙動・判断も変える必要がある。
-- **変更前・変更後**: `db/users.ts` が `features/billing` のフラグで分岐 → `features/billing` が `db/users` を呼び、分岐は `billing` 側に置く
-- **blocking**: 下位レイヤーの責務や説明が、特定の利用側の事情に依存している。
-- **根拠**: 各レイヤーの責務と、利用側の変更が下位レイヤーに波及する条件。利用例や参照を残す場合は、契約の理解に必要な理由を示す。
+- **Applicability**: When deciding import direction between modules or layer boundaries.
+- **Exemptions**: When comments, errors, or logs name a consumer as a usage example or reference necessary to understand the contract, exempt only that reference, and only if the wording containing the name does not implement branching, compatibility, or consumer-specific constraints. Show in the artifact why the reference is necessary and why changing or removing the consumer does not require changing lower-layer contracts, behavior, or decisions.
+- **Principle**: Define abstractions (ports) on the consumer side, not the implementation side. Keep lower-layer contracts and implementations independent of specific consumers' circumstances. Fix dependency problems by reviewing responsibilities and boundaries rather than using workarounds. Evaluate dependencies in comment, error, and log wording by whether consumer changes require changes to lower-layer contracts, behavior, or decisions.
+- **Violations and signs**:
+  - Lower-layer comments treat a specific consumer's circumstances as lower-layer contracts or constraints.
+  - Shared parts contain specific consumers' circumstances (flags or branches).
+  - Avoiding cycles with re-exports or lazy imports.
+  - A lower layer has helpers for an upper layer merely for convenience.
+  - (In a design proposal) Consumer-specific changes also require changes to lower-layer contracts, behavior, or decisions.
+- **Before and after**: `db/users.ts` branches on a `features/billing` flag → `features/billing` calls `db/users`, and branching belongs in `billing`
+- **blocking**: Lower-layer responsibilities or explanations depend on specific consumers' circumstances.
+- **Evidence**: Each layer's responsibilities and the conditions under which consumer changes propagate to lower layers. If retaining usage examples or references, show why they are necessary to understand the contract.
 
-## 4. 全経路に必要な保証を迂回できない構造にする
+## 4. Make guarantees required on every path impossible to bypass
 
-- **適用場面**: 検証・隔離・記録・計測・権限のように、すべての経路に効かせたい処理を置くとき。
-- **適用除外**: DB 側のポリシーなどで境界や対象ごとに保証を強制し、対象の網羅性と迂回できない理由を示せるとき。
-- **原則**: すべての経路に必要な保証は、適用漏れを防げる構造で強制する。共通の通過点に集約できるなら集約する。処理の配置にかかわらず、規約やレビューで適用を呼びかけるだけにせず、必要な保証を迂回できる経路をなくす。
-- **違反・兆候**:
-  - 「この処理でも同じチェックを忘れずに」という、規約やレビュー頼みになっている。
-  - 同じ処理のコピーが、機能ごとに少しずつ違う形である。
-  - 新しい経路を足すたびに、その処理を手で付ける必要があり、適用漏れを検知できない。
-  - 権限の確認を経路ごとに書き、未確認のまま操作できる経路がある。
-  - （設計案で）入口や対象が列挙されておらず、必要な保証をすべてに強制できる根拠がない。
-- **変更前・変更後**: 各 handler の冒頭で `assertTenant(req)` → 各 handler に至る経路が必ず通る router の middleware で強制する
-- **blocking**: 必要な保証を迂回できる経路がある。
-- **根拠**: 入口の列挙、保証を強制する境界、適用漏れの検査。境界や対象ごとに強制する場合は、対象の網羅性と迂回できない理由を示す。
+- **Applicability**: When placing processing intended to apply on every path, such as validation, isolation, recording, measurement, or authorization.
+- **Exemptions**: When guarantees are enforced per boundary or target, such as through DB policies, and completeness of target coverage and reasons they cannot be bypassed can be shown.
+- **Principle**: Enforce guarantees required on every path through structures that prevent omissions. Consolidate them at a shared passage point if possible. Regardless of placement, eliminate paths that can bypass required guarantees instead of relying solely on conventions or reviews to request application.
+- **Violations and signs**:
+  - Relying on conventions or reviews saying "Do not forget the same check in this processing too."
+  - Copies of the same processing differ slightly by feature.
+  - Each new path requires manually attaching the processing, and omissions cannot be detected.
+  - Writing authorization checks separately for each path leaves a path that allows operations without a check.
+  - (In a design proposal) Entry points or targets are not listed, and there is no evidence that required guarantees can be enforced on all of them.
+- **Before and after**: `assertTenant(req)` at the start of each handler → Enforce it in router middleware through which every path to each handler must pass
+- **blocking**: A path can bypass required guarantees.
+- **Evidence**: A list of entry points, boundaries enforcing guarantees, and checks for omissions. When enforcing per boundary or target, show completeness of target coverage and why bypass is impossible.
 
-## 5. フレームワーク・外部サービスの型を公開契約・保存データ・ドメインの型に含めない
+## 5. Keep framework and external service types out of public contracts, stored data, and domain types
 
-- **適用場面**: フレームワーク・外部サービスを利用する処理で、公開する契約・保存するデータ・ドメインの型を決めるとき。
-- **適用除外**:
-  - フレームワークのハンドラ契約など、外部機構を直接操作する境界で、外部型を隠すと中継するだけの抽象が増えるとき。外すのはその境界の契約での外部型の利用を禁じる要求だけであり、直接扱う必要のない利用側・保存データ・ドメインの型への伝播は除外しない。成果物には、境界の責務・外部型が必要な操作・型が伝わる範囲を示す。
-  - 数値・日時などの汎用ライブラリの値型を使うとき。外すのはその値型の利用を禁じる要求だけであり、保存・通信に用いる場合は形式と復元方法を別に定めることを条件とし、内部表現を保存契約とすることは除外しない。成果物には、値型の意味・利用範囲・保存や通信の形式と復元方法を示す。
-  - 差し替えの予定も変換で隠せる外部固有の知識もなく、外部型を使う範囲を同時に変更でき、独立して互換性を維持する公開契約や保存形式を含まないとき。外すのはその範囲での外部型の利用を禁じる要求だけである。成果物には、変換で知識を隠せない理由・外部型の変更が及ぶ範囲・同時に変更できる根拠を示す。
-- **原則**: フレームワーク・外部サービスの型を、公開する契約・保存するデータ・ドメインの型に含めない。境界でその責務に合う型に変換し、外部固有の名前・制約・ライフサイクルを利用側へ漏らさない。変換層は、現在隠す必要のある知識と変更の波及範囲に基づいて設け、将来差し替える可能性だけを追加の理由にしない。
-- **違反・兆候**:
-  - フレームワーク・外部サービスの都合に合わせて、公開契約・保存データ・ドメインの型が変わっている。
-  - 将来の差し替えだけを理由に、同じ情報を中継する独自型と変換を追加している。
-  - （設計案で）公開契約・保存データ・ドメインの型に、フレームワーク・外部サービスの型が含まれている。
-- **変更前・変更後**: `function charge(customer: PaymentService.Customer)` → `function charge(customer: Customer)` と、境界で `toCustomer(externalCustomer)`
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 変換によって隠す外部固有の知識と、公開契約・保存データ・ドメインへの変更の波及範囲。変換・保守の負担に見合う理由、または変換しない理由を示す。
+- **Applicability**: When deciding public contracts, stored data, or domain types in processing that uses frameworks or external services.
+- **Exemptions**:
+  - At boundaries directly operating external mechanisms, such as framework handler contracts, when hiding external types would add abstractions that merely relay information. Waive only the ban on external types in that boundary's contract; propagation into consumers, stored data, or domain types that do not need to handle them directly is not exempt. Show in the artifact the boundary's responsibilities, operations requiring external types, and the scope to which types propagate.
+  - When using value types from general-purpose libraries, such as numbers or dates and times. Waive only the ban on using that value type, on condition that storage and communication formats and restoration methods are separately defined when used for those purposes; using the internal representation as the storage contract is not exempt. Show in the artifact the value type's meaning, usage scope, storage or communication formats, and restoration methods.
+  - When no substitution is planned, conversion would hide no external-specific knowledge, the entire scope using external types can change together, and it includes no public contracts or storage formats whose compatibility must be maintained independently. Waive only the ban on external types within that scope. Show in the artifact why conversion cannot hide knowledge, the reach of external-type changes, and why the scope can change together.
+- **Principle**: Keep framework and external service types out of public contracts, stored data, and domain types. At boundaries, convert them to types suited to the responsibilities there, and do not expose external-specific names, constraints, or lifecycles to consumers. Establish conversion layers based on knowledge that currently needs hiding and the reach of changes; possible future substitution alone does not justify adding them.
+- **Violations and signs**:
+  - Public contracts, stored data, or domain types change to suit frameworks or external services.
+  - Adding custom types and conversions that merely relay the same information solely for future substitution.
+  - (In a design proposal) Public contracts, stored data, or domain types include framework or external service types.
+- **Before and after**: `function charge(customer: PaymentService.Customer)` → `function charge(customer: Customer)` with `toCustomer(externalCustomer)` at the boundary
+- **blocking**: None (record as reference information).
+- **Evidence**: External-specific knowledge hidden by conversion and the reach of changes into public contracts, stored data, and the domain. Show why the conversion and maintenance burden is justified, or why conversion is not performed.
 
-## 6. 変わりうる決定はモジュールに隠す
+## 6. Hide decisions that may change inside modules
 
-- **適用場面**: モジュールが外に見せるもの（公開する関数・型）を決めるとき。
-- **適用除外**: 合意した要求または維持すべき既存の互換契約を満たすために、データ形式・処理方式そのものの公開が必要で、結果や操作の公開だけでは足りないときは、公開が必要な要素に限って除外する。成果物には、要求・互換契約への参照、必要な操作・検証、形式・方式を隠すと要求や契約を満たせない理由を示す。今回作る利用側の依存だけでは、公開が必要である根拠にならない。
-- **原則**: データの保持方法、使用するツール、処理方式など、後から変わりうる決定は、その責務を持つモジュールの内部に隠す。外部に公開するのは、変更頻度の低い契約だけとする。公開したものはほかのモジュールから利用されて変更しにくくなるため、公開範囲を最小限にする。内部に隠すことは、抽象（ポート）の追加を意味しない（`principles/designing.md` の原則2）。
-- **違反・兆候**:
-  - 内部の表現（テーブルの列、外部 API の応答の形）が、そのまま他のモジュールに渡っている。
-  - どこからも使われていない関数・型が公開されている。
-  - 1つのモジュールの中身を変えると、使う側も一緒に変えなければならない。
-  - （設計案で）データの保持方法や外部 API の応答の形を、そのまま公開する契約になっている。
-  - 浅いモジュールであり、インターフェースが実装と同じくらい大きく、隠しているものがない。
-  - 要求と方式を同じ種類のものとして並べ、「何を満たすか」と「どう実現するか」が1つの一覧に混ざり、方式を変える判断と要求を守る判断を区別できない。
-- **変更前・変更後**: `export const db` → `export function findPlan(id)`
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 公開しているものの一覧と、それぞれが約束である理由。
+- **Applicability**: When deciding what a module exposes (public functions and types).
+- **Exemptions**: When meeting agreed requirements or an existing compatibility contract that must be preserved requires exposing the data format or processing method itself, and exposing results or operations alone is insufficient, exempt only the elements that must be exposed. Show in the artifact references to the requirements or compatibility contracts, necessary operations and verification, and why hiding the format or method would fail to meet those requirements or contracts. Dependencies of consumers created in the current work alone do not establish that exposure is necessary.
+- **Principle**: Hide decisions that may change later, such as data storage methods, tools used, or processing methods, inside the module responsible for them. Expose only contracts that change infrequently. Minimize what is exposed, because other modules use it and make it hard to change. Hiding internally does not mean adding abstractions (ports) (principle 2 of `principles/designing.md`).
+- **Violations and signs**:
+  - Internal representations (table columns or external API response shapes) pass directly to other modules.
+  - Functions or types unused anywhere are public.
+  - Changing one module's internals requires changing consumers too.
+  - (In a design proposal) The contract directly exposes data storage methods or external API response shapes.
+  - A module is shallow: its interface is as large as its implementation, hiding nothing.
+  - Requirements and methods are listed as the same kind of thing, mixing "what must be met" and "how to achieve it" in one list, making decisions to change methods indistinguishable from decisions to preserve requirements.
+- **Before and after**: `export const db` → `export function findPlan(id)`
+- **blocking**: None (record as reference information).
+- **Evidence**: A list of what is exposed and why each item is a promise.
 
-## 7. たどるレイヤーと覚える状態を減らす
+## 7. Reduce layers to traverse and state to remember
 
-- **適用場面**: レイヤーを追加するとき。リファクタリングの効果を判定するとき。
-- **適用除外**: 中継する層を取り除くことで必要な契約・知識の隠蔽・制約の強制が失われ、それらを保てるより単純な構造でも変更・理解・検証の負担を減らせないときは、その層を残すことに限って除外する。成果物には、その層が担う契約・隠す知識・強制する制約と、層を取り除く案との比較を示す。
-- **原則**: 「たどるレイヤーの数」と「把握しておく必要がある状態の量」を、理解負担の手がかりとする。中継するだけで、契約の表現・知識の隠蔽・制約の強制を担わないレイヤーは削除する。状態のスコープを縮小する（純粋関数 > ローカル > フィールド > モジュール > グローバル）。行数や循環的複雑度は代理指標にすぎない。リファクタリングは、変更・理解・検証の負担が減り、必要な保証が保たれるかで評価する。
-- **違反・兆候**:
-  - 処理を追う途中に、契約・知識・制約を何も受け持たないレイヤーがある。
-  - 既存コードを変更せずに済ませるためだけに、レイヤーを追加している。
-  - （設計案で）制約を満たすために仕組みを増やしているが、それが隠す知識や強制する保証を示せない。
-- **変更前・変更後**: `Controller → Service → Manager → Repository → db`（Service と Manager は中継するだけで、契約・知識・制約を受け持たない）→ `Controller → Repository → db`
-- **blocking**: 同じ目的を満たし、境界の保証も保ったまま、より単純な構造にできる。
-- **根拠**: 変更前後のレイヤーと状態の変化、削除によって露出する知識、境界の保証を保てる理由。具体的な変更・理解・検証の場面を比べ、負担が減ることを示す。
+- **Applicability**: When adding layers. When evaluating the effects of refactoring.
+- **Exemptions**: When removing a relay layer would lose necessary contracts, knowledge hiding, or constraint enforcement, and no simpler structure preserving them can reduce the burden of change, understanding, or verification, exempt only retaining that layer. Show in the artifact the layer's contracts, hidden knowledge, enforced constraints, and comparison with removing it.
+- **Principle**: Use "number of layers to traverse" and "amount of state to keep in mind" as indicators of the burden of understanding. Remove layers that merely relay information without expressing contracts, hiding knowledge, or enforcing constraints. Reduce state scope (pure functions > local > field > module > global). Line count and cyclomatic complexity are only proxy measures. Evaluate refactoring by whether it reduces the burden of change, understanding, and verification while preserving necessary guarantees.
+- **Violations and signs**:
+  - Tracing processing passes through a layer responsible for no contracts, knowledge, or constraints.
+  - Adding a layer solely to avoid changing existing code.
+  - (In a design proposal) Adding mechanisms to satisfy constraints without showing what knowledge they hide or guarantees they enforce.
+- **Before and after**: `Controller → Service → Manager → Repository → db` (Service and Manager only relay information and carry no contracts, knowledge, or constraints) → `Controller → Repository → db`
+- **blocking**: A simpler structure can meet the same purpose while preserving boundary guarantees.
+- **Evidence**: Changes in layers and state before and after, knowledge exposed by removal, and why boundary guarantees can be preserved. Compare concrete situations of change, understanding, and verification to show reduced burden.

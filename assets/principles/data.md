@@ -1,111 +1,111 @@
-# データと状態
+# Data and state
 
-## 1. 同じ対象・時点・意味の事実の正本を定める
+## 1. Define the source of truth for facts with the same subject, time, and meaning
 
-- **適用場面**: 同じ情報を複数の場所に持たせそうなとき。似た処理を共通化しようとするとき。
-- **適用除外**: 性能要件を満たすために派生値の保存や複製が必要なときは、派生値を保存せず計算する要求だけを除外する。対象の性能要件と保存や複製が必要な根拠を示す。正本、同期の責任者、更新方法、許容する不整合とその範囲、範囲を超えた場合の処理も示す。
-- **原則**: 同じ対象・時点・意味の事実について、正本を1か所に定める。現在の正本から再現できる派生値は保存せず、計算する。過去時点の判断や取引を再現するための値は、その時点の事実として保存する。複製には、正本、同期の責任者、更新方法、許容する不整合とその範囲を超えた場合の処理を定める。同じ規則の変更を必ず同時に反映すべき処理は規則の定義を共有し、記述が一致していても変更理由や契約が異なれば独立させる。
-- **違反・兆候**:
-  - 同じ対象・時点・意味の事実を表すデータが複数の場所にあり、それぞれ別の経路で更新される。
-  - 状態を表す boolean のフラグが増え続ける（実際は1つの状態遷移で表せる）。
-  - どちらが正しいかを、実行時に多数決やタイムスタンプの比較で決めている。
-  - 形がたまたま同じなだけの別々の決まりを、1か所にまとめている（片方だけを変えたくなったとき、分け直すことになる）。
-  - 複製した一覧の更新方法や許容する不整合が決まっていない。
-  - （設計案で）同じ事実を複数の場所に保存するが、正本と同期の責任者が書かれていない。
-  - 同時に変更すべき形式や順序の規則を、複数のモジュールが独立に定義している。
-  - 同じ規則を適用すべき処理経路が複数あり、変更を同時に反映する保証がない。
-- **変更前・変更後**: `user.isPremium` と `subscription.plan` の両方を保存 → `subscription.plan` から `isPremium` を計算する。注文金額を現在の商品単価から再計算 → 注文時の単価を保存し、その時点の取引を再現する。
-- **blocking**: 同じ対象・時点・意味の事実が、正本と同期方法を定めず複数の場所で別々に更新される。
-- **根拠**: 事実の対象・時点・意味と正本の場所。複製の同期の責任者、更新方法、許容する鮮度や不整合。同じ規則を共有する処理と、変更理由や契約が異なるため独立させる処理。
+- **Applicability**: When considering keeping the same information in multiple places. When considering sharing similar processing.
+- **Exemptions**: When storing derived values or duplicating data is necessary to meet performance requirements, waive only the requirement to calculate derived values instead of storing them. Show the relevant performance requirements and evidence that storage or duplication is necessary. Also show the source of truth, who owns synchronization, the update method, the permitted inconsistency and its scope, and what to do if it exceeds that scope.
+- **Principle**: Define one source of truth for facts with the same subject, time, and meaning. Calculate derived values that can be reproduced from the current source of truth instead of storing them. Store values needed to reproduce decisions or transactions at a past point in time as facts from that time. For duplicates, define the source of truth, who owns synchronization, the update method, the permitted inconsistency, and what to do if it exceeds that scope. Processing that must always reflect changes to the same rule simultaneously must share the rule's definition; keep processing independent when its reasons for change or contracts differ, even if its text is identical.
+- **Violations and signs**:
+  - Data representing facts with the same subject, time, and meaning exists in multiple places and is updated through separate paths.
+  - Boolean state flags keep increasing (when a single state transition could actually express them).
+  - Deciding which value is correct at runtime by majority vote or timestamp comparison.
+  - Combining separate rules in one place merely because they happen to have the same shape (they will need separating again when only one must change).
+  - The update method or permitted inconsistency of a duplicated list is undefined.
+  - (In a design proposal) The same fact is stored in multiple places, but the source of truth and synchronization owner are not stated.
+  - Multiple modules independently define format or ordering rules that must change together.
+  - Multiple processing paths must apply the same rule, but there is no guarantee that changes are reflected simultaneously.
+- **Before and after**: Store both `user.isPremium` and `subscription.plan` → Calculate `isPremium` from `subscription.plan`. Recalculate an order amount from current product unit prices → Store unit prices at the time of the order and reproduce the transaction at that time.
+- **blocking**: Facts with the same subject, time, and meaning are updated independently in multiple places without a defined source of truth and synchronization method.
+- **Evidence**: The subject, time, and meaning of facts, and the location of their source of truth. The synchronization owner, update method, and permitted freshness or inconsistency of duplicates. Processing that shares the same rule, and processing kept independent because its reasons for change or contracts differ.
 
-## 2. 失敗・重複・中断時の状態と対処を先に定める
+## 2. Define states and responses for failure, duplication, and interruption in advance
 
-- **適用場面**: 外部との通信、メッセージの処理、途中で止まりうる処理を設計するとき。
-- **適用除外**: 失敗・重複・中断後、外部・内部のどちらにも再取得以外の復旧を要する状態が残らず、失敗の通知と再取得で契約を満たせるときは、復旧手順だけを省略できる。途中結果と使用中の資源の扱い、重複した結果の扱いを示す。失敗の通知方法と、再取得が安全である根拠も示す。
-- **原則**: 外部サービスの停止、メッセージの重複、処理の中断は、通常の入力として扱う。失敗・重複・中断時に残る状態と許容する結果を先に定め、中止・破棄・再計算・再実行・手動確認から必要な対処を選ぶ。外部に副作用が残る処理では、結果が不明になる場合も含め、外部側が処理を識別・照会できる範囲と保証に応じて復旧方法を定める。
-- **違反・兆候**:
-  - 失敗時の挙動が「たぶん起きない」として決まっていない。
-  - リトライ・タイムアウトを、問題が起きるたびに足している。
-  - タイムアウトのない待機（外部呼び出し、ロック、キュー）。
-  - 途中で止まると、許容していない状態が残る。
-  - 外部に副作用が残る処理で、応答が失われたときに結果を識別・照会できるか確認していない。
-  - 外部の実行結果が不明なまま再実行し、重複した副作用が起こりうる。
-  - （設計案で）外部との通信が途中で止まったときに残る状態と、回復の手段が書かれていない。
-- **変更前・変更後**: 決済の応答が失われたらそのまま再実行する → 外部側の識別・照会の保証を確認し、結果を確定できる場合は照会結果から再開し、確定できない場合は再実行せず手動確認に回す。
-- **blocking**: 失敗・重複・中断時に残る状態と許容する結果、必要な対処が決まっていない。
-- **根拠**: 失敗・重複・中断が起こる各点で残る状態、許容する結果と対処。外部側の識別・照会能力と保証、結果が不明な場合の扱い、復旧できない範囲。
+- **Applicability**: When designing external communication, message processing, or processing that may stop partway through.
+- **Exemptions**: When failure, duplication, or interruption leaves no external or internal state requiring recovery other than fetching again, and failure notification and fetching again satisfy the contract, only the recovery procedure may be omitted. Show how intermediate results, resources in use, and duplicate results are handled. Also show how failure is reported and why fetching again is safe.
+- **Principle**: Treat external service outages, duplicate messages, and processing interruptions as normal inputs. Define in advance the states left by failure, duplication, or interruption and the acceptable outcomes, then choose the necessary responses from aborting, discarding, recalculating, rerunning, and manual verification. For processing that leaves external side effects, define recovery according to the external system's ability and guarantees to identify and query the operation, including cases where the outcome becomes unknown.
+- **Violations and signs**:
+  - Failure behavior is undefined because "it probably will not happen."
+  - Adding retries and timeouts whenever a problem occurs.
+  - Waiting without a timeout (external calls, locks, or queues).
+  - Stopping partway through leaves an unacceptable state.
+  - For processing that leaves external side effects, failing to check whether the outcome can be identified and queried when a response is lost.
+  - Rerunning while the external outcome remains unknown, potentially duplicating side effects.
+  - (In a design proposal) The state left when external communication stops partway through and the recovery method are not stated.
+- **Before and after**: Rerun a payment immediately if its response is lost → Check the external system's identification and query guarantees; resume from the query result if the outcome can be established, and otherwise send it for manual verification without rerunning.
+- **blocking**: The states left by failure, duplication, or interruption, acceptable outcomes, or necessary responses are undefined.
+- **Evidence**: The state left at each possible point of failure, duplication, or interruption, acceptable outcomes, and responses. The external system's identification and query capabilities and guarantees, handling of unknown outcomes, and the scope that cannot be recovered.
 
-## 3. 不正な状態や値の受け入れを型と検証で防ぐ
+## 3. Prevent invalid states and values with types and validation
 
-- **適用場面**: 型・データ構造・インターフェースを決めるとき。
-- **適用除外**:
-  - DB 制約などが、対象の不正状態を拒否すべきすべての受理・保存・出力経路で同じ保証を強制し、型にも制約を持たせると同じ規則の重複管理になるとき。外すのはその性質に対する型の追加の要求だけであり、外部入力の検証・変換と不正状態を拒否する保証は必要である。成果物には、対象の不正状態、保証手段とそれを強制する境界、対象経路と迂回できない根拠を示す。
-  - 値を種類別の型に分けても防げる取り違えがないとき。外すのはその型の導入の要求だけであり、外部入力の検証・変換と不正状態を拒否する保証は必要である。成果物には、対象の値と利用箇所、取り違えが生じない根拠を示す。
-- **原則**: 不正な状態の組み合わせは、利用する型体系で無理なく表せる範囲で型により防ぎ、失敗の種類も型で示す。値や実行時の状態に依存する制約は、境界の検証・DB 制約・更新時の検査で保証する。保存形式や外部契約にも保証手段を定め、注意やレビューだけに頼らない。同じプリミティブ型の取り違えが具体的な誤動作につながり、型の区別で防げる場合は、識別子・単位・検証済みの値などを区別できる型にする。外部データは、検証・変換するまで検証済みの型として扱わない。
-- **違反・兆候**:
-  - 同時に成り立たないはずの値が、どちらも任意の項目として並んでいる。
-  - 状態によって意味を持つ値が、状態と別に置かれている（「承認済みのときだけ承認者が入る」を型が知らない）。
-  - 失敗が `null` や `boolean` で返り、何が起きたかを呼び出し元が区別できない。
-  - 「〜の後でしか呼ばないこと」のような呼び出し方の約束が、コメントにしか書かれていない。
-  - 分かっている型を `unknown` で受けたり、キャストで塗りつぶしている。
-  - 誤った値が1行書かれるだけで、より強い権限が得られる。
-  - （設計案で）同時に成り立たない状態や値を表せるが、それを拒否する検証や制約がない。
-- **変更前・変更後**: `{ status: string; approvedBy?: string }` → `{ status: "draft" } | { status: "approved"; approvedBy: UserId }`
-- **blocking**: 不正な状態が、保証なく受理・保存・出力される。
-- **根拠**: 防ぐべき不正な状態や具体的な取り違えと、型・検証・制約の対応。不正な値や更新が型エラーになるか、境界の検証・DB 制約・更新時の検査で拒否されることの確認。
+- **Applicability**: When deciding on types, data structures, or interfaces.
+- **Exemptions**:
+  - When DB constraints or other means enforce the same guarantee on every acceptance, storage, and output path that must reject the invalid state, and adding the constraint to types would duplicate management of the same rule. Waive only the requirement to add a type for that property; validation and conversion of external input and the guarantee of rejecting invalid states remain necessary. Show in the artifact the invalid state, the guarantee mechanism and the boundary enforcing it, the covered paths, and why they cannot bypass it.
+  - When separating values into types by kind would prevent no possible mix-up. Waive only the requirement to introduce that type; validation and conversion of external input and the guarantee of rejecting invalid states remain necessary. Show in the artifact the values, their uses, and why mix-ups cannot occur.
+- **Principle**: Prevent invalid combinations of states through types to the extent naturally expressible in the type system being used, and represent failure kinds with types too. Guarantee constraints dependent on values or runtime state through boundary validation, DB constraints, and checks during updates. Define guarantee mechanisms for storage formats and external contracts too; do not rely only on care or review. When mixing up values of the same primitive type causes concrete misbehavior that distinct types can prevent, use types that distinguish identifiers, units, validated values, and so on. Do not treat external data as a validated type until it has been validated and converted.
+- **Violations and signs**:
+  - Values that should be mutually exclusive are both listed as optional fields.
+  - A value meaningful only in a particular state is separate from that state (the type does not know that an approver exists only when approved).
+  - Failures return `null` or `boolean`, leaving callers unable to distinguish what happened.
+  - Calling conventions such as "Call only after..." exist only in comments.
+  - Receiving a known type as `unknown` or obscuring it with casts.
+  - Writing a single incorrect value grants stronger privileges.
+  - (In a design proposal) Mutually exclusive states or values can be represented, but no validation or constraint rejects them.
+- **Before and after**: `{ status: string; approvedBy?: string }` → `{ status: "draft" } | { status: "approved"; approvedBy: UserId }`
+- **blocking**: Invalid states are accepted, stored, or output without guarantees preventing them.
+- **Evidence**: How types, validation, and constraints correspond to invalid states or concrete mix-ups to prevent. Verification that invalid values or updates cause type errors or are rejected by boundary validation, DB constraints, or checks during updates.
 
-## 4. ドメインの規則を、散らばった分岐ではなく1つの構造で表す
+## 4. Express domain rules in one structure rather than scattered branches
 
-- **適用場面**: 条件分岐を足そうとするとき。状態や種類を扱う設計をするとき。
-- **適用除外**: 同じキーで分岐していても、規則が独立して変わり、まとめると無関係な変更が波及するときは、それらの規則を一緒の構造にまとめる要求だけを除外する。各規則の内部には本原則を適用する。各規則の変更理由と、一方だけを変更できる具体例を示す。
-- **原則**: 分散した条件分岐ではなく、構造（ステートマシン、テーブル、直和型、reducer）でドメインの規則を表現する。規則の変更漏れや不正な遷移を防げる構造を選ぶ。同じ種類で分岐しているだけの、独立して変わる規則（料金とバックアップ保持期間など）を1つの構造にまとめない。
-- **違反・兆候**:
-  - 同じ規則に関する `if / else` が各所で伸びていく。
-  - 同期しなければならない2つ目の boolean が現れる。
-  - 同じ規則が複数箇所で独立に定義されている。
-  - （設計案で）同時に変更すべき状態や種類ごとの規則が、共通の構造で表されず、複数のモジュールの条件分岐として書かれている。
-- **変更前・変更後**: 同じ料金規則を複数の条件分岐で定義する → 料金のテーブルを共有し、独立して変わるバックアップ保持期間の規則は別に定義する。
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 規則の変更漏れや不正な遷移を防げること。
+- **Applicability**: When about to add a conditional branch. When designing around states or kinds.
+- **Exemptions**: Even when rules branch on the same key, if they change independently and combining them would propagate unrelated changes, waive only the requirement to combine those rules in one structure. Apply this principle within each rule. Show each rule's reasons for change and a concrete example where only one changes.
+- **Principle**: Express domain rules with structures (state machines, tables, sum types, or reducers) rather than scattered conditional branches. Choose structures that prevent missed rule updates and invalid transitions. Do not combine independently changing rules (such as pricing and backup retention periods) into one structure merely because they branch on the same kind.
+- **Violations and signs**:
+  - `if / else` branches concerning the same rule keep growing in multiple places.
+  - A second boolean appears that must be synchronized.
+  - The same rule is independently defined in multiple places.
+  - (In a design proposal) Rules for states or kinds that must change together are written as conditional branches across multiple modules rather than expressed in a shared structure.
+- **Before and after**: Define the same pricing rule in multiple conditional branches → Share a pricing table, and separately define the independently changing backup retention rule.
+- **blocking**: None (record as reference information).
+- **Evidence**: The structure prevents missed rule updates and invalid transitions.
 
-## 5. データの所有と生存期間を定め、不変条件を守る境界を決める
+## 5. Define data ownership and lifetime, and the boundaries that protect invariants
 
-- **適用場面**: データ構造・更新経路・所有・生存期間を決める、または変えるとき。
-- **適用除外**: なし。
-- **原則**: エンティティの切り方、データの所有と生存期間を定め、成立すべき不変条件を挙げる。中断と競合に対して、それぞれの不変条件をどの境界で守るかを定める。境界をまたぐ更新では、許容する一時状態と回復方法を定める。
-- **違反・兆候**:
-  - 所有者が決まっていないデータがある。
-  - 生存期間が決まっていない状態がある。
-  - トランザクションの境界が暗黙である。
-  - 中断すると、必須の明細がない親レコードが残る。
-  - 境界をまたぐ更新で、許容する一時状態や回復方法が決まっていない。
-- **変更前・変更後**: 注文と明細を別々に保存し、中断時の扱いが未定 → 注文が明細を所有し、明細は注文と同じ生存期間とする。「確定した注文には必須の明細がある」という不変条件を、注文と明細を同じトランザクションで保存することで守る。
-- **blocking**: 必要な整合性を保証する境界が未定のまま更新がある。
-- **根拠**: エンティティの切り方、所有と生存期間、不変条件と保証する境界・手段の対応。中断・競合時にも条件を守れることと、境界をまたぐ更新で許容する一時状態・回復方法。
+- **Applicability**: When deciding or changing data structures, update paths, ownership, or lifetimes.
+- **Exemptions**: None.
+- **Principle**: Define entity boundaries, data ownership, and lifetimes, and list the invariants that must hold. Define which boundary protects each invariant against interruption and contention. For updates across boundaries, define acceptable temporary states and recovery methods.
+- **Violations and signs**:
+  - Data has no defined owner.
+  - State has no defined lifetime.
+  - Transaction boundaries are implicit.
+  - An interruption leaves a parent record without required detail records.
+  - Acceptable temporary states or recovery methods are undefined for updates across boundaries.
+- **Before and after**: Save an order and its details separately without defining interruption handling → The order owns its details, which have the same lifetime as the order. Protect the invariant "A confirmed order has its required details" by saving the order and details in the same transaction.
+- **blocking**: Updates exist without defined boundaries guaranteeing the necessary consistency.
+- **Evidence**: How entity boundaries, ownership, lifetimes, and invariants correspond to guarantee boundaries and mechanisms. Conditions remain protected during interruption and contention, and acceptable temporary states and recovery methods are defined for updates across boundaries.
 
-## 6. 独立した更新では共有を減らし、並行した更新と統合でも共通の不変条件を守る
+## 6. Reduce sharing for independent updates, and preserve shared invariants during concurrent updates and integration
 
-- **適用場面**: 複数の処理（並列の作業、エージェント、ワーカー）が同じ状態を更新する、または共通の不変条件に関わる設計をするとき。
-- **適用除外**: なし。
-- **原則**: 独立した更新では、共有する可変状態を減らす。同じ不変条件に関わる場合は、保存先を分けただけで保証できると判断せず、並行した更新と結果の統合でも条件が保たれることを示す。更新規則と統合規則だけでは保証できない場合に、単一の書き手・トランザクション・条件付き更新・ロックなどから、必要な保証を最も簡単に満たす調停方法を選ぶ。「注意して書く」という規約だけでは並行性を制御できない。
-- **違反・兆候**:
-  - 同じ不変条件に関わる複数の書き手がいるが、並行した更新と結果の統合でも条件が保たれる根拠がない。
-  - 「同時に実行しないでください」という注意書きがある。
-  - 保存先を分けただけで、合計在庫など共通の不変条件も守れると判断している。
-  - （設計案で）保存先が別でも同じ不変条件に関わる処理があり、並行した更新と結果の統合でも条件を保つ保証が書かれていない。
-- **変更前・変更後**: 保存先を分けた販売記録にそれぞれ書き込み、在庫を超える販売が成立する → 在庫が足りる場合だけ販売を成立させる条件付き更新とトランザクションで、在庫と販売記録の整合性を守る。
-- **blocking**: 競合時に不変条件を保証できない。
-- **根拠**: 書き手ごとの保存先、共有する不変条件、許可する更新、統合規則、それらが不変条件を保つ根拠。調停が必要な場合は、その方法と必要な保証を満たす根拠。
+- **Applicability**: When designing multiple processes (parallel tasks, agents, or workers) that update the same state or affect shared invariants.
+- **Exemptions**: None.
+- **Principle**: Reduce shared mutable state for independent updates. When updates affect the same invariant, do not assume separate storage locations alone guarantee it; show that concurrent updates and integration of results preserve it too. If update and integration rules alone cannot guarantee it, choose the simplest coordination method that provides the necessary guarantees, such as a single writer, transactions, conditional updates, or locks. A convention to "write carefully" cannot control concurrency.
+- **Violations and signs**:
+  - Multiple writers affect the same invariant, but there is no evidence that concurrent updates and integration of results preserve it.
+  - A warning says "Do not run concurrently."
+  - Assuming that separating storage locations also protects shared invariants such as total inventory.
+  - (In a design proposal) Processing affects the same invariant despite separate storage locations, but no guarantee of preserving it through concurrent updates and integration of results is stated.
+- **Before and after**: Write to separate sales records, allowing sales beyond available inventory → Preserve consistency between inventory and sales records through transactions and conditional updates that allow sales only when inventory is sufficient.
+- **blocking**: Invariants cannot be guaranteed under contention.
+- **Evidence**: Each writer's storage location, shared invariants, permitted updates, integration rules, and why they preserve the invariants. If coordination is necessary, its method and why it provides the required guarantees.
 
-## 7. データの表現と変換で必要な意味を保つ
+## 7. Preserve required meaning in data representations and conversions
 
-- **適用場面**: 値の保存形式、単位、精度、正規化、変換方法を決めるとき。
-- **適用除外**: なし。
-- **原則**: 後続の処理で必要な区別と精度を先に定め、それを保てる表現を選ぶ。丸めや正規化で情報を失う場合は、失ってよい理由と実施する時点を定める。後続の処理や再計算に元の値が必要なら保持する。
-- **違反・兆候**:
-  - 通貨や単位を区別せず計算する。
-  - 取り込み時の丸めで、後続の計算に必要な精度を失う。
-  - 検索用の正規化結果で、表示や再処理に必要な元の値を上書きする。
-- **変更前・変更後**: 金額を取り込み時に丸めて保存する → 必要な元の精度で保存し、集計や確定のために定めた段階で丸める。
-- **blocking**: 表現や変換によって、要求された区別・精度・再計算可能性を失う。
-- **根拠**: 必要な区別と精度、変換で失われる情報と失ってよい理由、変換する時点。代表値と境界値で要求を満たすことの確認結果。
+- **Applicability**: When deciding value storage formats, units, precision, normalization, or conversion methods.
+- **Exemptions**: None.
+- **Principle**: First define the distinctions and precision needed by subsequent processing, then choose a representation that preserves them. When rounding or normalization loses information, define why that loss is acceptable and when to perform it. Retain original values if subsequent processing or recalculation needs them.
+- **Violations and signs**:
+  - Calculating without distinguishing currencies or units.
+  - Rounding on import loses precision needed for subsequent calculations.
+  - Overwriting original values needed for display or reprocessing with normalized search values.
+- **Before and after**: Round and store amounts on import → Store them at the required original precision, then round at the stage defined for aggregation or finalization.
+- **blocking**: Representation or conversion loses required distinctions, precision, or the ability to recalculate.
+- **Evidence**: Required distinctions and precision, information lost in conversion and why its loss is acceptable, and the timing of conversion. Verification results showing that representative and boundary values meet the requirements.

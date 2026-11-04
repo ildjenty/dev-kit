@@ -1,172 +1,172 @@
-# 画面の原則
+# UI principles
 
-画面の目的は、利用者が何かを達成し、理解し、体験することを支えることである。誰が、どのような状況で、何を目的に使うのかという仮説から、表示する内容と操作を考え、試作で確かめて見直す。
+Screens support users in accomplishing, understanding, or experiencing something. Form hypotheses about who uses them, in what situations, and for what purposes; use those hypotheses to choose content and operations, then verify and revise them through prototypes.
 
-## 1. 利用者の目的から始める
+## 1. Start from the user's purpose
 
-- **適用場面**: 画面に何を置くかを決めるとき。
-- **適用除外**: 誤字や表示欠けだけを修復し、既存の文言定義・表示仕様と修正差分から、表示すべき内容や操作の意味が変わらないと確認できるとき。利用者・状況・利用目的と表示内容の再検討だけを外す。成果物には、修復の根拠となる定義・仕様と差分を示す。
-- **原則**: 誰が、どのような状況で、何を達成し、理解し、体験するために使うのかを考え、その目的に必要な内容と操作を選ぶ。作画前に利用目的と表示内容の仮説を置き、配置や操作を試さなければ分からない点は簡単な試作で確かめる。確かめた結果に応じて、内容と利用目的を見直す。
-- **違反・兆候**:
-  - 数字と文が並ぶだけで、何のために使う画面かが分からない。
-  - 持っているデータを全部見せる作りになっている。
-  - 開いた人が、画面の目的や使い方を理解できない。
-  - 利用目的と表示内容の仮説がないまま、外観の調整が始まっている。
-  - 試作で前提の誤りが分かっても、最初の案を見直していない。
-- **変更前・変更後**: 「注文の全項目を表に出す」→「出荷の担当が、今日出す注文を選ぶ画面。出荷日と状態を先頭に置く案を試し、必要な内容を見直す」
-- **blocking**: 利用者・状況・利用目的が定まっていない。
-- **根拠**: 利用者・状況・利用目的の説明と、表示内容の仮説。試作した場合は、確かめた点と見直した内容。
+- **Applicability**: When deciding what to put on a screen.
+- **Exemptions**: When only repairing typos or missing display content, and existing wording definitions, display specifications, and the repair diff confirm that the meaning of displayed content and operations does not change. Waive only reconsideration of users, situations, purposes, and displayed content. Show in the artifact the definitions, specifications, and diff supporting the repair.
+- **Principle**: Consider who uses the screen, in what situation, and what they aim to accomplish, understand, or experience; choose content and operations necessary for that purpose. Before drawing, form hypotheses about the purpose and displayed content, and use simple prototypes to check points that cannot be understood without trying layouts or operations. Revise content and purposes according to the results.
+- **Violations and signs**:
+  - Numbers and text are merely listed, leaving the screen's purpose unclear.
+  - Displaying all available data.
+  - People opening the screen cannot understand its purpose or how to use it.
+  - Adjusting appearance without hypotheses about purpose and displayed content.
+  - Not revising the initial proposal even after a prototype reveals mistaken assumptions.
+- **Before and after**: "Display every order field in a table" → "A screen for shipping staff to select orders to ship today. Try placing shipping date and status first, then reconsider the necessary content."
+- **blocking**: Users, situations, or purposes are undefined.
+- **Evidence**: An explanation of users, situations, and purposes, and hypotheses about displayed content. If prototyped, what was checked and revised.
 
-## 2. 利用者の既習知識に合わせる
+## 2. Match what users already know
 
-- **適用場面**: 配置や操作を決めるとき。
-- **適用除外**: なし。
-- **原則**: 対象利用者が使い慣れた既存画面と、対象プラットフォームの慣習を踏まえて配置や操作を決める。同種製品の配置や操作は参考とし、そのまま採用する理由にはしない。慣れた配置や操作から変える場合は、利用目的への利点と再学習の負担を比べる。
-- **違反・兆候**:
-  - 使い慣れた既存画面や対象プラットフォームと異なる操作を、理由なく採用している。
-  - 説明がないと使えない独自の操作がある。
-  - 同種製品を参照したことだけで、配置や操作を正当化している。
-- **変更前・変更後**: 「同種製品に合わせて保存ボタンを移す」→「既存画面の保存位置を確認し、変更の利点と再学習の負担から配置を決める」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 対象利用者が使い慣れた既存画面とプラットフォームの慣習。参照した同種製品との違いと、配置や操作を採用した理由。
+- **Applicability**: When deciding layout or operations.
+- **Exemptions**: None.
+- **Principle**: Decide layout and operations based on existing screens familiar to target users and conventions of the target platform. Use similar products' layouts and operations as references, not as sufficient reasons to adopt them unchanged. When changing familiar layouts or operations, compare benefits for the user's purpose against the burden of relearning.
+- **Violations and signs**:
+  - Adopting operations different from familiar existing screens or the target platform without a reason.
+  - Custom operations require explanation before use.
+  - Justifying layout or operations solely by reference to similar products.
+- **Before and after**: "Move the save button to match similar products" → "Check the save position on existing screens, then decide placement from the benefits of the change and the burden of relearning."
+- **blocking**: None (record as reference information).
+- **Evidence**: Existing screens familiar to target users and platform conventions. Differences from referenced similar products and reasons for adopting the layout or operations.
 
-## 3. 作業全体の負担から情報を選ぶ
+## 3. Choose information based on the burden of the whole task
 
-- **適用場面**: 要素を足すときや、詳細を隠すとき。
-- **適用除外**: なし。
-- **原則**: 表示する情報は、利用目的と見落とした場合の影響に加え、比較や操作に必要な往復と記憶の負担から選ぶ。詳細を隠す場合は、利用者が必要な情報を見つけ、比較できることを確かめる。確認のための往復を減らすなど、目的のある繰り返し表示は残す。
-- **違反・兆候**:
-  - 消しても目的の達成に影響しない要素が残っている。
-  - 利用頻度が低いという理由で、見落とすと影響の大きい情報を隠している。
-  - 比較に必要な情報が別々の詳細にあり、往復して値を覚える必要がある。
-  - 繰り返し表示を削った結果、確認のための往復が増えている。
-  - 詳細の開き方や、必要な情報の場所が分からない。
-- **変更前・変更後**: 「契約期間と追加料金を各商品の詳細に隠す」→「比較に必要な契約期間と追加料金を一覧に残し、それ以外の詳細は開いて確認できる」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 各要素の用途と、見落とした場合の影響。詳細を開く手順、比較方法、繰り返し表示を残す目的。
+- **Applicability**: When adding elements or hiding details.
+- **Exemptions**: None.
+- **Principle**: Choose information to display based on its purpose and the impact of overlooking it, as well as the navigation and memory burden needed for comparison and operations. When hiding details, verify that users can find and compare necessary information. Keep purposeful repeated displays, such as those reducing back-and-forth navigation for verification.
+- **Violations and signs**:
+  - Elements remain whose removal would not affect achieving the purpose.
+  - Hiding information with a large impact if overlooked merely because it is infrequently used.
+  - Information needed for comparison is in separate details, requiring navigation and memorization of values.
+  - Removing repeated displays increases navigation needed for verification.
+  - It is unclear how to open details or where necessary information is located.
+- **Before and after**: "Hide contract duration and additional fees in each product's details" → "Keep contract duration and additional fees needed for comparison in the list, and allow opening the remaining details."
+- **blocking**: None (record as reference information).
+- **Evidence**: Each element's use and the impact of overlooking it. Procedures for opening details, comparison methods, and purposes for keeping repeated displays.
 
-## 4. 重要な情報から目に入るようにする
+## 4. Make important information visible first
 
-- **適用場面**: 大きさ・太さ・色・位置を決めるとき。
-- **適用除外**: 同じ重要度の候補を比較する画面で、特定の候補を先に目立たせると、比較する前に選択を誘導してしまうとき。除外は候補間の強調に限り、比較項目や操作のまとまりは保つ。
-- **原則**: サイズ・太さ・色・位置を使い、判断に最も重要な情報が最初に目に入るようにする。関連する要素は近づけ、関連しない要素は離して配置する。近接した要素や外観が似た要素は、同じグループとして認識される。
-- **違反・兆候**:
-  - すべてが目立っていて、どれも目立っていない。
-  - 関係のないものが近くに並び、同じグループに見える。
-- **変更前・変更後**: すべての数字を同じ大きさで → 判断に使う1つを大きく、残りは小さく
-- **blocking**: なし。
-- **根拠**: 最初に目に入るべきものと、その見え方。
+- **Applicability**: When deciding size, weight, color, or position.
+- **Exemptions**: When a screen compares equally important candidates and emphasizing a particular candidate first would steer selection before comparison. Limit the exemption to emphasis between candidates; preserve grouping of comparison items and operations.
+- **Principle**: Use size, weight, color, and position so that the information most important for a decision is noticed first. Place related elements together and unrelated elements apart. Nearby elements or elements with similar appearances are perceived as a group.
+- **Violations and signs**:
+  - Everything stands out, so nothing stands out.
+  - Unrelated things are placed nearby and appear to be one group.
+- **Before and after**: All numbers at the same size → Enlarge the one used for the decision and make the rest smaller
+- **blocking**: None.
+- **Evidence**: What should be noticed first and how it appears.
 
-## 5. 利用者の言葉で書く
+## 5. Write in the user's language
 
-- **適用場面**: ラベルと文言を決めるとき。
-- **適用除外**: 法令や契約で表示文言が指定され、利用者の言葉への置き換えによって必要な表示を満たせなくなるとき。除外は指定された文言に限る。
-- **原則**: ラベルや文言には、一般的な用語と利用者自身の言葉を使う。状態を示す文言では、誰のどの操作や処理を待っているかを明記する。要求・拒否・皮肉と受け取られる可能性がないか、読み手の立場で確認する。日時の表示は、特定の日付と経過時間のどちらを知る必要があるかで選び、両方が必要なら併記する。
-- **違反・兆候**:
-  - 作る側の用語や、作業中に付けた名前がラベルに出ている。
-  - 「準備中です」だけで、利用者自身の作業を待っているように読める。
-  - 同じものが画面によって別の名前で呼ばれている。
-  - 数に応じた複数形を扱わず、「1 members」と表示される（複数形は `Intl.PluralRules` で扱う）。
-  - 特定の日付が必要なのに経過時間だけを示したり、経過時間が必要なのに日付から計算させたりしている。
-- **変更前・変更後**: 「entitlement の同期待ち」→「プランの反映を待っています(数分かかります)」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 文言の一覧と、日時の表示から利用者が何を判断するか。
+- **Applicability**: When deciding labels and wording.
+- **Exemptions**: When laws or contracts specify display wording and replacing it with users' language would fail to meet the required display. Limit the exemption to the specified wording.
+- **Principle**: Use common terms and users' own words in labels and wording. Status wording must specify whose operation or which processing is being awaited. Check from the reader's perspective whether it could be taken as a demand, rejection, or sarcasm. Choose date and time displays according to whether users need a specific date or elapsed time, and show both when both are needed.
+- **Violations and signs**:
+  - Labels expose developers' terms or names created during the work.
+  - "Preparing" alone can be read as waiting for the user's own work.
+  - The same thing has different names on different screens.
+  - Failing to handle count-dependent plurals, displaying "1 members" (use `Intl.PluralRules` for plurals).
+  - Showing only elapsed time when a specific date is needed, or making users calculate elapsed time from a date when elapsed time is needed.
+- **Before and after**: "Waiting for entitlement synchronization" → "Waiting for your plan to take effect (this takes a few minutes)."
+- **blocking**: None (record as reference information).
+- **Evidence**: A list of wording and what users determine from date and time displays.
 
-## 6. 状態を表示し、エラーから復旧できるようにする
+## 6. Show state and enable recovery from errors
 
-- **適用場面**: 操作の結果と失敗の扱いを決めるとき。
-- **適用除外**:
-  - 入力内容や作業位置の保持によって第三者への漏えいが生じる、または合意済みの保持・消去条件に反するとき。外すのは保持できない項目と位置情報の保持の要求だけであり、失われる内容を事前に伝え、修正・再開の手順を用意する。成果物には、対象と漏えい経路または保持・消去条件を示す。
-  - 失敗原因の区別を公開すると、開示が認められていない情報が伝わるとき。外すのはその原因情報の公開の要求だけであり、公開可能な範囲で失敗と次の対応を伝え、原因の区別は内部処理に残す。成果物には、秘匿する情報と公開応答を共通化する条件・応答例を示す。
-- **原則**: システムの状態を表示し、誤操作の起こりやすさと損失に応じて、取り消し、対象と影響の事前表示、追加確認を選ぶ。重大な損失を伴う操作では、対象と影響を理解したうえで実行を選べるようにする。記憶に頼らず画面を見て理解できるようにし、熟練した利用者にはショートカットを用意する。失敗時は、原因と復旧方法を伝え、入力済みの内容と作業位置を保って修正や再開ができるようにする。説明がなければ使えない箇所にはヘルプを用意する。
-- **違反・兆候**:
-  - 押した後に、何が起きたか分からない。
-  - 重大な損失を伴う操作で、実行する対象や影響が分からない。
-  - 損失や誤操作の起こりやすさを考慮せず、一律に追加確認を求めている。
-  - 失敗したときに、次に何をすればよいかが書かれていない。
-  - 失敗すると入力済みの内容や作業位置が失われ、修正や再開ができない。
-  - 説明がないと使えない所に、ヘルプがない。
-  - よく繰り返す操作に、ショートカットがない。
-- **変更前・変更後**: 「保存に失敗すると入力が消え、エラー画面になる」→「入力と作業位置を保ち、通信が切れて保存できなかったことと、再接続後に保存し直せることを伝える」
-- **blocking**: 重大な損失を伴う操作を、対象と影響を認識できないまま実行できる。主要な作業で予告なく入力を失う、または失敗後に修正・再開できない。
-- **根拠**: 操作ごとの結果表示、実行前に示す対象と影響、誤操作の予防方法。失敗前後の入力内容と作業位置、復旧の案内と再開手順。
+- **Applicability**: When deciding how to handle operation results and failures.
+- **Exemptions**:
+  - When preserving input or work position would disclose information to a third party or violate agreed retention or deletion conditions. Waive only preservation of the fields and position information that cannot be retained; warn in advance what will be lost and provide procedures for correction and resumption. Show in the artifact the targets and disclosure paths or retention and deletion conditions.
+  - When publicly distinguishing failure causes would disclose information not authorized for disclosure. Waive only publication of that cause information; communicate failure and next steps within what may be disclosed, and retain distinctions among causes internally. Show in the artifact the information to conceal, conditions for sharing public responses, and response examples.
+- **Principle**: Show system state, and choose undo, advance display of targets and effects, or additional confirmation according to the likelihood and loss from mistaken operations. For operations involving serious loss, allow users to choose execution after understanding the target and effects. Make the screen understandable without relying on memory, and provide shortcuts for experienced users. On failure, communicate causes and recovery methods, and preserve entered content and work position so users can correct or resume. Provide help wherever use requires explanation.
+- **Violations and signs**:
+  - After pressing a control, it is unclear what happened.
+  - The target or effects of an operation involving serious loss are unclear.
+  - Uniformly requiring additional confirmation without considering loss or the likelihood of mistaken operations.
+  - On failure, no next steps are given.
+  - Failure loses entered content or work position and prevents correction or resumption.
+  - No help where use requires explanation.
+  - No shortcuts for frequently repeated operations.
+- **Before and after**: "A save failure erases input and shows an error screen" → "Preserve input and work position, and explain that saving failed because the connection was lost and that saving can be retried after reconnection."
+- **blocking**: Operations involving serious loss can execute without users recognizing the target and effects. Major tasks lose input without warning or cannot be corrected or resumed after failure.
+- **Evidence**: Result displays for each operation, targets and effects shown before execution, and methods of preventing mistaken operations. Input and work position before and after failure, recovery guidance, and resumption procedures.
 
-## 7. 画面の状態と遷移を設計する
+## 7. Design screen states and transitions
 
-- **適用場面**: 画面で起こり得る状態と、その間の遷移を決めるとき。
-- **適用除外**: なし。
-- **原則**: その画面で起こり得る状態を挙げ、利用目的の達成を妨げる状態での表示と操作を定める。空・読み込み中・失敗・部分的な結果・件数や文字量の偏りを、漏れを探す観点にする。条件変更、画面移動、処理の中断、応答順の逆転による遷移も設計し、表示内容がどの対象・条件の結果かを保つ。表示する値を実際に取得できるかも確認する。
-- **違反・兆候**:
-  - データがそろった状態の見え方しか決まっていない。
-  - 画面で起こり得ない状態まで、一律に用意している。
-  - 文字列が長いと、重なる・はみ出す。
-  - 画面に表示する値の取得元が決まっていない。
-  - JS が失敗すると空白になり、静止状態でも内容を読めない。
-  - 長い名前・該当するデータがない場合・大量のデータ・多言語で表示が崩れる。
-  - 長い一覧のスクロールが重い。
-  - 条件を変えた後に届いた古い応答を、新しい条件の結果として表示している。
-  - 画面移動や中断の後で、どの対象の処理結果か分からなくなる。
-- **変更前・変更後**: 「検索の成功と失敗の画面を用意した」→「検索条件を変え、応答が逆順に届いても、表示中の条件と結果が食い違わないことを確かめた」
-- **blocking**: 到達し得る状態や遷移で主要な利用が行き詰まる。表示内容が、別の対象や条件の結果として受け取られる。
-- **根拠**: 状態の選定理由と、各状態の表示・操作。操作順と応答順を変えたときの表示結果。
+- **Applicability**: When deciding possible screen states and transitions between them.
+- **Exemptions**: None.
+- **Principle**: List states possible on the screen and define displays and operations for states that prevent achieving its purpose. Use empty, loading, failure, partial results, and uneven item counts or text lengths as perspectives for finding omissions. Also design transitions caused by changed conditions, navigation, interruption, or reversed response order, preserving which target and conditions the displayed results belong to. Confirm that displayed values can actually be obtained.
+- **Violations and signs**:
+  - Only appearance with complete data is defined.
+  - Uniformly providing even states impossible on the screen.
+  - Long strings overlap or overflow.
+  - Sources for displayed values are undefined.
+  - JS failure leaves a blank screen, with content unreadable even in a static state.
+  - Long names, no matching data, large data volumes, or multiple languages break the display.
+  - Long lists scroll slowly.
+  - Old responses arriving after conditions change are displayed as results for the new conditions.
+  - After navigation or interruption, it becomes unclear which target the processing results belong to.
+- **Before and after**: "Provided search success and failure screens" → "Verified that displayed conditions and results remain consistent even when search conditions change and responses arrive in reverse order."
+- **blocking**: Reachable states or transitions block major uses. Displayed content is understood as results for a different target or conditions.
+- **Evidence**: Reasons for selecting states, and displays and operations for each. Display results when operation and response orders vary.
 
-## 8. アクセシビリティを確保する
+## 8. Ensure accessibility
 
-- **適用場面**: 色、操作、読み上げ、動きを決めるとき。
-- **適用除外**: 知覚能力そのものを測る検査で、刺激の識別内容を別の知覚経路で提示すると測定が成立しなくなるときは、その刺激の代替提示だけを外す。成果物には検査仕様と対象の刺激、代替提示で測定が成立しなくなる理由を示す。説明・開始・中断・回答・結果確認には本原則を適用する。
-- **原則**: 文字が背景に埋もれず、内容を読める配色にする。必要な情報と操作の意味が、視覚表示、キーボード操作、読み上げでも伝わり、主要な作業を完了できるようにする。種類や状態は意味を取り違えずに区別できる表現で示し、色だけに頼らない。意味が共有されていないアイコンや位置には、理解に必要な文言を添える。動きは状態変化の理解に役立つ範囲にとどめ、反復操作を待たせたり、注意や体調を妨げたりしないようにする。動きを減らす利用者設定でも、必要な変化が伝わるようにする。
-- **違反・兆候**:
-  - キーボードでは届かない操作がある。
-  - 読み上げでは、選択肢や選択状態、操作の意味や結果が分からない。
-  - 薄い色の文字が背景に埋もれている。
-  - 状態を色だけで表し、形か文言を添えていない。
-  - 独自のアイコンや位置の意味が伝わらず、種類や状態を取り違える。
-  - 押せないものが、ボタンのように見える。
-  - タッチ端末でホバーに依存する操作があり、ホバーなしでは操作できない。
-  - 動きが反復操作を待たせたり、注意や体調を妨げたりしている。
-  - 動きを減らす設定では、必要な状態変化が分からない。
-- **変更前・変更後**: 「開閉だけをキーボードで確認する」→「キーボードと読み上げで選択肢と選択状態を理解し、選択から確定まで完了できることを確かめる」
-- **blocking**: キーボード操作や読み上げで、情報の理解や操作に支障があり、主要な作業を完了できない。種類や状態を色だけで区別している。
-- **根拠**: 配色による読みやすさと、キーボード・読み上げで情報を理解し、主要な作業を完了した結果。種類や状態の識別方法と、通常時および動きを減らした場合の操作確認。
+- **Applicability**: When deciding colors, operations, screen-reader output, or motion.
+- **Exemptions**: In tests measuring perception itself, when presenting identifying stimulus content through another perceptual channel would invalidate measurement, waive only that alternative stimulus presentation. Show in the artifact the test specification, target stimuli, and why alternative presentation invalidates measurement. Apply this principle to explanations, starting, interruption, answers, and checking results.
+- **Principle**: Choose colors that keep text distinct from the background and content readable. Make necessary information and operation meanings understandable through visual display, keyboard operation, and screen readers, allowing completion of major tasks. Represent kinds and states so they can be distinguished without misunderstanding; do not rely on color alone. Add wording needed to understand icons or positions whose meanings are not shared. Limit motion to what helps understand state changes, and prevent it from delaying repeated operations or disrupting attention or physical well-being. Convey necessary changes even when users choose reduced motion.
+- **Violations and signs**:
+  - Some operations cannot be reached by keyboard.
+  - Screen-reader output does not communicate options, selection state, or operation meanings or results.
+  - Pale text blends into the background.
+  - State is shown by color alone, without shape or wording.
+  - Custom icons or positions are not understood, causing confusion about kinds or states.
+  - Unclickable elements look like buttons.
+  - Touch devices have hover-dependent operations unusable without hover.
+  - Motion delays repeated operations or disrupts attention or physical well-being.
+  - Reduced-motion settings obscure necessary state changes.
+- **Before and after**: "Check only opening and closing with the keyboard" → "Verify that keyboard and screen-reader users can understand options and selection state and complete selection through confirmation."
+- **blocking**: Keyboard or screen-reader use impedes understanding or operations so that major tasks cannot be completed. Kinds or states are distinguished by color alone.
+- **Evidence**: Readability from color choices and results of understanding information and completing major tasks by keyboard and screen reader. How kinds and states are distinguished, and operation checks with normal and reduced motion.
 
-## 9. 描画結果と操作を確認する
+## 9. Check rendered results and interactions
 
-- **適用場面**: 画面ができたと言う前。
-- **適用除外**: 広い表や図の位置関係を保つために要素内の横スクロールが必要であり、幅に収めると比較に必要な情報が欠けたり、対応関係が分からなくなったりするとき。要素内の横スクロールは許す。除外は要素内の横スクロールに限り、描画結果と操作の確認は行う。
-- **原則**: 外観は数値や説明だけで判断せず、描画結果を画像として確認する。反応、待機、フォーカス移動、アニメーションなど、時間と操作に依存する性質は実際に操作して確かめる。評価は根拠から確認できた範囲に限り、未確認の箇所や性質は `NOT ASSESSED` とする。
-- **違反・兆候**:
-  - 描画した結果を一度も見ずに「できた」としている。
-  - 静止画だけを見て、反応や待機、フォーカス移動、アニメーションも確認済みとしている。
-  - 文字の重なりやはみ出しに、利用者が先に気づく。
-  - `100vh` で画面の下が切れる。
-  - ページ全体に意図しない横スクロールがある。
-  - 暗い画面の読み込み時に白く光る。
-  - 画像や動画の上の文字のコントラストが足りず、読めない。
-  - フォントが読み込まれず、意図しない代替フォントで表示される。
-  - プレースホルダの文言（lorem、`TODO`）が実際の文言に置き換わらず残っている。
-  - 内容から色と形を決めず、紫のグラデーション、光る球、ぼかしの塊を既定の装飾にしている。
-  - 数字が変わるたびに桁がずれる。
-  - 大きい見出しが間延びして見えたり、本文が読みにくかったりする。
-  - ボタンの反応が鈍く感じられる。
-  - アバターが楕円形に変形している。
-  - ドロップダウンがもたつく。
-  - 操作後のフォーカスが意図しない場所へ移り、作業を続けられない。
-  - ポップオーバーが意図しない位置から表示される。
-  - アニメーションがかくついたり、意図しないものが動いたりする。
-- **変更前・変更後**: 「画像を見たので、ドロップダウンの反応も問題ない」→「画像で外観を確認し、実際に開閉して反応とフォーカス移動を確かめた。未確認の性質は `NOT ASSESSED` とした」
-- **blocking**: 描画結果や実際の操作で、必要な内容を読めない、操作できない、作業を続けられない支障を確認した。
-- **根拠**: 外観を確認した画像と、実際の操作手順および反応・待機・フォーカス移動・アニメーションの観測結果。
+- **Applicability**: Before saying a screen is complete.
+- **Exemptions**: When horizontal scrolling within an element is necessary to preserve spatial relationships in wide tables or diagrams, and fitting them to width would omit information needed for comparison or obscure correspondence. Permit horizontal scrolling within the element. Limit the exemption to that scrolling; still check rendered results and interactions.
+- **Principle**: Do not judge appearance from numbers or explanations alone; inspect rendered results as images. Verify properties dependent on time and interaction, such as responsiveness, waiting, focus movement, and animation, through actual interaction. Limit evaluation to what the evidence confirms, and mark unverified areas or properties `NOT ASSESSED`.
+- **Violations and signs**:
+  - Calling a screen "complete" without ever seeing its rendered result.
+  - Treating responsiveness, waiting, focus movement, or animation as verified from static images alone.
+  - Users notice overlapping or overflowing text first.
+  - `100vh` cuts off the bottom of the screen.
+  - Unintended horizontal scrolling across the whole page.
+  - A dark screen flashes white during loading.
+  - Insufficient contrast makes text over images or videos unreadable.
+  - Fonts fail to load, causing unintended fallback fonts to appear.
+  - Placeholder text (lorem, `TODO`) remains instead of actual wording.
+  - Using purple gradients, glowing spheres, or blurred blobs as default decoration instead of choosing colors and shapes from content.
+  - Digits shift position whenever numbers change.
+  - Large headings look too spread out, or body text is hard to read.
+  - Buttons feel slow to respond.
+  - Avatars are distorted into ovals.
+  - Dropdowns feel sluggish.
+  - Focus moves somewhere unintended after an operation, preventing continued work.
+  - Popovers appear from unintended positions.
+  - Animations stutter or unintended elements move.
+- **Before and after**: "Saw the image, so dropdown responsiveness is fine too" → "Checked appearance in an image, then actually opened and closed the dropdown to verify responsiveness and focus movement. Marked unverified properties `NOT ASSESSED`."
+- **blocking**: Rendered results or actual interaction reveal impediments that prevent reading necessary content, operating the screen, or continuing work.
+- **Evidence**: Images used to check appearance, actual interaction procedures, and observations of responsiveness, waiting, focus movement, and animation.
 
-## 10. 数値と比較の意味を保つ
+## 10. Preserve the meaning of numbers and comparisons
 
-- **適用場面**: 数値、集計、グラフ、比較結果を画面に示すとき。
-- **適用除外**: 数値の前提不足や比較条件の不備を見抜く能力を測る課題で、その前提や不備の明示が正答の手掛かりになるとき。外すのは、課題として提示する資料について評価対象の前提を補足し、条件の違いや欠測・未確定を明示する要求だけであり、課題用の資料であることを示して実際の判断・取引の根拠として使わせず、解説と評価結果の表示には本原則を適用する。成果物には、評価する能力、対象の資料、補足すると評価が成立しなくなる情報、解説での提示方法を示す。
-- **原則**: 数値を解釈するために必要な対象、単位、期間、母数、集計範囲を示す。比較条件が異なる値を扱う場合は、比較方法を見直すか、条件の違いが伝わるように表示する。欠測や未確定の結果はその状態を示し、全体の確定値として扱わない。
-- **違反・兆候**:
-  - 期間や母数が異なる値を、同じ条件の値として比較している。
-  - 絞り込み後の合計を、全体の合計として表示している。
-  - 取得できた範囲だけの結果を、全件の結果として表示している。
-  - 欠測や未確定の結果が、確定した全体の値に見える。
-- **変更前・変更後**: 「今月の途中経過と前月全体を比べて前月比を表示する」→「両月の同じ経過日数の値を比べ、比較した期間も表示する」
-- **blocking**: 解釈に必要な前提が欠けている、または比較方法が適切でないために、利用者が対象・傾向・確実性を取り違える。
-- **根拠**: 表示値の取得元、集計・比較の条件と、それらが利用者に伝わることを示す表示例。
+- **Applicability**: When displaying numbers, aggregates, graphs, or comparison results on a screen.
+- **Exemptions**: In tasks measuring the ability to detect missing numerical assumptions or flawed comparison conditions, when making those assumptions or flaws explicit would reveal the answer. Waive only the requirement to supplement evaluated assumptions and indicate differing conditions, missing measurements, or provisional results in the task materials; identify them as task materials and prevent their use as a basis for actual decisions or transactions. Apply this principle to explanations and evaluation-result displays. Show in the artifact the ability being assessed, target materials, information whose addition would invalidate evaluation, and how it will be presented in explanations.
+- **Principle**: Show subjects, units, periods, denominators, and aggregation scope needed to interpret numbers. When handling values with different comparison conditions, reconsider the comparison method or display the differences clearly. Indicate missing measurements or provisional results as such; do not treat them as final values for the whole.
+- **Violations and signs**:
+  - Comparing values for different periods or denominators as though conditions were identical.
+  - Displaying filtered totals as overall totals.
+  - Displaying results only from the retrievable scope as results for all items.
+  - Missing measurements or provisional results appear to be final overall values.
+- **Before and after**: "Compare the current partial month with the entire previous month and display the month-over-month change" → "Compare values for the same number of elapsed days in both months, and display the compared periods too."
+- **blocking**: Missing assumptions needed for interpretation or unsuitable comparison methods cause users to misunderstand subjects, trends, or certainty.
+- **Evidence**: Sources of displayed values, aggregation and comparison conditions, and display examples showing that users can understand them.

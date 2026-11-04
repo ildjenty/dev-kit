@@ -1,93 +1,93 @@
-# 作業の進め方
+# Working approach
 
-## 1. 始める前に、ゴールと問題を自分の言葉で言い直す
+## 1. Restate the goal and problem in your own words before starting
 
-- **適用場面**: brief を受け取ったとき。依頼を受けたとき。
-- **適用除外**: なし。
-- **原則**: 着手前に、ゴール、完了条件、問題を自分の言葉で言い直す。原因の仮説と、選択を委任された手段は候補として検証する。明示された制約と、指定された手段は保持し、変える必要があるなら理由と影響を示して確認する。言い直した内容が依頼と異なる場合は、着手前に確認する。完了後は、却下したもの、省略したもの、参照しなかった入力、自分で判断したものを明示する。
-- **違反・兆候**:
-  - 依頼の文をそのまま繰り返して始める。
-  - 選択を委任された手段を、目的を確かめずに採用する。
-  - 制約として指定された手段を候補扱いし、不要な比較を始める。
-  - 却下した案や省略した手順を返さず、完了だけを報告する。
-- **変更前・変更後**: 「キャッシュが原因とのことなので作り直す」→「目的は一覧の表示遅延を解消することである。依存を追加しない制約を保持し、原因がキャッシュかを計測で確かめる。完了条件は、合意した表示時間を満たすことである」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 言い直した文と、依頼の制約・完了条件との対応。完了時に明示した一覧。
+- **Applicability**: When receiving a brief. When receiving a request.
+- **Exemptions**: None.
+- **Principle**: Before starting, restate the goal, completion criteria, and problem in your own words. Verify hypotheses about causes and methods whose choice has been delegated as candidates. Preserve explicit constraints and specified methods; if they need changing, show reasons and effects and seek confirmation. If the restatement differs from the request, confirm before starting. On completion, state what was rejected, what was omitted, which inputs were not consulted, and what you decided yourself.
+- **Violations and signs**:
+  - Starting by repeating the request verbatim.
+  - Adopting methods whose choice was delegated without verifying the purpose.
+  - Treating methods specified as constraints as candidates and starting unnecessary comparisons.
+  - Reporting only completion without returning rejected options or omitted procedures.
+- **Before and after**: "The cache is said to be the cause, so rebuild it" → "The purpose is to eliminate delays in displaying the list. Preserve the constraint against adding dependencies, and measure whether the cache is the cause. Completion means meeting the agreed display time."
+- **blocking**: None (record as reference information).
+- **Evidence**: The restatement and how it corresponds to the request's constraints and completion criteria. The list explicitly stated on completion.
 
-## 2. 作業を検証して戻せる単位に区切り、依存や干渉のある変更は重ねない
+## 2. Divide work into verifiable and reversible units, and do not overlap dependent or interfering changes
 
-- **適用場面**: 作業を区切るとき。次の作業に進めるか、同時に進められるかを決めるとき。
-- **適用除外**: 合意した要求や外部契約上、取り消せない操作、または取り消すと合意した安全要件に反する操作が必要であり、その不可逆性を含む有効な承認・委任があるときに限り、該当する操作を原状復帰できるという要求だけを外す。作業単位ごとの検証と、未検証の結果への依存や互いの検証への干渉を避ける要求は外さない。成果物には、対象の操作、原状復帰できない理由または戻すと悪化する理由、承認・委任の範囲、実施結果の確認方法、中断・失敗時に許容する状態と対処を示す。
-- **原則**: 作業を、結果を検証し問題があれば戻せる単位に区切る。未検証の結果に依存する作業や、互いの検証を妨げる変更は重ねない。
-- **違反・兆候**:
-  - 未検証の出力を確定した前提として、後続の作業を進める。
-  - 検証中の対象を別の作業が書き換え、どの変更を検証したか分からなくなる。
-  - 同時に進めた作業を、誰がどう統合し検証するか決めていない。
-- **変更前・変更後**: 「検証中の実装を書き換えながら、その出力を前提に後続処理も作った」→「対象を固定して検証し、結果を確認してから後続処理に進む。独立した仕様調査は同時に進め、依存関係と統合の担当・手順を記録する」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 作業の区切りと、単位ごとの検証方法・戻し方。同時に進める作業の独立性、依存関係、統合の担当・手順と検証方法。
+- **Applicability**: When dividing work. When deciding whether to proceed to the next task or run tasks concurrently.
+- **Exemptions**: Only when agreed requirements or external contracts require irreversible operations, or operations whose reversal would violate agreed safety requirements, and valid approval or delegation covers that irreversibility, waive only the requirement to restore those operations to their original state. Do not waive verification of each work unit or avoidance of dependence on unverified results and interference with each other's verification. Show in the artifact the operations, why restoration is impossible or reversal would worsen matters, approval or delegation scope, how execution results will be verified, and acceptable states and responses on interruption or failure.
+- **Principle**: Divide work into units whose results can be verified and reverted if there is a problem. Do not overlap work dependent on unverified results or changes that interfere with each other's verification.
+- **Violations and signs**:
+  - Proceeding with downstream work using unverified output as an established assumption.
+  - Another task rewrites a target under verification, making it unclear which change was verified.
+  - No decision on who will integrate and verify concurrent work or how.
+- **Before and after**: "Rewrote an implementation under verification while building downstream processing based on its output" → "Hold the target fixed, verify it, and check results before proceeding downstream. Investigate independent specifications concurrently, recording dependencies and integration ownership and procedures."
+- **blocking**: None (record as reference information).
+- **Evidence**: Work divisions and each unit's verification and reversal methods. Independence and dependencies of concurrent work, integration ownership and procedures, and verification methods.
 
-## 3. 振る舞いの変更と構造変更を識別し、それぞれの結果を検証する
+## 3. Distinguish behavior changes from structural changes and verify each result
 
-- **適用場面**: 振る舞いを変えるとき。構造を整理するとき。検証の準備に構造変更が必要なとき。
-- **適用除外**: なし。
-- **原則**: 振る舞いを変える変更と、振る舞いを維持する構造変更を識別し、それぞれの結果を検証できるようにする。変更ごとに、変えるものと維持するものを明らかにし、検証結果から各変更の影響を区別できるようにする。
-- **違反・兆候**:
-  - 修正と整理を混ぜ、動作が変わった原因を区別できない。
-  - 構造変更で維持する振る舞いを確認せず、整理だけなので影響はないと判断する。
-- **変更前・変更後**: 「不具合を直しながら構造も変え、最後にまとめて確認した」→「再現条件を制御するため、入出力を維持して計算部分を切り出し、その維持を検証した。その後に修正し、不具合への効果を別に検証した」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 変更ごとの維持対象と検証結果。整理を先に行った場合は、その必要性と、修正の効果と整理の影響を区別した記録。
+- **Applicability**: When changing behavior. When organizing structure. When structural changes are needed to prepare verification.
+- **Exemptions**: None.
+- **Principle**: Distinguish behavior-changing changes from behavior-preserving structural changes so each result can be verified. For each change, clarify what changes and what is preserved, and make each change's effects distinguishable from verification results.
+- **Violations and signs**:
+  - Mixing fixes and cleanup makes the cause of behavior changes indistinguishable.
+  - Assuming cleanup has no effect without checking behavior preserved through structural changes.
+- **Before and after**: "Fixed a defect while changing structure, then checked everything together at the end" → "To control reproduction conditions, extracted the calculation while preserving inputs and outputs, and verified that preservation. Then made the fix and separately verified its effect on the defect."
+- **blocking**: None (record as reference information).
+- **Evidence**: What each change preserves and verification results. If cleanup comes first, why it is necessary and records distinguishing the fix's effects from the cleanup's effects.
 
-## 4. 同じ前提に基づく修正が失敗を繰り返したら、前提を見直す
+## 4. Revisit assumptions when fixes based on them repeatedly fail
 
-- **適用場面**: 修正が check に失敗したとき。
-- **適用除外**: なし。
-- **原則**: 同じ前提に基づく修正が同じ検査で失敗を繰り返した場合は、その前提のまま修正を続けない。前提を書き出し、仮説の検証は `principles/verification.md` の原則3に従う。段階的に具体化している途中で、前提を決めたステージに戻るか現在のステージで修正するかは、`principles/harness.md` の原則3に従って判断する。
-- **違反・兆候**:
-  - 同じ場所を少しずつ変えた修正が繰り返されている。
-  - 「今度こそ」で始まる修正。
-- **変更前・変更後**: 「また修正: タイムアウトをさらに延ばす」→「前提『遅いのはネットワーク』を疑う。計測すると DB の待ちだった」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 書き出した前提と、検証に用いた観測結果。ステージに戻った場合は、戻り先でその前提を決めたこと。
+- **Applicability**: When a fix fails a check.
+- **Exemptions**: None.
+- **Principle**: If fixes based on the same assumptions repeatedly fail the same checks, do not continue fixing under those assumptions. Write down the assumptions and follow principle 3 of `principles/verification.md` for hypothesis testing. During progressive refinement, follow principle 3 of `principles/harness.md` to decide whether to return to the stage that decided the assumption or fix it in the current stage.
+- **Violations and signs**:
+  - Repeated fixes make small changes to the same place.
+  - Fixes begin with "This time for sure."
+- **Before and after**: "Another fix: increase the timeout further" → "Question the assumption 'The network is slow.' Measurement showed a DB wait."
+- **blocking**: None (record as reference information).
+- **Evidence**: Written assumptions and observations used to test them. If returning to a stage, that the assumption was decided there.
 
-## 5. 定型処理はコマンドにし、手順はそれを呼ぶ
+## 5. Turn routine processing into commands and call them from procedures
 
-- **適用場面**: skill、playbook に手順を書くとき。同じ手順の再実行やコピーに気づいたとき。
-- **適用除外**: 別の作業中に見つけた新設候補は、その作業の成立に不要なときに限り、その場での新設を見送り、候補を成果物に記録して別の課題で採否を決める。また、既存のツールでは満たせず、新設・保守の負担が組み立て直しによる誤りや繰り返しの負担を上回るときは、新設を見送ってよく、成果物には候補、既存のツールでは満たせない点、比較した負担を示す。外すのは新設の要求だけであり、既存のツールの調査・利用、作った場合の試験と呼び出し元の移行は外さない。原則の他の要求と blocking は適用される。
-- **原則**: 入力・出力・副作用・失敗時の結果を定義できる定型処理は、コマンド（ツール）にし、skill と playbook はそれを呼ぶ。手順側に残すのは、適用条件、呼び出しの順序、判断、結果の確認、実施と省略の記録であり、コマンドの中身は書き写さない。同じ手順の繰り返しやコピーに気づいたら共通化を検討し、手順の安定性、今後の利用見込み、組み立て直しによる誤りと作成・保守の負担を比べて決める。作るときは、同じ処理をする既存のツールがないかを先に確認し、試験を付け、置き換える呼び出し元を移行する。
-- **違反・兆候**:
-  - 複数の skill、playbook に、同じ処理の実装(コマンド列)が重複している。同じ既存コマンドの呼び出しは数えない。
-  - 既存のツールで満たせる処理を、用途の差を示さずに別実装として追加している。
-  - 共通コマンドを作ったのに、従来のコピーが skill や playbook に残っている。
-- **変更前・変更後**: 「3つの skill が、記録の検証を同じ3コマンドで書いていた」→「1つのコマンドにし、3つの skill はそれを呼ぶ形に置き換え、索引に載せた」
-- **blocking**: 既存のツールで満たせる処理を、用途の差を成果物で示さずに、同等の別実装として追加している。
-- **根拠**: ツールと試験の結果、索引からの導線、置き換えた呼び出し元。作成を見送った場合は、候補の記録と、手順の安定性・利用見込み・負担を比較した理由。
+- **Applicability**: When writing procedures in skills or playbooks. When noticing repeated execution or copying of the same procedure.
+- **Exemptions**: For candidates found during other work, defer creation only if it is unnecessary for that work to succeed, record the candidate in the artifact, and decide adoption in a separate issue. Creation may also be deferred when existing tools cannot meet the need and creation and maintenance burdens exceed the burden of repeated work or errors from reconstructing the procedure; show in the artifact the candidate, what existing tools cannot meet, and the burdens compared. Waive only creation, not investigation and use of existing tools, or testing and caller migration if a tool is created. The principle's other requirements and blocking conditions apply.
+- **Principle**: Turn routine processing with definable inputs, outputs, side effects, and failure results into commands (tools), and call them from skills and playbooks. Leave applicability conditions, invocation order, decisions, result verification, and records of execution and omission in procedures; do not copy command implementations into them. When noticing repetition or copying of the same procedure, consider consolidation, comparing procedure stability, expected future use, reconstruction errors, and creation and maintenance burdens. Before creating a tool, check for existing tools doing the same processing, add tests, and migrate callers being replaced.
+- **Violations and signs**:
+  - Multiple skills or playbooks duplicate the same processing implementation (command sequences). Calls to the same existing command do not count.
+  - Adding a separate implementation for processing covered by existing tools without showing a difference in purpose.
+  - Creating a shared command while leaving old copies in skills or playbooks.
+- **Before and after**: "Three skills described record validation with the same three commands" → "Combined them into one command, replaced the three skills' procedures with calls to it, and listed it in the index."
+- **blocking**: Adding an equivalent separate implementation for processing covered by existing tools without showing a difference in purpose in the artifact.
+- **Evidence**: Tool and test results, access from the index, and replaced callers. If creation is deferred, the candidate record and reasons based on comparison of procedure stability, expected use, and burdens.
 
-## 6. 合意と委任の範囲内で実行上の判断を進め、必要な承認を求める
+## 6. Proceed with execution decisions within agreement and delegation, and seek necessary approval
 
-- **適用場面**: 「〜してよいか」と聞きたくなったとき。
-- **適用除外**: なし。
-- **原則**: 合意された目的・範囲・制約と、委任された権限の中で行える実行上の判断は、確認を繰り返さず進め、結果を示す。router の「人への確認」に該当する事項（不可逆性、セキュリティ・課金・外部への書き込み、設計文書との不一致、規約と harness の変更、目的の未合意）などで、新たな承認や製品上の判断が必要な場合は停止する。人が指定した確認条件は守る。テストの期待値や assert の書き換えは、`principles/testing.md` の原則9に従う。判断は、規則の文言だけでなく、その目的に基づいて行う。人の判断が必要な事項を、有効な承認や委任がないまま委任先が決定したり、暫定判断として進めたりしてはならない。
-- **違反・兆候**:
-  - 合意と委任の範囲内にあるファイル作成やテスト追加について、確認を繰り返す。
-  - 承認済みの操作について、対象・環境・範囲が変わっていないのに承認を求め直す。
-  - 人が指定した確認条件を、可逆な操作であることを理由に無視する。
-  - セキュリティ設定の変更や外部への投稿を、有効な承認や委任がないまま実行する。
-  - 委任先が、人の承認が必要な事項を未承認の暫定判断で進める。
-- **変更前・変更後**: 「承認された環境への反映だが、外部への書き込みなので再び確認する」→「承認の対象・環境・範囲が変わっていないことを確認し、指定された確認条件に従って実行し、結果を示す」。未承認の決済設定の変更は停止して確認する。
-- **blocking**: 人の承認が必要な判断・操作を、有効な承認や委任がないまま実行している（委任先による実行、暫定判断としての実行を含む）。
-- **根拠**: 判断・操作と、合意された目的・範囲・制約、承認・委任範囲との対応。既存の承認の対象・環境・範囲と、指定された確認条件。停止した場合は、新たな承認や製品上の判断が必要な理由。
+- **Applicability**: When tempted to ask "May I do this?"
+- **Exemptions**: None.
+- **Principle**: Proceed without repeated confirmation on execution decisions within the agreed purpose, scope, constraints, and delegated authority, and show the results. Stop when new approval or product decisions are needed, such as matters covered by the router's "human confirmation" (irreversibility, security, billing, external writes, disagreement with design documents, changes to conventions or the harness, or unagreed purpose). Respect confirmation conditions specified by people. Follow principle 9 of `principles/testing.md` for rewriting expected values or assertions. Judge from rules' purposes as well as their wording. A delegate must not decide matters requiring human judgment or proceed with provisional decisions without valid approval or delegation.
+- **Violations and signs**:
+  - Repeatedly confirming file creation or test additions within agreement and delegation.
+  - Seeking approval again for approved operations whose target, environment, and scope have not changed.
+  - Ignoring human-specified confirmation conditions because an operation is reversible.
+  - Changing security settings or posting externally without valid approval or delegation.
+  - A delegate proceeds on unapproved provisional decisions for matters requiring human approval.
+- **Before and after**: "Deployment to this environment is approved, but ask again because it is an external write" → "Confirm that the approval's target, environment, and scope are unchanged, execute according to specified confirmation conditions, and show results." Stop and seek confirmation for unapproved payment-setting changes.
+- **blocking**: Decisions or operations requiring human approval are executed without valid approval or delegation (including execution by delegates or as provisional decisions).
+- **Evidence**: How decisions and operations correspond to agreed purpose, scope, constraints, and approval or delegation scope. The target, environment, and scope of existing approval, and specified confirmation conditions. If stopping, why new approval or product judgment is necessary.
 
-## 7. 頼まれていない変更をしない
+## 7. Do not make unrequested changes
 
-- **適用場面**: 差分に、依頼のスコープの外の変更を含めるかを決めるとき。
-- **適用除外**: なし。
-- **原則**: 依頼されたスコープの外では、変更の意図も影響も確認されていない。変更対象のモジュール内で依頼された変更と不可分な修正は、合意された範囲内で、その必要性を示して同じ差分に含める。モジュール外の改善や、今回の変更に不要な改善は実装せず、提案として報告する。指示にない挙動（上限、既定値、失敗時の挙動）を自ら決めた場合は、自分の判断であることを報告する。
-- **違反・兆候**:
-  - 変更に不要なリネーム・整形・リファクタリングが、本来の変更と同じ差分に混ざる。
-  - 調べるために足したログやコメントが残っている。
-  - 上限・既定値・失敗時の挙動を自分で決め、報告に書かない。
-- **変更前・変更後**: 「ついでに import の順序を整えた」→「import の順序は別の変更として提案する」
-- **blocking**: 依頼のスコープの外で、挙動を変える変更がある。
-- **根拠**: 差分の各ファイルが、依頼のどの部分のためかを示す。
+- **Applicability**: When deciding whether to include changes outside the request's scope in a diff.
+- **Exemptions**: None.
+- **Principle**: Outside the requested scope, neither change intent nor effects have been confirmed. Include fixes within the changed module that are inseparable from the requested change in the same diff, within the agreed scope, explaining their necessity. Do not implement improvements outside the module or unnecessary for the current change; report them as proposals. If independently deciding unspecified behavior (limits, defaults, or failure behavior), report that it was your judgment.
+- **Violations and signs**:
+  - Unnecessary renaming, formatting, or refactoring is mixed into the same diff as the actual change.
+  - Logs or comments added for investigation remain.
+  - Independently deciding limits, defaults, or failure behavior without reporting it.
+- **Before and after**: "Also sorted imports while here" → "Propose import ordering as a separate change."
+- **blocking**: Behavior-changing changes exist outside the request's scope.
+- **Evidence**: Show which part of the request each file in the diff serves.

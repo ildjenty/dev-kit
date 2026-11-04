@@ -1,42 +1,42 @@
 # principles
 
-`devkit init` が導入した原則は、リポジトリが所有し、育てる。check の観点ファイルでは、これらの原則を評価基準とする。機械で決定的に判定できる規則は原則にしない。ループの仕組みに関するものは仕組みの定義で扱い、対象のコードと文書に関するものは `rules.md` に規則と強制手段を置く。手段が実装されるまでは「未実装」として残す。
+The repository owns and develops the principles introduced by `devkit init`. The check perspective files use these principles as evaluation criteria. Do not turn rules that machines can judge deterministically into principles. Address matters concerning the loop mechanism in the mechanism's definitions; put rules concerning the target code and documents, along with their enforcement mechanisms, in `rules.md`. Leave mechanisms marked as "not implemented" until they are implemented.
 
-- **`principles/engineering.md`**: コードを書くとき
-- **`principles/designing.md`**: 設計の進め方を決めるとき
-- **`principles/structure.md`**: モジュールの配置と依存を決めるとき
-- **`principles/data.md`**: データと状態を決めるとき
-- **`principles/testing.md`**: テストを書くとき、既存のコードを変える前
-- **`principles/verification.md`**: ツール・API・バージョン・原因・計測値について述べるとき
-- **`principles/working.md`**: 作業の進め方を決めるとき
-- **`principles/context.md`**: コンテキストと記録を扱うとき
-- **`principles/harness.md`**: 振り返りでループの仕組み（部品、組み立て、計画）を見直すとき、観点 `harness` の check を行うとき
-- **`principles/ui.md`**: 画面を設計する・作るとき
-- **`principles/writing.md`**: 人が読む文章（報告、PR 本文、文書）を書くとき
+- **`principles/engineering.md`**: When writing code
+- **`principles/designing.md`**: When deciding how to approach design
+- **`principles/structure.md`**: When deciding module placement and dependencies
+- **`principles/data.md`**: When deciding on data and state
+- **`principles/testing.md`**: When writing tests and before changing existing code
+- **`principles/verification.md`**: When making statements about tools, APIs, versions, causes, or measurements
+- **`principles/working.md`**: When deciding how to work
+- **`principles/context.md`**: When handling context and records
+- **`principles/harness.md`**: When reviewing the loop mechanism (parts, assembly, and plans) in a retrospective, or running a check from the `harness` perspective
+- **`principles/ui.md`**: When designing or building screens
+- **`principles/writing.md`**: When writing text for people to read (reports, PR descriptions, and documents)
 
-## 原則のフォーマット
+## Principle format
 
-各原則は、次の項目で記述する。
+Describe each principle using the following fields.
 
-- **名前**: 会話で参照できる短い名前。人は「『2つ目の実例が出るまで抽象化しない』で見直して」のように名前で指示できる。
-- **適用場面**: 適用場面を「〜のとき」の1文で示す。
-- **適用除外**: この原則の要求のうち、従うとかえって悪くなるものを、条件付きで外す。「〜のとき」の条件、外す要求の範囲、該当すると判断するために成果物に示すものを書く。条件が複数あるときは、条件ごとに入れ子の箇条書きにする。該当しても、外した要求に限って違反としない。原則の他の要求と blocking は残る。本文がすでに認めている通常の行為は除外に書かない。思いつかなければ「なし」と書き、「なし」は批評で反例を探す対象となる。
-- **原則**: 実施する内容と、その理由。
-- **違反・兆候**: 差分や設計案を見て、該当するかどうかを判断できる形で記述する。
-- **変更前・変更後**: 変更前と変更後の例を1組示す。
-- **blocking**: check で、この原則の違反を blocking にする条件。
-- **根拠**: 原則を満たしたと判断するために提示する根拠。
+- **Name**: A short name that can be referenced in conversation. People can give instructions by name, such as "Review this against 'Do not abstract until there is a second concrete example.'"
+- **Applicability**: State when the principle applies in one sentence beginning with "When."
+- **Exemptions**: Conditionally exempt requirements of this principle that would make things worse if followed. State the "when" condition, the scope of the requirements being waived, and what the artifact must show to establish that the condition applies. If there are multiple conditions, use nested bullets for each condition. Even when an exemption applies, only the waived requirements cease to count as violations. The principle's other requirements and blocking conditions remain in force. Do not list ordinary actions already permitted by the body as exemptions. If none come to mind, write "None"; "None" is subject to criticism seeking counterexamples.
+- **Principle**: What to do and why.
+- **Violations and signs**: Describe these so that a diff or design proposal can be examined to determine whether they apply.
+- **Before and after**: Give one pair of before and after examples.
+- **blocking**: Conditions under which a check makes a violation of this principle blocking.
+- **Evidence**: Evidence to present to establish that the principle has been met.
 
-エージェントは返答で、どの原則によってどの決定が変わったかを明示する。名前を挙げるだけで決定に変化がなければ、適用したことにはならない。適用除外を使って原則を外した場合も、どの除外に当たるか、外した要求の範囲、理由を明示する。
+In responses, agents must state which principle changed which decision. Merely naming a principle without changing a decision does not count as applying it. When using an exemption to waive a principle's requirements, also state which exemption applies, the scope of the waived requirements, and the reason.
 
-## 原則が競合する場合
+## When principles conflict
 
-- **`principles/designing.md` の原則2「2つ目の実例が出るまで抽象化しない」と `principles/structure.md` の原則5「フレームワーク・外部サービスの型を公開契約・保存データ・ドメインの型に含めない」**: `principles/designing.md` の原則2の適用除外として `principles/structure.md` の原則5に従う。理由とトレードオフ: 公開契約・保存データ・ドメインの型を外部固有の知識から隔離する変換は、2つ目の実例を待たずに行う。汎用ライブラリの値型など、`principles/structure.md` の原則5の適用除外に当たる場合は変換を強制しない。トレードオフは変換と保守の負担であり、隠す知識と変更の波及範囲に見合うかを示す。差し替えの interface までは作らない
-- **`principles/data.md` の原則1「同じ対象・時点・意味の事実の正本を定める」と `principles/structure.md` の原則6「変わりうる決定はモジュールに隠す」**: 優先: `principles/data.md` の原則1。理由とトレードオフ: 過去時点の事実は保存し、性能のために複製する場合は正本と同期の責任者、更新方法、許容する不整合とその範囲を超えた場合の処理を定める。`principles/structure.md` の原則6は公開の範囲を定め、保存方法はその責務を持つモジュールに隠す
-- **`principles/structure.md` の原則4「全経路に必要な保証を迂回できない構造にする」と `principles/structure.md` の原則3「下位レイヤーの契約と実装を特定の利用側に依存させない」**: 優先: `principles/structure.md` の原則3。理由とトレードオフ: 横断処理は、使う側の名前を知らずに書く（汎用の middleware）。使う側ごとの分岐が要るなら、それは共通の通過点に置く処理ではなく使う側の処理である
-- **`principles/designing.md` の原則5「新しい仕組みを足す前に削除・置き換えを検討する」と `principles/working.md` の原則7「頼まれていない変更をしない」**: 優先: `principles/working.md` の原則7。理由とトレードオフ: 消すのも変更である。今回の変更で不要になるものや要求を満たすために削除が必要なものを検討し、無関係な整理は混ぜない。依頼のスコープの外なら、消す案を提案として報告する
-- **`principles/designing.md` の原則7「既存の流儀に揃える」と `principles/designing.md` の原則4「安全に一括で切り替えられる移行は互換レイヤーを残さず終える」**: 優先: 既存の流儀を変えると決めた範囲の移行は `principles/designing.md` の原則4、今回の要求と保証を満たす既存の流儀に揃える場合は `principles/designing.md` の原則7。理由とトレードオフ: 移行は今回の変更に不可分な範囲に限り、安全に一括で切り替えられるなら互換レイヤーを残さない。段階移行が必要なら一時互換の対象と撤去条件を定める。全体の統一が独立した改善になるなら別の課題にする
+- **Principle 2 of `principles/designing.md`, "Do not abstract until there is a second concrete example," and principle 5 of `principles/structure.md`, "Keep framework and external service types out of public contracts, stored data, and domain types"**: Follow principle 5 of `principles/structure.md` as an exemption to principle 2 of `principles/designing.md`. Reason and tradeoff: Perform conversions that isolate public contracts, stored data, and domain types from external specifics without waiting for a second concrete example. Do not force conversions when an exemption to principle 5 of `principles/structure.md` applies, such as value types from general-purpose libraries. The tradeoff is the cost of conversion and maintenance; show whether it is justified by the knowledge being hidden and the reach of changes. Do not go as far as creating an interface for substitution
+- **Principle 1 of `principles/data.md`, "Define the source of truth for facts with the same subject, time, and meaning," and principle 6 of `principles/structure.md`, "Hide decisions that may change inside modules"**: Priority: principle 1 of `principles/data.md`. Reason and tradeoff: Preserve facts from past points in time. When duplicating data for performance, define the source of truth, who owns synchronization, the update method, the permitted inconsistency, and what to do if it exceeds that scope. Principle 6 of `principles/structure.md` defines what is exposed; hide storage methods in the module responsible for them
+- **Principle 4 of `principles/structure.md`, "Make guarantees required on every path impossible to bypass," and principle 3 of `principles/structure.md`, "Keep lower-layer contracts and implementations independent of specific consumers"**: Priority: principle 3 of `principles/structure.md`. Reason and tradeoff: Write cross-cutting processing without knowing consumers' names (general-purpose middleware). If it needs branches for individual consumers, it belongs to those consumers rather than at a shared passage point
+- **Principle 5 of `principles/designing.md`, "Consider removal or replacement before adding a new mechanism," and principle 7 of `principles/working.md`, "Do not make unrequested changes"**: Priority: principle 7 of `principles/working.md`. Reason and tradeoff: Deletion is also a change. Consider things made unnecessary by the current change or whose removal is required to meet the requirements; do not mix in unrelated cleanup. If deletion is outside the request's scope, report it as a proposal
+- **Principle 7 of `principles/designing.md`, "Follow existing conventions," and principle 4 of `principles/designing.md`, "Finish migrations that can safely switch all at once without leaving compatibility layers"**: Priority: principle 4 of `principles/designing.md` for migrations within the scope where a change to existing conventions has been decided; principle 7 of `principles/designing.md` when following existing conventions that meet the current requirements and guarantees. Reason and tradeoff: Limit migration to what is inseparable from the current change, and leave no compatibility layer if a safe switch all at once is possible. If a staged migration is necessary, define what temporary compatibility covers and the conditions for its removal. If making everything consistent is an independent improvement, make it a separate issue
 
-## 更新方法
+## How to update principles
 
-原則を追加・変更する場合は、一度に少しだけにする。個別の事例をそのまま記載せず、ほかの場面にも適用できる形にする。既存の原則と重複する場合は、新設せず既存の項目に追記する。`stages/retrospective.md` の振り返りでは、その作業で起きた問題・見逃し・規範の不足や負担を基に、原則がどの観点・雛形で使われているか、使われない原則や負担に見合わない原則がないかを確かめ、整理・削減を検討する。規範全体の棚卸しは、その必要が見えたときだけ行う。 原則の変更はループ自身の変更として、既定では最初に効く時点より前に人の確認を通す。
+Add or change only a small number of principles at a time. Do not record individual incidents verbatim; express them in a form that applies to other situations. If a principle overlaps with an existing one, add to the existing entry instead of creating another. In the retrospective in `stages/retrospective.md`, use the problems, oversights, and gaps or burdens in norms encountered during the work to check which perspectives and templates use each principle, whether any principles are unused, and whether any cost more than they are worth; consider organizing and reducing them. Review the entire set of norms only when a need becomes apparent. Treat changes to principles as changes to the loop itself and, by default, obtain human review before they first take effect.

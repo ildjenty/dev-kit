@@ -1,132 +1,132 @@
-# テストの原則
+# Testing principles
 
-テストでは仕様を検証する。テストの仕組みがないリポジトリでは、作業の中で仕組みを作り、テストを実行する検証コマンドを `devkit.toml` の `[commands.test]` に登録する。実装をそのまま再現するだけのテストは書かない。テストを書きにくい場合は、書き方で回避する前に、設計に問題がないかを検討する。
+Tests verify specifications. In repositories without a test mechanism, create one during the work and register the verification command that runs tests under `[commands.test]` in `devkit.toml`. Do not write tests that merely reproduce the implementation. If tests are hard to write, consider whether the design has a problem before working around it through test-writing techniques.
 
-## 1. 誤りと検出手段からテスト対象を選ぶ
+## 1. Choose test targets based on errors and detection methods
 
-- **適用場面**: テストを書くかどうかを決めるとき。
-- **適用除外**: 対象の契約がすべての入力・状態で拒否または非表示を要求し、正当な許可・表示のケースが存在しないとき、陽性対照の追加だけを求めない。契約の出典と対象範囲、対象処理を実行した根拠、拒否・非表示の処理を壊すと同じテストが狙った理由で失敗する記録を示す。
-- **原則**: 起こりうる誤り、その影響、ほかの検査で検出できる範囲を基に、テスト対象を選ぶ。例外になる誤りも、その経路をほかの検査が実行しなければ検出できない。コードを削除したときの挙動や、本番からの到達性だけで対象から外さず、製品の動作、配布する成果物、検証結果の信頼性への影響を判断する。作成・保守の負担は、誤りの影響、再発可能性、代替検証の負担と比較する。実装前に書きにくいことだけを理由に省略せず、準備コードと assert の長さの比率で価値を判断しない。動作検証で代替する場合も、同じ失敗を検出できることが必要である。対象には次のものを含める。
-  - セキュリティ上の処理: 認可、テナント分離、fail-closed、冪等性、トランザクション境界、信頼境界での入力検証。宣言（RLS ポリシー、GRANT、制約）で記述したものと、その前提となる DB やライブラリの保証も含む。
-  - ロジックの誤り: 誤った結果だけでなく、特定の入力や状態での例外、データ消失、主要機能の停止につながる処理。
-  - 外部仕様との契約: 外部サービスが実際に返すヘッダーやステータスコードなどと、その応答に対する自分の処理は分けて確かめる。自分の処理には、仕様に基づくモックや記録した応答を使える。実サービスやエミュレータでも、確認した契約と再現していない差異を示す。
-  - 網羅性: 「すべてのテーブルに RLS がある」のように、追加時の適用漏れが誤りにつながる規則。
-  - 陽性対照: 「拒否される」「表示されない」を確認するテストが、条件の記述ミスなどによって対象の処理を実行せずに成功することを防ぐ、最小限の「許可される」「表示される」のテスト。
-- **違反・兆候**:
-  - 宣言や処理をそのまま言い換え、ほかの検査で検出できる誤りしか確かめていない。
-  - ライブラリ・フレームワーク・DB 自体の動きを、製品が依存する保証との関係を示さずに確かめる。
-  - 本番から呼ばれないという理由で、コード生成器や検証結果に影響するヘルパーを対象から外す。
-  - 単純な補助処理を、それを使うテストで十分に検証できるか判断せず、個別に確かめる。
-  - 対象の処理を実行しなくても通る「拒否される」「表示されない」のテストに、陽性対照がない。
-  - 実装前の準備の難しさや、準備コードの長さだけで自動テストを省略する。
-- **変更前・変更後**: 「引用符付きフィールドで例外になるので、実行時に分かるとして対象から外す」→「その入力をほかの検査が実行していないため、読み込みを検証するテストを残す」
-- **blocking**: セキュリティ上の誤り、データ消失、主要機能の停止など、重大な失敗を検出する検証がない。
-- **根拠**: 起こりうる失敗と検出手段の対応、作成・保守と代替検証の負担。外部との契約では、確認した範囲と代替物で再現できない差異。
+- **Applicability**: When deciding whether to write tests.
+- **Exemptions**: When the target contract requires rejection or non-display for all inputs and states, with no legitimate allowance or display case, do not require adding a positive control. Show the contract's source and scope, evidence that the target processing ran, and a record that breaking rejection or non-display makes the same test fail for the intended reason.
+- **Principle**: Choose test targets based on possible errors, their impact, and what other checks can detect. Even errors that raise exceptions cannot be detected unless other checks exercise that path. Do not exclude targets based solely on behavior when code is deleted or reachability from production; assess effects on product behavior, distributed artifacts, and reliability of verification results. Compare creation and maintenance burdens with error impact, recurrence likelihood, and the burden of alternative verification. Do not omit tests merely because they are hard to write before implementation, or judge value by the ratio of setup code length to assertion length. Behavioral verification used instead must detect the same failures. Include the following targets.
+  - Security processing: Authorization, tenant isolation, fail-closed behavior, idempotency, transaction boundaries, and input validation at trust boundaries. Include declarations (RLS policies, GRANTs, constraints) and the DB or library guarantees they rely on.
+  - Logic errors: Processing that leads not only to incorrect results but also to exceptions for particular inputs or states, data loss, or major feature outages.
+  - Contracts with external specifications: Verify what external services actually return, such as headers and status codes, separately from your handling of those responses. Specification-based mocks or recorded responses may be used for your handling. Even with real services or emulators, state the contracts verified and differences not reproduced.
+  - Completeness: Rules where omissions on addition cause errors, such as "All tables have RLS."
+  - Positive controls: Minimal "allowed" or "displayed" tests that prevent tests for "rejected" or "not displayed" from succeeding without exercising the target processing because of mistakes in conditions or similar errors.
+- **Violations and signs**:
+  - Merely restating declarations or processing and checking only errors detectable by other checks.
+  - Checking libraries, frameworks, or the DB itself without showing the relationship to guarantees the product depends on.
+  - Excluding code generators or helpers affecting verification results because production does not call them.
+  - Testing simple helpers separately without judging whether tests using them already verify them sufficiently.
+  - No positive controls for "rejected" or "not displayed" tests that pass without executing the target processing.
+  - Omitting automated tests solely because pre-implementation setup is difficult or setup code is long.
+- **Before and after**: "Exclude quoted fields because they raise exceptions and will be noticed at runtime" → "Keep a test verifying loading because no other check exercises that input."
+- **blocking**: No verification detects serious failures such as security errors, data loss, or major feature outages.
+- **Evidence**: How possible failures correspond to detection methods, and the burdens of creation, maintenance, and alternative verification. For external contracts, the verified scope and differences substitutes cannot reproduce.
 
-## 2. 同じ失敗を同じ前提で検出するテストを集約する
+## 2. Consolidate tests that detect the same failures under the same assumptions
 
-- **適用場面**: どのレイヤーにテストを置くかを決めるとき。
-- **適用除外**: 同じ性質を確かめるテストでも、実行経路、権限、設定、レイヤー間の接続が異なるとき。低コストな層への集約によって、その違いに起因する失敗を検出できなくなるためである。
-- **原則**: 同じ前提で同じ失敗を検出するテストは、低コストな層へ集約する。型と実行時の検証は、同じ入力範囲で同じ性質を保証している場合に限り重複を減らす。外部入力、保存済みデータ、実行時設定を検証済みの型へ変換する処理は、型の存在を理由にテストから外さない。
-- **違反・兆候**:
-  - 同じ前提で同じ失敗しか検出しないテストを、複数のレイヤーに残す。
-  - 同じ性質を確かめているという理由で、異なる経路や権限のテストを削る。
-  - 内部の型を根拠に、境界での変換や検証のテストを削る。
-  - 大量のスナップショットテストで、何が仕様なのかが分からない。
-- **変更前・変更後**: 「他テナントの行を読めないことを確認したので、更新のテストを削る」→「読み取りと更新は異なる経路と権限を検証するため、両方を残す」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 各テストが検出する失敗と前提の違い、集約後も残る保証。
+- **Applicability**: When deciding which layer should contain tests.
+- **Exemptions**: Even when tests verify the same property, their execution paths, authority, configuration, or connections between layers differ. Consolidating them into a lower-cost layer would prevent detecting failures caused by those differences.
+- **Principle**: Consolidate tests that detect the same failures under the same assumptions into lower-cost layers. Reduce duplication between type checks and runtime validation only when they guarantee the same properties over the same input range. Do not exclude tests for converting external input, stored data, or runtime configuration into validated types merely because those types exist.
+- **Violations and signs**:
+  - Keeping tests in multiple layers that detect only the same failures under the same assumptions.
+  - Removing tests for different paths or authority because they verify the same property.
+  - Removing boundary conversion or validation tests based on internal types.
+  - So many snapshot tests that the specification is unclear.
+- **Before and after**: "Confirmed that other tenants' rows cannot be read, so remove update tests" → "Keep both because reading and updating verify different paths and authority."
+- **blocking**: None (record as reference information).
+- **Evidence**: Differences in failures detected and assumptions for each test, and guarantees remaining after consolidation.
 
-## 3. 期待値は完了条件から決め、実装から写さない
+## 3. Derive expected values from completion criteria, not from the implementation
 
-- **適用場面**: テストの期待値を書くとき。
-- **適用除外**: 仕様が文書化されていない既存システムで、互換性の維持対象として確認した現状の出力を特性テストに記録するとき。期待値を仕様の推定から決めると、維持すべき振る舞いを取りこぼすためである。
-- **原則**: 期待値は実装から転記せず、完了条件（仕様）から定める。各完了条件を確かめる具体的なテストを用意し、登録した検証コマンドから実行できるようにする。同じ理解に基づいてコードとテストを作成すると、同じ誤解によって両者が一致し、誤りを検出できない。
-- **違反・兆候**:
-  - 関数の出力をそのまま期待値に写す。
-  - テストを通すために、期待値を実装の出力に合わせて書き換える。
-- **変更前・変更後**: `expect(calc(input)).toEqual(calc(input))` に等しい書き方 → 完了条件から `expect(calc({ qty: 3, unit: 100 })).toBe(300)`
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 期待値の出どころ（完了条件のどの記述か）。
+- **Applicability**: When writing expected values in tests.
+- **Exemptions**: When recording current outputs confirmed as behavior to preserve for compatibility in characterization tests for an existing system without documented specifications. Deriving expected values from inferred specifications would miss behavior that must be preserved.
+- **Principle**: Derive expected values from completion criteria (specifications), not by copying the implementation. Provide concrete tests for each completion criterion and make them runnable through registered verification commands. When code and tests are created from the same understanding, the same misunderstanding can make them agree and leave errors undetected.
+- **Violations and signs**:
+  - Copying function outputs directly into expected values.
+  - Rewriting expected values to match implementation output to make tests pass.
+- **Before and after**: Writing the equivalent of `expect(calc(input)).toEqual(calc(input))` → Derive `expect(calc({ qty: 3, unit: 100 })).toBe(300)` from completion criteria
+- **blocking**: None (record as reference information).
+- **Evidence**: The source of expected values (which statement in the completion criteria).
 
-## 4. テストが落ちることと、落ちないことを確かめる
+## 4. Verify that tests fail and that they keep passing
 
-- **適用場面**: テストが本当に何かを確かめているかを検証するとき。
-- **適用除外**: 契約を保った内部変更の予定がなく、落ちないことの確認のためだけに内部の組み替えが必要となるとき。確認のためだけの組み替えは不要な手戻りを生むため、落ちないことを確かめるための変更は行わない。
-- **原則**: 壊す変更で狙った性質を検出できるかを確かめ、実装への依存はテストが観察する契約から評価する。
-  - 落ちること: 振る舞いを壊す変更が、テストの保証したい性質を破るものかを確かめる。条件を反転する、チェックを削除する、失敗の代わりに既定値を返すといった変更と、失敗の理由が対応しているかを判断する。
-  - 落ちないこと: 実際に内部を変更する作業では、契約を保った変更でテストが通ることを確かめる。実装に縛られているかどうかは、原則5（振る舞いを確かめ、実装をなぞらない）に従い、観察対象が契約に含まれるかで判断する。
-- **違反・兆候**:
-  - 「0件」「拒否される」「変わらない」を確認するテストが、対象のデータがない場合にも通る。
-  - 契約を保った内部変更で、契約に含まれない実装の違いを理由にテストが落ちる。
-- **変更前・変更後**: 「通ったので、拒否処理を検証できたとした」→「拒否のチェックを外すと狙った理由で落ちることを確かめ、内部を変更する作業では同じ契約のテストが通ることを確かめる」
-- **blocking**: セキュリティ上の処理のテストで、壊す変更が保証したい性質を破っていない、または無関係な理由で失敗している。
-- **根拠**: 壊した振る舞いと失敗の理由の対応、テストが観察する契約。内部を変更した場合は、契約を保った変更で通った記録。
+- **Applicability**: When verifying that tests actually check something.
+- **Exemptions**: When no contract-preserving internal change is planned and internal restructuring would be needed solely to verify that tests keep passing. Do not make changes solely to verify continued passing, because restructuring just for verification creates unnecessary rework.
+- **Principle**: Check whether breaking changes detect the intended property, and evaluate implementation dependence from the contract observed by the test.
+  - Failing: Check whether behavior-breaking changes violate the property the test is intended to guarantee. Judge whether changes such as inverting a condition, removing a check, or returning a default instead of failure correspond to the failure reason.
+  - Keeping passing: In work that actually changes internals, verify that contract-preserving changes pass tests. Follow principle 5 (Verify behavior without tracing the implementation) to judge implementation coupling by whether the observed subject is part of the contract.
+- **Violations and signs**:
+  - Tests for "zero results," "rejected," or "unchanged" also pass when target data does not exist.
+  - Contract-preserving internal changes fail tests because of implementation differences outside the contract.
+- **Before and after**: "The test passed, so rejection was verified" → "Verify that removing the rejection check makes the test fail for the intended reason, and in work changing internals, verify that tests for the same contract keep passing."
+- **blocking**: In security-processing tests, the breaking change does not violate the intended guaranteed property, or the test fails for unrelated reasons.
+- **Evidence**: How broken behavior corresponds to the failure reason, and the contract observed by tests. If internals changed, records of passing tests after contract-preserving changes.
 
-## 5. 振る舞いを確かめ、実装をなぞらない
+## 5. Verify behavior without tracing the implementation
 
-- **適用場面**: 何を assert するかを決めるとき。
-- **適用除外**: なし。
-- **原則**: 戻り値、保存結果、外部への要求、発生してはいけない作用など、契約として観察できる振る舞いを assert する。利用者から見える入口で契約を確かめ、CLI なら引数・標準出力・終了コードを検証する。回数や順序も契約の一部であれば確かめる。契約に含まれない内部ヘルパーの呼び出し方や内部状態には依存しない。テストごとに、ある条件下でのひとつの契約を説明し、その契約に必要な結果と副作用はまとめて assert する。無関係な条件や契約を混ぜない。テストの検出能力は、狙う性質を1つに絞って検証対象を最小限の差分で壊し、1回実行して失敗を確かめ、直ちに元に戻して変更前のソースの状態が復元されたことを確認する。テストファイルのリポジトリ相対パスとフレームワーク上の識別名の組をテスト ID とし、失敗を引き起こした差分と実行結果を結び付けて記録する。妥当性は原則4で判断する。
-- **違反・兆候**:
-  - モックの戻り値をそのまま assert する（対象ではなくモックを確かめている）。
-  - 契約に含まれない内部ヘルパーの呼び出し回数や順序を assert する。
-  - 契約に含まれる送信回数や副作用を、戻り値が正しいという理由で確かめない。
-  - 無関係な条件や契約を同じテストで確かめる。
-  - テストの名前から、何を保証しているかが読めない。
-- **変更前・変更後**: 「注文拒否の戻り値だけを確かめる」→「同じ拒否操作について、戻り値と、在庫も決済も変わらないことをまとめて確かめる」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: テストが説明する条件と契約、各 assert が確かめる結果や副作用との対応。
+- **Applicability**: When deciding what to assert.
+- **Exemptions**: None.
+- **Principle**: Assert behavior observable as a contract, such as return values, stored results, external requests, and effects that must not occur. Check contracts at user-visible entry points; for a CLI, verify arguments, standard output, and exit codes. Verify counts and order too if they are part of the contract. Do not depend on internal helper calls or internal state outside the contract. Each test must explain one contract under a given set of conditions and assert together the results and side effects required for that contract. Do not mix unrelated conditions or contracts. To verify detection capability, target one property, break the verification target with a minimal diff, run once to confirm failure, then immediately revert and confirm restoration of the source to its pre-change state. Use the pair of the test file's repository-relative path and its framework identifier as the test ID, and record the failure-inducing diff linked to the execution result. Judge validity under principle 4.
+- **Violations and signs**:
+  - Asserting mock return values directly (checking the mock rather than the target).
+  - Asserting counts or ordering of internal helper calls outside the contract.
+  - Not checking contractually required transmission counts or side effects because return values are correct.
+  - Checking unrelated conditions or contracts in the same test.
+  - The test name does not reveal what it guarantees.
+- **Before and after**: "Check only the return value for order rejection" → "For the same rejection operation, check the return value together with the fact that neither inventory nor payment changes."
+- **blocking**: None (record as reference information).
+- **Evidence**: Conditions and contract explained by the test, and how each assertion corresponds to results or side effects it checks.
 
-## 6. 到達可能な失敗条件からケースを選ぶ
+## 6. Choose cases from reachable failure conditions
 
-- **適用場面**: テストに使う入力、初期状態、操作の並び、失敗を発生させる箇所を決めるとき。
-- **適用除外**: なし。
-- **原則**: 契約と実行経路を基に、到達可能で異なる失敗を起こす入力・状態・履歴を選ぶ。境界では不正入力を検証し、内部では保証済みの型と状態を前提にする。状態を持つ処理では、重複実行、順序の違い、中断、再開、並行実行から、保証に影響する条件を選ぶ。テスト名は「どのような条件で、何が起きるか」を表し、準備・実行・確認を分けて記述する。
-- **違反・兆候**:
-  - 契約外の値を渡すためだけに型の保証を回避する。
-  - 履歴に依存する処理を、初期状態からの単発実行だけで検証する。
-- **変更前・変更後**: 「要求ごとに空の DB から実行する」→「要求の再実行や中断後の再開でも、守るべき性質が保たれるかを確かめる」
-- **blocking**: 重要な保証が入力・状態・履歴に依存するのに、その保証を破りうる条件が検証から抜けている。
-- **根拠**: 選んだ条件へ到達する経路と、その条件で検出したい失敗。
+- **Applicability**: When deciding test inputs, initial states, operation sequences, or points at which to induce failure.
+- **Exemptions**: None.
+- **Principle**: Based on contracts and execution paths, choose reachable inputs, states, and histories that cause distinct failures. Validate invalid input at boundaries; internally, assume guaranteed types and states. For stateful processing, choose guarantee-affecting conditions from duplicate execution, different ordering, interruption, resumption, and concurrent execution. Test names must express "under what conditions, what happens," and setup, execution, and verification must be written separately.
+- **Violations and signs**:
+  - Bypassing type guarantees solely to pass out-of-contract values.
+  - Verifying history-dependent processing only with single executions from initial state.
+- **Before and after**: "Run each request from an empty DB" → "Check whether required properties hold when requests rerun or resume after interruption too."
+- **blocking**: An important guarantee depends on inputs, state, or history, but conditions that could violate it are missing from verification.
+- **Evidence**: Paths reaching the selected conditions and failures to detect under those conditions.
 
-## 7. 無関係な揺らぎを制御し、失敗条件を再現する
+## 7. Control unrelated variability and reproduce failure conditions
 
-- **適用場面**: 時刻・乱数・順序・外部との通信・DB に依存するテストを書くとき。
-- **適用除外**: 不定期の失敗が、変更権限のない外部環境の不具合に起因すると切り分けられたとき、その外部原因の修正だけを求めない。対象のバージョン・環境・実行結果、切り分けの根拠と再開条件を記録する。確認できなかった検証は `NOT ASSESSED` とする。再実行で通っただけで、原因が修正されたとは扱わない。
-- **原則**: 検証に無関係な時刻・乱数・実行順序・外部通信・ほかのテストが残した DB の行による揺らぎは制御する。検出したい競合や時間経過は、再現できる条件として残す。依存を固定・差し替えする場合は、保たれる保証と検証できなくなる性質を示す。不定期の失敗は、製品の不具合、テスト間の干渉、外部環境の問題に切り分け、原因を修正する。再実行で通っただけでは修正とせず、通すために検出対象の発生条件を消さない。
-- **違反・兆候**:
-  - 検証に無関係な時刻・乱数・順序・外部通信・ほかのテストが残した DB の行で、結果が変わる。
-  - 競合を検証するテストで、DB を常に直列実行する代替物へ差し替える。
-  - たまに失敗するテストを、もう一度実行して通ったので直ったとする。
-- **変更前・変更後**: 「期限のテストで実時間の経過を待つ」→「時刻を制御し、期限の前後で結果が変わる条件を再現する」
-- **blocking**: なし（参考情報として記録する）。
-- **根拠**: 揺らぎの制御方法、残した失敗条件、差し替えで保たれる保証と失われる保証。
+- **Applicability**: When writing tests dependent on time, randomness, order, external communication, or a DB.
+- **Exemptions**: When intermittent failures have been isolated to defects in an external environment you lack authority to change, do not require fixing that external cause. Record the target version, environment, execution results, evidence for isolation, and conditions for resuming. Mark verification that could not be confirmed as `NOT ASSESSED`. Do not treat a passing rerun alone as a fixed cause.
+- **Principle**: Control variability unrelated to verification from time, randomness, execution order, external communication, or DB rows left by other tests. Preserve contention or passage of time that must be detected as reproducible conditions. When fixing or substituting dependencies, show guarantees preserved and properties no longer verifiable. Isolate intermittent failures into product defects, interference between tests, or external environment problems, and fix the cause. A passing rerun alone is not a fix; do not remove the conditions that trigger the target failure just to make tests pass.
+- **Violations and signs**:
+  - Results change because of unrelated time, randomness, order, external communication, or DB rows left by other tests.
+  - Replacing the DB with a substitute that always executes serially in tests for contention.
+  - Treating an intermittently failing test as fixed because it passed on rerun.
+- **Before and after**: "Wait for real time to pass in a deadline test" → "Control time and reproduce conditions where results change before and after the deadline."
+- **blocking**: None (record as reference information).
+- **Evidence**: How variability is controlled, failure conditions preserved, and guarantees preserved and lost through substitution.
 
-## 8. 維持する振る舞いと、変更後に満たす契約を区別する
+## 8. Distinguish behavior to preserve from contracts to satisfy after the change
 
-- **適用場面**: 既存のコードを変えるとき。
-- **適用除外**: なし。
-- **原則**: 原則1でテスト対象となる振る舞いについて、変更の目的に応じて契約を確かめる。振る舞いを維持する変更では、維持対象を既存テストまたは特性テストに記録し、仕組みがなければ本書の冒頭に従って作成・登録する。特性テストは実装前の失敗を確認できないため、原則5の手順で検出能力を確認する。不具合修正や合意済みの仕様変更では、変更後の契約をテストにする。変更前の実装が新しい契約に違反する場合に限り、その違反が起きる条件でテストが失敗することを確認する。旧契約で許容された結果がすべて新契約でも許容される変更では、外す保証と維持する保証を示し、原則4と原則5の手順に従ってテストの検出能力を確かめる。観測した現状と正しいとする仕様を区別し、修正する誤りを維持対象に含めない。変更後は、維持対象が保たれ、変更対象が新しい契約を満たすことを確かめる。
-- **違反・兆候**:
-  - 維持対象の振る舞いを記録せずに、既存コードを変更する。
-  - 修正する誤りを、そのまま満たすべき期待値として固定する。
-  - 変更前の実装が新しい契約に違反するのに、その違反が起きる条件でテストが失敗することを確かめない。
-  - 制約を緩める変更で、外す保証と維持する保証を示さない。
-  - 制約を緩める変更で、原則4と原則5の手順に従ってテストの検出能力を確かめない。
-- **変更前・変更後**: 「他テナントの行が読める現状を期待値にする」→「読めてはいけない契約をテストにし、修正前に失敗し、修正後に成功することを確かめる」
-- **blocking**: セキュリティ上の処理など重大な失敗に関わる変更で、維持対象または修正対象の検証が欠けている。
-- **根拠**: 維持対象と変更対象の契約、それぞれを確かめるテストと変更前後の結果。制約を緩める変更では、外す保証と維持する保証、原則4と原則5の手順に従って検出能力を確かめた記録。
+- **Applicability**: When changing existing code.
+- **Exemptions**: None.
+- **Principle**: For behavior selected for testing under principle 1, verify contracts according to the purpose of the change. For behavior-preserving changes, record behavior to preserve in existing or characterization tests; if no mechanism exists, create and register one as described at the start of this document. Because characterization tests cannot demonstrate failure before implementation, verify their detection capability through the procedure in principle 5. For defect fixes or agreed specification changes, test the contract required after the change. Only if the old implementation violates the new contract, confirm that tests fail under conditions causing that violation. For changes where every outcome permitted by the old contract is also permitted by the new one, show guarantees waived and preserved, and verify test detection capability through the procedures in principles 4 and 5. Distinguish observed current behavior from the specification considered correct; do not include errors being fixed in behavior to preserve. After changing, verify that preserved behavior remains and changed behavior satisfies the new contract.
+- **Violations and signs**:
+  - Changing existing code without recording behavior to preserve.
+  - Freezing errors being fixed as expected values that must continue to be met.
+  - When the old implementation violates the new contract, not verifying that tests fail under conditions causing that violation.
+  - Relaxing constraints without showing guarantees waived and preserved.
+  - Relaxing constraints without verifying test detection capability through the procedures in principles 4 and 5.
+- **Before and after**: "Use the current ability to read other tenants' rows as the expected value" → "Test the contract that they must not be readable, and verify failure before the fix and success afterward."
+- **blocking**: A change affecting serious failures such as security processing lacks verification of behavior to preserve or to fix.
+- **Evidence**: Contracts for preserved and changed behavior, tests checking each, and results before and after. For relaxed constraints, guarantees waived and preserved and records of verifying detection capability through the procedures in principles 4 and 5.
 
-## 9. テストの失敗は、契約と根拠に照らして直す
+## 9. Fix test failures against contracts and evidence
 
-- **適用場面**: テストが失敗したとき。
-- **適用除外**: なし。
-- **原則**: 失敗理由を、実装の誤り、テストの誤り、前提の変化に分けて判断する。実装の誤りは実装を修正し、失敗を消すために合意した保証を弱めたり、期待値を実装の出力に追従させたりしない。合意済みの仕様変更、仕様に照らして明白なテストの誤り、保証を維持する修正では、根拠を示してテストを更新する。仕様が不明・矛盾している、または保証を弱める必要があるときは、未合意の意味変更に限って人に判断を求める。
-- **違反・兆候**:
-  - 落ちたテストの期待値を、今の出力に合わせて直している。
-  - テストの省略や assert の削除で、合意した保証を弱めている。
-  - 合意済みの仕様変更や明白な誤記の修正で、再び人の判断を求めている。
-- **変更前・変更後**: 「出力に合わせて期待値を直す」→「合意済みの税込価格への変更を根拠に期待値を更新する。税の扱いが未合意なら判断を求める」
-- **blocking**: 未合意の意味変更によって、期待する振る舞いや合意した保証を変えている。
-- **根拠**: 失敗理由の分類、更新の根拠となる仕様や合意、未合意の判断がある場合はその内容。
+- **Applicability**: When tests fail.
+- **Exemptions**: None.
+- **Principle**: Classify failure reasons as implementation errors, test errors, or changed assumptions. Fix implementation errors in the implementation; do not weaken agreed guarantees or adjust expected values to follow implementation output merely to eliminate failures. For agreed specification changes, test errors evident from specifications, or fixes preserving guarantees, update tests with supporting evidence. When specifications are unclear or contradictory, or guarantees need weakening, seek human judgment only for unagreed changes in meaning.
+- **Violations and signs**:
+  - Adjusting a failing test's expected values to match current output.
+  - Weakening agreed guarantees by skipping tests or deleting assertions.
+  - Seeking human judgment again for agreed specification changes or corrections of obvious typos.
+- **Before and after**: "Adjust expected values to match output" → "Update expected values based on the agreed change to tax-inclusive prices. Seek judgment if tax handling has not been agreed."
+- **blocking**: An unagreed change in meaning changes expected behavior or agreed guarantees.
+- **Evidence**: Classification of failure reasons, specifications or agreements supporting updates, and any unagreed decisions.
