@@ -149,6 +149,11 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 	}
 	input := check.RequestInput{Kind: requestKind, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: aspect, TargetVersion: target, TargetPath: path, Norms: norms, OutputSchema: schema, CompletionConditionIDs: append([]string{}, item.CompletionConditionIDs...), Progress: progress, PreviousFindings: findings, Authorizations: []check.Authorization{}}
 	input.Authorizations = judgmentAuthorizations(state, target, version)
+	if requestKind == check.PlanRequest {
+		if err := e.planRequestInputs(state, &input); err != nil {
+			return meta, instructionData{}, false, err
+		}
+	}
 	request, err := check.PrepareRequest(input)
 	if err != nil {
 		return meta, instructionData{}, false, err
@@ -358,6 +363,9 @@ func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan
 	return issued, nil
 }
 func (e *Engine) acceptPending(ctx context.Context, state *ledger.State) (bool, error) {
+	if changed, err := e.reissueRejected(ctx, state); changed || err != nil {
+		return changed, err
+	}
 	observations, err := e.pendingObservations(state)
 	if err != nil || observations == nil {
 		return false, err
@@ -884,15 +892,22 @@ func (e *Engine) pendingRequestCurrent(ctx context.Context, state *ledger.State,
 
 func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, instruction ledger.Instruction, request instructionData, obs observedResult) (bool, error) {
 	result := obs.result
+	if result.Failure != "" {
+		return e.rejectResult(instruction, obs, errors.New(result.Failure))
+	}
 	if result.AgentID == "" || result.Runner != request.Instruction.Runner {
-		return false, fmt.Errorf("result %s: runner or agent identity does not match", obs.path)
+		return e.rejectResult(instruction, obs, errors.New("runner or agent identity does not match"))
 	}
 	provenance := check.Provenance{Source: check.SubagentResult, InstructionID: instruction.ID, Runner: result.Runner, AgentID: result.AgentID, Effort: result.Effort, Model: result.Model, ResultPath: obs.path}
 	if instruction.Kind == form.InstructionPlan {
-		return e.acceptPlannerResult(ctx, state, instruction, request.Origin, result.Content)
+		return e.acceptPlannerResult(ctx, state, instruction, request, obs)
 	}
 	if request.Detection != nil {
-		return true, e.acceptDetection(ctx, state, instruction, request, result.Content, provenance)
+		test, err := e.validateDetection(instruction, request, result.Content, provenance)
+		if err != nil {
+			return e.rejectResult(instruction, obs, err)
+		}
+		return true, e.recordDetection(ctx, state, instruction, request, test)
 	}
 	if request.Request == nil {
 		return false, errors.New("judgment request is missing")
@@ -903,7 +918,7 @@ func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, 
 	}
 	judgment, accepted, err := check.AcceptResult(*request.Request, result.Content, schema, provenance, state.LatestJudgments(request.Request.TargetVersion, normRefs(request.Request.Norms)))
 	if err != nil {
-		return false, err
+		return e.rejectResult(instruction, obs, err)
 	}
 	if accepted {
 		_, err = e.append(&ledger.Judgment{Judgment: judgment, RoundID: instruction.RoundID})
@@ -912,22 +927,37 @@ func (e *Engine) acceptObservedResult(ctx context.Context, state *ledger.State, 
 	return false, nil
 }
 
-func (e *Engine) acceptPlannerResult(ctx context.Context, state *ledger.State, instruction ledger.Instruction, origin plan.ProposalOrigin, content []byte) (bool, error) {
-	var output form.PlannerResult
-	if err := e.forms["planner-result"].Decode(content, &output); err != nil {
-		return false, err
+func (e *Engine) acceptPlannerResult(ctx context.Context, state *ledger.State, instruction ledger.Instruction, request instructionData, obs observedResult) (bool, error) {
+	p, err := e.parsePlannerResult(instruction, obs.result.Content)
+	if err != nil {
+		return e.rejectResult(instruction, obs, err)
 	}
-	if output.InstructionID != instruction.ID {
-		return false, errors.New("planner instruction ID does not match")
-	}
-	p, err := e.plans.ParsePlan(output.Plan)
+	source, err := e.asset(ctx, request.Reference, "plans/"+request.TemplateName+".json")
 	if err != nil {
 		return false, err
 	}
-	if p.Version != instruction.PlanVersion {
-		return false, errors.New("planner version does not match the requested version")
+	if p.Template.Name != request.TemplateName || p.Template.ContentHash != plan.ContentHash(source) {
+		return e.rejectResult(instruction, obs, errors.New("planner template does not match its instruction"))
 	}
-	return true, e.acceptPlan(ctx, state, p, origin, instruction.ID)
+	return true, e.acceptPlan(ctx, state, p, request.Origin, instruction.ID)
+}
+
+func (e *Engine) parsePlannerResult(instruction ledger.Instruction, content []byte) (plan.Plan, error) {
+	var output form.PlannerResult
+	if err := e.forms["planner-result"].Decode(content, &output); err != nil {
+		return plan.Plan{}, err
+	}
+	if output.InstructionID != instruction.ID {
+		return plan.Plan{}, errors.New("planner instruction ID does not match")
+	}
+	p, err := e.plans.ParsePlan(output.Plan)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	if p.Version != instruction.PlanVersion {
+		return plan.Plan{}, errors.New("planner version does not match the requested version")
+	}
+	return p, nil
 }
 
 func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item plan.Check, path string) (Result, bool, error) {
@@ -1033,7 +1063,11 @@ func (e *Engine) askRoundApproval(ctx context.Context, state *ledger.State, p pl
 		return Result{}, err
 	}
 	if category == config.MetaLoopEdit {
-		text, err = e.loopEditText(ctx, roundReference(round), target.Tree, "Approve development loop edits before committing this stage? If rejected, the worker must undo the edits.\n\n"+text)
+		base, baseErr := e.stageDiffBase(round)
+		if baseErr != nil {
+			return Result{}, baseErr
+		}
+		text, err = e.loopEditText(ctx, base, target.Tree, "Approve development loop edits before committing this stage? If rejected, the worker must undo the edits.\n\n"+text)
 		if err != nil {
 			return Result{}, err
 		}
@@ -1065,13 +1099,17 @@ func (e *Engine) askRoundApproval(ctx context.Context, state *ledger.State, p pl
 
 func (e *Engine) roundConfirmationCategories(ctx context.Context, round *ledger.Round, settings config.Config) ([]string, error) {
 	target := *round.ReturnedTarget
-	paths, err := e.workspace.ChangedFiles(ctx, round.StartTarget.Tree, target.Tree)
+	base, err := e.stageDiffBase(round)
+	if err != nil {
+		return nil, err
+	}
+	paths, err := e.workspace.ChangedFiles(ctx, base, target.Tree)
 	if err != nil {
 		return nil, err
 	}
 	categories := differenceCategories(paths, settings)
 	categories = slices.DeleteFunc(categories, func(category string) bool { return category == config.MetaLoopEdit })
-	if changed, err := e.metaLoopChanged(ctx, roundReference(round), target.Tree); err != nil {
+	if changed, err := e.metaLoopChanged(ctx, base, target.Tree); err != nil {
 		return nil, err
 	} else if changed && !slices.Contains(categories, config.MetaLoopEdit) {
 		categories = append(categories, config.MetaLoopEdit)
@@ -1150,4 +1188,15 @@ func (e *Engine) decideRound(ctx context.Context, p plan.Plan, stage plan.Stage,
 		return Result{}, err
 	}
 	return Result{}, nil
+}
+
+func (e *Engine) planRequestInputs(state *ledger.State, input *check.RequestInput) error {
+	work, _ := state.Work()
+	task, err := os.ReadFile(filepath.Join(e.workRoot(), work.TaskRef))
+	if err != nil {
+		return err
+	}
+	input.OriginalRequest = work.OriginalRequest
+	input.StartTask = string(task)
+	return nil
 }

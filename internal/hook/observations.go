@@ -35,6 +35,8 @@ type SubagentResult struct {
 	Effort        string          `json:"effort,omitempty"`
 	Model         string          `json:"model,omitempty"`
 	Content       json.RawMessage `json:"content"`
+	Failure       string          `json:"failure,omitempty"`
+	FinalMessage  string          `json:"final_message,omitempty"`
 }
 
 func publishSubagentResult(workRoot string, result SubagentResult) error {

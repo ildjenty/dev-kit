@@ -18,6 +18,8 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 
 ステージの遷移 `done` には、次のステージ ID、作業の終了を表す `null`、残りの計画の作り直しを表す `"replan"` を書ける。`"replan"` では、そのステージの完了後に既存の再計画の経路で計画者が残りを作り直す。作り直した計画にも計画の check と承認の条件を適用する。要件定義を先に行って再計画するかは雛形の組み方で決まり、kit は要件定義を特別扱いしない。
 
+計画の検証では、`done` をたどって同じステージを再び通る循環を拒否する。`"replan"` または `null` で遷移の連鎖を終える。
+
 ## 既定の雛形
 
 - **`default`**: `purpose → scope → structure → contract → steps → implement → retrospective`。候補は `research` と `prototype` である。`scope` に人の承認ゲートを置く。`implement` に必須の `command:test` と、観点 `test`・`diff` の check を置く。
@@ -67,6 +69,8 @@ check とゲート(人の承認を待つ関門)は、次の規則で組む。
 ## 計画の check と人によるレビュー
 
 計画自体に観点[「計画」](checks.md#計画)の check を適用し、雛形からの逸脱と承認条件は[計画](architecture/data.md#計画-plan)に従って確認する。
+
+計画の判定依頼には、作業に記録した要求の原文と `start` の課題を固定入力として渡す。完了条件と `open_questions` が原文の要求を漏らさず扱い、要求を追加していないかを確かめる。
 
 観点と実行主体は `[plan_check] aspect = "plan"`・`runner = "devkit-judge"` が既定である。登録済みの判定コマンドは devkit が実行し、それ以外はサブエージェントへ指示する。
 

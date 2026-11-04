@@ -15,13 +15,15 @@ router は、分類表に基づいて次の行動を分類する。
 - **返す値**: 人への確認の要否を返す。既定と利用側の上書き・追加・削除による分類、および[暫定判断](../architecture/data.md#決定と証拠-decision--evidence)(人の確認前の決定)の記録と確認は[人への確認対象](../architecture/guarantees.md#人への確認対象)に従う。
 - **対象**: [`needs-decision`](../architecture/data.md#指摘-finding)(人の判断が必要な指摘)、[brief](brief.md)(作業の依頼文)に沿った作業中の判断、[計画](../architecture/data.md#計画-plan)(課題固有のループのデータ)に設ける[ゲート](../architecture/data.md#ループの雛形-plantemplate)(人の承認を待つ関門)。
 
-ループ自身の変更は、規範・ホスト設定・skill・有効な pre-commit の設定の変更であり、requirements と structure は含めない。`[approval] meta_loop_edit` の既定は `"confirm"` であり、ステージにかかわらず、変更が効く最初のラウンドの前に確認する。最後のラウンドの変更は、判定後、完了時のコミット前に確認する。`"allow"` も設定できる。
+ループ自身の変更は、規範・ホスト設定・skill・リポジトリ内で git が追跡する有効な pre-commit の設定の変更であり、requirements と structure は含めない。`[approval] meta_loop_edit` の既定は `"confirm"` であり、ステージにかかわらず、変更が効く最初のラウンドの前に確認する。最後のラウンドの変更は、判定後、完了時のコミット前に確認する。`"allow"` も設定できる。
 
 計画承認は `[approval] plan` に従い、既定の `"requirements"` では、最初の計画、完了条件の ID または文面が直前に人が承認した計画から変わる計画、逸脱のある計画、外部操作を宣言した計画を確認する。同じ完了条件で逸脱も外部操作も未決事項もない再計画には再確認を求めない。`"always"` は毎バージョン、`"deviation"` は逸脱または外部操作の宣言がある場合に確認する。
 
 `open_questions` が空でない計画は、承認方針によらず人の承認を必須とする。
 
 分類表の追加・削除に未知の分類名があれば設定エラーとする。依存の宣言として扱うファイルは `[classification] dependency_files` で指定する。
+
+判定後の依存の宣言とループ自身の変更の分類は、そのステージ実行の最初のラウンド開始時のスナップショットと返却後のツリーを比較する。修正ラウンドでも比較元を保ち、不合格のラウンドで行った変更を含める。規範は各ラウンドの開始時に固定する。
 
 `[router] human_confirmation` で変更できる分類名は `dependency_changed` と `target_changed_again` だけである。`meta_loop_edit` の確認は `[approval] meta_loop_edit` だけに従い、分類表から削除できない。check の結果から次の行動への対応とロールは固定であり、計画の check は `[plan_check] aspect`・`runner` で指定する。
 

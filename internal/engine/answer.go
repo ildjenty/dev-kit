@@ -303,7 +303,16 @@ func (e *Engine) reviseUnassessedPlan(ctx context.Context) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	return e.planner(ctx, t, source, n+1, plan.InitialProposal)
+	state, err := e.load()
+	if err != nil {
+		return Result{}, err
+	}
+	for _, proposal := range state.PlanEvaluations(nil) {
+		if proposal.Plan.Version == n {
+			return e.planner(ctx, t, source, n+1, proposal.Origin)
+		}
+	}
+	return Result{}, errors.New("plan proposal origin is missing")
 }
 
 func (e *Engine) applyStageAnswer(state *ledger.State, question *form.Question, request AnswerRequest) (Result, error) {

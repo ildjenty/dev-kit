@@ -33,7 +33,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 
 ラウンド開始時に未登録の検証コマンドは、`auto-fixable` の指摘を伴う check の `FAIL` とする。作業者が検証の手段を作って登録し、既定では人の確認を経た次のラウンドから使う。
 
-既定の雛形は `default`・`fix`・`docs` であり、最後に作業者の retrospective を置く。すべての作業の brief と判定依頼が指示発行時点の作業履歴ファイルを参照し、振り返りはそこからすべての判定と指摘、人の回答や note の見逃しを確認する。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。規範を変えた場合はループ自身の変更として確認する。
+既定の雛形は `default`・`fix`・`docs` であり、最後に作業者の retrospective を置く。すべての作業の brief と判定依頼が指示発行時点の作業履歴ファイルを参照し、振り返りはそこからすべての判定と指摘、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、人の回答や note の見逃しを確認する。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。規範を変えた場合はループ自身の変更として確認する。
 
 ### ホストの差分と共通の仕組み
 
@@ -50,7 +50,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 - **外部操作**: 承認済みの操作の実行と再送時の回復は、[外部操作の承認](../architecture/guarantees.md#外部操作の承認)・[外部操作の二重適用](../architecture/guarantees.md#外部操作の二重適用)に従う。
 - **再計画**: 前のステージへの戻りと、ステージの遷移 `done: "replan"` による完了後の残りの作り直しに、既存の再計画の経路を使う。作り直した計画にも計画の check と承認の条件を適用し、要件定義は特別扱いしない。再計画に伴う [StageRun](../architecture/data.md#ステージの実行-stagerun)(ステージの実行の記録)と計画の切り替えは[計画のバージョン](../architecture/data.md#計画のバージョン)、手順は [router の判断](../architecture/flow.md#router-の判断)に従う。
 - **ホストと git に任せる範囲**: サブエージェントの起動と隔離、worktree の扱いは[ホストと git に任せる範囲](../architecture/guarantees.md#実装対象外の機能)、並行作業の配置は[利用側のリポジトリ](../architecture/layout.md#利用側のリポジトリ)に従う。
-- **メタループの編集**: 規範・ホスト設定・skill・有効な pre-commit の設定の変更は、どのステージでも `[approval] meta_loop_edit` に従う。既定では変更が効く最初のラウンドの前に人が確認し、最後のラウンドの変更は判定後、完了時のコミット前に確認する。requirements と structure は成果としてステージの判定で確認する。
+- **メタループの編集**: 規範・ホスト設定・skill・リポジトリ内で git が追跡する有効な pre-commit の設定の変更は、どのステージでも `[approval] meta_loop_edit` に従う。既定では変更が効く最初のラウンドの前に人が確認し、最後のラウンドの変更は判定後、完了時のコミット前に確認する。requirements と structure は成果としてステージの判定で確認する。
 - **互換性**: `kit_version` とバイナリの非互換と、読めない記録は[ロールアウト](../architecture/guarantees.md#ロールアウト)に従って報告する。
 - **停止の補助**: 停止の判断は [Stop](../architecture/hooks.md#stop)、中断と継続上限は[中断](../architecture/guarantees.md#中断)、完了の確定は[完了条件](../architecture/guarantees.md#完了条件)に従う。
 - **checkpoint の注入**: 出力上限を超えた場合の注入内容は[性能と出力の上限](../architecture/guarantees.md#性能と出力の上限)に従う。

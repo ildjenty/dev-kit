@@ -115,8 +115,19 @@ func (h Handler) subagentStop(e event.Event, state *ledger.State, now time.Time)
 	var identity struct {
 		InstructionID string `json:"instruction_id"`
 	}
-	if json.Unmarshal([]byte(e.LastAssistantMessage), &identity) != nil || identity.InstructionID == "" {
-		return nil
+	parseErr := json.Unmarshal([]byte(e.LastAssistantMessage), &identity)
+	failure := ""
+	if parseErr != nil {
+		failure = "The final message is not valid result JSON: " + parseErr.Error()
+	} else if identity.InstructionID == "" {
+		failure = "The final message has no instruction ID."
+	}
+	if failure != "" {
+		id, err := h.failedInstruction(e, state)
+		if err != nil || id == "" {
+			return err
+		}
+		identity.InstructionID = id
 	}
 	for _, instruction := range state.UnacceptedInstructions() {
 		if instruction.ID != identity.InstructionID || !subagentInstruction(instruction.Kind) {
@@ -135,6 +146,10 @@ func (h Handler) subagentStop(e event.Event, state *ledger.State, now time.Time)
 		result := SubagentResult{
 			InstructionID: instruction.ID, Runner: runner, AgentID: e.AgentID,
 			Host: e.Host, ObservedAt: now, Content: json.RawMessage(e.LastAssistantMessage),
+		}
+		if failure != "" {
+			result.Content = nil
+			result.Failure, result.FinalMessage = failure, e.LastAssistantMessage
 		}
 		if e.Host == event.ClaudeCode {
 			result.Effort = e.Effort
@@ -308,4 +323,27 @@ func (h Handler) continuationLimit(state *ledger.State) (int, error) {
 		limit = settings.StopContinuation()
 	}
 	return limit, nil
+}
+
+func (h Handler) failedInstruction(e event.Event, state *ledger.State) (string, error) {
+	if h.InstructionRunner == nil {
+		return "", fmt.Errorf("instruction runner resolver is required")
+	}
+	id := ""
+	for _, instruction := range state.UnacceptedInstructions() {
+		if instruction.SessionID != e.SessionID || !subagentInstruction(instruction.Kind) {
+			continue
+		}
+		runner, err := h.InstructionRunner(instruction)
+		if err != nil {
+			return "", err
+		}
+		if runner == e.AgentType {
+			if id != "" {
+				return "", nil
+			}
+			id = instruction.ID
+		}
+	}
+	return id, nil
 }

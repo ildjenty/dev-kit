@@ -12,7 +12,9 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 規範の入力は[規範の固定](../architecture/guarantees.md#規範の固定)に従う。
 
-ラウンドの判定依頼は、開始時の比較元の展開先、変更ファイル一覧、devkit が git で生成して `brief/` 内に保存した差分ファイルのパス、指示発行時点の作業履歴ファイルを含む。短いパッチだけ本文にも載せる。対象の受け渡し、コマンドの実行場所と照合は[判定対象の展開と完了時の永続化](../architecture/guarantees.md#判定対象の展開と完了時の永続化)に従う。
+ラウンドの判定依頼は、そのステージ実行の最初のラウンド開始時の比較元の展開先、変更ファイル一覧、devkit が git で生成して `brief/` 内に保存した差分ファイルのパス、指示発行時点の作業履歴ファイルを含む。修正ラウンドでも同じ比較元から返却後への累積差分を渡し、不合格のラウンドで行った変更を含める。規範は各ラウンドの開始時に固定する。短いパッチだけ本文にも載せる。対象の受け渡し、コマンドの実行場所と照合は[判定対象の展開と完了時の永続化](../architecture/guarantees.md#判定対象の展開と完了時の永続化)に従う。
+
+計画の判定依頼には、作業に記録した要求の原文と `start` の課題を固定入力として含める。観点 `plan` は、完了条件と `open_questions` が原文の要求を漏らさず扱い、要求を追加していないかを確かめる。
 
 [判定者](../architecture/data.md#計画-plan)(評価を担うロール)の結果ファイルまたはコマンド実行結果を受け取り、[受理境界](../architecture/guarantees.md#判定結果の受理)(結果を取り込む際の照合条件)で照合する。判定者サブエージェントの返却形式は [form](../architecture/modules.md#form)(スキーマとテンプレートを持つ部品)と[作業結果の判定](../architecture/flow.md#作業結果の判定)、判定コマンド(`[judges]`)(判定を返すコマンド)の出力スキーマは [config](../architecture/modules.md#config)(設定を解析する実装)に従う。
 
@@ -41,6 +43,8 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 [実行主体(runner)](../architecture/data.md#計画-plan)(check を実行する担当)の指定は[ループの雛形](../architecture/data.md#ループの雛形-plantemplate)(ループの定義)の check、種類と必要な確認能力は[計画](../architecture/data.md#計画-plan)(雛形から作る課題ごとの実行内容)と[操作の禁止とサブエージェントの制限](../architecture/guarantees.md#操作の禁止とサブエージェントの制限)に従う。検証コマンド(`[commands]`)(テストなどを実行するコマンド)を使う `command:` の check と判定コマンドの登録は [config](../architecture/modules.md#config)で定める。
 
 サブエージェントの設定は[リポジトリ内の定義](../architecture/layout.md#指示ファイルとホスト設定)、起動時の制限は [PreToolUse](../architecture/hooks.md#pretooluse)(ツール実行前の hook)に従う。起動と結果の来歴の照合、重複結果の扱いは[判定結果の受理](../architecture/guarantees.md#判定結果の受理)に従う。
+
+サブエージェントの結果がスキーマまたは内容の検証に失敗した場合は、engine が失敗と結果の拒否を記録して再読せず、同じ対象と依頼内容で出し直し回数を増やして再指示する。2回の再指示でも検証に失敗する場合は人へ問いを出す。最終メッセージを JSON として解析できない場合も hook の失敗の観測を経て同じ扱いとする。
 
 コマンド実行結果の Judgment への変換は[作業結果の判定](../architecture/flow.md#作業結果の判定)と[受理境界](../architecture/guarantees.md#判定結果の受理)に従う。結果の保存の責務は [check のモジュール契約](../architecture/modules.md#check)に従い、判定の有効性は[対象のバージョンと規範の識別](../architecture/data.md#check-の結果-judgment)で照合する。
 

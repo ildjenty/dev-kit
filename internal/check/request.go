@@ -31,6 +31,8 @@ type Authorization struct {
 // RequestInput holds judgment inputs resolved by the caller.
 // Provide Progress for rounds and valid Authorizations for the diff aspect.
 type RequestInput struct {
+	OriginalRequest        *string `json:",omitempty"`
+	StartTask              string  `json:",omitempty"`
 	Kind                   RequestKind
 	InstructionID          string
 	Runner                 string

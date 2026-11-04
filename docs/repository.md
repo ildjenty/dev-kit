@@ -32,7 +32,7 @@
 
 規範の識別に含めるのは、principles・stages・checks・plans・templates・rules・`devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md である。ラウンド開始時のスナップショットで固定する。requirements・structure・detect・`.devkit/run/` は含めず、これらの更新では規範の識別が変わらず、判定も失効しない。
 
-ループ自身の変更(`meta_loop_edit`)は、規範・ホスト設定・skill・リポジトリで有効な pre-commit の設定の変更である。要件と構造の更新は作業の成果としてステージの判定で見る。既定の `[approval] meta_loop_edit = "confirm"` では、どのステージの変更でも効力を持つ前に人が確認する。新たな未確認の変更はラウンドを開く前に問いで確認し、最後のラウンドの変更は完了時のコミット前に確認する。却下された変更が同じまま残る場合は、作業対象を保持して取り消す作業ラウンドを指示し、再確認を求めない。`"allow"` も選べる。
+ループ自身の変更(`meta_loop_edit`)は、規範・ホスト設定・skill・リポジトリ内で git が追跡する有効な pre-commit の設定の変更である。要件と構造の更新は作業の成果としてステージの判定で見る。既定の `[approval] meta_loop_edit = "confirm"` では、どのステージの変更でも効力を持つ前に人が確認する。新たな未確認の変更はラウンドを開く前に問いで確認し、最後のラウンドの変更は完了時のコミット前に確認する。却下された変更が同じまま残る場合は、作業対象を保持して取り消す作業ラウンドを指示し、再確認を求めない。`"allow"` も選べる。
 
 バイナリの配布、導入時に `init` が用意するものと `uninstall` による削除は [install](architecture/modules.md#install)、hook の登録先と設定の追記は[権限の境界](architecture/guarantees.md#権限の境界)に従う。
 

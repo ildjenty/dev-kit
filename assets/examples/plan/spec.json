@@ -15,6 +15,21 @@
       "kind": "allowed",
       "file": "allowed.md",
       "expected": "PASS"
+    },
+    {
+      "kind": "violation",
+      "file": "dropped-requirement.md",
+      "expected": "FAIL"
+    },
+    {
+      "kind": "violation",
+      "file": "invented-requirement.md",
+      "expected": "FAIL"
+    },
+    {
+      "kind": "conforming",
+      "file": "open-requirement.md",
+      "expected": "PASS"
     }
   ]
 }

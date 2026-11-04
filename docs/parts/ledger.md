@@ -54,6 +54,8 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 合格の識別には、観点・試験仕様・担当の定義に加え、観点が参照する原則と規則の内容ハッシュを含める。索引の既定の場所は `.devkit/detect.json` であり、`[paths] detect` で変更できる。
 
+索引の読み出し・書き込み・復元は、試験の指示に固定した同じ参照元の設定を使い、未コミットの `[paths] detect` の変更には従わない。合格・不合格の両方の検出試験について、例ごとの判定・指摘・期待判定との照合結果を作業履歴に含める。
+
 ### 外部操作の記録
 
 [外部操作](../architecture/flow.md#外部操作)(リポジトリ外への書き込み)の記録項目は [ExternalOp](../architecture/data.md#外部への書き込み-externalop)(操作の実行記録)、承認との結び付けは[外部操作の承認](../architecture/guarantees.md#外部操作の承認)、再送時の解決は[外部操作の二重適用](../architecture/guarantees.md#外部操作の二重適用)に従う。

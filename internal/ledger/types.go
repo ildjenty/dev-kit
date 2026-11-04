@@ -38,6 +38,8 @@ const (
 	KindArtifact      Kind = "artifact"
 )
 
+const KindResultRejection Kind = "result_rejection"
+
 // Payload is a record payload. Only the record types in this package implement it.
 // Use pointers to payloads when constructing records.
 type Payload interface {
@@ -178,6 +180,13 @@ type Judgment struct {
 	RoundID string `json:"round_id,omitempty"`
 }
 
+// ResultRejection records a malformed subagent result that must not be read again.
+type ResultRejection struct {
+	InstructionID string `json:"instruction_id"`
+	ResultPath    string `json:"result_path"`
+	Reason        string `json:"reason"`
+}
+
 type DetectionTest struct {
 	check.DetectionTest
 	InstructionID string `json:"instruction_id"`
@@ -306,3 +315,5 @@ func (*StageRun) recordKind() Kind      { return KindStageRun }
 func (*Round) recordKind() Kind         { return KindRound }
 func (*Instruction) recordKind() Kind   { return KindInstruction }
 func (*Artifact) recordKind() Kind      { return KindArtifact }
+
+func (*ResultRejection) recordKind() Kind { return KindResultRejection }

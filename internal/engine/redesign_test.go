@@ -218,6 +218,7 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	}
 	write(t, e.Root(), "greet.sh", "#!/bin/sh\nprintf 'Hello\\n'\nexit 0\n")
 	submit(correction, "implement")
+	approve(next(), "meta_loop_edit")
 	retrospective := next()
 	body, err := e.instructionBrief(retrospective.Instruction.ID)
 	if err != nil {

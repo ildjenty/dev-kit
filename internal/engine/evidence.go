@@ -27,7 +27,7 @@ func (e *Engine) workHistory(state *ledger.State, meta *ledger.Instruction) (str
 		text.WriteString("# Work history\n\n")
 		for _, record := range records {
 			switch record.Payload.(type) {
-			case *ledger.Judgment, *ledger.Question, *ledger.Answer, *ledger.Approval, *ledger.Lesson:
+			case *ledger.Judgment, *ledger.Question, *ledger.Answer, *ledger.Approval, *ledger.Lesson, *ledger.DetectionTest, *ledger.ResultRejection:
 				data, err := json.MarshalIndent(record.Payload, "", "  ")
 				if err != nil {
 					return "", err
@@ -83,7 +83,7 @@ func (e *Engine) judgmentEvidence(ctx context.Context, meta *ledger.Instruction,
 	}
 	text := "Work-history file (fixed at instruction issue time): " + history + "\n"
 	if round != nil && round.ReturnedTarget != nil {
-		comparison, err := e.comparison(ctx, round.StartTarget.Tree, round.ReturnedTarget.Tree)
+		comparison, err := e.stageComparison(ctx, round)
 		if err != nil {
 			return "", err
 		}
@@ -152,7 +152,7 @@ func (e *Engine) stageQuestionText(ctx context.Context, stage plan.Stage, round 
 	for _, item := range progress.Unconfirmed {
 		fmt.Fprintf(&text, "- %s\n", item)
 	}
-	comparison, err := e.comparison(ctx, round.StartTarget.Tree, round.ReturnedTarget.Tree)
+	comparison, err := e.stageComparison(ctx, round)
 	if err != nil {
 		return "", err
 	}
@@ -198,7 +198,7 @@ func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.Stat
 			if err != nil {
 				return err
 			}
-			before = roundReference(round)
+			before = state.Rounds(run.ID)[0].StartTarget.Tree
 		}
 	}
 	if q.StopCategory == config.MetaLoopEdit {
@@ -212,4 +212,24 @@ func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.Stat
 	}
 	q.StopReason = q.Text
 	return nil
+}
+
+func (e *Engine) stageDiffBase(round *ledger.Round) (string, error) {
+	state, err := e.load()
+	if err != nil {
+		return "", err
+	}
+	rounds := state.Rounds(round.StageRunID)
+	if len(rounds) == 0 {
+		return "", fmt.Errorf("stage run has no rounds")
+	}
+	return rounds[0].StartTarget.Tree, nil
+}
+
+func (e *Engine) stageComparison(ctx context.Context, round *ledger.Round) (string, error) {
+	base, err := e.stageDiffBase(round)
+	if err != nil {
+		return "", err
+	}
+	return e.comparison(ctx, base, round.ReturnedTarget.Tree)
 }

@@ -290,47 +290,55 @@ func (e *Engine) executeDetection(ctx context.Context, state *ledger.State, meta
 	return r, true, nil
 }
 func (e *Engine) acceptDetection(ctx context.Context, state *ledger.State, meta ledger.Instruction, data instructionData, source []byte, provenance check.Provenance) error {
+	test, err := e.validateDetection(meta, data, source, provenance)
+	if err != nil {
+		return err
+	}
+	return e.recordDetection(ctx, state, meta, data, test)
+}
+
+func (e *Engine) validateDetection(meta ledger.Instruction, data instructionData, source []byte, provenance check.Provenance) (check.DetectionTest, error) {
 	schema := e.forms["detection-result"]
 	var err error
 	var result form.DetectionResult
 	if err = schema.Decode(source, &result); err != nil {
-		return err
+		return check.DetectionTest{}, err
 	}
 	if result.InstructionID != meta.ID {
-		return errors.New("detection instruction ID does not match")
+		return check.DetectionTest{}, errors.New("detection instruction ID does not match")
 	}
 	observations := []check.DetectionObservation{}
 	for _, observation := range result.Observations {
 		raw, err := json.Marshal(observation.Judgment)
 		if err != nil {
-			return err
+			return check.DetectionTest{}, err
 		}
 		judgment, _, err := check.AcceptResult(*data.Request, raw, e.forms["judgment"], provenance, nil)
 		if err != nil {
-			return err
+			return check.DetectionTest{}, err
 		}
 		observations = append(observations, check.DetectionObservation{File: observation.File, Judgment: judgment, Reason: observation.Reason})
 	}
 	test, err := check.AssessDetection(data.Detection.Spec, data.Instruction.Runner, data.Detection.Identity, observations)
 	if err != nil {
-		return err
+		return check.DetectionTest{}, err
 	}
-	if _, err = e.append(&ledger.DetectionTest{DetectionTest: test, InstructionID: meta.ID}); err != nil {
+	return test, nil
+}
+
+func (e *Engine) recordDetection(ctx context.Context, state *ledger.State, meta ledger.Instruction, data instructionData, test check.DetectionTest) error {
+	if _, err := e.append(&ledger.DetectionTest{DetectionTest: test, InstructionID: meta.ID}); err != nil {
 		return err
 	}
 	if !test.Passed {
-		q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: data.Request.TargetVersion.Tree}, "detection_failed", "The detection test failed. Revise the aspect or propose a plan without this required check.", "")
-		_, err = e.saveQuestion(state, q, "")
+		q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: data.Request.TargetVersion.Tree}, "detection_failed", detectionFailureText(meta), "")
+		_, err := e.saveQuestion(state, q, "")
 		return err
 	}
-	return e.publishDetection(ctx, test)
+	return e.publishDetection(ctx, data.Reference, test)
 }
 
-func (e *Engine) publishDetection(ctx context.Context, test check.DetectionTest) error {
-	ref, err := e.workspace.SnapshotTree(ctx)
-	if err != nil {
-		return err
-	}
+func (e *Engine) publishDetection(ctx context.Context, ref string, test check.DetectionTest) error {
 	records, err := e.detectionRecords(ctx, ref)
 	if err != nil {
 		return err
@@ -359,7 +367,7 @@ func (e *Engine) resumeDetection(ctx context.Context, state *ledger.State, meta 
 		}
 	}
 	if !pending {
-		return e.restoreDetection(ctx, state, meta.ID, data.Request)
+		return e.restoreDetection(ctx, state, meta, data)
 	}
 	r, err := e.publishInstruction(meta, false, data, "")
 	if err != nil {
@@ -368,14 +376,14 @@ func (e *Engine) resumeDetection(ctx context.Context, state *ledger.State, meta 
 	return e.executeDetection(ctx, state, meta, data, r)
 }
 
-func (e *Engine) restoreDetection(ctx context.Context, state *ledger.State, instructionID string, request *check.Request) (Result, bool, error) {
+func (e *Engine) restoreDetection(ctx context.Context, state *ledger.State, meta ledger.Instruction, data instructionData) (Result, bool, error) {
 	recorded, err := e.records()
 	if err != nil {
 		return Result{}, false, err
 	}
 	var test *check.DetectionTest
 	for _, record := range recorded {
-		if result, ok := record.Payload.(*ledger.DetectionTest); ok && result.InstructionID == instructionID {
+		if result, ok := record.Payload.(*ledger.DetectionTest); ok && result.InstructionID == meta.ID {
 			copy := result.DetectionTest
 			test = &copy
 		}
@@ -384,13 +392,21 @@ func (e *Engine) restoreDetection(ctx context.Context, state *ledger.State, inst
 		return Result{}, false, errors.New("accepted detection result is missing")
 	}
 	if test.Passed {
-		return Result{}, true, e.publishDetection(ctx, *test)
+		return Result{}, true, e.publishDetection(ctx, data.Reference, *test)
 	}
-	q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: request.TargetVersion.Tree}, "detection_failed", "The detection test failed. Revise the aspect or propose a plan without this required check.", "")
+	q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: data.Request.TargetVersion.Tree}, "detection_failed", detectionFailureText(meta), "")
 	q, err = e.saveQuestion(state, q, "")
 	if err != nil {
 		return Result{}, false, err
 	}
 	r, err := e.issueQuestion(state, q)
 	return r, true, err
+}
+
+func detectionFailureText(meta ledger.Instruction) string {
+	text := "The detection test failed. Revise the aspect or examples."
+	if meta.StageRunID == "" {
+		text += " The human must commit the fix before continuing because out-of-round judgments read committed norms."
+	}
+	return text + " Alternatively, make this check not required in the plan template or set [detection] required = false in devkit.toml."
 }

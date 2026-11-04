@@ -50,9 +50,9 @@ Codex では、束縛のあるセッションで呼び出し元の `agent_type` 
 ## SubagentStop
 
 - **入力**: `agent_type`、`agent_id`、`last_assistant_message`、`agent_transcript_path`、取得できる場合はホストから観測した effort または model、発行済みの[指示](data.md#指示-instruction)。
-- **判断**: `agent_type` が devkit の判定者・計画者の定義名であることを確かめ、[最終メッセージの結果](guarantees.md#判定結果の受理)から指示 ID を取る。束縛があり、発行済みのサブエージェントへの指示と指示 ID・担当名が一致すれば採取する。計画の check と検出試験の指示も対象とし、不一致なら何もしない。
-- **出力**: 最終メッセージに来歴を添えて結果ファイルとして公開し、[判定結果の受理](guarantees.md#判定結果の受理)に渡す。
-- **書く生成物**: `results/<指示 ID>-<agent_id>.json`。検証済みの指示 ID・担当、SubagentStop の観測時刻を添える。effort・model の来歴は [Judgment](data.md#check-の結果-judgment)に従う。
+- **判断**: `agent_type` が devkit の判定者・計画者の定義名であることを確かめ、[最終メッセージの結果](guarantees.md#判定結果の受理)から指示 ID を取る。束縛があり、発行済みのサブエージェントへの指示と指示 ID・担当名が一致すれば採取する。計画の check と検出試験の指示も対象とし、指示 ID・担当名の不一致なら何もしない。最終メッセージを JSON として解析できない場合は失敗の観測を残す。
+- **出力**: 最終メッセージに来歴を添えて結果ファイルとして公開し、[判定結果の受理](guarantees.md#判定結果の受理)に渡す。JSON の解析失敗の観測も公開し、`next` が失敗の記録・結果の拒否・再指示と上限での人への問いを処理する。
+- **書く生成物**: 結果ファイル `results/<指示 ID>-<agent_id>.json`、または JSON の解析失敗の観測である。結果ファイルには検証済みの指示 ID・担当、SubagentStop の観測時刻を添える。effort・model の来歴は [Judgment](data.md#check-の結果-judgment)に従う。
 
 両ホストで `agent_type` は定義の `name` と一致し、`last_assistant_message` から最終メッセージの本文を取得できる。Claude Code の `agent_transcript_path` は `<session>/subagents/agent-<id>.jsonl` で、最初の user メッセージから起動時の prompt を読める。Codex は rollout の JSONL を指すが、起動時の `message` は平文で取り出せない。
 

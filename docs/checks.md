@@ -93,12 +93,13 @@
 ## 計画
 
 - **確認事項**:
+  - 要求: 判定依頼の固定入力である要求の原文と `start` の課題に照らし、完了条件と `open_questions` が原文の要求を漏らさず扱い、要求を追加していないか。
   - ゲート: [ループの雛形](architecture/data.md#ループの雛形-plantemplate)の理由の書き方に従い、理由を示しているか。人への確認の判定は[人への確認対象](architecture/guarantees.md#人への確認対象)に従っているか。
   - 逸脱: [計画の雛形からの逸脱](architecture/data.md#計画-plan)を確認し、該当する指摘に [`needs-decision`](architecture/data.md#指摘-finding)(人の判断が必要な指摘)を付けているか。
   - 規模: ステージを減らせないか。
   - 完了条件: [計画](architecture/data.md#計画-plan)に従い、ID 付きの文章と、条件ごとの確認手段の妥当性・網羅性を確かめているか。
   - 網羅性: 変更の種類(画面・データ・外部との通信・構造)に必要な検査が含まれるか。
-- **blocking**: 完了条件に、check または人のゲートによる確認手段がない。
+- **blocking**: 要求の抜けや追加がある、または完了条件に check または人のゲートによる確認手段がない。
 
 ## harness
 
@@ -110,7 +111,7 @@
   - skill: [`description`](https://agentskills.io/specification#description-field)(skill の説明項目)の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`assets/principles/working.md` の原則5](../assets/principles/working.md#5-定型処理はコマンドにし手順はそれを呼ぶ)に従う。
   - 判定: [check の結果](architecture/data.md#check-の結果-judgment)に従い、`NOT ASSESSED`(未評価)を返せるか。
   - 原則の内容: 適用条件・要求・例外・blocking の意味を判断できるか。
-  - 問題の捕捉: brief が参照する作業履歴ファイルから、作業全体の判定・指摘(blocking でないものも含む)、`FAIL`・`NOT ASSESSED` の経緯、ラウンド数、人の却下・訂正・作り直しの指示、`note` で伝えられた見逃しを確かめ、各問題をどこで捕まえるべきだったかを判断しているか。
+  - 問題の捕捉: brief が参照する作業履歴ファイルから、作業全体の判定・指摘(blocking でないものも含む)、合格・不合格の検出試験の例ごとの判定・指摘・期待判定との照合結果、`FAIL`・`NOT ASSESSED` の経緯、ラウンド数、人の却下・訂正・作り直しの指示、`note` で伝えられた見逃しを確かめ、各問題をどこで捕まえるべきだったかを判断しているか。
   - 再発防止: 機械の検査、雛形、観点、原則、skill の順(設定 `[lessons] destinations` で変更可能)で反映先を選び、リポジトリの規範へ反映しているか。反映しない理由があるか。観点を変えたら検出試験の例も更新しているか。規則の「手段: 未実装」と繰り返す違反を、テスト・lint・型・pre-commit・検証コマンドへ移す候補にしているか。
   - 規範の働き: どの原則がどの観点・雛形で使われるか、使われない仕組みや負担に見合わない仕組みがないか。その作業で見えた問題・不足・負担を扱い、規範全体の棚卸しは必要が見えたときだけ行っているか。
   - 単純さ: 部品・原則・記録・観点の数と形式に、より単純な対案があるか。比較と blocking の条件は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-防ぐ失敗と運用負担から仕組みを選ぶ)に従う。

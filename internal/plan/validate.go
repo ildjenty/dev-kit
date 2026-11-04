@@ -128,7 +128,7 @@ func validateStages(start string, stages, optional []Stage, conditions map[strin
 			return err
 		}
 	}
-	return nil
+	return validateDoneChains(all)
 }
 
 func validateStageTransitions(stage Stage, stages []Stage, ids map[string]bool) error {
@@ -166,6 +166,27 @@ func validateStageChecks(stage Stage, conditions map[string]bool) error {
 			if conditions != nil && !conditions[id] {
 				return fmt.Errorf("%s: completion condition not found: %q", stage.ID, id)
 			}
+		}
+	}
+	return nil
+}
+
+func validateDoneChains(stages []Stage) error {
+	next := make(map[string]*string, len(stages))
+	for _, stage := range stages {
+		next[stage.ID] = stage.Transitions.Done
+	}
+	finished := make(map[string]bool)
+	for _, stage := range stages {
+		seen := make(map[string]bool)
+		for id := &stage.ID; id != nil && *id != "replan" && !finished[*id]; id = next[*id] {
+			if seen[*id] {
+				return fmt.Errorf("done transitions contain a cycle at stage %q", *id)
+			}
+			seen[*id] = true
+		}
+		for id := range seen {
+			finished[id] = true
 		}
 	}
 	return nil
