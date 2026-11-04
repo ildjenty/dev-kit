@@ -33,3 +33,25 @@ func TestDoneTransitionsRejectCycles(t *testing.T) {
 }
 
 func doneTarget(id string) *string { return &id }
+
+func TestReplannedPlanMayGoBackToARemovedStage(t *testing.T) {
+	v := validator(t)
+	template, hash := loadTemplate(t, v, "default")
+	p := NewPlan(template, hash, "Build a CLI", []CompletionCondition{{"C1", "The CLI works"}})
+	bindChecks(&p)
+	// After purpose completes, the replanned plan starts at scope and keeps scope's back edge to purpose.
+	p.Stages = p.Stages[1:]
+	p.StartStage = p.Stages[0].ID
+	if back, _ := p.Stages[0].Transitions.Next(Back); back == nil || *back != "purpose" {
+		t.Fatalf("test premise: scope must go back to purpose, got %v", back)
+	}
+	if err := v.ValidatePlan(p); err != nil {
+		t.Fatalf("replanned plan rejected: %v", err)
+	}
+	broken := template
+	broken.Stages = append([]Stage(nil), template.Stages[1:]...)
+	broken.StartStage = broken.Stages[0].ID
+	if err := v.ValidateTemplate(broken); err == nil {
+		t.Fatal("template with a back edge to a missing stage was accepted")
+	}
+}

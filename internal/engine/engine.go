@@ -647,6 +647,13 @@ func (e *Engine) acceptPlan(ctx context.Context, state *ledger.State, p plan.Pla
 	if p.Template.ContentHash != plan.ContentHash(source) {
 		return errors.New("plan template content hash does not match")
 	}
+	template, err := e.plans.ParseTemplate(source)
+	if err != nil {
+		return err
+	}
+	if err := plan.ValidateBackTargets(template, p); err != nil {
+		return err
+	}
 	_, err = e.append(&ledger.PlanVersion{Plan: p, Origin: origin, InstructionID: instructionID})
 	return err
 }

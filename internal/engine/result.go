@@ -58,7 +58,9 @@ func (e *Engine) retryRejected(ctx context.Context, state *ledger.State, meta le
 	if err != nil {
 		return err
 	}
-	if _, err := e.publishInstruction(meta, true, data, body.Text); err != nil {
+	// Tell the reissued subagent why its previous result was rejected, so the retry can differ.
+	brief := body.Text + "\n\n## Previous result rejected\n\nThe previous result for this request was rejected by devkit:\n\n" + failure.Reason + "\n\nReturn a result that resolves this reason.\n"
+	if _, err := e.publishInstruction(meta, true, data, brief); err != nil {
 		return err
 	}
 	if count < 3 {

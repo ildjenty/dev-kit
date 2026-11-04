@@ -102,7 +102,6 @@ func TestSchemaAndReferences(t *testing.T) {
 	bindChecks(&p)
 	for _, change := range []func(*Plan){
 		func(p *Plan) { p.Stages[0].Checks[0].CompletionConditionIDs = []string{"missing"} },
-		func(p *Plan) { p.Stages[0].Transitions.Back = "missing" },
 		func(p *Plan) {
 			p.Stages[0].Checks[0].Runner = "command:test"
 			p.Stages[0].Checks[0].Aspect = "different"
@@ -116,6 +115,11 @@ func TestSchemaAndReferences(t *testing.T) {
 		if err := v.ValidatePlan(bad); err == nil {
 			t.Fatal("accepted an invalid plan")
 		}
+	}
+	missingBack := clonePlan(p)
+	missingBack.Stages[0].Transitions.Back = "missing"
+	if err := ValidateBackTargets(template, missingBack); err == nil {
+		t.Fatal("accepted a back transition to a stage absent from the plan and the template")
 	}
 	data, err := json.Marshal(p)
 	if err != nil {

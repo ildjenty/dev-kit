@@ -939,6 +939,11 @@ func (e *Engine) acceptPlannerResult(ctx context.Context, state *ledger.State, i
 	if p.Template.Name != request.TemplateName || p.Template.ContentHash != plan.ContentHash(source) {
 		return e.rejectResult(instruction, obs, errors.New("planner template does not match its instruction"))
 	}
+	if template, err := e.plans.ParseTemplate(source); err != nil {
+		return false, err
+	} else if err := plan.ValidateBackTargets(template, p); err != nil {
+		return e.rejectResult(instruction, obs, err)
+	}
 	return true, e.acceptPlan(ctx, state, p, request.Origin, instruction.ID)
 }
 

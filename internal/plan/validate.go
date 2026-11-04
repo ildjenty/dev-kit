@@ -121,7 +121,7 @@ func validateStages(start string, stages, optional []Stage, conditions map[strin
 		return fmt.Errorf("start stage is not selected: %q", start)
 	}
 	for _, stage := range all {
-		if err := validateStageTransitions(stage, stages, ids); err != nil {
+		if err := validateStageTransitions(stage, stages, ids, conditions != nil); err != nil {
 			return err
 		}
 		if err := validateStageChecks(stage, conditions); err != nil {
@@ -131,10 +131,15 @@ func validateStages(start string, stages, optional []Stage, conditions map[strin
 	return validateDoneChains(all)
 }
 
-func validateStageTransitions(stage Stage, stages []Stage, ids map[string]bool) error {
+func validateStageTransitions(stage Stage, stages []Stage, ids map[string]bool, plannedBack bool) error {
 	for _, action := range []Transition{Fix, Ask, Back, Done} {
 		target, _ := stage.Transitions.Next(action)
 		if action == Done && target != nil && *target == "replan" {
+			continue
+		}
+		// A back transition replans from its target, so in a plan it may name a stage that
+		// already ran and is no longer selected. ValidateBackTargets checks it against the template.
+		if action == Back && plannedBack && target != nil && *target != "replan" {
 			continue
 		}
 		if target != nil && !ids[*target] {
@@ -187,6 +192,21 @@ func validateDoneChains(stages []Stage) error {
 		}
 		for id := range seen {
 			finished[id] = true
+		}
+	}
+	return nil
+}
+
+// ValidateBackTargets checks that every back transition of the plan names a stage of the
+// plan or of its template, including optional stages.
+func ValidateBackTargets(template PlanTemplate, p Plan) error {
+	known := map[string]bool{}
+	for _, stage := range append(append(slices.Clone(template.Stages), template.OptionalStages...), p.Stages...) {
+		known[stage.ID] = true
+	}
+	for _, stage := range p.Stages {
+		if target, _ := stage.Transitions.Next(Back); target != nil && !known[*target] {
+			return fmt.Errorf("%s: back transition target not found: %q", stage.ID, *target)
 		}
 	}
 	return nil

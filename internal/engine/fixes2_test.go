@@ -334,6 +334,10 @@ func TestMalformedSubagentResultsReissueAndEscalate(t *testing.T) {
 					if err != nil || reissued.Reference != initial.Reference || reissued.Origin != initial.Origin || !reflect.DeepEqual(reissued.Context, initial.Context) {
 						t.Fatalf("reissue changed fixed inputs: %+v, %v", reissued, err)
 					}
+					brief, err := os.ReadFile(result.Instruction.Brief)
+					if err != nil || !strings.Contains(string(brief), "## Previous result rejected") {
+						t.Fatalf("reissued brief does not state why the previous result was rejected: %v", err)
+					}
 				} else if result.Instruction.Question == nil || result.Instruction.Question.StopCategory != "malformed_result" {
 					t.Fatalf("missing human escalation: %+v", result)
 				}
