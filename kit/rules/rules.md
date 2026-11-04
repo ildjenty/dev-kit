@@ -20,9 +20,9 @@ None registered. When adding a decision, include its enforcement mechanism and g
 
 ## Work procedures
 
-Follow the consuming repository layout (`docs/architecture/layout.md#%E5%88%A9%E7%94%A8%E5%81%B4%E3%81%AE%E3%83%AA%E3%83%9D%E3%82%B8%E3%83%88%E3%83%AA`) for parallel work placement. Follow principle 6 of `principles/data.md` for shared state and common invariants.
+For parallel work on one machine, use separate checkouts opened through the host or git worktrees; each checkout has its own `.devkit/run/`. Follow principle 6 of `principles/data.md` for shared state and common invariants.
 
-Follow interruption (`docs/architecture/guarantees.md#%E4%B8%AD%E6%96%AD`) for human-initiated pause and resume and the Stop continuation limit.
+Follow `skills/devkit/SKILL.md#pause-and-resume` for human-initiated pause and resume. After three consecutive Stop blocks without new work records, Stop allows stopping and asks whether to continue; wait for the human answer. Tool calls and session changes do not reset the count.
 
 ## Comments and lint
 
@@ -32,9 +32,9 @@ Follow interruption (`docs/architecture/guarantees.md#%E4%B8%AD%E6%96%AD`) for h
 
 A test ID uniquely identifies a test within the repository as the pair of its repository-relative test file path and its identifier in the test framework.
 
-Checking a test's detection ability means deliberately breaking its subject and confirming that the test fails. This differs from detection tests of aspect files (`docs/architecture/guarantees.md#%E6%A4%9C%E5%87%BA%E8%A9%A6%E9%A8%93`).
+Checking a test's detection ability means deliberately breaking its subject and confirming that the test fails. This differs from detection tests of aspect files (`checks/README.md#detection-tests`).
 
-- **Confirm that tests, including regression tests, fail once before implementation. Record the test ID, target version (`docs/architecture/data.md#%E5%AF%BE%E8%B1%A1%E3%81%AE%E3%83%90%E3%83%BC%E3%82%B8%E3%83%A7%E3%83%B3-targetversion`, the state under verification), and execution result. If this cannot be checked before implementation, use the test detection ability check in the next rule instead**. Principle 4 of `principles/testing.md`. Enforcement: Not implemented.
+- **Confirm that tests, including regression tests, fail once before implementation. Record the test ID, target version (`schemas/judgment.json#/$defs/target_version`, the state under verification), and execution result. If this cannot be checked before implementation, use the test detection ability check in the next rule instead**. Principle 4 of `principles/testing.md`. Enforcement: Not implemented.
 - **For tests whose failure could not be confirmed before implementation and tests of security-related processing, deliberately break the subject with the smallest necessary diff and record the failure-inducing diff and execution result linked to the test ID**. Principle 4 of `principles/testing.md`. Enforcement: Not implemented.
 - **When checking test detection ability, target one property, break it with the smallest necessary diff, run once, immediately revert, and confirm that the source state before the change is restored**. Principle 4 of `principles/testing.md`. Enforcement: Not implemented.
 - **Do not leave `skip` or `only` in tests**. Principle 9 of `principles/testing.md`. Enforcement: Not implemented.
@@ -52,7 +52,7 @@ Checking a test's detection ability means deliberately breaking its subject and 
 - **Do not use "obviously", "naturally", or "simply" in prose**. Principle 2 of `principles/verification.md`. Enforcement: Not implemented.
 - **Exclude the following machine-readable fixed format from checks requiring conclusions and decision material first**. Principle 1 of `principles/writing.md`. Enforcement: Not implemented.
 
-  - Termination blocks (`docs/architecture/data.md#%E9%80%B2%E6%8D%97-progress`, JSON recording round results)
+  - Termination blocks (`schemas/progress.json`, JSON recording round results)
 
 - **Questions requesting human decisions must include options, a recommendation, and its reason**. Principle 7 of `principles/writing.md`. Enforcement: Not implemented.
 - **Do not write "I" in PR bodies or review comments**. Principle 2 of `principles/writing.md`. Enforcement: Not implemented.
@@ -73,4 +73,4 @@ Checking a test's detection ability means deliberately breaking its subject and 
 - **Use a font size of at least 16px for mobile input fields**. Principle 8 of `principles/ui.md`. Enforcement: Not implemented.
 - **Suppress background scrolling only when opening a menu excludes the background from interaction**. Principle 9 of `principles/ui.md`. Enforcement: Not implemented.
 - **For animation, check actual responsiveness and rendering quality for unnecessary rendering work**. Principle 9 of `principles/ui.md`. Enforcement: Not implemented.
-- **Capture screenshots corresponding to the page, state, and target version (`docs/architecture/data.md#%E5%AF%BE%E8%B1%A1%E3%81%AE%E3%83%90%E3%83%BC%E3%82%B8%E3%83%A7%E3%83%B3-targetversion`) under verification, and retain capture records**. Principle 9 of `principles/ui.md`. Enforcement: Not implemented.
+- **Capture screenshots corresponding to the page, state, and target version (`schemas/judgment.json#/$defs/target_version`) under verification, and retain capture records**. Principle 9 of `principles/ui.md`. Enforcement: Not implemented.

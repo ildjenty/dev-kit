@@ -3,6 +3,7 @@ package plan
 import (
 	"encoding/json"
 	"io/fs"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -65,7 +66,7 @@ func TestDefaultsAndExamples(t *testing.T) {
 			}
 		})
 	}
-	data, err := fs.ReadFile(devkit.FS(), "docs/architecture/examples.md")
+	data, err := os.ReadFile("../../docs/architecture/examples.md")
 	if err != nil {
 		t.Fatal(err)
 	}

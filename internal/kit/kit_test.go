@@ -25,8 +25,6 @@ func TestCopyLayoutAndRead(t *testing.T) {
 		t.Fatalf("copy directory or version differs: %s, %s", k.Dir(), k.Version())
 	}
 	for _, pair := range [][2]string{
-		{"README.md", "README.md"},
-		{"docs/parts/runtime.md", "docs/parts/runtime.md"},
 		{"principles/harness.md", "principles/harness.md"},
 		{"kit/plans/default.json", "plans/default.json"},
 		{"kit/plans/README.md", "plans/README.md"},
@@ -43,7 +41,7 @@ func TestCopyLayoutAndRead(t *testing.T) {
 			t.Errorf("copy contents differ: %s", pair[1])
 		}
 	}
-	for _, name := range []string{"kit"} {
+	for _, name := range []string{"kit", "docs", "README.md"} {
 		if _, err := fs.Stat(k, name); !errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("unexpected copied path: %s: %v", name, err)
 		}

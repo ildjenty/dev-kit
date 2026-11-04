@@ -1,6 +1,4 @@
-Stores host settings, judge and planner subagent definitions, and rules fragments.
-Procedures for using devkit belong in kit/skills/; event JSON conversion belongs in internal/host/event.
-For placement, see `docs/architecture/modules.md#kit`; for installation, see `docs/architecture/modules.md#install`.
+These JSON and TOML settings fragments and Markdown/TOML subagent definitions configure the supported hosts. `devkit init` installs them at the paths below. Procedures for using devkit are in the installed kit copy's `skills/devkit/SKILL.md`.
 
 - `claude/settings.json` contains hook, sandbox, and permissions fragments to append to `.claude/settings.json`.
 - `claude/agents/` contains read-only judge and planner definitions placed in `.claude/agents/`.

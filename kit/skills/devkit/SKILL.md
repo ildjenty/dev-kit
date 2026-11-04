@@ -5,7 +5,7 @@ description: Advance the devkit planning, work, and judgment loop. Use when star
 
 # Using devkit
 
-Carry out the instructions returned by `devkit`. It determines stage order, judgment, approval, and completion. Follow the norms and formats in the work's `.devkit/kit/<kit_version>/docs/` and the principles and schemas referenced by the request.
+Carry out the instructions returned by `devkit`. It determines stage order, judgment, approval, and completion. Follow the schemas, stage definitions and completion rules, check instructions, and principles in the work's `.devkit/kit/<kit_version>/` copy: `schemas/`, `stages/`, `checks/`, and `principles/`, as referenced by the request.
 
 ## Invoking commands
 

@@ -67,7 +67,6 @@ dev-kit/
     detect.json              検出試験の合格記録の索引
     structure.json           構造ステージを使うときだけ
     kit/<バージョン>/         固定物のコピー
-      docs/                  部品の契約とその参照文書
       principles/            原則
       plans/                 既定の雛形
       stages/                ステージ定義
