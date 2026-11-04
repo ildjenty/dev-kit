@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	devkit "github.com/ildjenty/dev-kit"
+	"github.com/ildjenty/dev-kit/assets"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/workspace"
@@ -34,11 +34,8 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 		return Result{}, err
 	}
 	result := Result{Root: w.Root(), Guidance: []string{uninstallGuidance}}
-	assets, err := fs.Sub(devkit.FS(), "kit")
-	if err != nil {
-		return result, err
-	}
-	if err := result.removeConfig(assets); err != nil {
+	files := assets.FS()
+	if err := result.removeConfig(files); err != nil {
 		return result, err
 	}
 	for _, name := range []string{".devkit/kit", ".devkit/run"} {
@@ -54,11 +51,11 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 		{"hosts/claude/agents", ".claude/agents"},
 		{"hosts/codex/agents", ".codex/agents"},
 	} {
-		if err := result.removeTree(assets, pair[0], pair[1]); err != nil {
+		if err := result.removeTree(files, pair[0], pair[1]); err != nil {
 			return result, err
 		}
 	}
-	rules, err := fs.ReadFile(assets, "rules/rules.md")
+	rules, err := fs.ReadFile(files, "rules/rules.md")
 	if err != nil {
 		return result, err
 	}
@@ -69,7 +66,7 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 		return result, err
 	}
 	for _, fragment := range hostFragments {
-		data, err := fs.ReadFile(assets, fragment.source)
+		data, err := fs.ReadFile(files, fragment.source)
 		if err != nil {
 			return result, err
 		}
@@ -112,7 +109,7 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 	return result, result.pruneDirectories()
 }
 
-func (r *Result) removeConfig(assets fs.FS) error {
+func (r *Result) removeConfig(files fs.FS) error {
 	before, err := readOptional(filepath.Join(r.Root, "devkit.toml"))
 	if err != nil || before == nil {
 		return err
@@ -124,7 +121,7 @@ func (r *Result) removeConfig(assets fs.FS) error {
 	if c.KitVersion != kit.Version {
 		return fmt.Errorf("kit version mismatch: binary %q, devkit.toml %q; uninstall with the matching devkit binary", kit.Version, c.KitVersion)
 	}
-	deny, err := fs.ReadFile(assets, "hosts/deny.toml")
+	deny, err := fs.ReadFile(files, "hosts/deny.toml")
 	if err != nil {
 		return err
 	}
@@ -167,12 +164,12 @@ func (r *Result) removeAll(name string) error {
 	return nil
 }
 
-func (r *Result) removeTree(assets fs.FS, source, target string) error {
-	return fs.WalkDir(assets, source, func(name string, entry fs.DirEntry, err error) error {
+func (r *Result) removeTree(files fs.FS, source, target string) error {
+	return fs.WalkDir(files, source, func(name string, entry fs.DirEntry, err error) error {
 		if err != nil || entry.IsDir() {
 			return err
 		}
-		data, err := fs.ReadFile(assets, name)
+		data, err := fs.ReadFile(files, name)
 		if err != nil {
 			return err
 		}

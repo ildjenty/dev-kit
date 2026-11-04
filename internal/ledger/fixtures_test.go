@@ -16,7 +16,7 @@ import (
 var fixtureValidator = sync.OnceValues(func() (*Validator, error) {
 	sources := make(map[string][]byte)
 	for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
-		source, err := os.ReadFile(filepath.Join("..", "..", "kit", "schemas", name+".json"))
+		source, err := os.ReadFile(filepath.Join("..", "..", "assets", "schemas", name+".json"))
 		if err != nil {
 			return nil, err
 		}

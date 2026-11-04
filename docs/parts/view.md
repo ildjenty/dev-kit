@@ -48,7 +48,7 @@ view は1つの[作業](../architecture/data.md#作業-work)(1課題のループ
 
 #### 構造図
 
-構造図の入力は[構造の記録](../architecture/data.md#構造の記録-structure)、生成形式は [view の契約](../architecture/modules.md#view)に従う。図の描き方は [`principles/writing.md` の原則8](../../principles/writing.md#8-図の目的を定め関係の種類と向きを示す)に従い、入力に関係の種類がなければ依存関係の図までにとどめる。
+構造図の入力は[構造の記録](../architecture/data.md#構造の記録-structure)、生成形式は [view の契約](../architecture/modules.md#view)に従う。図の描き方は [`assets/principles/writing.md` の原則8](../../assets/principles/writing.md#8-図の目的を定め関係の種類と向きを示す)に従い、入力に関係の種類がなければ依存関係の図までにとどめる。
 
 ## 保証
 

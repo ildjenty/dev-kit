@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	TemplateSchemaPath = "kit/schemas/plan-template.json"
-	PlanSchemaPath     = "kit/schemas/plan.json"
+	TemplateSchemaPath = "schemas/plan-template.json"
+	PlanSchemaPath     = "schemas/plan.json"
 	PlanSchemaVersion  = 1
 	DefaultPlanRounds  = 3
 )

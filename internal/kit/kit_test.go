@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	devkit "github.com/ildjenty/dev-kit"
+	"github.com/ildjenty/dev-kit/assets"
 	"github.com/ildjenty/dev-kit/internal/kit"
 )
 
@@ -26,10 +26,10 @@ func TestCopyLayoutAndRead(t *testing.T) {
 	}
 	for _, pair := range [][2]string{
 		{"principles/harness.md", "principles/harness.md"},
-		{"kit/plans/default.json", "plans/default.json"},
-		{"kit/plans/README.md", "plans/README.md"},
+		{"plans/default.json", "plans/default.json"},
+		{"plans/README.md", "plans/README.md"},
 	} {
-		want, err := fs.ReadFile(devkit.FS(), pair[0])
+		want, err := fs.ReadFile(assets.FS(), pair[0])
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -41,7 +41,7 @@ func TestCopyLayoutAndRead(t *testing.T) {
 			t.Errorf("copy contents differ: %s", pair[1])
 		}
 	}
-	for _, name := range []string{"kit", "docs", "README.md"} {
+	for _, name := range []string{"kit", "docs", "README.md", "embed.go"} {
 		if _, err := fs.Stat(k, name); !errors.Is(err, fs.ErrNotExist) {
 			t.Errorf("unexpected copied path: %s: %v", name, err)
 		}

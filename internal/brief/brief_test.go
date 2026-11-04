@@ -13,7 +13,7 @@ import (
 
 func requestTemplate(t *testing.T, name string) string {
 	t.Helper()
-	source, err := os.ReadFile("../../kit/templates/brief/" + name + ".md.tmpl")
+	source, err := os.ReadFile("../../assets/templates/brief/" + name + ".md.tmpl")
 	if err != nil {
 		t.Fatal(err)
 	}

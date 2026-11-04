@@ -23,7 +23,7 @@ func loadInput(t *testing.T, stops []ledger.StopObservation, payloads ...ledger.
 	t.Helper()
 	sources := make(map[string][]byte)
 	for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
-		data, err := os.ReadFile(filepath.Join("..", "..", "kit", "schemas", name+".json"))
+		data, err := os.ReadFile(filepath.Join("..", "..", "assets", "schemas", name+".json"))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -28,9 +28,9 @@ check は固定した[規範](../architecture/modules.md#check)(評価に用い�
 
 失敗のシナリオを示せない指摘は返さず、重大度は付けない。[blocking](../architecture/modules.md#check)(修正を求める条件)ではない指摘は修正を求めず、参考情報として残す。指摘数に上限は設けず、報告する範囲は観点ファイルの blocking の定義と「報告しない事項」で調整する。
 
-評価対象や外部の文書の扱いは [principles/context.md](../../principles/context.md) の原則3に従う。
+評価対象や外部の文書の扱いは [assets/principles/context.md](../../assets/principles/context.md) の原則3に従う。
 
-省略した手順の報告は [principles/working.md](../../principles/working.md) の原則1、判定後の反証の検討は [principles/verification.md](../../principles/verification.md) の原則1に従う。
+省略した手順の報告は [assets/principles/working.md](../../assets/principles/working.md) の原則1、判定後の反証の検討は [assets/principles/verification.md](../../assets/principles/verification.md) の原則1に従う。
 
 ### 実行主体と受理
 

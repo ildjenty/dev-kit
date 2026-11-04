@@ -6,7 +6,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 - **下位モジュール**: plan、form、kit、config、workspace は上位モジュールの名前を知らない。
 - **ポート**: interface は置かない。Workspace と External は具体型として利用し、試験では関数値を差し替える。判定者・計画者のサブエージェントの起動の抽象化は、[ホストに任せる範囲](guarantees.md#ホストgit-と-kit-の責務分担)に含める。
-- **外部型の変換**: host/event はホストの JSON、workspace は git の出力、config は TOML、ledger/fsstore はファイル形式、external は外部コマンドの入出力を境界で内部の型に変換する。外部の型を公開契約・記録・ドメイン(plan・ledger・check など)に持ち込まない。[principles/structure.md](../../principles/structure.md) の原則5に従う。
+- **外部型の変換**: host/event はホストの JSON、workspace は git の出力、config は TOML、ledger/fsstore はファイル形式、external は外部コマンドの入出力を境界で内部の型に変換する。外部の型を公開契約・記録・ドメイン(plan・ledger・check など)に持ち込まない。[assets/principles/structure.md](../../assets/principles/structure.md) の原則5に従う。
 - **共通の通過点**: ledger の書き込みは[記録の書き込みと排他](data.md#記録の書き込みと排他)、外部書き込みは [external](#external)、固定物は [kit](#kit)に集める。ホストの設定はホスト自身が読む。
 
 モジュールの内部構造、view の見た目、ledger/fsstore の最適化は、後から変更できる。
@@ -39,7 +39,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### check
 
-- **責務**: 観点ファイルを解析し、blocking の定義、確認事項、報告しない事項、出力形式を扱う。指示ファイル、[principles](../../principles/README.md)、kit 内の規範と JSON Schema、[規則と強制手段 (Rules)](data.md#規則と強制手段-rules)、brief、計画、観点ファイルを規範として束ね、判定依頼の内容を決める。依頼文への組み立ては brief が担う。[判定結果の受理と集約](guarantees.md#判定結果の受理)、必須 check の網羅状況、[検出試験](guarantees.md#検出試験)の照合を担う。`command:` の check の実行結果も同じ受理境界で [Judgment](data.md#check-の結果-judgment) にする。
+- **責務**: 観点ファイルを解析し、blocking の定義、確認事項、報告しない事項、出力形式を扱う。指示ファイル、[principles](../../assets/principles/README.md)、kit 内の規範と JSON Schema、[規則と強制手段 (Rules)](data.md#規則と強制手段-rules)、brief、計画、観点ファイルを規範として束ね、判定依頼の内容を決める。依頼文への組み立ては brief が担う。[判定結果の受理と集約](guarantees.md#判定結果の受理)、必須 check の網羅状況、[検出試験](guarantees.md#検出試験)の照合を担う。`command:` の check の実行結果も同じ受理境界で [Judgment](data.md#check-の結果-judgment) にする。
 - **持つデータ**: [Judgment](data.md#check-の結果-judgment) と [Finding](data.md#指摘-finding)の型、解析した観点ファイル、判定依頼と解析結果、検出試験の仕様と結果を持つ。
 - **公開する契約**: 規範・観点ファイル・対象のバージョンと場所・出力スキーマを受け取り、判定依頼の内容を返す操作を公開する。ラウンドや観点に応じた追加入力は[判定結果の受理](guarantees.md#判定結果の受理)、修正ラウンドの追加入力は[指摘 ID の引き継ぎ](data.md#指摘-finding)に従う。結果ファイルまたはコマンド実行結果を受け取り、`Judgment` を解析して返す操作も公開する。適用除外、集約、必須 check と検出試験の照合も公開する。
 - **依存**: 観点ファイルの形式と `Judgment` のスキーマを扱う form に依存する。
@@ -150,11 +150,11 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### kit
 
-kit はバージョンを持つ固定物を提供する。供給源はリポジトリ内のコピー `.devkit/kit/<バージョン>/` の1つに限定する。埋め込みは `init` のコピーの書き出し、`uninstall` の削除対象の照合と設定の断片の除去、`doctor` の一致の照合にだけ使う。[ルートパッケージ](#ルートパッケージ)が埋め込む `kit/` の中身はバージョンディレクトリの直下に、`principles/` はその中の `principles/` にコピーする。`docs/` とルートの `README.md` は配布しない。
+kit はバージョンを持つ固定物を提供する。供給源はリポジトリ内のコピー `.devkit/kit/<バージョン>/` の1つに限定する。埋め込みは `init` のコピーの書き出し、`uninstall` の削除対象の照合と設定の断片の除去、`doctor` の一致の照合にだけ使う。`init` は [assets パッケージ](#assets-パッケージ)が埋め込む `assets/` 内の配布物を、ディレクトリ構成を保ったまま `.devkit/kit/<バージョン>/` の直下にコピーする。`assets/principles/` のコピー先は `.devkit/kit/<バージョン>/principles/` である。`docs/` とリポジトリ直下の `README.md` は配布しない。
 
 brief と判定依頼が参照する規範と形式は、コピー内の principles、ステージ定義、観点ファイル、JSON Schema、テンプレートで完結する。設計文書や部品の契約を読むことは前提にしない。利用側の観点ファイルは `.devkit/checks/` にも置く。[Work](data.md#作業-work)(1課題のループ)の kit のバージョンと一致しないコピーは拒否する。
 
-固定物には、既定の雛形、ステージ定義、kit 提供の観点ファイル、テンプレート、router の分類表の既定、規則の既定、JSON Schema、skill、ホスト設定・サブエージェント定義・rules の断片、principles、検出試験の違反例・適合例・許容例がある。固定物の供給、埋め込みからのコピー、一致の照合を公開する。他の処理モジュールには依存せず、埋め込みの供給源をルートパッケージから読む。状態機械の進行や入出力を伴わないドメインの判断は持たない。
+固定物には、既定の雛形、ステージ定義、kit 提供の観点ファイル、テンプレート、router の分類表の既定、規則の既定、JSON Schema、skill、ホスト設定・サブエージェント定義・rules の断片、principles、検出試験の違反例・適合例・許容例がある。固定物の供給、埋め込みからのコピー、一致の照合を公開する。他の処理モジュールには依存せず、埋め込みの供給源を assets パッケージから読む。状態機械の進行や入出力を伴わないドメインの判断は持たない。
 
 ### view
 
@@ -189,9 +189,9 @@ brief と判定依頼が参照する規範と形式は、コピー内の princip
 - **依存**: すべての実装パッケージに依存する。
 - **置くもの・置かないもの**: コマンドの定義と配線を置く。計画・判定・記録の意味論は各モジュールへ渡す。
 
-### ルートパッケージ
+### assets パッケージ
 
-ルートパッケージは `go:embed` で `kit/` と `principles/` だけをバイナリに直接埋め込む。`docs/` とルートの `README.md` は埋め込まない。埋め込んだ固定物を `fs.FS` として公開し、kit パッケージが読む。埋め込み元のファイルを参照し、実装パッケージには依存しない。埋め込みの定義と公開を担い、固定物の供給と照合は kit が担う。
+assets パッケージ(`github.com/ildjenty/dev-kit/assets`)は、`assets/embed.go` の `package assets` で、自分のディレクトリ内の配布物を `go:embed` によりバイナリに直接埋め込む。`principles/` も `assets/` 内に含む。`docs/` とリポジトリ直下の `README.md` は埋め込まない。埋め込んだ固定物を `FS()` で `fs.FS` として公開し、internal/kit が読む。埋め込み元のファイルを参照し、実装パッケージには依存しない。埋め込みの定義と公開を担い、固定物の供給と照合は kit が担う。
 
 ## モジュール間の依存関係
 
@@ -240,7 +240,7 @@ graph TD
   check --> form
   router --> plan
   router --> check
-  kit --> root[ルート: 埋め込み]
+  kit --> assets[assets: 埋め込み]
 ```
 
 ## doctor の確認項目

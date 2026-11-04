@@ -10,8 +10,8 @@ import (
 func TestFindingIDsAreLocalToAspect(t *testing.T) {
 	request := judgmentRequest(t)
 	schema, err := form.CompileSchemaWithResources(request.OutputSchema, map[string][]byte{
-		"urn:devkit:form:finding":   asset(t, "kit/schemas/finding.json"),
-		"urn:devkit:form:reference": asset(t, "kit/schemas/reference.json"),
+		"urn:devkit:form:finding":   asset(t, "schemas/finding.json"),
+		"urn:devkit:form:reference": asset(t, "schemas/reference.json"),
 	})
 	if err != nil {
 		t.Fatal(err)

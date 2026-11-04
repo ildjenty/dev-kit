@@ -11,7 +11,7 @@ import (
 
 func schemaFor(t *testing.T, name string) *Schema {
 	t.Helper()
-	source, err := os.ReadFile(filepath.Join("..", "..", "kit", "schemas", name+".json"))
+	source, err := os.ReadFile(filepath.Join("..", "..", "assets", "schemas", name+".json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,7 +20,7 @@ func schemaFor(t *testing.T, name string) *Schema {
 		if dependency == name {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join("..", "..", "kit", "schemas", dependency+".json"))
+		data, err := os.ReadFile(filepath.Join("..", "..", "assets", "schemas", dependency+".json"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -244,7 +244,7 @@ func TestTemplates(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			source, err := os.ReadFile(filepath.Join("..", "..", "kit", "templates", tc.name+".md.tmpl"))
+			source, err := os.ReadFile(filepath.Join("..", "..", "assets", "templates", tc.name+".md.tmpl"))
 			if err != nil {
 				t.Fatal(err)
 			}

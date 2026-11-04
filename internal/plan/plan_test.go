@@ -9,14 +9,14 @@ import (
 	"strings"
 	"testing"
 
-	devkit "github.com/ildjenty/dev-kit"
+	"github.com/ildjenty/dev-kit/assets"
 )
 
 func validator(t *testing.T) *Validator {
 	t.Helper()
 	read := func(path string) []byte {
 		t.Helper()
-		data, err := fs.ReadFile(devkit.FS(), path)
+		data, err := fs.ReadFile(assets.FS(), path)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -31,7 +31,7 @@ func validator(t *testing.T) *Validator {
 
 func loadTemplate(t *testing.T, v *Validator, name string) (PlanTemplate, string) {
 	t.Helper()
-	data, err := fs.ReadFile(devkit.FS(), "kit/plans/"+name+".json")
+	data, err := fs.ReadFile(assets.FS(), "plans/"+name+".json")
 	if err != nil {
 		t.Fatal(err)
 	}

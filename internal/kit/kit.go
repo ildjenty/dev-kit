@@ -7,9 +7,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
-	devkit "github.com/ildjenty/dev-kit"
+	"github.com/ildjenty/dev-kit/assets"
 )
 
 // Version is the version of the assets embedded in the binary.
@@ -82,7 +81,7 @@ func Copy(repoRoot string) error {
 			}
 			return nil
 		}
-		data, err := fs.ReadFile(devkit.FS(), source)
+		data, err := fs.ReadFile(assets.FS(), source)
 		if err != nil {
 			return fmt.Errorf("kit: read embedded asset: %w", err)
 		}
@@ -125,7 +124,7 @@ func (k *Kit) Verify() error {
 		if entry.IsDir() {
 			return nil
 		}
-		data, err := fs.ReadFile(devkit.FS(), source)
+		data, err := fs.ReadFile(assets.FS(), source)
 		if err != nil {
 			return fmt.Errorf("kit: read embedded asset: %w", err)
 		}
@@ -166,13 +165,13 @@ func (k *Kit) Verify() error {
 }
 
 func walkEmbedded(visit func(source, name string, entry fs.DirEntry) error) error {
-	return fs.WalkDir(devkit.FS(), ".", func(source string, entry fs.DirEntry, err error) error {
+	return fs.WalkDir(assets.FS(), ".", func(source string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return fmt.Errorf("kit: walk embedded assets: %w", err)
 		}
-		if source == "." || source == "kit" {
+		if source == "." {
 			return nil
 		}
-		return visit(source, strings.TrimPrefix(source, "kit/"), entry)
+		return visit(source, source, entry)
 	})
 }

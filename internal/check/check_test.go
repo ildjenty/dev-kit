@@ -6,13 +6,13 @@ import (
 	"slices"
 	"testing"
 
-	devkit "github.com/ildjenty/dev-kit"
+	"github.com/ildjenty/dev-kit/assets"
 	"github.com/ildjenty/dev-kit/internal/form"
 )
 
 func asset(t *testing.T, path string) []byte {
 	t.Helper()
-	data, err := fs.ReadFile(devkit.FS(), path)
+	data, err := fs.ReadFile(assets.FS(), path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,19 +20,19 @@ func asset(t *testing.T, path string) []byte {
 }
 
 func TestKitAspects(t *testing.T) {
-	paths, err := fs.Glob(devkit.FS(), "kit/checks/*.md")
+	paths, err := fs.Glob(assets.FS(), "checks/*.md")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range paths {
-		if path == "kit/checks/README.md" {
+		if path == "checks/README.md" {
 			continue
 		}
 		aspect, err := ParseAspect(string(asset(t, path)))
 		if err != nil || aspect.Blocking == "" || aspect.OutputFormat == "" {
 			t.Fatalf("%s: %+v, %v", path, aspect, err)
 		}
-		if _, err := ParseDetectionSpec(asset(t, "kit/examples/"+aspect.ID+"/spec.json")); err != nil {
+		if _, err := ParseDetectionSpec(asset(t, "examples/"+aspect.ID+"/spec.json")); err != nil {
 			t.Fatalf("%s detection test: %v", aspect.ID, err)
 		}
 	}
@@ -43,7 +43,7 @@ func TestKitAspects(t *testing.T) {
 
 func TestAspectTemplateAndExistingKeys(t *testing.T) {
 	want := Aspect{ID: "example", Checks: "checks", Blocking: "condition", DoNotReport: "outside scope", OutputFormat: "JSON"}
-	rendered, err := form.ApplyTemplate(string(asset(t, "kit/templates/aspect.md.tmpl")), want)
+	rendered, err := form.ApplyTemplate(string(asset(t, "templates/aspect.md.tmpl")), want)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func judgmentRequest(t *testing.T) Request {
 		Kind: RoundRequest, InstructionID: "judgment-1", Runner: "review",
 		Aspect: Aspect{ID: "purpose"}, TargetVersion: form.TargetVersion{Kind: form.TargetTree, Tree: "tree"}, TargetPath: "snap/tree",
 		Norms:        []Norm{{Reference: form.NormReference{Path: "AGENTS.md", BlobID: "blob"}}},
-		OutputSchema: asset(t, "kit/schemas/judgment.json"), CompletionConditionIDs: []string{"C1"},
+		OutputSchema: asset(t, "schemas/judgment.json"), CompletionConditionIDs: []string{"C1"},
 		Progress:         &form.Progress{InstructionID: "work-1", TerminationKind: form.TerminationCompleted},
 		PreviousFindings: []Finding{{ID: "old"}},
 	})
@@ -77,8 +77,8 @@ func judgmentRequest(t *testing.T) Request {
 func TestAcceptResult(t *testing.T) {
 	request := judgmentRequest(t)
 	schema, err := form.CompileSchemaWithResources(request.OutputSchema, map[string][]byte{
-		"urn:devkit:form:finding":   asset(t, "kit/schemas/finding.json"),
-		"urn:devkit:form:reference": asset(t, "kit/schemas/reference.json"),
+		"urn:devkit:form:finding":   asset(t, "schemas/finding.json"),
+		"urn:devkit:form:reference": asset(t, "schemas/reference.json"),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -212,7 +212,7 @@ func TestCheckRequired(t *testing.T) {
 }
 
 func TestDetection(t *testing.T) {
-	source := asset(t, "kit/examples/purpose/spec.json")
+	source := asset(t, "examples/purpose/spec.json")
 	spec, err := ParseDetectionSpec(source)
 	if err != nil {
 		t.Fatal(err)
@@ -220,7 +220,7 @@ func TestDetection(t *testing.T) {
 	examples := make(map[string][]byte)
 	var observations []DetectionObservation
 	for _, example := range spec.Cases {
-		examples[example.File] = asset(t, "kit/examples/purpose/"+example.File)
+		examples[example.File] = asset(t, "examples/purpose/"+example.File)
 		findings := []Finding{}
 		if example.Kind == Violation {
 			findings = append(findings, Finding{ID: "violation", Blocking: true, Kind: AutoFixable, Scenario: "completion cannot be determined"})
@@ -230,7 +230,7 @@ func TestDetection(t *testing.T) {
 			Reason: "compared the intended condition and result", MatchesBlocking: true, RespectsDifference: true,
 		})
 	}
-	identity, err := NewDetectionIdentity(asset(t, "kit/checks/purpose.md"), source, []byte("runner definition"), examples)
+	identity, err := NewDetectionIdentity(asset(t, "checks/purpose.md"), source, []byte("runner definition"), examples)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -248,7 +248,7 @@ func TestDetection(t *testing.T) {
 		t.Fatal("could not reuse a passing record for identical content")
 	}
 	examples["allowed.md"] = append(examples["allowed.md"], '\n')
-	changed, err := NewDetectionIdentity(asset(t, "kit/checks/purpose.md"), source, []byte("runner definition"), examples)
+	changed, err := NewDetectionIdentity(asset(t, "checks/purpose.md"), source, []byte("runner definition"), examples)
 	if err != nil {
 		t.Fatal(err)
 	}

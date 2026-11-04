@@ -44,7 +44,7 @@ func NewValidator(templateSchema, planSchema []byte) (*Validator, error) {
 }
 
 func schemaURL(path string) string {
-	return "https://devkit.invalid/schemas/v1/" + strings.TrimPrefix(path, "kit/schemas/")
+	return "https://devkit.invalid/schemas/v1/" + strings.TrimPrefix(path, "schemas/")
 }
 
 func decode(data []byte, schema *jsonschema.Schema, result any) error {

@@ -24,7 +24,7 @@ JSON の例は[雛形と計画](architecture/examples.md#雛形と計画)を参�
 
 利用者は変更の種類(機能追加・修正・文書など)ごとに雛形を組み、担当を含む構成項目は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。
 
-各雛形の開始ステージは、修正方法を知っているかではなく、何を変えるかで決める。元に戻せないもの(変更困難な決定)の判断は、公開契約か内部契約かにかかわらず、[`principles/designing.md` の原則1](../principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する)に従う。
+各雛形の開始ステージは、修正方法を知っているかではなく、何を変えるかで決める。元に戻せないもの(変更困難な決定)の判断は、公開契約か内部契約かにかかわらず、[`assets/principles/designing.md` の原則1](../assets/principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する)に従う。
 
 - 目的やスコープの根拠を具体化するなら、[ステージ0(目的)](stages.md#0-目的)。
 - 元に戻せないものに触れるなら、[ステージ1(スコープ)](stages.md#1-スコープ)。
@@ -37,9 +37,9 @@ check とゲート(人の承認を待つ関門)は、次の規則で組む。
 - 画面・データ・外部との通信を変えるステージには、観点[「動作検証」](checks.md#動作検証)の check を置く。
 - 人によるレビューゲートの理由の書き方は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。人に確認する条件は[人への確認対象](architecture/guarantees.md#人への確認対象)で定める。
 - 画面のデザインを始める前のレビューゲートの承認対象は、[問いの定義](architecture/data.md#問い-question)に従う。
-- check の追加・必須化の判断は [`principles/harness.md` の原則5](../principles/harness.md#5-防ぐ失敗と運用負担から仕組みを選ぶ)に従う。[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は、[検出試験](architecture/guarantees.md#検出試験)(観点ファイルが期待する判定を出せるかの試験)に従う。
+- check の追加・必須化の判断は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-防ぐ失敗と運用負担から仕組みを選ぶ)に従う。[判定者](architecture/data.md#計画-plan)(check を担当するロール)が担当する観点を必須にする条件は、[検出試験](architecture/guarantees.md#検出試験)(観点ファイルが期待する判定を出せるかの試験)に従う。
 
-ステージ間の前提と戻り先の設計は [`principles/harness.md` の原則3](../principles/harness.md#3-前提が崩れたときに戻るステージを決める)に従う。戻り先の表現は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)、入力の組み立ては[作業の指示](architecture/flow.md#作業の指示)、再計画は[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
+ステージ間の前提と戻り先の設計は [`assets/principles/harness.md` の原則3](../assets/principles/harness.md#3-前提が崩れたときに戻るステージを決める)に従う。戻り先の表現は[ループの雛形](architecture/data.md#ループの雛形-plantemplate)、入力の組み立ては[作業の指示](architecture/flow.md#作業の指示)、再計画は[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
 
 ### 計画を作る規則
 

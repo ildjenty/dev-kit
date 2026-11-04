@@ -22,7 +22,7 @@ func newHandler(t *testing.T) Handler {
 	t.Helper()
 	sources := make(map[string][]byte)
 	for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
-		data, err := os.ReadFile(filepath.Join("..", "..", "kit", "schemas", name+".json"))
+		data, err := os.ReadFile(filepath.Join("..", "..", "assets", "schemas", name+".json"))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -237,7 +237,7 @@ func TestDenyRules(t *testing.T) {
 
 func TestKitDenyDefaults(t *testing.T) {
 	h := newHandler(t)
-	data, err := os.ReadFile(filepath.Join("..", "..", "kit", "hosts", "deny.toml"))
+	data, err := os.ReadFile(filepath.Join("..", "..", "assets", "hosts", "deny.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}

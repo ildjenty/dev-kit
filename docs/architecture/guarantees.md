@@ -4,7 +4,7 @@ kit は事故、自己評価の偏り、再開時の食い違い、バージョ�
 
 ## 信頼の前提
 
-作業者(セッションのエージェント)と評価対象のコードに悪意はないものとする。記録や承認の偽造、規範を書き換えて check を通す細工、資格情報の窃取は、同じ OS 利用者の権限で動く kit では防げないため範囲外とする。チームでは育てるものを git 管理し、PR レビューで確認できるようにする。[principles/harness.md](../../principles/harness.md) の原則5に従い、この前提を超える保証の仕組みは設けない。記録には秘密情報を書かない。
+作業者(セッションのエージェント)と評価対象のコードに悪意はないものとする。記録や承認の偽造、規範を書き換えて check を通す細工、資格情報の窃取は、同じ OS 利用者の権限で動く kit では防げないため範囲外とする。チームでは育てるものを git 管理し、PR レビューで確認できるようにする。[assets/principles/harness.md](../../assets/principles/harness.md) の原則5に従い、この前提を超える保証の仕組みは設けない。記録には秘密情報を書かない。
 
 pre-commit hook・判定コマンド・検証コマンドの権限および人のレビューは[権限の境界](#権限の境界)に従う。エージェントが書いたテストコードも同じ権限で動くことを信頼の前提に含める。
 
@@ -14,7 +14,7 @@ pre-commit hook・判定コマンド・検証コマンドの権限および人�
 
 ## ホスト・git と kit の責務分担
 
-git と、Claude Code・Codex CLI の両方にある機能で賄えるものは kit で実装しない。[principles/designing.md](../../principles/designing.md) の原則5に従う。
+git と、Claude Code・Codex CLI の両方にある機能で賄えるものは kit で実装しない。[assets/principles/designing.md](../../assets/principles/designing.md) の原則5に従う。
 
 - ブランチ、worktree、ignore、履歴、アーカイブ、利用者の名前は git に任せる。
 - sandbox、hook の登録と実行の仕組み、permissions、skill、指示ファイル、サブエージェントの起動と隔離、セッション再開と compaction、人とのやり取りはホストに任せる。
@@ -69,17 +69,17 @@ devkit は `core.hooksPath` を設定せず、git hook のファイルも用意�
 
 適用除外の主張と根拠がある場合は、それによって対象から外れる要求に限って違反としない。判定は、`FAIL`、`NOT ASSESSED`、`PASS` の優先順で集約する。
 
-ラウンドの判定依頼には、そのラウンドの[終了ブロック](data.md#進捗-progress)(作業者の報告)を含める。作成者の説明は [Judgment](data.md#check-の結果-judgment)(判定者の結果)の代わりにならず、その扱いは [`principles/harness.md` の原則1](../../principles/harness.md#1-作成者の説明に依存せず対象を合意条件と照合する)に従う。
+ラウンドの判定依頼には、そのラウンドの[終了ブロック](data.md#進捗-progress)(作業者の報告)を含める。作成者の説明は [Judgment](data.md#check-の結果-judgment)(判定者の結果)の代わりにならず、その扱いは [`assets/principles/harness.md` の原則1](../../assets/principles/harness.md#1-作成者の説明に依存せず対象を合意条件と照合する)に従う。
 
-観点「差分」の判定依頼には、有効な[承認](data.md#回答承認-answer--approval)・委任(判断・操作を任せた範囲)の一覧を含め、判定者が対象と範囲を照合できるようにする。委任の判断基準は [`principles/working.md` の原則6](../../principles/working.md#6-合意と委任の範囲内で実行上の判断を進め必要な承認を求める)・[原則7](../../principles/working.md#7-頼まれていない変更をしない)に従う。
+観点「差分」の判定依頼には、有効な[承認](data.md#回答承認-answer--approval)・委任(判断・操作を任せた範囲)の一覧を含め、判定者が対象と範囲を照合できるようにする。委任の判断基準は [`assets/principles/working.md` の原則6](../../assets/principles/working.md#6-合意と委任の範囲内で実行上の判断を進め必要な承認を求める)・[原則7](../../assets/principles/working.md#7-頼まれていない変更をしない)に従う。
 
 ### 検出試験
 
 - **失敗**: 違反を検出できるか確かめていない観点を、必須 check にする。
-- **仕組み**: 対象は判定者(サブエージェントと判定コマンド)が担当する観点ファイルだけとし、`command:` の check は検出試験を要しない。違反例では `FAIL`、適合例・許容例では `PASS` を期待する。[principles/harness.md](../../principles/harness.md) の原則2に従い、計画に指定された当該 check の実行主体と一致する[合格記録](data.md#検出試験の記録-detectiontest)がない観点は必須 check にしない。記録が不足すれば、`next` はラウンドを開く前に検出試験を指示し、合格を記録してから開始時のスナップショットを取る。不合格なら観点を修正するか必須から外すかの問いを起票し、停止する。
+- **仕組み**: 対象は判定者(サブエージェントと判定コマンド)が担当する観点ファイルだけとし、`command:` の check は検出試験を要しない。違反例では `FAIL`、適合例・許容例では `PASS` を期待する。[assets/principles/harness.md](../../assets/principles/harness.md) の原則2に従い、計画に指定された当該 check の実行主体と一致する[合格記録](data.md#検出試験の記録-detectiontest)がない観点は必須 check にしない。記録が不足すれば、`next` はラウンドを開く前に検出試験を指示し、合格を記録してから開始時のスナップショットを取る。不合格なら観点を修正するか必須から外すかの問いを起票し、停止する。
 - **置き場所**: `internal/check/` の試験仕様と結果の判定、`internal/engine/` の `next`、`.devkit/detect.json` の合格記録の索引。
 
-合格記録の再利用は[内容ハッシュによる同一性](data.md#検出試験の記録-detectiontest)に従い、表記修正でも識別に使うハッシュが変われば試験をやり直す。[principles/harness.md](../../principles/harness.md) の原則2の適用除外は、人が手で行う試験だけに適用する。
+合格記録の再利用は[内容ハッシュによる同一性](data.md#検出試験の記録-detectiontest)に従い、表記修正でも識別に使うハッシュが変われば試験をやり直す。[assets/principles/harness.md](../../assets/principles/harness.md) の原則2の適用除外は、人が手で行う試験だけに適用する。
 
 ### 回答の受理
 
@@ -163,7 +163,7 @@ SessionStart の観測がないセッションでは `devkit start` を拒否し
 
 - **失敗**: 依存やループ自身の変更を、確認なしに進める。
 - **仕組み**: 「人に確認する」は kit の分類表の既定データとし、リポジトリ側の追記で上書きできる。既定には依存の宣言(ロックファイル・マニフェスト)の差分、宣言のないメタループの編集、[commit 直前の対象の照合](#commit-直前の対象の照合)で取り直した後の対象の再変化を含める。メタループの編集は `.devkit/`(`run/` を除く)・`devkit.toml`・ホストの設定・指示ファイル・skill・git hook(リポジトリで有効な pre-commit)の変更である。`.devkit/` にはループの雛形を置く `.devkit/plans/` も含まれる。検証そのものを変える編集なので、メタループの編集を宣言したステージ以外では人が確認する。
-- **置き場所**: `kit/router/` の既定、`devkit.toml` の追記、`internal/router/` の分類。hook の稼働を確認できない場合は[再開と hook の稼働確認](#再開と-hook-の稼働確認)で扱う。
+- **置き場所**: `assets/router/` の既定、`devkit.toml` の追記、`internal/router/` の分類。hook の稼働を確認できない場合は[再開と hook の稼働確認](#再開と-hook-の稼働確認)で扱う。
 
 分類表で「暫定判断で進めてレビューで確認する」とした場合は、問いを起票せず、暫定の決定を `devkit note` で記録して進み、次のゲートまたは PR レビューで人が確認する。router の分類の出力としては「修正する」または「完了する」で返す。
 
@@ -212,7 +212,7 @@ Claude Code の判定者・計画者のサブエージェントは、定義の `
 
 ## 性能と出力の上限
 
-運用上の制約と対策は [principles/designing.md](../../principles/designing.md) の原則6に従う。
+運用上の制約と対策は [assets/principles/designing.md](../../assets/principles/designing.md) の原則6に従う。
 
 作業ごとの記録数は少ないため、独立したファイルを一覧して読み込む方式で足りる。`next` は毎回 ledger を全走査する。対象のバージョンの計算は、追跡ファイルと ignore されていない未追跡ファイルを走査してコミットオブジェクトを作れる規模のリポジトリを前提とする。判定対象の展開は対象のバージョンごとに1回行い、作業の完了・中止時に削除する。
 

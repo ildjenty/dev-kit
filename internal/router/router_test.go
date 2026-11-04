@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/BurntSushi/toml"
-	devkit "github.com/ildjenty/dev-kit"
+	"github.com/ildjenty/dev-kit/assets"
 	"github.com/ildjenty/dev-kit/internal/check"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/plan"
@@ -14,7 +14,7 @@ import (
 
 func defaultTable(t *testing.T) Table {
 	t.Helper()
-	data, err := fs.ReadFile(devkit.FS(), "kit/router/default.toml")
+	data, err := fs.ReadFile(assets.FS(), "router/default.toml")
 	if err != nil {
 		t.Fatal(err)
 	}

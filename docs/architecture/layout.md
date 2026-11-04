@@ -24,7 +24,8 @@ dev-kit/
     install/             導入・削除と doctor
     kit/                 固定物の供給・コピー・照合の実装
     view/                HTML の生成
-  kit/                   固定物の埋め込み元
+  assets/                配布する固定物の埋め込み元
+    embed.go             固定物の埋め込みと公開(package assets)
     plans/               既定の雛形: default、feature、fix、docs など
     stages/              ステージ定義
     checks/              観点ファイル
@@ -35,17 +36,16 @@ dev-kit/
     skills/              skill の正本(devkit の進め方)
     hosts/               ホスト設定、サブエージェント定義、rules の断片
     examples/            検出試験の違反例・適合例・許容例
-  principles/            既存の原則
+    principles/          既存の原則
   docs/                  既存の設計書
     parts/               部品の契約
     architecture/        判定と進行の規則
     *.md                 契約から相対リンクでたどる設計書
-  embed.go               固定物の埋め込みと公開
 ```
 
-バイナリの配布と利用側への導入は [install](modules.md#install)に従う。埋め込みの範囲は[ルートパッケージ](modules.md#ルートパッケージ)、コピーの供給とコピー先の配置は [kit](modules.md#kit)に従う。
+バイナリの配布と利用側への導入は [install](modules.md#install)に従う。配布物はすべて `assets/` に置く。埋め込みの範囲は [assets パッケージ](modules.md#assets-パッケージ)、コピーの供給とコピー先の配置は [kit](modules.md#kit)に従う。`docs/` とリポジトリ直下の `README.md` は配布しない。
 
-各ディレクトリの配置ガイドは、`doc.go` の先頭コメントまたは README に置く。[`principles/structure.md`](../../principles/structure.md) の原則1に従う。
+各ディレクトリの配置ガイドは、`doc.go` の先頭コメントまたは README に置く。[`assets/principles/structure.md`](../../assets/principles/structure.md) の原則1に従う。
 
 ## 利用側のリポジトリ
 

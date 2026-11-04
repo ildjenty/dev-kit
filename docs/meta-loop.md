@@ -8,7 +8,7 @@
 - **振り返り**: 問題に応じて会話の記録や原因を調べ、案に対する採用・却下・保留の判断を通常の記録として残す。メタループの編集を宣言したステージでの扱いと、宣言のないステージでの人への確認は[人への確認対象](architecture/guarantees.md#人への確認対象)に従う。
 - **改善の手がかり**: [check](parts/check.md)(評価と判定の部品)の結果の記録([blocking](architecture/data.md#指摘-finding)(完了を妨げる指摘)ではない指摘も含む)と、人が後から発見した見逃しを手がかりにする。人は check の結果から意図的に一部を選んで読み直し、自分の判断と check の判定を照合する。同種の問題が繰り返される場合は、[観点](checks.md)(check の確認事項のまとまり)・原則・lint として取り込む候補にする。
 - **検査**: 確認事項は観点「[harness](checks.md#harness)」「[skill の試験](checks.md#skill-の試験)」「[前提の批評](checks.md#前提の批評)」に従う。
-- **整理・削減**: 原則の整理の候補と期間は [`principles/README.md`](../principles/README.md#更新方法)に従う。使われなかった観点・skill も同じ基準で候補にする。削除するかどうかは、未使用の期間ではなく、その仕組みが必要になる代表的なケースで比較して決める。[検出試験](architecture/guarantees.md#検出試験)(観点ファイルの判定能力の試験)と整理・削減は、同じ作業で同時に行わない。
+- **整理・削減**: 原則の整理の候補と期間は [`assets/principles/README.md`](../assets/principles/README.md#更新方法)に従う。使われなかった観点・skill も同じ基準で候補にする。削除するかどうかは、未使用の期間ではなく、その仕組みが必要になる代表的なケースで比較して決める。[検出試験](architecture/guarantees.md#検出試験)(観点ファイルの判定能力の試験)と整理・削減は、同じ作業で同時に行わない。
 
 手がかりの自動集計は、何を測るべきかが分かるまで実装しない。
 
@@ -19,7 +19,7 @@
 生成した設計には、配置の不自然さや冗長さが生じることがある。[ステージ候補](stages.md)の「0 目的」「2 構造」では、次の問題が手がかりになる。検査と blocking の基準は観点「[構造](checks.md#構造)」に従う。
 
 - **配置の誤り**: 成果物を本来の配置先と異なる場所に置く。配置ガイドの欠如が原因・兆候となる。ガイドの配置と取り込みは[リポジトリ側の構成](repository.md#リポジトリ側の構成)に従う。
-- **冗長さ**(制約ごとに仕組みを足す、既存コードを変更せずにレイヤーを追加する): より単純な構造との比較は観点「[構造](checks.md#構造)」に従う。判断には [`principles/designing.md`](../principles/designing.md) の原則5と [`principles/structure.md`](../principles/structure.md) の原則7の違反・兆候を使う。
+- **冗長さ**(制約ごとに仕組みを足す、既存コードを変更せずにレイヤーを追加する): より単純な構造との比較は観点「[構造](checks.md#構造)」に従う。判断には [`assets/principles/designing.md`](../assets/principles/designing.md) の原則5と [`assets/principles/structure.md`](../assets/principles/structure.md) の原則7の違反・兆候を使う。
 - **前提への固着**(Issue に書かれた手段に設計が縛られる): 目的と手段を決める範囲はステージ「[0 目的](stages.md#0-目的)」「[2 構造](stages.md#2-構造)」に従い、観点「[構造](checks.md#構造)」で前提を照合する。
 - **1回だけの生成**(一度の生成で設計を済ませる): check の [`FAIL`](architecture/data.md#check-の結果-judgment)(不合格の判定)に対する修正ラウンドは[作業結果の判定](architecture/flow.md#作業結果の判定)と [router](architecture/modules.md#router)(次の行動を分類する部品)の[判断](architecture/flow.md#router-の判断)に従い、設計を作り直す。
 - **既存の流儀の無視**(同じ種類の処理があるのに、既存の書き方と異なる実装を追加する): 調査と成果物はステージ「[調査](stages.md#調査)」「[2 構造](stages.md#2-構造)」、照合は観点「[構造](checks.md#構造)」「[差分](checks.md#差分)」に従う。

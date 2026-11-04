@@ -4,7 +4,7 @@ kit は、利用者が[ループの雛形](architecture/data.md#ループの雛�
 
 0〜5 は段階的な具体化の順序を示し、初期化は動作する開発環境を整えるステージとする。採用するステージの列と候補、調査・試作の候補としての扱いは[ループの雛形](architecture/data.md#ループの雛形-plantemplate)に従う。
 
-元に戻せないもの(変更困難な決定)の判断は、[`principles/designing.md` の原則1](../principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する)に従う。
+元に戻せないもの(変更困難な決定)の判断は、[`assets/principles/designing.md` の原則1](../assets/principles/designing.md#1-変更困難な決定は先に特定し判断材料を得てから確定する)に従う。
 
 ## 0 目的
 

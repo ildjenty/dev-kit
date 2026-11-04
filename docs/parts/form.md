@@ -26,7 +26,7 @@ form は固定フォーマットの型と、[スキーマ・テンプレート](
 
 [観点ファイル](../architecture/modules.md#check)(判定の確認事項)の例は[観点と検出試験](../architecture/examples.md#観点と検出試験)を参照する。
 
-PR 本文で共有する情報は[資産の更新と共有](../architecture/data.md#資産の更新と共有)、記載内容は [`principles/writing.md` の原則1](../../principles/writing.md#1-結論と人の判断に必要なことを先に書く)に従う。
+PR 本文で共有する情報は[資産の更新と共有](../architecture/data.md#資産の更新と共有)、記載内容は [`assets/principles/writing.md` の原則1](../../assets/principles/writing.md#1-結論と人の判断に必要なことを先に書く)に従う。
 
 設計案には供給されたテンプレートを適用し、元に戻せないもの(変更困難な決定)は[計画の一覧](../architecture/data.md#計画-plan)に従う。
 

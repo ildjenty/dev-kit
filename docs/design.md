@@ -4,7 +4,7 @@ dev-kit は、リポジトリ専用の開発ループを回すための道具で
 
 リポジトリの持ち主が「どの順で進み、どこで check を通し、どこで人が見るか」を[ループの雛形](architecture/data.md#ループの雛形-plantemplate)(リポジトリごとのループの定義)として組む。エージェントは普段のセッションでそのループに従い、`devkit` が順序・完了・記録を決定的に守らせる。指示ファイルや [skill](architecture/layout.md#指示ファイルとホスト設定)(セッションに伝える作業手順)で頼むだけでは、順序と完了条件を守らせる力がない。
 
-kit は、下記の7つの部品、原則、[固定物](architecture/modules.md#kit)(バージョン付きの資産)、`devkit` を提供する。部品と組み立てが満たす原則は [`principles/harness.md`](../principles/harness.md)に従う。部品はループを支える機能の単位であり、雛形に組み込む要素の形式と既定は kit が用意する。
+kit は、下記の7つの部品、原則、[固定物](architecture/modules.md#kit)(バージョン付きの資産)、`devkit` を提供する。部品と組み立てが満たす原則は [`assets/principles/harness.md`](../assets/principles/harness.md)に従う。部品はループを支える機能の単位であり、雛形に組み込む要素の形式と既定は kit が用意する。
 
 ## 基本方針
 
@@ -12,7 +12,7 @@ kit は、下記の7つの部品、原則、[固定物](architecture/modules.md#
 - 手続きは、複雑にすればよいわけではない。既定では最も簡素な手順を採用し、必要な場合に限って追加する。
 - 利用者が[ステージ](stages.md)(作業を分ける段階)、check、承認ゲート(人の承認を待つ区切り)をループの雛形として組む。課題ごとの[計画](architecture/data.md#計画-plan)(雛形から作る実行内容)を作る手順と取捨の範囲は[作業の開始](architecture/flow.md#作業の開始)、承認は[計画の check と承認ゲート](architecture/flow.md#計画の-check-と承認ゲート)に従う。
 - ループの外にいる人が、次の判断に必要な現在の前提を把握できていない状態を「理解の負債」と呼ぶ。その返済とは、現在の前提を把握することである。人が戻ってきたときは、現在の要約と自分がすべきことを最初に読み、差分は経過を追うための補助として使う。
-- 規則と原則の分担は [principles](../principles/README.md#principles)に従う。利用側の規則の正本と配置は [Rules](architecture/data.md#規則と強制手段-rules)、規則の既定の供給は [kit](architecture/modules.md#kit)に従う。
+- 規則と原則の分担は [principles](../assets/principles/README.md#principles)に従う。利用側の規則の正本と配置は [Rules](architecture/data.md#規則と強制手段-rules)、規則の既定の供給は [kit](architecture/modules.md#kit)に従う。
 
 ## 部品
 

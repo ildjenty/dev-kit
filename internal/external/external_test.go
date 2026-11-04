@@ -22,7 +22,7 @@ func fixture(t *testing.T) (*External, Request) {
 	t.Helper()
 	sources := make(map[string][]byte)
 	for _, name := range []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan"} {
-		data, err := os.ReadFile(filepath.Join("..", "..", "kit", "schemas", name+".json"))
+		data, err := os.ReadFile(filepath.Join("..", "..", "assets", "schemas", name+".json"))
 		if err != nil {
 			t.Fatal(err)
 		}

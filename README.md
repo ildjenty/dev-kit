@@ -32,13 +32,13 @@ In Codex, trust the project interactively and trust each project hook through `/
 
 1. [docs/architecture.md](docs/architecture.md): Overview of the structure and behavior, the work flow and the scope of the guarantees.
 2. [docs/design.md](docs/design.md): Basic policy and the roles of the seven parts.
-3. [principles/README.md](principles/README.md): The principles that [check](docs/parts/check.md) (the part for evaluation and judgment) uses as criteria, and how to write a principle.
+3. [principles/README.md](assets/principles/README.md): The principles that [check](docs/parts/check.md) (the part for evaluation and judgment) uses as criteria, and how to write a principle.
 
 The canonical design is [docs/architecture.md](docs/architecture.md) and [docs/architecture/](docs/architecture/). If `docs/parts/` or the documents directly under `docs/` disagree with it, the canonical design wins. The work procedure follows the [flow](docs/architecture/flow.md).
 
 Pausing and resuming, and the Stop continuation limit, follow [interruption](docs/architecture/guarantees.md#中断).
 
-The design documents under `docs/` and `principles/` are written in Japanese.
+The design documents under `docs/` and the principles under `assets/principles/` are written in Japanese. Everything devkit distributes is under `assets/`; `docs/` is for developing dev-kit and is not distributed.
 
 ## Files
 
@@ -59,4 +59,5 @@ The design documents under `docs/` and `principles/` are written in Japanese.
 - [docs/rules.md](docs/rules.md): The design-level list of rules imposed on target code and documents, and their enforcement. The canonical version in a using repository follows [Rules](docs/architecture/data.md#規則と強制手段-rules).
 - [docs/repository.md](docs/repository.md): How the using repository's layout maps to the execution mechanisms.
 - [docs/meta-loop.md](docs/meta-loop.md): The procedure for improving the loop itself.
-- [principles/](principles/): The principles, split into files by where they apply.
+- [assets/](assets/): Everything devkit distributes. `devkit init` copies it into `.devkit/kit/<version>/` in the using repository.
+  - [principles/](assets/principles/): The principles, split into files by where they apply.
