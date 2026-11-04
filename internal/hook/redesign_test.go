@@ -74,3 +74,18 @@ func TestConfiguredStopContinuationLimit(t *testing.T) {
 		t.Fatalf("configured limit was ignored: %+v, %+v, %v", result, stops, err)
 	}
 }
+
+func TestResultJSONUnwrapsSingleFencedBlock(t *testing.T) {
+	for _, tc := range []struct{ name, in, want string }{
+		{"plain", `{"a":1}`, `{"a":1}`},
+		{"json fence", "```json\n{\"a\":1}\n```", `{"a":1}`},
+		{"bare fence", "```\n{\"a\":1}\n```\n", `{"a":1}`},
+		{"other language", "```yaml\na: 1\n```", "```yaml\na: 1\n```"},
+		{"text around", "Here:\n```json\n{\"a\":1}\n```", "Here:\n```json\n{\"a\":1}\n```"},
+		{"two blocks", "```json\n{}\n```\n```json\n{}\n```", "```json\n{}\n```\n```json\n{}\n```"},
+	} {
+		if got := resultJSON(tc.in); got != tc.want {
+			t.Errorf("%s: got %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}

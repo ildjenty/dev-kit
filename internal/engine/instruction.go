@@ -705,8 +705,9 @@ func (e *Engine) table(ctx context.Context, ref string) (router.Table, error) {
 	table.ConfirmationRules[config.MetaLoopEdit] = mode
 	return table, nil
 }
+// question builds a devkit-generated question. Devkit has no grounds to recommend an answer, so the recommendation is left empty.
 func (e *Engine) question(target form.ApprovalTarget, category, text, stage string) form.Question {
-	return form.Question{ID: ulidString(), Text: text, ApprovalTarget: target, Options: []string{"approve", "reject", "defer"}, Recommendation: "defer", StopCategory: category, NextStage: stage, StoppedStage: stage, StopReason: text, Evidence: []form.Reference{}}
+	return form.Question{ID: ulidString(), Text: text, ApprovalTarget: target, Options: []string{"approve", "reject", "defer"}, Recommendation: "", StopCategory: category, NextStage: stage, StoppedStage: stage, StopReason: text, Evidence: []form.Reference{}}
 }
 func (e *Engine) saveQuestion(state *ledger.State, q form.Question, supersedes string) (form.Question, error) {
 	for _, current := range state.UnansweredQuestions() {

@@ -115,7 +115,8 @@ func (h Handler) subagentStop(e event.Event, state *ledger.State, now time.Time)
 	var identity struct {
 		InstructionID string `json:"instruction_id"`
 	}
-	parseErr := json.Unmarshal([]byte(e.LastAssistantMessage), &identity)
+	message := resultJSON(e.LastAssistantMessage)
+	parseErr := json.Unmarshal([]byte(message), &identity)
 	failure := ""
 	if parseErr != nil {
 		failure = "The final message is not valid result JSON: " + parseErr.Error()
@@ -145,7 +146,7 @@ func (h Handler) subagentStop(e event.Event, state *ledger.State, now time.Time)
 		}
 		result := SubagentResult{
 			InstructionID: instruction.ID, Runner: runner, AgentID: e.AgentID,
-			Host: e.Host, ObservedAt: now, Content: json.RawMessage(e.LastAssistantMessage),
+			Host: e.Host, ObservedAt: now, Content: json.RawMessage(message),
 		}
 		if failure != "" {
 			result.Content = nil
@@ -214,6 +215,30 @@ func (h Handler) stop(e event.Event, state *ledger.State, now time.Time) (event.
 	return result, nil
 }
 
+// resultJSON returns the JSON body of a subagent final message. A message that
+// consists only of one fenced code block is unwrapped, because models commonly
+// fence JSON; any other text is returned unchanged and validated as is.
+func resultJSON(message string) string {
+	trimmed := strings.TrimSpace(message)
+	if !strings.HasPrefix(trimmed, "```") || !strings.HasSuffix(trimmed, "```") {
+		return message
+	}
+	body := strings.TrimSuffix(trimmed, "```")
+	newline := strings.IndexByte(body, '\n')
+	if newline < 0 {
+		return message
+	}
+	opening := strings.TrimSpace(body[3:newline])
+	if opening != "" && opening != "json" {
+		return message
+	}
+	inner := body[newline+1:]
+	if strings.Contains(inner, "```") {
+		return message
+	}
+	return strings.TrimSpace(inner)
+}
+
 func stopAllowed(state *ledger.State) bool {
 	if state.WorkStatus() != ledger.WorkActive {
 		return true
@@ -222,7 +247,7 @@ func stopAllowed(state *ledger.State) bool {
 		switch instruction.Kind {
 		case form.InstructionQuestion, form.InstructionExternal, form.InstructionCompleted,
 			form.InstructionAborted, form.InstructionJudgmentWait, form.InstructionJudgment,
-			form.InstructionPlanCheck, form.InstructionDetectionTest:
+			form.InstructionPlanCheck, form.InstructionDetectionTest, form.InstructionPlan:
 			return true
 		}
 	}

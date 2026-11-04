@@ -524,12 +524,27 @@ func (e *Engine) planApprovalText(state *ledger.State, template plan.PlanTemplat
 			fmt.Fprintf(&text, "- %s (deviation)\n", stage.ID)
 		}
 	}
-	deviations, _ := json.MarshalIndent(plan.Deviations(template, p), "", "  ")
-	irreversible, _ := json.MarshalIndent(p.IrreversibleDecisions, "", "  ")
-	external, _ := json.MarshalIndent(p.ExternalOperations, "", "  ")
-	questions, _ := json.MarshalIndent(p.OpenQuestions, "", "  ")
-	fmt.Fprintf(&text, "\nDeviations:\n%s\n\nIrreversible items:\n%s\n\nExternal operations:\n%s\n\nOpen questions (answer with revision instructions):\n%s", deviations, irreversible, external, questions)
+	deviations := plan.Deviations(template, p)
+	fmt.Fprintf(&text, "\nDeviations:\n%s\n\nIrreversible items:\n%s\n\nExternal operations:\n%s\n\nOpen questions (answer with revision instructions):\n%s",
+		approvalJSON(deviations, len(deviations)), approvalList(p.IrreversibleDecisions), approvalJSON(p.ExternalOperations, len(p.ExternalOperations)), approvalList(p.OpenQuestions))
 	return text.String(), nil
+}
+
+// approvalList renders strings as a bulleted list, or "None" when empty.
+func approvalList(items []string) string {
+	if len(items) == 0 {
+		return "None"
+	}
+	return "- " + strings.Join(items, "\n- ")
+}
+
+// approvalJSON renders structured items as indented JSON, or "None" when empty.
+func approvalJSON(value any, count int) string {
+	if count == 0 {
+		return "None"
+	}
+	data, _ := json.MarshalIndent(value, "", "  ")
+	return string(data)
 }
 
 func (e *Engine) commitBase(round *ledger.Round) (string, error) {
