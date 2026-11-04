@@ -27,7 +27,7 @@ func (e *Engine) workHistory(state *ledger.State, meta *ledger.Instruction) (str
 		text.WriteString("# Work history\n\n")
 		for _, record := range records {
 			switch record.Payload.(type) {
-			case *ledger.Judgment, *ledger.Question, *ledger.Answer, *ledger.Approval, *ledger.Lesson, *ledger.DetectionTest, *ledger.ResultRejection:
+			case *ledger.Judgment, *ledger.Question, *ledger.Answer, *ledger.Approval, *ledger.Decision, *ledger.Evidence, *ledger.Lesson, *ledger.DetectionTest, *ledger.ResultRejection:
 				data, err := json.MarshalIndent(record.Payload, "", "  ")
 				if err != nil {
 					return "", err

@@ -475,6 +475,9 @@ func TestWorkHistoryIsGenericAndFixedAtIssuance(t *testing.T) {
 	if _, err := e.Note(ctx, ledger.KindLesson, marshal(t, ledger.Lesson{Content: "First recorded lesson", Evidence: []form.Reference{}})); err != nil {
 		t.Fatal(err)
 	}
+	if _, err := e.Note(ctx, ledger.KindEvidence, marshal(t, form.Evidence{ID: "E1", Content: "Tests failed before the implementation", Sources: []form.Reference{{External: "test.log"}}, VerificationMethod: "Ran the tests before writing the code"})); err != nil {
+		t.Fatal(err)
+	}
 	state, err := e.load()
 	if err != nil {
 		t.Fatal(err)
@@ -490,8 +493,8 @@ func TestWorkHistoryIsGenericAndFixedAtIssuance(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(original), "First recorded lesson") {
-		t.Fatal("a non-retrospective stage lacked its lesson history")
+	if !strings.Contains(string(original), "First recorded lesson") || !strings.Contains(string(original), "Tests failed before the implementation") {
+		t.Fatal("work history lacked a lesson or recorded evidence")
 	}
 	if _, err := e.Note(ctx, ledger.KindLesson, marshal(t, ledger.Lesson{Content: "Later lesson must stay out", Evidence: []form.Reference{}})); err != nil {
 		t.Fatal(err)
