@@ -26,7 +26,7 @@ func TestDetectionIndexUsesInstructionReferenceOnAcceptAndRestore(t *testing.T) 
 	write(t, e.Root(), "devkit.toml", string(settings)+"\n[state]\ndetect = '.devkit/fixed-detect.json'\n")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure detection index path")
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -100,11 +100,12 @@ func TestReplanNotAssessedHumanRevisionKeepsRemainingWork(t *testing.T) {
 	write(t, e.Root(), ".devkit/plans/test.json", string(marshal(t, template)))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure replanning")
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := planResult(t, e, start)
+	// Stages after replan are unreachable in a plan; the replanned plan contains them.
+	p := planResultWith(t, e, start, func(p *plan.Plan) { p.Stages = p.Stages[:1] })
 	work := checkedNext(t, e)
 	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
 		t.Fatal(err)
@@ -115,6 +116,8 @@ func TestReplanNotAssessedHumanRevisionKeepsRemainingWork(t *testing.T) {
 		t.Fatalf("remaining work missing: %+v, %v", before, err)
 	}
 	p.Version = 2
+	p.Stages, p.StartStage = template.Stages[1:], template.Stages[1].ID
+	p.Stages[0].Checks = []plan.Check{}
 	collect(t, e, planning.Instruction, form.PlannerResult{InstructionID: planning.Instruction.ID, Plan: marshal(t, p)})
 	review, err := e.Next(ctx)
 	if err != nil {
@@ -146,7 +149,7 @@ func TestDetectionHistoryIncludesPassedAndFailedCases(t *testing.T) {
 	for _, passed := range []bool{true, false} {
 		t.Run(map[bool]string{true: "passed", false: "failed"}[passed], func(t *testing.T) {
 			e, ctx := fixture(t)
-			start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+			start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -285,7 +288,7 @@ func TestMalformedSubagentResultsReissueAndEscalate(t *testing.T) {
 	for _, mode := range []string{"schema", "content", "json"} {
 		t.Run(mode, func(t *testing.T) {
 			e, ctx := fixture(t)
-			result, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+			result, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -299,11 +302,11 @@ func TestMalformedSubagentResultsReissueAndEscalate(t *testing.T) {
 				if mode == "schema" {
 					message = string(marshal(t, map[string]any{"instruction_id": previous.ID}))
 				} else if mode == "content" {
-					template, source, err := e.template(ctx, initial.Reference, "test")
+					template, source, err := e.pattern(ctx, initial.Reference, "test")
 					if err != nil {
 						t.Fatal(err)
 					}
-					p := plan.NewPlan(template, plan.ContentHash(source), "Update documentation", []plan.CompletionCondition{{ID: "C1", Description: "Documentation is complete"}})
+					p := newPlan(template, plan.ContentHash(source), "Update documentation", []plan.CompletionCondition{{ID: "C1", Description: "Documentation is complete"}})
 					p.Version = 99
 					message = string(marshal(t, form.PlannerResult{InstructionID: previous.ID, Plan: marshal(t, p)}))
 				}
@@ -384,7 +387,7 @@ func TestPlanCheckKeepsOriginalRequestAndStartTask(t *testing.T) {
 				}
 			}
 			task := "Rename the button"
-			start, err := e.Start(ctx, StartRequest{Template: "test", Task: task})
+			start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: task})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -429,7 +432,7 @@ func TestMalformedJudgeAndDetectionResultsReissue(t *testing.T) {
 			configureStage(t, e, func(s *plan.Stage) {
 				s.Checks = []plan.Check{judgeCheck("wording", false)}
 			})
-			start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+			start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -455,6 +458,7 @@ func TestMalformedJudgeAndDetectionResultsReissue(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
+				work = approvedNext(t, e, work)
 				if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
 					t.Fatal(err)
 				}

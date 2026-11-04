@@ -8,8 +8,8 @@ import (
 )
 
 func TestPlanApprovalPolicies(t *testing.T) {
-	template, hash := loadTemplate(t, validator(t), "default")
-	approved := NewPlan(template, hash, "Implement behavior", []CompletionCondition{
+	template, hash := loadTemplate(t, validator(t), "docs")
+	approved := newTestPlan(template, hash, "Implement behavior", []CompletionCondition{
 		{ID: "C1", Description: "First condition"},
 		{ID: "C2", Description: "Second condition"},
 	})
@@ -32,20 +32,20 @@ func TestPlanApprovalPolicies(t *testing.T) {
 		{"changed task", "requirements", &approved, func(p *Plan) { p.Task = "Replan behavior" }, false},
 		{"open questions", "requirements", &approved, func(p *Plan) { p.OpenQuestions = []string{"Clarify wording"} }, true},
 		{"deviation open questions", "deviation", &approved, func(p *Plan) { p.OpenQuestions = []string{"Clarify wording"} }, true},
-		{"deviation", "requirements", &approved, func(p *Plan) { p.Stages[1].Gate.Required = false }, true},
+		{"structure under requirements", "requirements", &approved, func(p *Plan) { p.Stages[0].Gate.Required = true }, false},
 		{"external operation", "requirements", &approved, func(p *Plan) { p.ExternalOperations = []ExternalOperation{{Kind: "publish"}} }, true},
 		{"always first", "always", nil, func(*Plan) {}, true},
 		{"always repeated", "always", &approved, func(*Plan) {}, true},
-		{"deviation first", "deviation", nil, func(*Plan) {}, false},
+		{"deviation first", "deviation", nil, func(*Plan) {}, true},
 		{"deviation changed requirements", "deviation", &approved, func(p *Plan) { p.CompletionConditions[0].Description = "Changed condition" }, false},
 		{"deviation external", "deviation", nil, func(p *Plan) { p.ExternalOperations = []ExternalOperation{{Kind: "publish"}} }, true},
-		{"deviation gate", "deviation", nil, func(p *Plan) { p.Stages[1].Gate.Required = false }, true},
+		{"deviation gate", "deviation", nil, func(p *Plan) { p.Stages[0].Gate.Required = true }, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			candidate := clonePlan(approved)
 			candidate.Version++
 			tc.change(&candidate)
-			if got := candidate.RequiresApproval(template, tc.policy, tc.previous); got != tc.want {
+			if got := candidate.RequiresApproval(tc.policy, tc.previous); got != tc.want {
 				t.Fatalf("approval required: %v; want: %v", got, tc.want)
 			}
 		})
@@ -53,8 +53,8 @@ func TestPlanApprovalPolicies(t *testing.T) {
 }
 
 func TestReplanUsesLastHumanApprovedRequirements(t *testing.T) {
-	template, hash := loadTemplate(t, validator(t), "default")
-	approved := NewPlan(template, hash, "Implement behavior", []CompletionCondition{{ID: "C1", Description: "Approved condition"}})
+	template, hash := loadTemplate(t, validator(t), "docs")
+	approved := newTestPlan(template, hash, "Implement behavior", []CompletionCondition{{ID: "C1", Description: "Approved condition"}})
 	intermediate, _ := Replan(approved, approved)
 	intermediate.CompletionConditions[0].Description = "Unapproved condition"
 	latest, _ := Replan(intermediate, approved)
@@ -63,23 +63,23 @@ func TestReplanUsesLastHumanApprovedRequirements(t *testing.T) {
 		{Plan: approved, Judgment: PlanPass, Origin: InitialProposal, Approved: true},
 		{Plan: intermediate, Judgment: PlanPass, Origin: HumanProposal},
 	}
-	if got, ok := ExecutableVersion(template, versions, 2, "requirements"); !ok || got.Version != latest.Version {
+	if got, ok := ExecutableVersion(versions, 2, "requirements", nil); !ok || got.Version != latest.Version {
 		t.Fatal("did not reuse the last human-approved requirements for a back-triggered replan")
 	}
-	if _, ok := ExecutableVersion(template, versions, 2, "always"); ok {
+	if _, ok := ExecutableVersion(versions, 2, "always", nil); ok {
 		t.Fatal("executed an unapproved version under the always policy")
 	}
 	latest.CompletionConditions[0].Description = "Unapproved condition"
 	versions[0].Plan = latest
-	if _, ok := ExecutableVersion(template, versions, 2, "requirements"); ok {
+	if _, ok := ExecutableVersion(versions, 2, "requirements", nil); ok {
 		t.Fatal("used an unapproved intermediate version as the requirements baseline")
 	}
 }
 
 func TestOpenQuestionsAndRemovedMetaLoopStages(t *testing.T) {
 	v := validator(t)
-	template, hash := loadTemplate(t, v, "default")
-	p := NewPlan(template, hash, "Implement behavior", []CompletionCondition{{ID: "C1", Description: "Expected behavior"}})
+	template, hash := loadTemplate(t, v, "docs")
+	p := newTestPlan(template, hash, "Implement behavior", []CompletionCondition{{ID: "C1", Description: "Expected behavior"}})
 	bindChecks(&p)
 	p.OpenQuestions = []string{"Which input should be accepted?"}
 	if err := v.ValidatePlan(p); err != nil {

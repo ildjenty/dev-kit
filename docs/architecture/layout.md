@@ -26,7 +26,7 @@ dev-kit/
     view/                HTML の生成
   assets/                配布する固定物の埋め込み元
     embed.go             固定物の埋め込みと公開(package assets)
-    plans/               既定の雛形: default、fix、docs
+    plans/               既定のパターン: default、fix、docs
     stages/              ステージ定義
     templates/           brief と form のテンプレート
     router/              分類表の既定
@@ -52,7 +52,7 @@ dev-kit/
 
 ```text
 <repo>/
-  devkit.toml                互換性の識別、配置、役割、承認、git、分類、上限、並列、教訓、雛形、コマンドの設定。git 管理
+  devkit.toml                互換性の識別、配置、役割、承認、git、check の一覧、経路と定義の決まり、計画、上限、並列、教訓、コマンドの設定。git 管理
   .claude/settings.json      hook の登録、excludedCommands、記録・結果への Edit の deny、Bash(devkit *) の allow の提案。init が項目を足す。git 管理
   .claude/agents/devkit-*.md 役割の agent のサブエージェント定義。init が既定の3つを書く。git 管理
   .claude/skills/devkit -> ../../.agents/skills/devkit   skill 単位のリンク。git 管理
@@ -64,7 +64,7 @@ dev-kit/
   .devkit/                   既定の files ソースと状態。git 管理(run/・worktrees/ を除く)
     principles/              原則と review/test.md などの用途別の判定基準。principles ソース
     stages/                  ステージ定義。init が初期内容をコピー
-    plans/<name>.json        ループの雛形。init が既定の default・fix・docs をコピー
+    plans/<name>.json        ループのパターン。init が既定の default・fix・docs をコピー
     checks/<観点ID>/         検出試験の例と spec.json。examples ソース
     templates/               brief と form のテンプレート
     rules.md                 規則と強制手段
@@ -87,9 +87,9 @@ dev-kit/
         view.html
 ```
 
-UserPromptSubmit は束縛の有無によらず、人の入力ごとにセッションの最新入力1件を更新し、束縛後は作業ごとの観測も残す。タスクの完了通知は入力に含めない。`start` はその原文を作業に結び付け、観測がなければ原文なしと記録する。
+UserPromptSubmit は束縛された作業の回答と訂正の入力を観測する。会話の写しと束縛前の最新入力は保持しない。メインのエージェントが合意した内容を start の課題へまとめ、長い課題は `--task-file`、途中の指示は `instruct` で渡す。
 
-経緯の索引は指示発行時点の内容で固定する生成物であり、ステージ・check の `history` に従う範囲を記録から決定的に絞る。採用された成果と今の材料は区別し、本文の成果は `outputs` で選ぶ。既定の範囲と必須の判定材料は[依頼の入力](data.md#依頼の入力)に従う。
+経緯の索引は指示発行時点の内容で固定する生成物であり、ステージ・一覧の check の `history` に従う範囲を記録から決定的に絞る。採用された成果と今の材料は区別し、本文の成果は `outputs` で選ぶ。既定の範囲と必須の判定材料は[依頼の入力](data.md#依頼の入力)に従う。
 
 入力ファイルの場所と内容の保存は[状態遷移と受理条件](data.md#状態遷移と受理条件)、記録 ID の形式は[記録の範囲](data.md#記録の範囲)、停止の観測の保持条件は[停止の観測](data.md#停止の観測-stopobservation)に従う。
 

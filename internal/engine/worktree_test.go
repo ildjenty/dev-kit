@@ -51,7 +51,7 @@ func refuseStart(t *testing.T, e *Engine, ctx context.Context, work *ledger.Work
 	refs := git(t, e.Root(), "show-ref")
 	branch := git(t, e.Root(), "branch", "--show-current")
 	index := git(t, e.Root(), "ls-files", "--stage")
-	if _, err := e.Start(ctx, StartRequest{Template: "test", Task: "Another task"}); err == nil {
+	if _, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Another task"}); err == nil {
 		t.Fatal("start accepted a checkout with unfinished work")
 	} else {
 		for _, text := range []string{work.ID, work.Branch, "separate worktree", "git worktree add <path> -b <branch>", "new session"} {
@@ -73,7 +73,7 @@ func TestStartRefusesActiveAndPausedCheckout(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			e, ctx := fixture(t)
-			if _, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"}); err != nil {
+			if _, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"}); err != nil {
 				t.Fatal(err)
 			}
 			if paused {
@@ -115,7 +115,7 @@ func TestStartAllowsEndedWorks(t *testing.T) {
 				t.Fatal(err)
 			}
 			oldID := e.workID
-			if result, err := e.Start(ctx, StartRequest{Template: "test", Task: "Another task"}); err != nil || result.WorkID == oldID {
+			if result, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Another task"}); err != nil || result.WorkID == oldID {
 				t.Fatalf("ended work blocked a new start: %+v, %v", result, err)
 			}
 		})
@@ -137,7 +137,7 @@ func TestConcurrentStartsUseOneCheckout(t *testing.T) {
 	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+		_, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 		done <- err
 	}()
 	select {
@@ -145,7 +145,7 @@ func TestConcurrentStartsUseOneCheckout(t *testing.T) {
 	case err := <-done:
 		t.Fatalf("first start failed before creating work: %v", err)
 	}
-	_, secondErr := other.Start(ctx, StartRequest{Template: "test", Task: "Another task"})
+	_, secondErr := other.Start(ctx, StartRequest{Pattern: "test", Task: "Another task"})
 	close(release)
 	if err := <-done; err != nil {
 		t.Fatal(err)
@@ -163,7 +163,7 @@ func TestConcurrentStartsUseOneCheckout(t *testing.T) {
 
 func TestParallelWorktreeLoops(t *testing.T) {
 	main, ctx := fixture(t)
-	write(t, main.Root(), "devkit.toml", "kit_version = 'v3'\n"+sessionWorker)
+	write(t, main.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n"+sessionWorker))
 	configureStage(t, main, func(stage *plan.Stage) {
 		stage.Checks = []plan.Check{judgeCheck("plan", true)}
 	})
@@ -196,7 +196,7 @@ func TestParallelWorktreeLoops(t *testing.T) {
 	commits := make([]string, len(engines))
 	for i, e := range engines {
 		observeAnswer(t, e, "Original request for "+e.sessionID)
-		results[i], err = e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+		results[i], err = e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 		if err != nil {
 			t.Fatal(err)
 		}

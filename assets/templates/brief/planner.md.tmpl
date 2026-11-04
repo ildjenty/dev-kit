@@ -10,22 +10,42 @@ Instruction ID: {{.InstructionID}}
 
 {{.Task}}
 
-## Loop template
+## Prioritized pattern
 
-Content hash: {{.TemplateHash}}
+Content hash: {{.PatternHash}}
 
 ```json
-{{.TemplateJSON}}
+{{.PatternJSON}}
 ```
 
-## Stage definitions
-{{range .StageDefinitions}}
-Reference: {{.Path}}
-
-{{.Content}}
+## Other patterns
+{{range .Patterns}}
+- {{.Path}}: {{.SnapshotPath}}
 {{end}}
+
+## Stage definition catalog
+
+{{.StageCatalog}}
+
+Read definition bodies only from these fixed references:
+{{range .StageDefinitions}}
+- {{.Path}}: {{.SnapshotPath}}
+{{end}}
+
+## Available roles
+
+```json
+{{.RolesJSON}}
+```
+
+## Loop rules and ceilings
+
+```json
+{{.LoopRulesJSON}}
+```
+
 {{template "repository" .Repository}}
-## Available checks
+## Available checks (name and one-line description)
 
 ```json
 {{.ChecksJSON}}
@@ -61,7 +81,7 @@ Reference: {{.Path}}
 {{template "previousOutputs" .PreviousOutputs}}
 ## Instructions to write
 
-Write task-specific `instructions` arrays on each stage, check, and unit that needs guidance. They are passed verbatim to the corresponding worker or judge and included in the plan approval question. Templates cannot contain instructions. They supplement fixed criteria and never narrow the scope to check.
+Write task-specific `instructions` arrays on each stage, check, and unit that needs guidance. They are passed verbatim to the corresponding worker or judge and included in the plan approval question. Patterns cannot contain task-specific instructions. They supplement fixed criteria and never narrow the scope to check.
 
 ## Current material
 
@@ -77,18 +97,20 @@ Put undecidable requirements in `open_questions` for the human. Answers remain f
 
 ## Plan contents
 
-Use the original user request, the task supplied to start, repository requirements, and the loop template to fill in completion conditions with IDs and the required stages. Do not invent a missing original request.
-If a requirement is ambiguous or cannot be decided from the inputs, do not fill the gap by guessing. List it in the optional `open_questions` array of strings for human clarification. Human answers are returned as rejection and revision instructions; incorporate them in the next proposal.
-Remove unrelated stages and select any necessary research or prototyping from the template candidates. Specify each check's target and completion condition IDs. Give each completion condition a way to verify it: a check run by a verification command, a judge, or a judgment command, or a human gate. Checks are not necessarily mechanical.
-Fill in task-specific irreversible decisions and declarations of required external operations. Use values confirmed in the inputs for each external operation's kind, target, input hash, registration definition hash, and executable content hash.
-Report removal of template stages, additions of stages outside the candidates, removal of gates, changes to transitions, removal of required checks, changes to criteria or examples selections, changed assignees, changed fix rule lists, and changed unit roles as deviations.
-Preserve template report, unit_report, human_prompt, delegations, outputs, history, schemas, and brief_by_planner selections; changes are deviations. For a split worker stage, you may supply units with unique plan-wide IDs, descriptions, and nonoverlapping scopes. Adding or removing split is a deviation. Already completed stages omitted by replanning are not removed-stage deviations. Units have no `after`: place work that depends on another result in a later stage. Only work is split; checks, gates, loop-edit confirmation, limits, back/replan, and questions stay at stage level.
-Human-approved completion conditions define completion of the work.
-For a revised proposal, incorporate human revision instructions and check findings. For replanning, rebuild the supplied remaining work.
+Use the original user request, task, repository requirements, and available patterns to propose the smallest sufficient loop. The prioritized pattern is a reference, not a constraint. You may reference any listed pattern; read its exact content at the fixed path and record its name and hash in `pattern`.
+List undecidable requirements in `open_questions`; incorporate human clarification in the next proposal. Human-approved completion conditions define completion. Give every completion condition an appropriate verification check or human gate; the plan judge and human assess coverage.
+
+Assign each stage a unique instance `id` and a catalog `definition` (omitting definition uses id). Reuse definitions freely with distinct instance IDs. Reuse an ID that ran in this work only when rerunning that work. A back-triggered plan must contain its return instance. Back targets are current instances or instances that ran in this work. All planned instances must be reachable from start_stage by done transitions. Ask and scalar fix target the same instance. Done may name the next instance, replan, or null.
+
+Use only listed definitions, configured roles, configured check names, and selections resolving to documents at the fixed reference. Each plan check contains aspect, required status, target, completion_condition_ids, and optional instructions. Runner, criteria, examples, schemas, history, and brief_by_planner come from the check registry and cannot be set by the plan. Follow loop.stage and loop.path rules and limit ceilings. Every implement instance must have its required verification later in the same segment before replan or end when the configured follows rule requires it.
+
+Choose stage reports, unit reports, human prompts, inputs, output selections, history, gates, limits, correction roles, and instructions as needed within the rules. Output selections may name an instance or all instances of a definition. Split units have unique plan-wide IDs, descriptions, and nonoverlapping scopes. Units have no after dependencies; put dependent work in later stages. Checks, gates, questions, and replanning stay at stage level.
+
+Pattern differences are displayed for the human and do not determine default approval. The first plan, changed completion conditions, external operations, and open questions require approval under the default policy. Under deviation, structure is compared with the last approved remaining plan. Fill external operation hashes only from verified supplied inputs. For revised proposals, incorporate human instructions and findings; for replanning, rebuild the supplied remaining work.
 
 ## Returning the result
 
-Set the plan version to {{.Version}}. Include the loop template's name and content hash in the plan reference.
+Set the plan version to {{.Version}}. Include the referenced pattern's name and exact content hash in `pattern`.
 Return a JSON-only final message containing `instruction_id` and `plan` in the specified output format.
 Set `instruction_id` to {{.InstructionIDJSON}}.
 {{if .OutputSchema}}
@@ -148,4 +170,4 @@ Read additional norms only when needed, using these paths into the fixed snapsho
 {{end}}
 {{end}}
 
-Use role IDs from the fixed devkit.toml for stage assignees, judge runners, and unit roles. Unit roles default to worker and must be work roles with agents. A split stage requires a session work assignee (a work role without an agent). Only fix transitions accept ordered assignee rules using check, failures_at_least, and human_rejected; ask, back, and done remain scalar transitions.
+Use role IDs from the fixed devkit.toml for stage assignees, judge runners, and unit roles. Unit roles default to worker and must be work roles with agents. A split stage requires a work assignee. Only fix transitions accept ordered assignee rules using check, failures_at_least, and human_rejected; ask, back, and done remain scalar transitions.

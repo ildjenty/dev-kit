@@ -92,7 +92,9 @@ func decodeRole(id string, fields map[string]any) (Role, error) {
 
 // Planning selects the role that proposes plans.
 type Planning struct {
-	Role string `toml:"role"`
+	Role      string      `toml:"role"`
+	MaxRounds int         `toml:"max_rounds"`
+	Inputs    []Selection `toml:"inputs"`
 }
 
 // RoleSettings returns effective repository roles.

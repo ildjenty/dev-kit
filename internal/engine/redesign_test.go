@@ -19,7 +19,7 @@ import (
 func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	e, ctx := fixture(t)
 	// The fixture initializes and commits a fresh repository. Use the shipped default policy.
-	settings := "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n"
+	settings := withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n")
 	write(t, e.Root(), "devkit.toml", settings)
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Use default settings")
@@ -32,11 +32,11 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	template, source, err := e.template(ctx, "HEAD", "default")
+	template, source, err := e.pattern(ctx, "HEAD", "default")
 	if err != nil {
 		t.Fatal(err)
 	}
-	proposal := plan.NewPlan(template, plan.ContentHash(source), "Build a greeting command", []plan.CompletionCondition{{ID: "R1", Description: "Requirements and completion conditions are agreed"}})
+	proposal := newPlan(template, plan.ContentHash(source), "Build a greeting command", []plan.CompletionCondition{{ID: "R1", Description: "Requirements and completion conditions are agreed"}})
 	bind := func(p *plan.Plan) {
 		for i := range p.Stages {
 			for j := range p.Stages[i].Checks {
@@ -120,9 +120,9 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	propose(started.Instruction, proposal)
+	propose(started.Instruction, chainStages(proposal, "purpose"))
 	approval := next()
-	for _, text := range []string{original, "Build a greeting command", "R1", "Requirements and completion conditions are agreed", "Adopted stages", "command:test", "Irreversible items", "External operations", "Open questions"} {
+	for _, text := range []string{original, "Build a greeting command", "R1", "Requirements and completion conditions are agreed", "Plan chain from", "command:test", "Irreversible items", "External operations", "Open questions"} {
 		if !strings.Contains(approval.Instruction.Question.Text, text) {
 			t.Fatalf("approval omitted %q", text)
 		}
@@ -143,10 +143,7 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	if run.State != ledger.StageCompleted || run.Commit == "" {
 		t.Fatal("replanning preceded stage commit")
 	}
-	remaining, err := proposal.SelectStages(template, []string{"scope", "structure", "contract", "steps", "implement", "retrospective"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	remaining := chainStages(proposal, "scope", "structure", "contract", "steps", "implement", "retrospective")
 	remaining.Version = 2
 	remaining.CompletionConditions = []plan.CompletionCondition{{ID: "C1", Description: "The greeting command prints Hello and exits successfully"}}
 	propose(replanning.Instruction, remaining)
@@ -256,10 +253,10 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 
 func TestDetectionCanBeDisabled(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n")
+	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n"))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Disable detection tests")
-	started, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	started, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,6 +271,7 @@ func TestDetectionCanBeDisabled(t *testing.T) {
 	}
 	collect(t, e, review.Instruction, pass(*data.Request))
 	work, err := e.Next(ctx)
+	work = approvedNext(t, e, work)
 	if err != nil || work.Instruction == nil || work.Instruction.Kind != form.InstructionWork {
 		t.Fatalf("plan did not run without a detection pass: %+v, %v", work, err)
 	}
@@ -287,7 +285,7 @@ func TestGitSettingsAndEmptyStage(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			e, ctx := fixture(t)
-			write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\ndefault_plan = 'test'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[git]\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n[detection]\nrequired = false\n")
+			write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\ndefault_plan = 'test'\n[roles.worker]\nkind = 'work'\nagent = ''\n[approval]\nplan = 'deviation'\n[git]\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n[detection]\nrequired = false\n"))
 			git(t, e.Root(), "add", ".")
 			git(t, e.Root(), "commit", "-qm", "Configure git behavior")
 			head := git(t, e.Root(), "rev-parse", "HEAD")
@@ -313,6 +311,7 @@ func TestGitSettingsAndEmptyStage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			work = approvedNext(t, e, work)
 			if !empty {
 				write(t, e.Root(), "README.md", "# Changed\n")
 			}
@@ -429,7 +428,7 @@ func TestStartRequiresCommittedInitialization(t *testing.T) {
 				write(t, e.Root(), pending, "Uncommitted initialization change\n")
 			}
 			branch := git(t, e.Root(), "branch", "--show-current")
-			if _, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"}); err == nil || !strings.Contains(err.Error(), "commit the devkit init changes first") {
+			if _, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"}); err == nil || !strings.Contains(err.Error(), "commit the devkit init changes first") {
 				t.Fatalf("start did not explain initialization requirement: %v", err)
 			}
 			if e.workID != "" || git(t, e.Root(), "branch", "--show-current") != branch {

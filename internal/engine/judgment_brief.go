@@ -32,10 +32,10 @@ func viewRequest(request check.Request) requestView {
 		TargetVersion: request.TargetVersion, TargetPath: request.TargetPath, Norms: normRefs(request.Norms), CompletionConditionIDs: request.CompletionConditionIDs, PreviousFindingIDs: request.PreviousFindingIDs}
 }
 
-// judgmentContext fixes the judge's inputs at issue time: adopted outputs selected by the check,
+// judgmentContext fixes the judge's inputs at issue time: adopted outputs selected by the judged stage,
 // current material with the always-required evidence, plan and pre-judgment instructions,
 // standing delegations with their sources, input schemas, and the history index.
-func (e *Engine) judgmentContext(ctx context.Context, state *ledger.State, item plan.Check, meta *ledger.Instruction, request check.Request, round *ledger.Round) error {
+func (e *Engine) judgmentContext(ctx context.Context, state *ledger.State, item catalogCheck, meta *ledger.Instruction, request check.Request, round *ledger.Round) error {
 	if meta.Context != nil && meta.Context.CurrentMaterial != "" {
 		return nil
 	}
@@ -51,7 +51,15 @@ func (e *Engine) judgmentContext(ctx context.Context, state *ledger.State, item 
 		meta.Context = &ledger.InstructionContext{}
 	}
 	meta.Context.CurrentMaterial = material + "\n"
-	meta.Context.Outputs = contextOutputs(selectOutputs(adopted, item.Outputs))
+	var selection []string
+	if round != nil {
+		stage, _, err := e.roundPlanStage(state, round)
+		if err != nil {
+			return err
+		}
+		selection = stage.Outputs
+	}
+	meta.Context.Outputs = contextOutputs(selectOutputs(adopted, selection))
 	meta.Context.Schemas, meta.Context.Instructions = item.Schemas, item.Instructions
 	scope := historyScope{Kind: item.JudgmentHistory(), Aspect: item.Aspect, Runner: string(item.Runner)}
 	if round != nil {
@@ -201,11 +209,11 @@ func (e *Engine) roundDocuments(ctx context.Context, roundID string) ([]brief.Do
 		if err != nil {
 			return nil, err
 		}
-		definition, err := e.asset(ctx, roundReference(round), "stages/"+stage.ID+".md")
+		definition, err := e.asset(ctx, roundReference(round), "stages/"+stage.DefinitionID()+".md")
 		if err != nil {
 			return nil, err
 		}
-		return []brief.Document{{Path: "Agreed plan", Content: "```json\n" + string(agreed) + "\n```", Exists: true}, {Path: "Stage definition stages/" + stage.ID + ".md", Content: string(definition), Exists: true}}, nil
+		return []brief.Document{{Path: "Agreed plan", Content: "```json\n" + string(agreed) + "\n```", Exists: true}, {Path: "Stage definition stages/" + stage.DefinitionID() + ".md", Content: string(definition), Exists: true}}, nil
 	}
 	return nil, errors.New("judgment round is missing")
 }

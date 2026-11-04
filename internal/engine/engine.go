@@ -58,10 +58,11 @@ type Options struct {
 	ReadConfig  func(context.Context, string) (config.Config, error)
 }
 
-// StartRequest identifies the repository template and the task supplied by the human.
+// StartRequest names the pattern the planner prioritizes and the task supplied by the human.
+// An empty Pattern prioritizes the configured default_plan.
 type StartRequest struct {
-	Template string
-	Task     string
+	Pattern string
+	Task    string
 }
 
 // Result is a short response. Instruction bodies are written to Brief files.
@@ -337,7 +338,7 @@ func (e *Engine) mutation(ctx context.Context) (*fsstore.Lock, error) {
 	return lock, nil
 }
 
-// Start records work on the current branch of this checkout and issues a planner instruction from a repository template.
+// Start records work on the current branch of this checkout and issues a planner instruction that prioritizes a repository pattern.
 func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error) {
 	checkout, err := e.lockStart()
 	if err != nil {
@@ -371,26 +372,15 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	if err := e.initialize(); err != nil {
 		return Result{}, err
 	}
-	name := request.Template
+	name := request.Pattern
 	if name == "" {
 		name = settings.DefaultPlanName()
 	}
 	if !localName(name) || strings.TrimSpace(request.Task) == "" {
-		return Result{}, errors.New("a template name and task are required")
+		return Result{}, errors.New("a pattern name and task are required")
 	}
-	source, err := e.asset(ctx, head, "plans/"+name+".json")
-	if err != nil {
+	if _, _, err := e.pattern(ctx, head, name); err != nil {
 		return Result{}, err
-	}
-	template, err := e.plans.ParseTemplate(source)
-	if err != nil {
-		return Result{}, err
-	}
-	if err := validateRoles(append(slices.Clone(template.Stages), template.OptionalStages...), settings); err != nil {
-		return Result{}, err
-	}
-	if template.Name != name {
-		return Result{}, errors.New("template name does not match its file name")
 	}
 	e.workID, e.workDir = e.newWork()
 	lock, err := e.store().Lock()
@@ -417,7 +407,7 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	if err = hook.PublishSession(e.runRoot(), bound, "bind"); err != nil {
 		return Result{}, err
 	}
-	return e.planner(ctx, template, source, 1, plan.InitialProposal)
+	return e.planner(ctx, name, 1, plan.InitialProposal, "")
 }
 
 // Status reads current state without writing records or binding a new session.
@@ -568,7 +558,14 @@ func (e *Engine) Plan(ctx context.Context, data []byte) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if err = e.acceptPlan(ctx, state, p, plan.HumanProposal, ""); err != nil {
+	head, err := e.workspace.Head(ctx)
+	if err != nil {
+		return Result{}, err
+	}
+	if err = e.validateProposal(ctx, state, p, head); err != nil {
+		return Result{}, err
+	}
+	if err = e.acceptPlan(p, plan.HumanProposal, ""); err != nil {
 		return Result{}, err
 	}
 	state, err = e.load()
@@ -620,51 +617,14 @@ func (e *Engine) highestPlan() (int, error) {
 	}
 	return n, nil
 }
-func (e *Engine) acceptPlan(ctx context.Context, state *ledger.State, p plan.Plan, origin plan.ProposalOrigin, instructionID string) error {
+// acceptPlan records a validated proposal with the next plan version.
+func (e *Engine) acceptPlan(p plan.Plan, origin plan.ProposalOrigin, instructionID string) error {
 	n, err := e.highestPlan()
 	if err != nil {
 		return err
 	}
 	if p.Version != n+1 {
 		return fmt.Errorf("plan version must be %d", n+1)
-	}
-	reference, err := e.workspace.Head(ctx)
-	if err != nil {
-		return err
-	}
-	if instructionID != "" {
-		issued, readErr := e.readInstruction(instructionID)
-		if readErr != nil {
-			return readErr
-		}
-		reference = issued.Reference
-		if p.Template.Name != issued.TemplateName {
-			return errors.New("planner template does not match its instruction")
-		}
-	}
-	if !localName(p.Template.Name) {
-		return errors.New("invalid plan template name")
-	}
-	source, err := e.asset(ctx, reference, "plans/"+p.Template.Name+".json")
-	if err != nil {
-		return err
-	}
-	if p.Template.ContentHash != plan.ContentHash(source) {
-		return errors.New("plan template content hash does not match")
-	}
-	template, err := e.plans.ParseTemplate(source)
-	if err != nil {
-		return err
-	}
-	settings, err := e.settings(ctx, reference)
-	if err != nil {
-		return err
-	}
-	if err := validateRoles(p.Stages, settings); err != nil {
-		return err
-	}
-	if err := plan.ValidateBackTargets(template, p); err != nil {
-		return err
 	}
 	_, err = e.append(&ledger.PlanVersion{Plan: p, Origin: origin, InstructionID: instructionID})
 	return err
@@ -690,16 +650,16 @@ func (e *Engine) External(ctx context.Context, request external.Request) (Result
 		return Result{}, err
 	}
 	request.Plan = nil
-	if p, ok := state.CurrentPosition().Plan, state.CurrentPosition().Plan != nil; ok {
-		template, _, err := e.template(ctx, ref, p.Plan.Template.Name)
-		if err != nil {
-			return Result{}, err
-		}
+	if state.CurrentPosition().Plan != nil {
 		norms, err := e.norms(ctx, ref)
 		if err != nil {
 			return Result{}, err
 		}
-		if selected, ok := state.ExecutablePlan(template, norms, settings.PlanApproval()); ok {
+		completed, err := e.approvalCompleted(state)
+		if err != nil {
+			return Result{}, err
+		}
+		if selected, ok := state.ExecutablePlan(norms, settings.PlanApproval(), completed); ok {
 			request.Plan = &selected
 		}
 	}
@@ -742,17 +702,6 @@ func (e *Engine) External(ctx context.Context, request external.Request) (Result
 	return r, nil
 }
 
-func (e *Engine) template(ctx context.Context, ref, name string) (plan.PlanTemplate, []byte, error) {
-	if !localName(name) {
-		return plan.PlanTemplate{}, nil, errors.New("invalid template name")
-	}
-	source, err := e.asset(ctx, ref, "plans/"+name+".json")
-	if err != nil {
-		return plan.PlanTemplate{}, nil, err
-	}
-	t, err := e.plans.ParseTemplate(source)
-	return t, source, err
-}
 func (e *Engine) reference(ctx context.Context, state *ledger.State) (string, error) {
 	if r, ok := state.OpenRound(); ok {
 		return roundReference(r), nil

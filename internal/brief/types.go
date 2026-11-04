@@ -25,9 +25,11 @@ type NormPath struct {
 }
 
 // StageOutput passes an adopted previous stage output without changing its content.
+// StageID is the instance ID; Definition is its stage definition ID.
 type StageOutput struct {
-	StageID string
-	Content string
+	StageID    string
+	Definition string
+	Content    string
 }
 
 // RepositoryFacts contains layout guides, rules and their irreversible decisions, and available checks.
@@ -43,7 +45,8 @@ type RepositoryFacts struct {
 
 // CommandOutput contains the result of a required command: check executed by the caller.
 type CommandOutput struct {
-	Check    plan.Check
+	Aspect   string
+	Runner   string
 	ExitCode int
 	Output   string
 }
@@ -105,17 +108,23 @@ type JudgmentInput struct {
 }
 
 // PlannerInput contains information for initial planning, revised proposals, and rebuilding the remaining plan.
-// The caller determines Version and TemplateHash; brief neither generates nor verifies them.
+// The caller determines Version and PatternHash; brief neither generates nor verifies them.
+// Pattern is the prioritized pattern; other patterns and stage definitions are passed by path.
 type PlannerInput struct {
 	// RequestTemplate is the request text resolved by the caller from the fixed repository snapshot.
 	RequestTemplate   string
 	InstructionID     string
 	Version           int
-	Template          plan.PlanTemplate
-	TemplateHash      string
+	Pattern           plan.PlanTemplate
+	PatternHash       string
+	Patterns          []NormPath
+	StageCatalog      string
+	StageDefinitions  []NormPath
+	Roles             []RoleEntry
+	LoopRules         LoopRules
+	Checks            []CheckEntry
 	Task              string
 	OriginalRequest   string
-	StageDefinitions  []Document
 	Repository        RepositoryFacts
 	Norms             []Document
 	NormPaths         []NormPath
@@ -127,6 +136,26 @@ type PlannerInput struct {
 	OutputSchema      string
 }
 
+// RoleEntry lists one configured role for the planner.
+type RoleEntry struct {
+	ID    string `json:"id"`
+	Kind  string `json:"kind"`
+	Agent string `json:"agent,omitempty"`
+}
+
+// CheckEntry names one configured check with a one-line description.
+type CheckEntry struct {
+	Aspect      string `json:"aspect"`
+	Description string `json:"description"`
+}
+
+// LoopRules lists the fixed loop rules and the global stage limit ceilings.
+type LoopRules struct {
+	Stage    []plan.StageRule `json:"stage"`
+	Path     []plan.PathRule  `json:"path"`
+	Ceilings plan.Limits      `json:"ceilings"`
+}
+
 // JudgmentBriefInput asks the planner how to check one round before a judgment. The result is
 // supplementary and cannot narrow the fixed criteria or the judgment scope.
 type JudgmentBriefInput struct {
@@ -134,6 +163,7 @@ type JudgmentBriefInput struct {
 	RequestTemplate string
 	InstructionID   string
 	Check           plan.Check
+	Runner          string
 	Plan            plan.Plan
 	Requirements    Document
 	CurrentMaterial string

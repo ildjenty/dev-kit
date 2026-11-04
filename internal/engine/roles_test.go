@@ -19,9 +19,9 @@ import (
 func roleWork(t *testing.T, change func(*plan.Stage)) (*Engine, Result) {
 	t.Helper()
 	e, ctx := fixture(t)
-	configure(t, e, "[detection]\nrequired=false\n[roles.senior]\nkind='work'\nagent=''\n[commands.fail]\nexecutable='/usr/bin/false'\ntimeout_seconds=5\n")
+	configure(t, e, "[detection]\nrequired=false\n[roles.senior]\nkind='work'\nagent=''\n[commands.fail]\nexecutable='/usr/bin/false'\ntimeout_seconds=5\n[limits]\nmax_rounds_ceiling=5\nmax_no_progress_ceiling=5\n")
 	configureStage(t, e, change)
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -31,7 +31,7 @@ func roleWork(t *testing.T, change func(*plan.Stage)) (*Engine, Result) {
 
 func TestFixRuleCheckAndFailureCountKeepStageRunAndDiff(t *testing.T) {
 	e, work := roleWork(t, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "command:fail", Runner: "command:fail", Required: true}}
+		stage.Checks = []plan.Check{{Aspect: "command:fail", Required: true}}
 		stage.Limits = plan.Limits{MaxRounds: 5, MaxNoProgress: 5}
 		stage.Transitions.FixRules = []plan.FixRule{{When: &plan.FixCondition{Check: "command:fail", FailuresAtLeast: 2}, Assignee: "senior"}}
 	})
@@ -156,7 +156,7 @@ func TestPremiseBrokenAsksAndRecommendsHumanBack(t *testing.T) {
 
 func TestLimitOffersRoleContinuationOnlyAfterHumanChoice(t *testing.T) {
 	e, work := roleWork(t, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "command:fail", Runner: "command:fail", Required: true}}
+		stage.Checks = []plan.Check{{Aspect: "command:fail", Required: true}}
 		stage.Limits = plan.Limits{MaxRounds: 1, MaxNoProgress: 1}
 		stage.Transitions.FixRules = []plan.FixRule{{Assignee: "senior"}}
 	})
@@ -194,7 +194,7 @@ func TestRolePlanValidation(t *testing.T) {
 		{ID: "s", Assignee: "missing"},
 		{ID: "s", Assignee: "judge"},
 		{ID: "s", Assignee: "human", Split: true},
-		{ID: "s", Assignee: "worker", Checks: []plan.Check{{Runner: "planner"}}},
+		{ID: "s", Assignee: "worker", Checks: []plan.Check{{Aspect: "unconfigured"}}},
 		{ID: "s", Assignee: "worker", Split: true, Units: []plan.Unit{{Role: "human"}}},
 		{ID: "s", Assignee: "worker", Transitions: plan.Transitions{FixRules: []plan.FixRule{{Assignee: "human"}}}},
 	} {
@@ -225,46 +225,49 @@ func TestDefaultRolesPreserveInstructionsAndDeviations(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"default", "fix", "docs"} {
-		template, source, err := e.template(ctx, "HEAD", name)
+		template, source, err := e.pattern(ctx, "HEAD", name)
 		if err != nil {
 			t.Fatal(err)
 		}
-		p := plan.NewPlan(template, plan.ContentHash(source), "Review the default roles", []plan.CompletionCondition{{ID: "C1", Description: "Preserve default behavior"}})
+		p := newPlan(template, plan.ContentHash(source), "Review the default roles", []plan.CompletionCondition{{ID: "C1", Description: "Preserve default behavior"}})
 		if err := validateRoles(p.Stages, settings); err != nil {
 			t.Fatal(err)
 		}
-		if deviations := plan.Deviations(template, p); len(deviations) != 0 {
-			t.Fatalf("default roles introduced deviations: %+v", deviations)
+		items, err := resolveChecks(settings, p.Stages[0].Checks)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, item := range items {
+			if !item.Runner.IsCommand() && item.Runner != "judge" {
+				t.Fatal("default judgment role changed")
+			}
 		}
 		for _, stage := range p.Stages {
 			if stage.Assignee != plan.Worker || stage.Transitions.FixRules != nil {
 				t.Fatal("default stage work changed")
 			}
-			for _, item := range stage.Checks {
-				if !item.Runner.IsCommand() && item.Runner != "judge" {
-					t.Fatal("default judgment role changed")
-				}
-			}
 		}
 	}
-	started, err := e.Start(ctx, StartRequest{Template: "default", Task: "Preserve default instructions"})
+	started, err := e.Start(ctx, StartRequest{Pattern: "default", Task: "Preserve default instructions"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if started.Instruction.Runner != "devkit-planner" || started.Instruction.Text != "Launch the planner with: devkit-instruction "+started.Instruction.ID {
 		t.Fatal("default planner launch changed")
 	}
-	template, source, err := e.template(ctx, "HEAD", "default")
+	template, source, err := e.pattern(ctx, "HEAD", "default")
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := plan.NewPlan(template, plan.ContentHash(source), "Preserve default instructions", []plan.CompletionCondition{{ID: "C1", Description: "Agree on requirements"}})
+	p := newPlan(template, plan.ContentHash(source), "Preserve default instructions", []plan.CompletionCondition{{ID: "C1", Description: "Agree on requirements"}})
 	for i := range p.Stages {
 		for j := range p.Stages[i].Checks {
 			p.Stages[i].Checks[j].CompletionConditionIDs = []string{"C1"}
 			p.Stages[i].Checks[j].Target = "Task outputs"
 		}
 	}
+	// The purpose stage replans; the stages after it belong to the next plan.
+	p = chainStages(p, "purpose")
 	collect(t, e, started.Instruction, form.PlannerResult{InstructionID: started.Instruction.ID, Plan: marshal(t, p)})
 	work := checkedNext(t, e)
 	if work.Instruction.Kind != form.InstructionWork || work.Instruction.Text != "Perform the work described in the brief, then run devkit submit." {
@@ -300,6 +303,9 @@ func roleNext(t *testing.T, e *Engine) Result {
 			}
 			collect(t, e, result.Instruction, pass(*data.Request))
 		default:
+			if approved := approvedNext(t, e, result); approved.Instruction != result.Instruction {
+				return roleNext(t, e)
+			}
 			return result
 		}
 	}
@@ -309,25 +315,25 @@ func roleNext(t *testing.T, e *Engine) Result {
 
 func TestRoleChangesAppearInPlanApproval(t *testing.T) {
 	e, ctx := fixture(t)
-	if _, err := e.Start(ctx, StartRequest{Template: "test", Task: "Review role changes"}); err != nil {
+	if _, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Review role changes"}); err != nil {
 		t.Fatal(err)
 	}
-	template, source, err := e.template(ctx, "HEAD", "test")
+	template, source, err := e.pattern(ctx, "HEAD", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := plan.NewPlan(template, plan.ContentHash(source), "Review role changes", []plan.CompletionCondition{{ID: "C1", Description: "Correct assignments"}})
+	p := newPlan(template, plan.ContentHash(source), "Review role changes", []plan.CompletionCondition{{ID: "C1", Description: "Correct assignments"}})
 	p.Stages[0].Assignee = "agent"
 	p.Stages[0].Transitions.FixRules = []plan.FixRule{{Assignee: "worker"}}
 	state, err := e.load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	text, err := e.planApprovalText(state, template, p)
+	text, err := e.planApprovalText(ctx, state, p, "HEAD")
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"changed_assignee", "changed_fix_rules", "Template: \"worker\"", "Plan: \"agent\"", "\"assignee\": \"worker\""} {
+	for _, want := range []string{"assignee agent", `"Field": "assignee"`, `"Before": "worker"`, `"After": "agent"`, `"Field": "transitions"`} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("approval omitted %q: %s", want, text)
 		}
@@ -338,7 +344,7 @@ func TestStartRejectsWritableOutsideSource(t *testing.T) {
 	e, ctx := fixture(t)
 	outside := t.TempDir()
 	configure(t, e, "[sources.extra]\npath = "+strconv.Quote(outside)+"\nwritable=true\n")
-	_, err := e.Start(ctx, StartRequest{Template: "test", Task: "Read outside knowledge"})
+	_, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Read outside knowledge"})
 	if err == nil || !strings.Contains(err.Error(), "outside the repository are read-only") {
 		t.Fatalf("outside writable source was accepted: %v", err)
 	}
@@ -371,7 +377,7 @@ func TestRoleConfigurationAndAgentChangesAreNorms(t *testing.T) {
 	}
 	git(t, e.Root(), "add", "devkit.toml")
 	git(t, e.Root(), "commit", "-qm", "Configure senior role")
-	if _, err := e.Start(ctx, StartRequest{Template: "test", Task: "Use a repository role"}); err == nil || !strings.Contains(err.Error(), "commit the devkit init changes first") {
+	if _, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Use a repository role"}); err == nil || !strings.Contains(err.Error(), "commit the devkit init changes first") {
 		t.Fatalf("uncommitted custom definitions were accepted: %v", err)
 	}
 	git(t, e.Root(), "add", ".claude/agents/devkit-senior.md", ".codex/agents/devkit-senior.toml")
@@ -383,7 +389,7 @@ func TestRoleConfigurationAndAgentChangesAreNorms(t *testing.T) {
 	if !slices.Contains(differenceCategories(e.Root(), []string{"devkit.toml", ".claude/agents/devkit-senior.md"}, config.Config{}), config.MetaLoopEdit) {
 		t.Fatal("role edits were not classified as loop edits")
 	}
-	if _, err := e.Start(ctx, StartRequest{Template: "test", Task: "Use a repository role"}); err != nil {
+	if _, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Use a repository role"}); err != nil {
 		t.Fatal(err)
 	}
 }

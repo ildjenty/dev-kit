@@ -104,7 +104,7 @@ func TestFixedFormats(t *testing.T) {
 			Judgment: NotAssessed, Findings: []Finding{finding}, CheckedScope: []string{}, UncheckedScope: []string{"Screen"},
 			Method: "Open the screen", Environment: "Local",
 		}},
-		{"planner-result", PlannerResult{InstructionID: "instruction", Plan: json.RawMessage(`{"version":1,"template":{"name":"test","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"task":"Implement the task","completion_conditions":[{"id":"C1","description":"The task is complete"}],"start_stage":"implement","stages":[{"id":"implement","assignee":"worker","checks":[],"gate":{"required":false,"reason":"No gate required"},"limits":{"max_rounds":3,"max_no_progress":2},"transitions":{"fix":"implement","ask":"implement","back":"implement","done":null}}],"external_operations":[]}`)}},
+		{"planner-result", PlannerResult{InstructionID: "instruction", Plan: json.RawMessage(`{"version":1,"pattern":{"name":"test","content_hash":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"task":"Implement the task","completion_conditions":[{"id":"C1","description":"The task is complete"}],"start_stage":"implement","stages":[{"id":"implement","assignee":"worker","checks":[],"gate":{"required":false,"reason":"No gate required"},"limits":{"max_rounds":3,"max_no_progress":2},"transitions":{"fix":"implement","ask":"implement","back":"implement","done":null}}],"external_operations":[]}`)}},
 		{"question", question},
 		{"question", decisionQuestion},
 		{"question", externalQuestion},

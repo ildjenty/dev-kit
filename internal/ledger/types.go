@@ -304,7 +304,7 @@ type Instruction struct {
 	Inputs       []plan.Selection      `json:"inputs,omitempty"`
 	Runner       string                `json:"runner,omitempty"`
 	TargetPath   string                `json:"target_path,omitempty"`
-	TemplateName string                `json:"template_name,omitempty"`
+	PatternName  string                `json:"pattern_name,omitempty"`
 	Origin       plan.ProposalOrigin   `json:"origin,omitempty"`
 	Request      *check.Request        `json:"request,omitempty"`
 	Detection    *InstructionDetection `json:"detection,omitempty"`
@@ -312,9 +312,10 @@ type Instruction struct {
 }
 
 // InstructionDetection preserves the inputs used to accept a detection result.
-// Check keeps the criteria and examples selections that produced the identity.
+// Check and Definition keep the catalog selections that produced the identity.
 type InstructionDetection struct {
-	Check    plan.Check              `json:"check"`
+	Check      plan.Check           `json:"check"`
+	Definition plan.CheckDefinition `json:"definition"`
 	Spec     check.DetectionSpec     `json:"spec"`
 	Identity check.DetectionIdentity `json:"identity"`
 	Examples map[string]string       `json:"examples"`

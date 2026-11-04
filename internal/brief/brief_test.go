@@ -74,11 +74,11 @@ func TestBuildWork(t *testing.T) {
 			LayoutGuides:          []Document{{Path: "internal/save/README.md", Content: "Storage layout guide"}},
 			Rules:                 Document{Path: ".devkit/rules.md", Content: "Existing rules"},
 			IrreversibleDecisions: []string{"Irreversible rule decision"},
-			AvailableChecks:       []plan.Check{{Aspect: "command:test", Runner: "command:test"}},
+			AvailableChecks:       []plan.Check{{Aspect: "command:test"}},
 		},
 		Norms:            []Document{{Path: "AGENTS.md", Content: "Fixed instructions"}},
 		PreviousFindings: []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "Saving fails"}},
-		CommandOutputs:   []CommandOutput{{Check: plan.Check{Aspect: "command:test", Runner: "command:test", Required: true}, ExitCode: 1, Output: command}},
+		CommandOutputs:   []CommandOutput{{Aspect: "command:test", Runner: "command:test", ExitCode: 1, Output: command}},
 		PreCommitOutput:  "pre-commit verification failed\nDetails\n",
 		OutputSchema:     `{"type":"object","required":["instruction_id"]}`,
 	}
@@ -150,10 +150,15 @@ func TestBuildPlanner(t *testing.T) {
 		RequestTemplate:   requestTemplate(t, "planner"),
 		InstructionID:     "plan-2",
 		Version:           2,
-		Template:          plan.PlanTemplate{Name: "fix", StartStage: "implement", PlanLimits: &plan.PlanLimits{MaxRounds: 4}},
-		TemplateHash:      "template-hash",
+		Pattern:           plan.PlanTemplate{Name: "fix", StartStage: "implement", Stages: []plan.Stage{{ID: "implement", Limits: plan.Limits{MaxRounds: 4}}}},
+		PatternHash:       "pattern-hash",
+		Patterns:          []NormPath{{Path: "plans/docs.json", SnapshotPath: "snap/tree/.devkit/plans/docs.json"}},
+		StageCatalog:      "- `stages/implement.md`: 5 Implementation.",
+		StageDefinitions:  []NormPath{{Path: "stages/implement.md", SnapshotPath: "snap/tree/.devkit/stages/implement.md"}},
+		Roles:             []RoleEntry{{ID: "worker", Kind: "work", Agent: "devkit-worker"}},
+		LoopRules:         LoopRules{Path: []plan.PathRule{{Last: "retrospective"}}, Ceilings: plan.Limits{MaxRounds: 3, MaxNoProgress: 2}},
+		Checks:            []CheckEntry{{Aspect: "diff", Description: "Review the diff"}},
 		Task:              "Fix the save failure",
-		StageDefinitions:  []Document{{Path: "stages/implement.md", Content: "Implementation definition"}},
 		Repository:        RepositoryFacts{Rules: Document{Path: ".devkit/rules.md", Content: "Repository rules"}},
 		Norms:             []Document{{Path: "principles/harness.md", Content: "Loop principles"}},
 		CurrentPlan:       &current,
@@ -175,8 +180,9 @@ func TestBuildPlanner(t *testing.T) {
 		t.Fatal("assembled different requests from identical inputs")
 	}
 	for _, want := range []string{
-		input.Task, input.TemplateHash, `"max_rounds": 4`, "Previous plan task", "Remaining task", "version to 2",
-		"stages/implement.md", "Implementation definition", "Repository rules", "principles/harness.md", "Loop principles",
+		input.Task, input.PatternHash, `"max_rounds": 4`, "Previous plan task", "Remaining task", "version to 2",
+		"stages/implement.md: snap/tree/.devkit/stages/implement.md", "plans/docs.json: snap/tree/.devkit/plans/docs.json", "5 Implementation",
+		`"agent": "devkit-worker"`, `"Last": "retrospective"`, "Review the diff", "Repository rules", "principles/harness.md", "Loop principles",
 		input.HumanInstructions, "PF1", "Missing completion conditions", input.PreviousOutputs[0].Content,
 		input.OutputSchema, "instruction_id", `"plan-2"`, "JSON-only final message",
 	} {
@@ -184,7 +190,7 @@ func TestBuildPlanner(t *testing.T) {
 			t.Errorf("request does not contain %q", want)
 		}
 	}
-	initial, err := BuildPlanner(PlannerInput{RequestTemplate: input.RequestTemplate, InstructionID: "plan-1", Version: 1, Template: input.Template, Task: input.Task})
+	initial, err := BuildPlanner(PlannerInput{RequestTemplate: input.RequestTemplate, InstructionID: "plan-1", Version: 1, Pattern: input.Pattern, Task: input.Task})
 	if err != nil {
 		t.Fatal(err)
 	}

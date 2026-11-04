@@ -24,7 +24,7 @@ type detectionInput = ledger.InstructionDetection
 
 // detectionInput reads the specification and examples selected by the check, resolves its
 // criteria, and derives the pass identity from them, the runner, and the request template.
-func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check) (detectionInput, []check.Criterion, error) {
+func (e *Engine) detectionInput(ctx context.Context, ref string, item catalogCheck) (detectionInput, []check.Criterion, error) {
 	if item.Examples == nil {
 		return detectionInput{}, nil, fmt.Errorf("judge-run check %q selects no detection examples; select examples or make the check not required", item.Aspect)
 	}
@@ -56,7 +56,7 @@ func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check
 		return detectionInput{}, nil, err
 	}
 	identity.Model, identity.Effort, err = e.declaredSettings(ctx, ref, item.Runner, runner)
-	return detectionInput{Check: item, Spec: spec, Identity: identity, Examples: texts}, criteria, err
+	return detectionInput{Check: item.Check, Definition: item.CheckDefinition, Spec: spec, Identity: identity, Examples: texts}, criteria, err
 }
 
 // detectionExamples reads the selected specification and the example documents it names,
@@ -131,7 +131,7 @@ func (e *Engine) detectionRecords(ctx context.Context, ref string) ([]check.Dete
 	}
 	return records, nil
 }
-func (e *Engine) detectionContext(ctx context.Context, items []plan.Check, ref string) ([]check.DetectionRequirement, []check.DetectionTest, error) {
+func (e *Engine) detectionContext(ctx context.Context, items []catalogCheck, ref string) ([]check.DetectionRequirement, []check.DetectionTest, error) {
 	settings, err := e.settings(ctx, ref)
 	if err != nil {
 		return nil, nil, err
@@ -153,7 +153,7 @@ func (e *Engine) detectionContext(ctx context.Context, items []plan.Check, ref s
 	records, err := e.detectionRecords(ctx, ref)
 	return requirements, records, err
 }
-func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items []plan.Check, ref string, stageRunID ...string) (Result, bool, error) {
+func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items []catalogCheck, ref string, stageRunID ...string) (Result, bool, error) {
 	settings, err := e.settings(ctx, ref)
 	if err != nil || !settings.DetectionRequired() {
 		return Result{}, false, err
@@ -182,7 +182,7 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 // issueDetection requests a detection test. The request holds only the criteria, the anonymous
 // example bodies, and the output contract; it carries no norms, work history, or specification.
 func (e *Engine) issueDetection(ctx context.Context, state *ledger.State, input detectionInput, criteria []check.Criterion, ref string, stageRunID ...string) (Result, bool, error) {
-	item := input.Check
+	item := catalogCheck{input.Check, input.Definition}
 	identity, _ := json.Marshal(input.Identity)
 	key := item.Aspect + ":" + string(item.Runner) + ":" + hash(identity)
 	meta, fresh, err := e.issuance(form.InstructionDetectionTest, key, nil, 0, "")

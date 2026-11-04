@@ -10,8 +10,10 @@ import (
 
 // CompletionInput holds plan rules and accepted records for the current target.
 // Targets resolves explicit check targets; checks without one use TargetVersion.
+// Runners maps each check aspect to the runner fixed by the check catalog.
 type CompletionInput struct {
 	Rule            plan.CompletionRule
+	Runners         map[string]plan.Runner
 	TargetVersion   form.TargetVersion
 	Targets         map[string]form.TargetVersion
 	Norms           []form.NormReference
@@ -40,6 +42,7 @@ func CheckCompletion(input CompletionInput) Completion {
 	var detection []check.DetectionRequirement
 	resolvedTargets := true
 	for _, item := range input.Rule.Checks {
+		runner := string(input.Runners[item.Aspect])
 		target := input.TargetVersion
 		if item.Target != "" {
 			var ok bool
@@ -47,13 +50,13 @@ func CheckCompletion(input CompletionInput) Completion {
 			resolvedTargets = resolvedTargets && ok
 		}
 		required = append(required, check.Requirement{
-			Aspect: item.Aspect, Runner: string(item.Runner), TargetVersion: target, Norms: input.Norms,
+			Aspect: item.Aspect, Runner: runner, TargetVersion: target, Norms: input.Norms,
 			CompletionConditionIDs: item.CompletionConditionIDs,
 		})
-		if input.Rule.RequireDetectionTests && !strings.HasPrefix(string(item.Runner), "command:") {
-			requirement := check.DetectionRequirement{Aspect: item.Aspect, Runner: string(item.Runner)}
+		if input.Rule.RequireDetectionTests && !strings.HasPrefix(runner, "command:") {
+			requirement := check.DetectionRequirement{Aspect: item.Aspect, Runner: runner}
 			for _, candidate := range input.Detection {
-				if candidate.Aspect == item.Aspect && candidate.Runner == string(item.Runner) {
+				if candidate.Aspect == item.Aspect && candidate.Runner == runner {
 					requirement = candidate
 					break
 				}

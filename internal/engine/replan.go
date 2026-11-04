@@ -37,16 +37,9 @@ func (e *Engine) remainingPlan(state *ledger.State) (*plan.Plan, error) {
 	if err != nil {
 		return nil, err
 	}
-	// A replan edge terminates this segment; the bound plan orders its remaining segment.
+	// A replan edge ends the bound plan's done path; the next plan supplies the rest.
 	if next != nil && *next == "replan" {
 		next = nil
-		for i, stage := range bound.Stages {
-			if stage.ID == run.StageID && i+1 < len(bound.Stages) {
-				id := bound.Stages[i+1].ID
-				next = &id
-				break
-			}
-		}
 	}
 	remaining := bound
 	remaining.Stages, remaining.StartStage = nil, ""

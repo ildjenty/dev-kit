@@ -10,7 +10,7 @@ func TestFlowSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if defaults.BriefMaxBytes() != 200000 || defaults.Limits.MaxTotalRounds != nil || defaults.RoleMaxConcurrent("judge") != 3 || !reflect.DeepEqual(defaults.PlanCheckSettings().Schemas, []string{"plan", "plan-template"}) {
+	if defaults.BriefMaxBytes() != 200000 || (defaults.Limits.MaxTotalRounds == nil || *defaults.Limits.MaxTotalRounds != 40) || defaults.RoleMaxConcurrent("judge") != 3 || !reflect.DeepEqual(defaults.PlanCheckSettings().Schemas, []string{"plan", "plan-template"}) {
 		t.Fatalf("unexpected flow defaults: %+v", defaults)
 	}
 	settings, err := Parse([]byte(`kit_version = 'v3'

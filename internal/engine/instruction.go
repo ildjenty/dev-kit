@@ -29,7 +29,7 @@ type instructionData struct {
 	Reference    string                     `json:"reference"`
 	Request      *check.Request             `json:"request,omitempty"`
 	Origin       plan.ProposalOrigin        `json:"origin,omitempty"`
-	TemplateName string                     `json:"template_name,omitempty"`
+	PatternName  string                     `json:"pattern_name,omitempty"`
 	Detection    *detectionInput            `json:"detection,omitempty"`
 	BriefText    string                     `json:"brief_text,omitempty"`
 	Context      *ledger.InstructionContext `json:"context,omitempty"`
@@ -430,7 +430,7 @@ func (e *Engine) readInstructionFacts(id string) (instructionData, error) {
 				}
 			}
 		}
-		return instructionData{Instruction: i, Reference: meta.Reference, Origin: meta.Origin, TemplateName: meta.TemplateName, Request: meta.Request, Detection: meta.Detection, Context: meta.Context, Inputs: meta.Inputs, RoundID: meta.RoundID}, nil
+		return instructionData{Instruction: i, Reference: meta.Reference, Origin: meta.Origin, PatternName: meta.PatternName, Request: meta.Request, Detection: meta.Detection, Context: meta.Context, Inputs: meta.Inputs, RoundID: meta.RoundID}, nil
 	}
 	return instructionData{}, fmt.Errorf("instruction not found: %s", id)
 }
@@ -469,11 +469,7 @@ func (e *Engine) regenerateBrief(ctx context.Context, meta ledger.Instruction, d
 	}
 	switch meta.Kind {
 	case form.InstructionPlan:
-		template, source, err := e.template(ctx, data.Reference, data.TemplateName)
-		if err != nil {
-			return brief.Brief{}, err
-		}
-		return e.plannerBrief(ctx, state, template, source, meta.PlanVersion, data.Origin, data.Reference, &meta)
+		return e.plannerBrief(ctx, state, data.PatternName, meta.PlanVersion, data.Origin, data.Reference, &meta)
 	case form.InstructionWork, form.InstructionUnitWork:
 		p, ok, err := e.boundPlan(meta.PlanVersion)
 		if err != nil {
@@ -525,7 +521,9 @@ func (e *Engine) InstructionRunner(instruction ledger.Instruction) (string, erro
 	return data.Instruction.Runner, nil
 }
 
-func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte, version int, origin plan.ProposalOrigin) (Result, error) {
+// planner issues a planning instruction that prioritizes the named pattern. A nonempty rejection
+// tells the planner why the current plan cannot continue.
+func (e *Engine) planner(ctx context.Context, pattern string, version int, origin plan.ProposalOrigin, rejection string) (Result, error) {
 	state, err := e.load()
 	if err != nil {
 		return Result{}, err
@@ -548,16 +546,12 @@ func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte
 	if ref, err = e.refreshSources(ctx, ref); err != nil {
 		return Result{}, err
 	}
-	name := t.Name
-	if t, source, err = e.template(ctx, ref, name); err != nil {
-		return Result{}, err
-	}
-	if t.Name != name {
-		return Result{}, errors.New("template name does not match its file name")
-	}
-	b, err := e.plannerBrief(ctx, state, t, source, version, origin, ref, &meta)
+	b, err := e.plannerBrief(ctx, state, pattern, version, origin, ref, &meta)
 	if err != nil {
 		return Result{}, err
+	}
+	if rejection != "" {
+		b.Text += "\n\n## Current plan rejected at stage start\n\nThe executable plan no longer satisfies the fixed loop rules:\n\n" + rejection + "\n\nPropose a plan for the remaining work that satisfies them.\n"
 	}
 	settings, err := e.settings(ctx, ref)
 	if err != nil {
@@ -567,76 +561,16 @@ func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte
 	if err != nil {
 		return Result{}, err
 	}
-	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Runner: runner, Text: "Launch the planner with: devkit-instruction " + meta.ID}, Reference: ref, Origin: origin, TemplateName: t.Name}, b.Text)
+	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Runner: runner, Text: "Launch the planner with: devkit-instruction " + meta.ID}, Reference: ref, Origin: origin, PatternName: pattern}, b.Text)
 }
 
-func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.PlanTemplate, source []byte, version int, origin plan.ProposalOrigin, ref string, meta *ledger.Instruction) (brief.Brief, error) {
-	template, err := e.asset(ctx, ref, "templates/brief/planner.md.tmpl")
+func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, name string, version int, origin plan.ProposalOrigin, ref string, meta *ledger.Instruction) (brief.Brief, error) {
+	input, err := e.plannerInput(ctx, state, name, version, ref, meta)
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	paths, err := e.normPaths(ctx, ref)
-	if err != nil {
+	if err := e.plannerMaterial(state, origin, &input, meta); err != nil {
 		return brief.Brief{}, err
-	}
-	facts, err := e.repository(ctx, ref, t.PlannerSelections())
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	definitions := []brief.Document{}
-	for _, stage := range append(slices.Clone(t.Stages), t.OptionalStages...) {
-		data, err := e.asset(ctx, ref, "stages/"+stage.ID+".md")
-		if err != nil {
-			return brief.Brief{}, err
-		}
-		definitions = append(definitions, brief.Document{Path: "stages/" + stage.ID + ".md", Content: string(data)})
-		facts.AvailableChecks = append(facts.AvailableChecks, stage.Checks...)
-	}
-	work, _ := state.Work()
-	task, err := os.ReadFile(filepath.Join(e.workRoot(), work.TaskRef))
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	outputs, err := e.outputs(state)
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	outputSchema, err := e.asset(ctx, ref, "schemas/planner-result.json")
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	docs, err := e.additionalInputs(ctx, ref, ref, t.PlannerSelections())
-	if err != nil {
-		return brief.Brief{}, err
-	}
-	input := brief.PlannerInput{RequestTemplate: string(template), InstructionID: meta.ID, Version: version, Template: t, TemplateHash: plan.ContentHash(source), Task: string(task), OriginalRequest: originalRequest(work), StageDefinitions: definitions, Repository: facts, Norms: docs, NormPaths: paths, PreviousOutputs: outputs, OutputSchema: string(outputSchema)}
-	if p, ok := latestPlan(state); ok {
-		input.CurrentPlan = &p.Plan
-		if origin == plan.BackProposal {
-			remaining, err := e.remainingPlan(state)
-			if err != nil {
-				return brief.Brief{}, err
-			}
-			input.RemainingPlan = remaining
-		}
-	}
-	if err := e.plannerHistory(state, &input); err != nil {
-		return brief.Brief{}, err
-	}
-	if meta.Context == nil {
-		main, err := e.mainInstructions("planner", "")
-		if err != nil {
-			return brief.Brief{}, err
-		}
-		meta.Context = &ledger.InstructionContext{MainInstructions: main, Findings: input.PreviousFindings, CurrentPlan: input.CurrentPlan, RemainingPlan: input.RemainingPlan, HumanInstructions: input.HumanInstructions}
-		for _, output := range input.PreviousOutputs {
-			meta.Context.Outputs = append(meta.Context.Outputs, ledger.InstructionOutput{StageID: output.StageID, Content: output.Content})
-		}
-	} else {
-		input.PreviousOutputs = instructionOutputs(meta.Context)
-		input.PreviousFindings = meta.Context.Findings
-		input.CurrentPlan, input.RemainingPlan = meta.Context.CurrentPlan, meta.Context.RemainingPlan
-		input.HumanInstructions = meta.Context.HumanInstructions
 	}
 	settings, err := e.settings(ctx, ref)
 	if err != nil {
@@ -646,15 +580,90 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 	for i := range input.PreviousOutputs {
 		items = append(items, spill{"Adopted output " + input.PreviousOutputs[i].StageID, &input.PreviousOutputs[i].Content})
 	}
-	for i := range input.StageDefinitions {
-		items = append(items, spill{"Stage definition " + input.StageDefinitions[i].Path, &input.StageDefinitions[i].Content})
-	}
 	main := meta.Context.MainInstructions
 	items = append(items, spill{"Main agent instructions", &main})
 	return e.fitBrief(meta, settings.BriefMaxBytes(), items, func() (brief.Brief, error) {
 		body, err := brief.BuildPlanner(input)
 		return mainInstructionBrief(body, main), err
 	})
+}
+
+// plannerInput reads the prioritized pattern, the catalogs, the task, and the planning inputs.
+func (e *Engine) plannerInput(ctx context.Context, state *ledger.State, name string, version int, ref string, meta *ledger.Instruction) (brief.PlannerInput, error) {
+	pattern, source, err := e.pattern(ctx, ref, name)
+	if err != nil {
+		return brief.PlannerInput{}, err
+	}
+	template, err := e.asset(ctx, ref, "templates/brief/planner.md.tmpl")
+	if err != nil {
+		return brief.PlannerInput{}, err
+	}
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return brief.PlannerInput{}, err
+	}
+	paths, err := e.normPaths(ctx, ref)
+	if err != nil {
+		return brief.PlannerInput{}, err
+	}
+	inputs := planSelections(settings.PlanningInputs())
+	facts, err := e.repository(ctx, ref, inputs)
+	if err != nil {
+		return brief.PlannerInput{}, err
+	}
+	work, _ := state.Work()
+	task, err := os.ReadFile(filepath.Join(e.workRoot(), work.TaskRef))
+	if err != nil {
+		return brief.PlannerInput{}, err
+	}
+	outputSchema, err := e.asset(ctx, ref, "schemas/planner-result.json")
+	if err != nil {
+		return brief.PlannerInput{}, err
+	}
+	docs, err := e.additionalInputs(ctx, ref, ref, inputs)
+	if err != nil {
+		return brief.PlannerInput{}, err
+	}
+	input := brief.PlannerInput{RequestTemplate: string(template), InstructionID: meta.ID, Version: version, Pattern: pattern, PatternHash: plan.ContentHash(source),
+		Task: string(task), OriginalRequest: originalRequest(work), Repository: facts, Norms: docs, NormPaths: paths, OutputSchema: string(outputSchema)}
+	return input, e.plannerCatalogs(ctx, ref, name, settings, &input)
+}
+
+// plannerMaterial adds the current and remaining plans, human instructions, findings, and adopted
+// outputs, fixed in the instruction context at first issue.
+func (e *Engine) plannerMaterial(state *ledger.State, origin plan.ProposalOrigin, input *brief.PlannerInput, meta *ledger.Instruction) error {
+	if meta.Context != nil {
+		input.PreviousOutputs = instructionOutputs(meta.Context)
+		input.PreviousFindings = meta.Context.Findings
+		input.CurrentPlan, input.RemainingPlan = meta.Context.CurrentPlan, meta.Context.RemainingPlan
+		input.HumanInstructions = meta.Context.HumanInstructions
+		return nil
+	}
+	outputs, err := e.outputs(state)
+	if err != nil {
+		return err
+	}
+	input.PreviousOutputs = outputs
+	if p, ok := latestPlan(state); ok {
+		input.CurrentPlan = &p.Plan
+		if origin == plan.BackProposal {
+			if input.RemainingPlan, err = e.remainingPlan(state); err != nil {
+				return err
+			}
+		}
+	}
+	if err := e.plannerHistory(state, input); err != nil {
+		return err
+	}
+	main, err := e.mainInstructions("planner", "")
+	if err != nil {
+		return err
+	}
+	meta.Context = &ledger.InstructionContext{MainInstructions: main, Findings: input.PreviousFindings, CurrentPlan: input.CurrentPlan, RemainingPlan: input.RemainingPlan, HumanInstructions: input.HumanInstructions}
+	for _, output := range input.PreviousOutputs {
+		meta.Context.Outputs = append(meta.Context.Outputs, ledger.InstructionOutput{StageID: output.StageID, Content: output.Content})
+	}
+	return nil
 }
 
 func (e *Engine) workInstruction(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, round *ledger.Round) (Result, error) {
@@ -712,7 +721,7 @@ func (e *Engine) workInput(ctx context.Context, state *ledger.State, p plan.Plan
 	if err != nil {
 		return brief.WorkInput{}, err
 	}
-	definition, err := e.asset(ctx, ref, "stages/"+stage.ID+".md")
+	definition, err := e.asset(ctx, ref, "stages/"+stage.DefinitionID()+".md")
 	if err != nil {
 		return brief.WorkInput{}, err
 	}
@@ -786,7 +795,7 @@ func (e *Engine) workContext(state *ledger.State, stage plan.Stage, round *ledge
 		input.CurrentMaterial = meta.Context.CurrentMaterial
 		input.CommandOutputs = nil
 		for _, command := range meta.Context.Commands {
-			input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: command.Aspect, Runner: plan.Runner(command.Runner)}, ExitCode: command.Command.ExitCode, Output: command.Command.Output})
+			input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Aspect: command.Aspect, Runner: command.Runner, ExitCode: command.Command.ExitCode, Output: command.Command.Output})
 		}
 	}
 	input.WorkHistoryPath, err = e.historyIndex(state, meta, historyScope{Kind: stage.WorkerHistory(), RunID: round.StageRunID, WorkerStage: stage.ID}, adopted)
@@ -831,7 +840,7 @@ func workSpills(input *brief.WorkInput) []spill {
 		items = append(items, spill{"Structure record " + input.Repository.LayoutGuides[i].Path, &input.Repository.LayoutGuides[i].Content})
 	}
 	for i := range input.CommandOutputs {
-		items = append(items, spill{"Command output " + input.CommandOutputs[i].Check.Aspect, &input.CommandOutputs[i].Output})
+		items = append(items, spill{"Command output " + input.CommandOutputs[i].Aspect, &input.CommandOutputs[i].Output})
 	}
 	for i := range input.SupportingSchemas {
 		items = append(items, spill{"Schema " + input.SupportingSchemas[i].Path, &input.SupportingSchemas[i].Content})
@@ -935,7 +944,7 @@ func (e *Engine) issueQuestion(state *ledger.State, q form.Question) (Result, er
 
 func (e *Engine) recordInstruction(meta ledger.Instruction, data instructionData) error {
 	meta.Reference, meta.Runner, meta.TargetPath = data.Reference, data.Instruction.Runner, data.Instruction.TargetPath
-	meta.TemplateName, meta.Origin = data.TemplateName, data.Origin
+	meta.PatternName, meta.Origin = data.PatternName, data.Origin
 	meta.Inputs = slices.Clone(data.Inputs)
 	meta.Request, meta.Detection = data.Request, data.Detection
 	if data.Request != nil {
@@ -1010,7 +1019,7 @@ func (e *Engine) workCommandOutputs(state *ledger.State, stageRunID string, inpu
 			if value.Command != nil {
 				for _, previous := range state.Rounds(stageRunID) {
 					if previous.ID == value.RoundID {
-						input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: value.Aspect, Runner: plan.Runner(value.Runner)}, ExitCode: value.Command.ExitCode, Output: value.Command.Output})
+						input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Aspect: value.Aspect, Runner: value.Runner, ExitCode: value.Command.ExitCode, Output: value.Command.Output})
 						commands = append(commands, value.Judgment)
 					}
 				}

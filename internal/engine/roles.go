@@ -111,7 +111,7 @@ func (e *Engine) correctionDecision(state *ledger.State, stage plan.Stage, round
 				facts.Checks = append(facts.Checks, judgment.Aspect)
 			}
 			for _, item := range stage.RequiredChecks() {
-				if item.Aspect == judgment.Aspect && string(item.Runner) == judgment.Runner && judgment.Judgment == check.Fail {
+				if item.Aspect == judgment.Aspect && judgment.Judgment == check.Fail {
 					failed = true
 				}
 			}
@@ -143,51 +143,17 @@ func roleContinuationOptions(q *form.Question, stage plan.Stage) {
 	}
 }
 
-func roleDifferences(template plan.PlanTemplate, p plan.Plan, deviations []plan.Deviation) string {
-	var text strings.Builder
-	originals := append(slices.Clone(template.Stages), template.OptionalStages...)
-	for _, deviation := range deviations {
-		if deviation.Kind != plan.ChangedAssignee && deviation.Kind != plan.ChangedFixRules && deviation.Kind != plan.ChangedUnitRole {
-			continue
-		}
-		after, _ := p.Stage(deviation.StageID)
-		var before plan.Stage
-		for _, stage := range originals {
-			if stage.ID == deviation.StageID {
-				before = stage
-			}
-		}
-		var oldValue, newValue any
-		switch deviation.Kind {
-		case plan.ChangedAssignee:
-			oldValue, newValue = before.Assignee, after.Assignee
-		case plan.ChangedFixRules:
-			oldValue, newValue = before.Transitions.FixRules, after.Transitions.FixRules
-		case plan.ChangedUnitRole:
-			oldValue, newValue = before.Units, after.Units
-		}
-		fmt.Fprintf(&text, "\n%s in %s:\n- Template: %s\n- Plan: %s\n", deviation.Kind, deviation.StageID, approvalJSON(oldValue, 1), approvalJSON(newValue, 1))
-	}
-	return text.String()
-}
-
+// validateCheckRoles requires every check to be configured in the catalog and forbids the
+// assignee from judging its own work.
 func validateCheckRoles(stage plan.Stage, settings config.Config) error {
-	roles := settings.RoleSettings()
-	for _, item := range stage.Checks {
-		if item.Runner.IsCommand() {
-			continue
-		}
-		if _, command := settings.Judges[string(item.Runner)]; command {
-			continue
-		}
-		role, exists := roles[string(item.Runner)]
-		if !exists || role.Kind != "judge" {
-			return fmt.Errorf("%s: check runner %q must name a judge role or registered judgment command", stage.ID, item.Runner)
-		}
+	items, err := resolveChecks(settings, stage.Checks)
+	if err != nil {
+		return fmt.Errorf("%s: %w", stage.ID, err)
+	}
+	for _, item := range items {
 		if string(stage.Assignee) == string(item.Runner) {
 			return fmt.Errorf("%s: assignee cannot judge its own work", stage.ID)
 		}
 	}
-
 	return nil
 }

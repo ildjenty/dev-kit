@@ -17,7 +17,7 @@ func TestInstructionFactsSurviveDeletedBriefs(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	started, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	started, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,6 +69,7 @@ func TestInstructionFactsSurviveDeletedBriefs(t *testing.T) {
 	removeBriefs()
 	collect(t, e, review.Instruction, pass(*data.Request))
 	work, err := e.Next(ctx)
+	work = approvedNext(t, e, work)
 	if err != nil || work.Instruction == nil || work.Instruction.Kind != form.InstructionWork {
 		t.Fatalf("plan result depended on a generated file: %+v, %v", work, err)
 	}

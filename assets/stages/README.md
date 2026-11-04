@@ -1,6 +1,6 @@
 Stage definitions describe the inputs, decisions, artifacts, and completion conditions for the stages selected by the plan.
 
-A stage definition is Markdown named `<stage_id>.md`, with an initial `# <name>` and the following headings in order: `## Inputs`, `## Decisions`, `## Deferred to later stages`, `## Irreversible items`, `## Artifacts`, and `## Completion conditions`. The filename is the ID. These headings are authoring conventions; devkit supplies the entire stage document body without interpreting its sections. References such as `principles/…`, `stages/…`, `examples/…`, `plans/…`, `templates/…`, `rules.md`, `requirements.md`, and `structure.json` are logical names resolved through `[sources.<name>]` in `devkit.toml`. Briefs map these names to actual paths. `schemas/…` identifies binary-owned output schemas supplied in the brief. The plan template and plan determine adopted stages, order, checks, runners, gates, limits, and transitions.
+A stage definition is Markdown named `<stage_id>.md`, with an initial `# <name>` and the following headings in order: `## Inputs`, `## Decisions`, `## Deferred to later stages`, `## Irreversible items`, `## Artifacts`, and `## Completion conditions`. The filename is the ID. These headings are authoring conventions; devkit supplies the entire stage document body without interpreting its sections. References such as `principles/…`, `stages/…`, `examples/…`, `plans/…`, `templates/…`, `rules.md`, `requirements.md`, and `structure.json` are logical names resolved through `[sources.<name>]` in `devkit.toml`. Briefs map these names to actual paths. `schemas/…` identifies binary-owned output schemas supplied in the brief. Patterns suggest stage arrangements. The task plan selects instance IDs and definition IDs, order, check names, gates, limits, and transitions, subject to the configured loop rules. Check runners and criteria come from devkit.toml.
 
 - `stages/purpose.md`: 0 Purpose.
 - `stages/scope.md`: 1 Scope.
@@ -8,6 +8,7 @@ A stage definition is Markdown named `<stage_id>.md`, with an initial `# <name>`
 - `stages/contract.md`: 3 Contract.
 - `stages/steps.md`: 4 Steps.
 - `stages/implement.md`: 5 Implementation.
+- `stages/edit.md`: Document editing.
 - `stages/verification.md`: Verification.
 - `stages/research.md`: Research.
 - `stages/prototype.md`: Prototype.
@@ -47,3 +48,5 @@ For a stage with `split: true` and planned `units`, launch the returned assigned
 Pause issues no new units and preserves results from running workers. Abort and completion remove unchanged unit worktrees and report retained changed worktrees for the human to manage with git. Do not discard them automatically.
 
 Stage assignees and judge runners are role IDs defined in `devkit.toml`. Agent-backed work roles, including the default `worker` (agent `devkit-worker`), run as one unit in a devkit-created worktree and return the progress block as the subagent's final message; the session agent launches them and waits. A work role with an empty `agent` means the session itself works in the checkout. Split-stage unit roles default to `worker`. Fix rules can reassign the next round within the same StageRun; cumulative differences and limits remain shared. Read-only source and rejected loop-edit undo rounds preserve the prior assignee. See `plans/README.md` for the rule shape and role constraints.
+
+Stage instance IDs are unique within a plan. `definition` selects this catalog; when omitted, the instance ID is also the definition ID. The same definition may be used repeatedly. Transitions, start_stage, return destinations, unit IDs, and fix rules refer to instances. Output selections may name an instance or select every instance of a definition. History and counts remain per instance; retrospective also groups counts by definition.

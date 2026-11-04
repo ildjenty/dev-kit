@@ -305,21 +305,13 @@ func (e *Engine) reviseUnassessedPlan(ctx context.Context) (Result, error) {
 	if !ok {
 		return Result{}, errors.New("plan is missing")
 	}
-	head, err := e.workspace.Head(ctx)
-	if err != nil {
-		return Result{}, err
-	}
-	t, source, err := e.template(ctx, head, p.Template.Name)
-	if err != nil {
-		return Result{}, err
-	}
 	state, err := e.load()
 	if err != nil {
 		return Result{}, err
 	}
 	for _, proposal := range state.PlanEvaluations(nil) {
 		if proposal.Plan.Version == n {
-			return e.planner(ctx, t, source, n+1, proposal.Origin)
+			return e.planner(ctx, p.Pattern.Name, n+1, proposal.Origin, "")
 		}
 	}
 	return Result{}, errors.New("plan proposal origin is missing")

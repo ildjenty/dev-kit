@@ -166,14 +166,15 @@ func TestRoutes(t *testing.T) {
 
 func TestCompletion(t *testing.T) {
 	stage := plan.Stage{Checks: []plan.Check{
-		{Aspect: "purpose", Runner: "review", Required: true, CompletionConditionIDs: []string{"C1"}},
-		{Aspect: "command:test", Runner: "command:test", Required: true},
+		{Aspect: "purpose", Required: true, CompletionConditionIDs: []string{"C1"}},
+		{Aspect: "command:test", Required: true},
 	}}
 	target := form.TargetVersion{Kind: form.TargetTree, Tree: "tree"}
 	norms := []form.NormReference{{Path: "AGENTS.md", BlobID: "blob"}}
 	identity := check.DetectionIdentity{RunnerHash: "runner", TemplateHash: "template", CriteriaHash: "criteria", ExamplesHash: "examples"}
 	input := CompletionInput{
 		Rule: stage.CompletionRule(), TargetVersion: target, Norms: norms,
+		Runners:        map[string]plan.Runner{"purpose": "review", "command:test": "command:test"},
 		Detection:      []check.DetectionRequirement{{Aspect: "purpose", Runner: "review", Identity: identity}},
 		DetectionTests: []check.DetectionTest{{Aspect: "purpose", Runner: "review", Identity: identity, Passed: true}},
 		Judgments: []check.Judgment{

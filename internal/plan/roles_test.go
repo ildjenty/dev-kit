@@ -3,14 +3,13 @@ package plan
 import (
 	"encoding/json"
 	"reflect"
-	"slices"
 	"testing"
 )
 
 func TestFixRulesSchemaAndSelection(t *testing.T) {
 	v := validator(t)
 	template, hash := loadTemplate(t, v, "docs")
-	original := NewPlan(template, hash, "Review documentation", []CompletionCondition{{ID: "C1", Description: "Correct documentation"}})
+	original := newTestPlan(template, hash, "Review documentation", []CompletionCondition{{ID: "C1", Description: "Correct documentation"}})
 	bindChecks(&original)
 	rejected := true
 	p := clonePlan(original)
@@ -44,14 +43,7 @@ func TestFixRulesSchemaAndSelection(t *testing.T) {
 			t.Fatalf("fix selection = %s %d; want %s %d", role, rule, tc.role, tc.rule)
 		}
 	}
-	p.Stages[0].Assignee = "editor"
-	p.Stages[0].Units = []Unit{{ID: "unit", Role: "senior"}}
-	deviations := Deviations(template, p)
-	for _, kind := range []DeviationKind{ChangedAssignee, ChangedFixRules, ChangedUnitRole} {
-		if !slices.ContainsFunc(deviations, func(d Deviation) bool { return d.Kind == kind }) {
-			t.Fatalf("missing role deviation: %s", kind)
-		}
-	}
+
 }
 
 func TestFixRuleSchemaRejectsOtherConditionsAndTargets(t *testing.T) {

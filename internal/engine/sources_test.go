@@ -25,7 +25,7 @@ func briefText(t *testing.T, instruction *form.Instruction) string {
 
 func configure(t *testing.T, e *Engine, settings string) {
 	t.Helper()
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[roles.agent]\nkind = 'work'\nagent = 'devkit-worker'\n[approval]\nplan = 'deviation'\n"+settings)
+	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[roles.worker]\nkind = 'work'\nagent = ''\n[roles.agent]\nkind = 'work'\nagent = 'devkit-worker'\n[approval]\nplan = 'deviation'\n"+settings))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure sources")
 }
@@ -42,10 +42,15 @@ func submitWork(t *testing.T, e *Engine, work Result) {
 
 func TestJudgmentRequestSuppliesSelectedCriteria(t *testing.T) {
 	e, ctx := fixture(t)
+	configureCatalogEntry(t, e, "wording", "")
+	data, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, e.Root(), "devkit.toml", strings.Replace(string(data), "select = 'review/wording.md' }]", "select = 'review/wording.md' }, { source = 'principles', select = 'designing.md' }]", 1))
+	git(t, e.Root(), "commit", "-qam", "Select more criteria")
 	configureStage(t, e, func(stage *plan.Stage) {
-		item := judgeCheck("wording", false)
-		item.Criteria = append(item.Criteria, plan.Selection{Source: "principles", Select: "designing.md"})
-		stage.Checks = []plan.Check{item}
+		stage.Checks = []plan.Check{judgeCheck("wording", false)}
 	})
 	submitWork(t, e, working(t, e, ctx))
 	judgment, err := e.Next(ctx)
@@ -69,41 +74,44 @@ func TestJudgmentRequestSuppliesSelectedCriteria(t *testing.T) {
 	if strings.Contains(text, string(unselected)) {
 		t.Fatal("judgment request included an unselected criteria document")
 	}
-	data, err := e.readInstruction(judgment.Instruction.ID)
+	issued, err := e.readInstruction(judgment.Instruction.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(data.Request.Criteria) != 2 || data.Request.Criteria[0].ID != "review/wording.md" || data.Request.Criteria[0].ContentHash == "" {
-		t.Fatalf("request did not record the criteria identities: %+v", data.Request.Criteria)
+	if len(issued.Request.Criteria) != 2 || issued.Request.Criteria[0].ID != "review/wording.md" || issued.Request.Criteria[0].ContentHash == "" {
+		t.Fatalf("request did not record the criteria identities: %+v", issued.Request.Criteria)
 	}
 }
 
-func TestEmptyCriteriaSelectionStopsBeforeJudging(t *testing.T) {
+func TestEmptyCriteriaSelectionRejectsThePlan(t *testing.T) {
 	e, ctx := fixture(t)
-	configureStage(t, e, func(stage *plan.Stage) {
-		item := judgeCheck("wording", false)
-		item.Criteria = append(item.Criteria, plan.Selection{Source: "principles", Select: "review/missing-*.md"})
-		stage.Checks = []plan.Check{item}
-	})
-	submitWork(t, e, working(t, e, ctx))
-	result, err := e.Next(ctx)
-	if err == nil || !strings.Contains(err.Error(), "review/missing-*.md") || !strings.Contains(err.Error(), "matched no documents") {
-		t.Fatalf("an empty criteria selection did not stop the judgment: %+v, %v", result, err)
-	}
-	state, err := e.load()
+	configureCatalogEntry(t, e, "wording", "")
+	data, err := os.ReadFile(filepath.Join(e.Root(), "devkit.toml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, instruction := range state.UnacceptedInstructions() {
-		if instruction.Kind == form.InstructionJudgment {
-			t.Fatalf("a judgment was requested without criteria: %+v", instruction)
-		}
+	write(t, e.Root(), "devkit.toml", strings.Replace(string(data), "select = 'review/wording.md' }]", "select = 'review/wording.md' }, { source = 'principles', select = 'review/missing-*.md' }]", 1))
+	git(t, e.Root(), "commit", "-qam", "Select missing criteria")
+	configureStage(t, e, func(stage *plan.Stage) {
+		stage.Checks = []plan.Check{judgeCheck("wording", false)}
+	})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	planResult(t, e, start)
+	reissued, err := e.Next(ctx)
+	if err != nil || reissued.Instruction == nil || reissued.Instruction.Kind != form.InstructionPlan || reissued.Instruction.ID == start.Instruction.ID {
+		t.Fatalf("a plan with an empty criteria selection was not rejected: %+v, %v", reissued, err)
+	}
+	if body := briefText(t, reissued.Instruction); !strings.Contains(body, "review/missing-*.md") {
+		t.Fatalf("the rejection omitted the unresolved selection: %s", body)
 	}
 }
 
 func TestDetectionRequestWithholdsExpectations(t *testing.T) {
 	e, ctx := fixture(t)
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +166,7 @@ func TestDetectionRequestWithholdsExpectations(t *testing.T) {
 
 func TestDetectionIdentityFollowsCriteriaAndTemplate(t *testing.T) {
 	e, ctx := fixture(t)
-	item := judgeCheck("plan", true)
+	item := catalogJudge("plan", true)
 	identity := func() check.DetectionIdentity {
 		t.Helper()
 		head := git(t, e.Root(), "rev-parse", "HEAD")
@@ -204,7 +212,7 @@ func TestDetectionIdentityFollowsCriteriaAndTemplate(t *testing.T) {
 func TestUnselectedNormDocumentChangeRequiresLoopConfirmation(t *testing.T) {
 	e, ctx := fixture(t)
 	configure(t, e, "[detection]\nrequired = false\n")
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -225,7 +233,7 @@ func outsideSourceWork(t *testing.T) (*Engine, string, string, Result) {
 	write(t, products, "requirements.md", "Initial outside requirements.\n")
 	write(t, guides, "style.md", "Initial outside guide.\n")
 	configure(t, e, fmt.Sprintf("[detection]\nrequired = false\n[sources.requirements]\npath = %q\n[sources.guides]\npath = %q\nnorm = true\n", products, guides))
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,30 +244,30 @@ func outsideSourceWork(t *testing.T) (*Engine, string, string, Result) {
 	return e, products, guides, checkedNext(t, e)
 }
 
-func TestPlanApprovalShowsChangedCriteriaSelections(t *testing.T) {
+func TestPlanApprovalShowsStructuralDifferenceFromThePattern(t *testing.T) {
 	e, ctx := fixture(t)
 	configureStage(t, e, func(stage *plan.Stage) {
 		stage.Checks = []plan.Check{judgeCheck("wording", false)}
 	})
 	configure(t, e, "[detection]\nrequired = false\n")
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	template, source, err := e.template(ctx, "HEAD", "test")
+	template, source, err := e.pattern(ctx, "HEAD", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := plan.NewPlan(template, plan.ContentHash(source), "Update documentation", []plan.CompletionCondition{{ID: "C1", Description: "The documentation is updated"}})
-	p.Stages[0].Checks[0].CompletionConditionIDs = []string{"C1"}
-	p.Stages[0].Checks[0].Target = "Documentation"
-	p.Stages[0].Checks[0].Criteria = []plan.Selection{{Source: "principles", Select: "review/consistency.md"}}
+	p := newPlan(template, plan.ContentHash(source), "Update documentation", []plan.CompletionCondition{{ID: "C1", Description: "The documentation is updated"}})
+	p.Stages[0].Checks = []plan.Check{{Aspect: "diff", Required: true, CompletionConditionIDs: []string{"C1"}, Target: "Documentation"}}
+	p.Stages[0].Instructions = []string{"Keep the heading."}
 	collect(t, e, start.Instruction, form.PlannerResult{InstructionID: start.Instruction.ID, Plan: marshal(t, p)})
-	question := checkedNext(t, e)
+	question := checkedResult(t, e)
 	if question.Instruction.Question == nil || question.Instruction.Question.ApprovalTarget.Kind != form.ApprovalPlan {
-		t.Fatalf("a changed criteria selection did not require plan approval: %+v", question)
+		t.Fatalf("the first plan did not require approval: %+v", question)
 	}
-	for _, want := range []string{"changed_criteria", "review/wording.md", "review/consistency.md"} {
+	for _, want := range []string{"Plan chain from implement", "definition implement, assignee worker", "required check diff (judge)", "Keep the heading.",
+		"Structural difference from the cited pattern test", `"Field": "checks"`, `"wording"`, `"diff"`} {
 		if !strings.Contains(question.Instruction.Question.Text, want) {
 			t.Fatalf("plan approval omitted %q: %s", want, question.Instruction.Question.Text)
 		}
@@ -287,7 +295,7 @@ func TestOutsideNormChangeBeforeRoundRequiresLoopConfirmation(t *testing.T) {
 func TestReadOnlySourceEditIsReturnedAsLesson(t *testing.T) {
 	e, ctx := fixture(t)
 	configure(t, e, "[detection]\nrequired = false\n[sources.rules]\nwritable = false\n")
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}

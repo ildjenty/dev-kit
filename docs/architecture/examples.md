@@ -1,44 +1,16 @@
 # 最小の例
 
-雛形・計画・設定は [PlanTemplate と Plan](data.md#ループの雛形-plantemplate)、[config](modules.md#config)、[検出試験](guarantees.md#検出試験)に従う。利用側の資産は `[sources.<名前>]` の既定の場所で示し、設定で変更できる。
+パターンは計画を組む参考であり、計画者が課題ごとに並び・担当・check・ゲート・上限・指示を決める。機械で守らせる決まりは `devkit.toml` に置く。利用側の資産は既定 `.devkit/plans/`・`.devkit/stages/`・`.devkit/principles/`・`.devkit/checks/`・`.devkit/templates/`・`.devkit/rules.md`・`.devkit/requirements.md`・`.devkit/structure.json` に置き、配置は設定で変更できる。
 
-## 雛形と計画
+<a id="雛形と計画"></a>
 
-判定者の check は `criteria` に規範のソース名と選び方を並べ、`examples` に検出試験の例と仕様の選び方を書く。`aspect` は判定の名前である。原則の用途別文書が必要とする原則も、選び方に明示する。選び方を雛形と変える計画は逸脱として承認の問いに差分を示す。
+## パターンと計画
 
-既定の雛形は次の構成である。
+既定の参考の並びは default が purpose・scope・structure・contract・steps・implement・verification・retrospective、fix が implement・verification・retrospective、docs が edit・retrospective である。default の purpose の `done` は `"replan"` であり、要件と完了条件を合意してから残りを組む。計画の開始から `done` で到達できないステージは含めない。
 
-- `default`: purpose → scope → structure → contract → steps → implement → verification → retrospective。候補は research・prototype・handoff であり、scope にゲートを置く。implement の必須 check は `command:test`・`test`・`diff` である。
-- `fix`: implement → verification → retrospective。候補は research・prototype・handoff であり、implement の必須 check は `command:test`・`test`・`diff` である。
-- `docs`: implement → retrospective。候補は handoff である。implement の必須 check は `wording` である。
+`start --plan fix` は fix を優先する指定である。省略時は `default_plan`(既定 default)を優先し、計画者はほかのパターンも参考にできる。計画の `pattern` に名前と内容ハッシュを記録し、指示の参照コミットで存在とハッシュを確かめる。
 
-`default` は、要件定義を先に行い、合意した完了条件で残りの計画を作る形にする。`.devkit/plans/default.json` の `purpose` に置く遷移表は次のとおりである。
-
-```json
-{
-  "fix": "purpose",
-  "ask": "purpose",
-  "back": "purpose",
-  "done": "replan"
-}
-```
-
-最初の計画は `purpose` から始め、`completion_conditions` には要件と完了条件の合意に関する条件を文章で書く。
-
-```json
-[
-  { "id": "R1", "description": "人に確かめた要件が requirements に記録されている" },
-  { "id": "R2", "description": "残りの作業の完了条件の案が人と合意できている" }
-]
-```
-
-最初の計画を人が承認してから、`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md` に書き、完了条件の案を作る。置き場所は `[sources.requirements]` で変更できる。`purpose` の完了後、`done: "replan"` により既存の再計画の経路へ進み、計画者が合意した完了条件で残りの計画を作り直す。作り直した計画は計画の check を通し、完了条件が変わるため既定では人が承認してから残りのステージを始める。
-
-遷移 `done` は、次のステージ ID、作業の終了を表す `null`、ステージの完了後に残りを再計画する `"replan"` を取る。要件定義を先に行って再計画するかは雛形の組み方で決まり、kit は要件定義を特別扱いしない。`fix` と `docs` は `purpose` の後に再計画する形を使わない。
-
-retrospective は作業者が担当する。必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。判定者の check の runner は既定の役割 `judge` であり、その agent は `init` が配るサブエージェント `devkit-judge` である。`--plan` の省略時は `default_plan` の値(既定 `"default"`)を使う。不要なステージを外す場合は、逸脱として承認の問いに示す。
-
-`init` が用意する `.devkit/plans/fix.json` の例である。`assignee` と `runner` には[役割](data.md#役割-role)の ID を書く。`assignee` の `worker` は `devkit-worker` を agent に持つ `work` の役割であり、devkit が作る worktree で作業する。`runner` の `judge` は `judge` の種類の役割であり、`command:test` は役割ではなく検証コマンドである。遷移の `fix`・`ask`・`back`・`done` は、修正・人への確認・前のステージへの戻り・完了を表し、`done` の `null` は最後のステージを示す。
+`.devkit/plans/fix.json` に配るパターンである。check は名前と必須かだけを持ち、runner・基準・例・経緯は `[checks.<観点>]` で定める。
 
 ```json
 {
@@ -51,74 +23,15 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
       "checks": [
         {
           "aspect": "command:test",
-          "runner": "command:test",
           "required": true
         },
         {
           "aspect": "test",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/test.md"
-            },
-            {
-              "source": "principles",
-              "select": "testing.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "test/spec.json"
-          }
+          "required": true
         },
         {
           "aspect": "diff",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/diff.md"
-            },
-            {
-              "source": "principles",
-              "select": "engineering.md"
-            },
-            {
-              "source": "principles",
-              "select": "working.md"
-            },
-            {
-              "source": "principles",
-              "select": "designing.md"
-            },
-            {
-              "source": "principles",
-              "select": "writing.md"
-            },
-            {
-              "source": "principles",
-              "select": "verification.md"
-            },
-            {
-              "source": "principles",
-              "select": "security.md"
-            },
-            {
-              "source": "templates",
-              "select": "pr.md.tmpl"
-            },
-            {
-              "source": "rules",
-              "select": ""
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "diff/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -164,39 +77,11 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
       "checks": [
         {
           "aspect": "command:e2e",
-          "runner": "command:e2e",
           "required": true
         },
         {
           "aspect": "behavior",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/behavior.md"
-            },
-            {
-              "source": "principles",
-              "select": "verification.md"
-            },
-            {
-              "source": "principles",
-              "select": "testing.md"
-            },
-            {
-              "source": "principles",
-              "select": "ui.md"
-            },
-            {
-              "source": "rules",
-              "select": ""
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "behavior/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -242,75 +127,15 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
       "checks": [
         {
           "aspect": "command:test",
-          "runner": "command:test",
           "required": true
         },
         {
           "aspect": "test",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/test.md"
-            },
-            {
-              "source": "principles",
-              "select": "testing.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "test/spec.json"
-          }
+          "required": true
         },
         {
           "aspect": "harness",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/harness.md"
-            },
-            {
-              "source": "principles",
-              "select": "harness.md"
-            },
-            {
-              "source": "principles",
-              "select": "working.md"
-            },
-            {
-              "source": "principles",
-              "select": "review/README.md"
-            },
-            {
-              "source": "stages",
-              "select": "README.md"
-            },
-            {
-              "source": "stages",
-              "select": "retrospective.md"
-            },
-            {
-              "source": "plans",
-              "select": "README.md"
-            },
-            {
-              "source": "examples",
-              "select": "README.md"
-            },
-            {
-              "source": "templates",
-              "select": "brief/judgment.md.tmpl"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "harness/spec.json"
-          },
-          "history": "all"
+          "required": true
         }
       ],
       "gate": {
@@ -400,26 +225,7 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
       "checks": [
         {
           "aspect": "contract",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/contract.md"
-            },
-            {
-              "source": "principles",
-              "select": "data.md"
-            },
-            {
-              "source": "principles",
-              "select": "engineering.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "contract/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -465,26 +271,7 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
       "checks": [
         {
           "aspect": "wording",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/wording.md"
-            },
-            {
-              "source": "principles",
-              "select": "writing.md"
-            },
-            {
-              "source": "templates",
-              "select": "pr.md.tmpl"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "wording/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -524,85 +311,230 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
         "select": "reports/handoff.json"
       }
     }
-  ],
-  "planner_inputs": [
-    {
-      "source": "requirements",
-      "select": ""
-    },
-    {
-      "source": "rules",
-      "select": ""
-    },
-    {
-      "source": "structure",
-      "select": ""
-    }
-  ],
-  "judge_inputs": [
-    {
-      "source": "requirements",
-      "select": ""
-    },
-    {
-      "source": "rules",
-      "select": ""
-    },
-    {
-      "source": "structure",
-      "select": ""
-    }
   ]
 }
 ```
 
-課題「保存ボタンの文言の修正」から作る計画の例である。候補の research・prototype・handoff は使わず、implement・verification・retrospective を採用する。`template.content_hash` は、雛形の JSON に末尾の改行を含めた SHA-256 である。完了条件ごとの確認手段は[計画](data.md#計画-plan)に従う。
+保存ボタンの文言を変える計画である。`pattern.content_hash` は配布する `assets/plans/fix.json` の末尾の改行を含む SHA-256 と一致する。実体 ID と `definition` を分け、遷移は実体 ID を使う。完了条件・対象・指示は課題ごとに書く。入力と報告の形は配布パターンと同じ選び方である。
 
 ```json
 {
   "version": 1,
-  "template": { "name": "fix", "content_hash": "a1be1c0c9df69aa7ec9488bf8782ab48688d0cf7683178caabeecc70e34bc656" },
+  "pattern": {
+    "name": "fix",
+    "content_hash": "a50b9109c1181f0d92d494c0db9de0d49021d2569e5ab38be2f51efbdabdda2c"
+  },
   "task": "保存ボタンの文言を「登録」から「保存」に変える",
   "completion_conditions": [
-    { "id": "C1", "description": "保存ボタンに「保存」と表示され、その表示を確かめるテストが登録済みのコマンドから実行されて通る" }
+    {
+      "id": "C1",
+      "description": "保存ボタンに「保存」と表示され、表示のテストと利用場面の通しの確認が登録済みコマンドで成功する"
+    }
   ],
-  "start_stage": "implement",
+  "start_stage": "implement-1",
   "stages": [
     {
-      "id": "implement",
-      "instructions": ["保存ボタンの表示を利用者の入口で確かめる"],
+      "id": "implement-1",
       "assignee": "worker",
       "checks": [
-        { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "返却後のツリー" },
-        { "aspect": "test", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"}, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示と、その表示を確かめるテスト" },
-        { "aspect": "diff", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}, {"source": "principles", "select": "security.md"}, {"source": "templates", "select": "pr.md.tmpl"}, {"source": "rules", "select": ""}], "examples": {"source": "examples", "select": "diff/spec.json"}, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示と、その表示を確かめるテスト" }
+        {
+          "aspect": "command:test",
+          "required": true,
+          "completion_condition_ids": [
+            "C1"
+          ],
+          "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+        },
+        {
+          "aspect": "test",
+          "required": true,
+          "completion_condition_ids": [
+            "C1"
+          ],
+          "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+        },
+        {
+          "aspect": "diff",
+          "required": true,
+          "completion_condition_ids": [
+            "C1"
+          ],
+          "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+        }
       ],
-      "gate": { "required": false, "reason": "公開契約を保つ修正" },
-      "limits": { "max_rounds": 3, "max_no_progress": 2 },
-      "transitions": { "fix": "implement", "ask": "implement", "back": "implement", "done": "verification" }
+      "gate": {
+        "required": false,
+        "reason": "Changes to existing code that do not affect hard-to-change decisions"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "implement-1",
+        "ask": "implement-1",
+        "back": "implement-1",
+        "done": "verification-1"
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
+        }
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/implement.json"
+      },
+      "definition": "implement",
+      "instructions": [
+        "完了条件 C1 を、この定義の成果と確認方法に照らして満たす"
+      ]
     },
     {
-      "id": "verification",
+      "id": "verification-1",
       "assignee": "worker",
       "checks": [
-        { "aspect": "command:e2e", "runner": "command:e2e", "required": true, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示を含む利用場面の通しの確認" },
-        { "aspect": "behavior", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/behavior.md"}], "examples": {"source": "examples", "select": "behavior/spec.json"}, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示を含む利用場面の通しの確認" }
+        {
+          "aspect": "command:e2e",
+          "required": true,
+          "completion_condition_ids": [
+            "C1"
+          ],
+          "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+        },
+        {
+          "aspect": "behavior",
+          "required": true,
+          "completion_condition_ids": [
+            "C1"
+          ],
+          "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+        }
       ],
-      "gate": { "required": false, "reason": "完了条件の利用場面を通しで確かめる" },
-      "limits": { "max_rounds": 3, "max_no_progress": 2 },
-      "transitions": { "fix": "verification", "ask": "verification", "back": "implement", "done": "retrospective" }
+      "gate": {
+        "required": false,
+        "reason": "Review the results of work required for the task"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "verification-1",
+        "ask": "verification-1",
+        "back": "implement-1",
+        "done": "retrospective-1"
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
+        }
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/verification.json"
+      },
+      "definition": "verification",
+      "instructions": [
+        "完了条件 C1 を、この定義の成果と確認方法に照らして満たす"
+      ]
     },
     {
-      "id": "retrospective",
+      "id": "retrospective-1",
       "assignee": "worker",
       "checks": [
-        { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "返却後のツリー" },
-        { "aspect": "test", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"}, "completion_condition_ids": ["C1"], "target": "最終のツリーのテストと登録済みコマンド" },
-        { "aspect": "harness", "runner": "judge", "history": "all", "required": true, "criteria": [{"source": "principles", "select": "review/harness.md"}, {"source": "principles", "select": "harness.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "review/README.md"}, {"source": "stages", "select": "README.md"}, {"source": "stages", "select": "retrospective.md"}, {"source": "plans", "select": "README.md"}, {"source": "examples", "select": "README.md"}, {"source": "templates", "select": "brief/judgment.md.tmpl"}], "examples": {"source": "examples", "select": "harness/spec.json"}, "completion_condition_ids": ["C1"], "target": "その作業の判定と指摘、要件への反映、規範の不足と再発防止" }
+        {
+          "aspect": "command:test",
+          "required": true,
+          "completion_condition_ids": [
+            "C1"
+          ],
+          "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+        },
+        {
+          "aspect": "test",
+          "required": true,
+          "completion_condition_ids": [
+            "C1"
+          ],
+          "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+        },
+        {
+          "aspect": "harness",
+          "required": true,
+          "completion_condition_ids": [
+            "C1"
+          ],
+          "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+        }
       ],
-      "gate": { "required": false, "reason": "作業の問題と再発防止を確認する" },
-      "limits": { "max_rounds": 3, "max_no_progress": 2 },
-      "transitions": { "fix": "retrospective", "ask": "retrospective", "back": "implement", "done": null }
+      "gate": {
+        "required": false,
+        "reason": "Review lessons and preserve requirements and prevention measures"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "retrospective-1",
+        "ask": "retrospective-1",
+        "back": "implement-1",
+        "done": null
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
+        }
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/retrospective.json"
+      },
+      "history": "all",
+      "definition": "retrospective",
+      "instructions": [
+        "完了条件 C1 を、この定義の成果と確認方法に照らして満たす"
+      ]
     }
   ],
   "external_operations": [],
@@ -610,11 +542,11 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
 }
 ```
 
-`open_questions` は任意の文字列配列であり、計画者が決められなかった要求を入れる。人が承認した完了条件が作業の完了基準となる。既定の `[approval] plan = "requirements"` では最初の計画を確認する。同じ完了条件で逸脱も外部操作も未決事項もない再計画には再確認を求めない。未決事項への回答は、計画の却下と作り直しの指示として計画者に渡す。
+`definition` を省くと `id` と同じ定義を使う。同じ定義を何度も使う増分は、`implement-2`・`verification-2` のように新しい ID で組む。走った実体 ID の再利用は同じ仕事の再実行だけを意味する。戻り後の計画には戻り先 ID を含める。
 
-`open_questions` が空でなければ、承認方針によらず人の承認を必須とする。
+最初の計画、完了条件の変更、外部操作、未決事項を既定では人が確認する。パターンとの違いは承認理由にはせず、前に承認した計画の残り、最初なら参考パターンとの構造の差分として表示する。未決事項への回答は再提案の指示として計画者へ渡す。
 
-implement の終了ブロックの例である。`instruction_id` は作業の指示で受け取った ID とする。提出は[作業結果の提出](flow.md#作業結果の提出)、受理は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
+implement の終了ブロックである。`instruction_id` は受け取った作業指示 ID に置き換える。`report` の形への適合は証拠や完了の根拠にはしない。
 
 ```json
 {
@@ -640,11 +572,9 @@ implement の終了ブロックの例である。`instruction_id` は作業の�
 }
 ```
 
-retrospective は、その作業の判定と指摘、人の回答や教訓を確認して再発防止を反映し、purpose で反映していない要件を `.devkit/requirements.md` に残す。要件と構造の変更はステージの判定で確認し、規範を変更した場合はループ自身の変更として人に確認する。
-
 ### 修正の担当の規則
 
-修正が続いたときに担当を変える雛形の例である。リポジトリは `devkit.toml` に `work` の種類の役割 `senior_worker` を足し、その agent の定義を `.claude/agents/devkit-senior-worker.md`・`.codex/agents/devkit-senior-worker.toml` に置く。
+追加する役割を設定し、両ホストの agent 定義を用意する。
 
 ```toml
 [roles.senior_worker]
@@ -652,176 +582,202 @@ kind = "work"
 agent = "devkit-senior-worker"
 ```
 
-雛形の implement の `fix` の遷移に規則の一覧を書く。条件と当てはめ方は[修正の担当の規則](data.md#修正の担当の規則)に従う。
+計画の implement-1 を次の形にする。判定の観点、必須 check、上限は既定の決まりに従う。
 
 ```json
 {
-  "id": "implement",
+  "id": "implement-1",
   "assignee": "worker",
   "checks": [
-    { "aspect": "command:test", "runner": "command:test", "required": true },
-    { "aspect": "diff", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}, {"source": "principles", "select": "security.md"}, {"source": "templates", "select": "pr.md.tmpl"}, {"source": "rules", "select": ""}], "examples": {"source": "examples", "select": "diff/spec.json"} }
+    {
+      "aspect": "command:test",
+      "required": true,
+      "completion_condition_ids": [
+        "C1"
+      ],
+      "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+    },
+    {
+      "aspect": "test",
+      "required": true,
+      "completion_condition_ids": [
+        "C1"
+      ],
+      "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+    },
+    {
+      "aspect": "diff",
+      "required": true,
+      "completion_condition_ids": [
+        "C1"
+      ],
+      "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+    }
   ],
-  "gate": { "required": false, "reason": "公開契約を保つ修正" },
-  "limits": { "max_rounds": 4, "max_no_progress": 2 },
+  "gate": {
+    "required": false,
+    "reason": "Changes to existing code that do not affect hard-to-change decisions"
+  },
+  "limits": {
+    "max_rounds": 3,
+    "max_no_progress": 2
+  },
   "transitions": {
     "fix": [
-      { "when": { "check": "diff", "failures_at_least": 2 }, "assignee": "senior_worker" },
-      { "when": { "human_rejected": true }, "assignee": "senior_worker" }
+      {
+        "when": {
+          "check": "diff",
+          "failures_at_least": 2
+        },
+        "assignee": "senior_worker"
+      },
+      {
+        "when": {
+          "human_rejected": true
+        },
+        "assignee": "senior_worker"
+      }
     ],
-    "ask": "implement",
-    "back": "implement",
-    "done": "retrospective"
-  }
+    "ask": "implement-1",
+    "back": "implement-1",
+    "done": "verification-1"
+  },
+  "inputs": [
+    {
+      "source": "requirements",
+      "select": ""
+    },
+    {
+      "source": "rules",
+      "select": ""
+    },
+    {
+      "source": "structure",
+      "select": ""
+    },
+    {
+      "source": "git",
+      "select": ""
+    }
+  ],
+  "report": {
+    "source": "templates",
+    "select": "reports/implement.json"
+  },
+  "definition": "implement",
+  "instructions": [
+    "完了条件 C1 を、この定義の成果と確認方法に照らして満たす"
+  ]
 }
 ```
 
-最初の修正ラウンドは `worker` の agent `devkit-worker` が自分の worktree で作業する。必須の check が `FAIL` になったラウンドが2つ以上になり、そのラウンドで `diff` が `FAIL` か `NOT ASSESSED` なら、次の修正ラウンドの担当は `senior_worker` になる。人がこのステージの問いに却下と答えた場合も同じである。`senior_worker` は agent のある `work` の役割なので、そのラウンドは単位が1つの分割と同じく、devkit が作る worktree で `devkit-senior-worker` が作業し、結果を作業ブランチへ合流する。その後の修正でどの規則も当てはまらなければ、担当は `worker` に戻る。
+FAIL のラウンドが2回以上で diff が FAIL または NOT ASSESSED なら、次の修正を senior_worker に渡す。人の却下も同じ役割へ渡す。上限3は担当の規則より先に効く。同じ StageRun の比較元と累積差分を保ち、どの規則にも当てはまらなければ worker に戻す。
 
-いずれも同じ StageRun の中のラウンドであり、比較元と累積の差分は変わらない。`max_rounds` の4に達したら規則より先に人に確認し、問いには `senior_worker` で続ける選択肢を含める。計画者が担当や規則の一覧を雛形から変えた計画は逸脱として承認の問いに差分を示す。
+<a id="分割の雛形と計画"></a>
 
-### 分割の雛形と計画
+### 分割のパターンと計画
 
-ステージの `inputs` の例は `[{"source": "requirements", "select": ""}, {"source": "rules", "select": ""}]` である。雛形は計画者・作業者・判定者それぞれの入力の選び方を持ち、既定で要件と規則を渡す。ステージ定義は `stages` ソースから選ぶ。
-
-リポジトリが分割を選ぶ雛形 `.devkit/plans/split.json` の `stages` の抜粋である。置き場所は `[sources.plans]` で変更できる。steps の完了後に残りを再計画し、implement の作業を単位に分ける。既定の雛形は複数単位への分割を使わない。
-
-```json
-[
-  {
-    "id": "steps",
-    "assignee": "worker",
-    "checks": [
-      { "aspect": "steps", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/steps.md"}], "examples": {"source": "examples", "select": "steps/spec.json"} }
-    ],
-    "gate": { "required": false, "reason": "手順ごとの目的と範囲を確かめる" },
-    "limits": { "max_rounds": 3, "max_no_progress": 2 },
-    "transitions": { "fix": "steps", "ask": "steps", "back": "steps", "done": "replan" }
-  },
-  {
-    "id": "implement",
-    "assignee": "worker",
-    "split": true,
-    "checks": [
-      { "aspect": "command:test", "runner": "command:test", "required": true },
-      { "aspect": "test", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"} },
-      { "aspect": "diff", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}, {"source": "principles", "select": "security.md"}, {"source": "templates", "select": "pr.md.tmpl"}, {"source": "rules", "select": ""}], "examples": {"source": "examples", "select": "diff/spec.json"} }
-    ],
-    "gate": { "required": false, "reason": "合流した成果をステージ全体で判定する" },
-    "limits": { "max_rounds": 3, "max_no_progress": 2 },
-    "transitions": { "fix": "implement", "ask": "implement", "back": "steps", "done": "retrospective" }
-  }
-]
-```
-
-steps で「保存処理とそのテスト」「利用手順」の2つの手順を決めた場合の、再計画した計画の implement の抜粋である。完了条件 `C1` は、保存処理が契約を満たし、利用手順が記述されていることを人が承認した条件とする。`completion_conditions` はその条件を引き継ぎ、残りのステージには implement と retrospective を置く。完了済みの steps を含めないことは逸脱に数えない。分割の追加・削除は逸脱であり、単位 ID の重複は検証で拒否する。範囲の重なりは計画の観点の判定者が指摘する。
+計画者はパターンを参考に、独立した仕事を `split: true` と `units` で分けられる。implement-1 を次の形にし、後続には verification-1 と retrospective-1 を置く。既定の配布パターンは複数単位に分割しない。
 
 ```json
 {
-  "start_stage": "implement",
-  "stages": [
+  "id": "implement-1",
+  "assignee": "worker",
+  "checks": [
     {
-      "id": "implement",
-      "assignee": "worker",
-      "split": true,
-      "units": [
-        {
-          "id": "save",
-          "description": "保存処理と完了条件を確かめるテストを実装する",
-          "scope": "internal/save/ と、その保存処理のテスト",
-          "role": "worker"
-        },
-        {
-          "id": "usage",
-          "description": "保存の利用手順を記述する",
-          "scope": "docs/save.md"
-        }
+      "aspect": "command:test",
+      "required": true,
+      "completion_condition_ids": [
+        "C1"
       ],
-      "checks": [
-        { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "合流後のツリー" },
-        { "aspect": "test", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"}, "completion_condition_ids": ["C1"], "target": "保存処理のテストと登録済みコマンド" },
-        { "aspect": "diff", "runner": "judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}, {"source": "principles", "select": "security.md"}, {"source": "templates", "select": "pr.md.tmpl"}, {"source": "rules", "select": ""}], "examples": {"source": "examples", "select": "diff/spec.json"}, "completion_condition_ids": ["C1"], "target": "単位の変更とマージ結果を含む累積差分" }
+      "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+    },
+    {
+      "aspect": "test",
+      "required": true,
+      "completion_condition_ids": [
+        "C1"
       ],
-      "gate": { "required": false, "reason": "合流した成果をステージ全体で判定する" },
-      "limits": { "max_rounds": 3, "max_no_progress": 2 },
-      "transitions": { "fix": "implement", "ask": "implement", "back": "steps", "done": "retrospective" }
+      "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+    },
+    {
+      "aspect": "diff",
+      "required": true,
+      "completion_condition_ids": [
+        "C1"
+      ],
+      "target": "保存ボタンの表示、テスト、利用場面、作業の振り返りのうち、この観点が担当する範囲"
+    }
+  ],
+  "gate": {
+    "required": false,
+    "reason": "Changes to existing code that do not affect hard-to-change decisions"
+  },
+  "limits": {
+    "max_rounds": 3,
+    "max_no_progress": 2
+  },
+  "transitions": {
+    "fix": "implement-1",
+    "ask": "implement-1",
+    "back": "implement-1",
+    "done": "verification-1"
+  },
+  "inputs": [
+    {
+      "source": "requirements",
+      "select": ""
+    },
+    {
+      "source": "rules",
+      "select": ""
+    },
+    {
+      "source": "structure",
+      "select": ""
+    },
+    {
+      "source": "git",
+      "select": ""
+    }
+  ],
+  "report": {
+    "source": "templates",
+    "select": "reports/implement.json"
+  },
+  "definition": "implement",
+  "instructions": [
+    "完了条件 C1 を、この定義の成果と確認方法に照らして満たす"
+  ],
+  "split": true,
+  "units": [
+    {
+      "id": "save",
+      "description": "保存処理とテストを実装する",
+      "scope": "internal/save/ と保存処理のテスト",
+      "role": "worker"
+    },
+    {
+      "id": "usage",
+      "description": "利用手順を記述する",
+      "scope": "docs/save.md"
     }
   ]
 }
 ```
 
-単位の `role` は agent のある `work` の役割の ID であり、省くと既定の `worker` になる。`usage` は省いた例である。`next` が返す各単位の指示 ID で、セッションがその役割の agent `devkit-worker` を1行の `devkit-instruction <指示 ID>` で起動する。作業場所は `.devkit/worktrees/<単位の指示 ID>/` とし、計画内の `save`・`usage` はディレクトリ名に使わない。brief に絶対パスを載せ、そこでだけ編集させる。単位がなければ通常のステージとして進める。
+単位の ID は計画内で一意とし、担当範囲の重なりは計画の判定者が確かめる。単位の成果に依存する仕事は別ステージにする。`role` の省略時は worker であり、agent のある work の役割に限る。
 
-すべての単位の終了ブロックを受理したら、devkit が各ツリーをコミットオブジェクトにして SHA で固定し、作業ブランチへ順に、コミットしないマージで合流する。ぶつかった場合は、セッションのまとめ役に統合の修正を指示する。合流後のツリーと、単位 ID を付けて欠けなく保持した各単位の終了ブロックを通常のステージのラウンドとして判定し、単位ごとの判定はしない。合流の記録と再開、中断・中止・作業完了時の worktree の扱いは[分割した作業と合流](flow.md#分割した作業と合流)に従う。
+セッションは各単位の agent を1行の `devkit-instruction <指示 ID>` で起動する。作業場所は `.devkit/worktrees/<単位の指示 ID>/` であり、単位 ID をディレクトリ名には使わない。全単位の結果を受理後、ツリーを SHA で固定して順にコミットしないマージで合流する。
+
+競合はステージの作業担当へ返す。agent があれば競合中のマージ状態と競合マーカーを持つ修正用 worktree を作り、作業者サブエージェントが1つの修正単位として直す。その結果を合流して残りの SHA を取り込む。agent のない work の役割ならセッションのチェックアウトで直す。合流後の累積差分と単位ごとの報告をステージ全体で判定する。
 
 ## 設定
 
-`devkit.toml` の例である。既定の役割 `judge` は agent `devkit-judge` のサブエージェント定義を使うため、判定コマンドの登録は不要である。検証コマンド `test` と `e2e` の実行ファイルは利用側で用意する。
+新規導入時に init が書く `devkit.toml` と同じ設定である。`kit_version` と `assets/hosts/roles.toml`・`assets/hosts/deny.toml` の内容を用いる。省略した配置・承認・git・並行数などは設定の既定値を使う。
 
 ```toml
 kit_version = "v3"
-default_plan = "default"
-
-[sources.principles]
-adapter = "files"
-path = ".devkit/principles"
-norm = true
-writable = true
-
-[sources.stages]
-adapter = "files"
-path = ".devkit/stages"
-norm = true
-writable = true
-
-[sources.plans]
-adapter = "files"
-path = ".devkit/plans"
-norm = true
-writable = true
-
-[sources.rules]
-adapter = "files"
-path = ".devkit/rules.md"
-norm = true
-writable = true
-
-[sources.git]
-adapter = "files"
-path = ".devkit/git.md"
-norm = true
-writable = true
-
-[sources.examples]
-adapter = "files"
-path = ".devkit/checks"
-norm = true
-writable = true
-
-[sources.templates]
-adapter = "files"
-path = ".devkit/templates"
-norm = true
-writable = true
-
-[sources.requirements]
-adapter = "files"
-path = ".devkit/requirements.md"
-norm = false
-writable = true
-
-[sources.structure]
-adapter = "files"
-path = ".devkit/structure.json"
-norm = false
-writable = true
-
-[state]
-detect = ".devkit/detect.json"
-
-[approval]
-plan = "requirements"
-meta_loop_edit = "confirm"
 
 [roles]
 read_only_tools = ["Read", "Glob", "Grep"]
@@ -843,36 +799,111 @@ kind = "human"
 
 [planning]
 role = "planner"
+max_rounds = 3
+inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }]
 
 [plan_check]
-aspect = "plan"
 runner = "judge"
-criteria = [{ source = "principles", select = "review/plan.md" }, { source = "rules", select = "" }]
-examples = { source = "examples", select = "plan/spec.json" }
 schemas = ["plan", "plan-template"]
-
-[git]
-commit_message = "devkit: {stage} ({work_id})"
-allow_empty_commit = true
-
-[classification]
-dependency_files = ["go.mod", "go.sum", "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "uv.lock", "composer.json", "composer.lock"]
+inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }]
 
 [limits]
-stop_continuation = 3
+max_rounds_ceiling = 3
+max_no_progress_ceiling = 2
+max_total_rounds = 40
 
-[parallel]
-max_concurrent = 3
+[checks."purpose"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/purpose.md" }]
+examples = { source = "examples", select = "purpose/spec.json" }
 
-[briefs]
-max_bytes = 200000
+[checks."irreversible"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/irreversible.md" }, { source = "principles", select = "designing.md" }]
+examples = { source = "examples", select = "irreversible/spec.json" }
 
-[detection]
-required = true
+[checks."structure"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/structure.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "structure.md" }, { source = "principles", select = "data.md" }]
+examples = { source = "examples", select = "structure/spec.json" }
 
-[lessons]
-destinations = ["hook_lint_type", "plan_template", "aspect", "principle", "skill"]
+[checks."contract"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/contract.md" }, { source = "principles", select = "data.md" }, { source = "principles", select = "engineering.md" }]
+examples = { source = "examples", select = "contract/spec.json" }
 
+[checks."steps"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/steps.md" }]
+examples = { source = "examples", select = "steps/spec.json" }
+
+[checks."command:test"]
+runner = "command:test"
+
+[checks."test"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/test.md" }, { source = "principles", select = "testing.md" }]
+examples = { source = "examples", select = "test/spec.json" }
+
+[checks."diff"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/diff.md" }, { source = "principles", select = "engineering.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "writing.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "security.md" }, { source = "templates", select = "pr.md.tmpl" }, { source = "rules", select = "" }]
+examples = { source = "examples", select = "diff/spec.json" }
+
+[checks."command:e2e"]
+runner = "command:e2e"
+
+[checks."behavior"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/behavior.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "testing.md" }, { source = "principles", select = "ui.md" }, { source = "rules", select = "" }]
+examples = { source = "examples", select = "behavior/spec.json" }
+
+[checks."harness"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/harness.md" }, { source = "principles", select = "harness.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "review/README.md" }, { source = "stages", select = "README.md" }, { source = "stages", select = "retrospective.md" }, { source = "plans", select = "README.md" }, { source = "examples", select = "README.md" }, { source = "templates", select = "brief/judgment.md.tmpl" }]
+examples = { source = "examples", select = "harness/spec.json" }
+history = "all"
+
+[checks."wording"]
+runner = "judge"
+criteria = [{ source = "principles", select = "review/wording.md" }, { source = "principles", select = "writing.md" }, { source = "templates", select = "pr.md.tmpl" }]
+examples = { source = "examples", select = "wording/spec.json" }
+
+[[loop.stage]]
+definition = "implement"
+checks = ["command:test", "test", "diff"]
+
+[[loop.stage]]
+definition = "verification"
+checks = ["command:e2e", "behavior"]
+
+[[loop.stage]]
+definition = "retrospective"
+checks = ["harness"]
+
+[[loop.path]]
+definition = "implement"
+follows = "verification"
+
+[[loop.path]]
+last = "retrospective"
+
+[deny]
+rules = ["Bash(git push *)", "Agent(fork)"]
+judge = ["apply_patch", "Edit", "Write", "NotebookEdit"]
+```
+
+check の一覧は runner と基準を固定し、計画とパターンは観点を参照する。`[[loop.stage]]` は対象の定義ごとに必須 check を課す。定義は一覧または `"*"` でも選べ、ゲート、許可する役割、上限の天井、`report`・`history`・`outputs` の固定も指定できる。
+
+`[[loop.path]]` の `definition = "implement"` と `follows = "verification"` は、implement の各実体の後に同じ区切りの verification を要求する。`last` は終了する経路の最後を定める。`require` は必ず含める定義、`first` は先頭を定める。計画1つだけでなく、採用済みの完了した実体と、計画の開始から `done` で到達する列を結んだ経路で確かめる。区切りは次の replan または終わりまでである。require と last は null で終わる区切りだけに適用する。
+
+計画の受理時とステージの開始時に決まりを検査する。受理時は指示の参照コミットで定義とすべての文書の選び方が1件以上に解決すること、例の観点が一致すること、検出試験を必須とする設定なら必須の判定に例があることも確かめる。
+
+`[limits] max_rounds_ceiling = 3` と `max_no_progress_ceiling = 2` を超える計画は拒否する。計画の判定のやり直しは `[planning] max_rounds = 3`、作業全体の上限は `[limits] max_total_rounds = 40` が既定である。累計上限で続行ならその時点の累計に40を加えて次の停止点とする。戻りや作り直しで累計を減らさない。
+
+検証コマンドの追加登録である。利用側が実行ファイルを用意し、登録ごとに期限を必ず書く。init は test・e2e を登録しない。未登録なら check が修正可能な FAIL になり、登録はループ自身の変更として人が確認して次のラウンドから使う。
+
+```toml
 [commands.test]
 executable = "./scripts/test"
 args = []
@@ -882,26 +913,21 @@ timeout_seconds = 120
 executable = "./scripts/e2e"
 args = []
 timeout_seconds = 120
-
-[deny]
-rules = ["Bash(git push *)", "Agent(fork)"]
 ```
 
-`kit_version` は記録形式とバイナリの互換性を識別する値であり、作業にも記録する。ソースごとの接続先と配置は変更できる。規範のソースは全体を列挙して固定し、成果は選んだ文書を固定する。`writable = true` は書き込み能力を表し、リポジトリ内のソースにだけ書ける。リポジトリ外のソースは読み取り専用であり、`writable = true` を書くと設定エラーになる。リポジトリ外のソースと読み取り専用のソースへの改善は教訓として管理者へ引き継ぐ。`[state] detect` はソースとは別の合格の索引である。実行の記録と生成物の `.devkit/run/` は固定である。`[detection] required` は既定 `true` であり、`false` なら検出試験を指示せず、合格記録なしで判定を受理する。`[lessons] destinations` は、機械の検査 → 雛形 → 用途別の判定基準 → 原則 → skill の優先順を表す。
+メインのエージェントは合意した課題を `start` に渡す。長い場合は課題引数の代わりに `--task-file` で本文を渡す。会話の写しは取らない。
 
-同時に動かす数は全体の `[parallel] max_concurrent`(既定3、1以上)と役割ごとの `[roles.<id>] max_concurrent`(指定時は1以上)の両方を満たす。数えるのは発行済みでまだ受理していないサブエージェントの指示である。互いに依存しない単位の作業、検証コマンド後の判定者の check、check ごとの判定直前の指示をまとめて返し、空いた分だけ次の `next` で発行する。役割の上限を省略した場合も全体の上限を守る。
+```sh
+devkit start --plan fix --task-file task.txt
+```
 
-`[roles.<id>]` は役割の種類 `kind` と任意の `agent` を定める。例の4つは既定と同じであり、書かなくても同じに動く。同じ ID を書けば上書きし、新しい ID を書けば追加する。`[roles] read_only_tools` は Claude Code の `judge`・`plan` の役割の agent の定義に許す `tools` であり、`[planning] role` は計画を作る `plan` の種類の役割である。役割の規則は[役割](data.md#役割-role)に従う。
+途中の指示は JSON を `devkit instruct guidance.json` で記録する。次の計画者・作業者の依頼文へ渡し、判定者や検出試験へは渡さない。すでに発行した依頼文を変えず、計画や完了条件の変更は再計画と承認を通す。
 
-`[router] human_confirmation` は `dependency_changed` と `target_changed_again` だけを変更でき、未知の分類名は設定エラーになる。check の結果から次の行動への対応は固定である。ループ自身の変更の確認は `[approval] meta_loop_edit` だけに従う。`[plan_check]` は計画の check の名前、runner、`criteria`・`examples` の選び方を指定する。runner は `judge` の種類の役割の ID か登録済みの判定コマンドの名前であり、判定コマンドなら devkit が実行する。`[classification] dependency_files` は依存の宣言として扱うファイルの glob である。`[deny]` の構文は [PreToolUse](hooks.md#pretooluse)、結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)に従う。
-
-検証コマンドの期限は登録ごとに必須である。ラウンド開始時に `test` が未登録なら、`command:test` は `FAIL` となり、検証の手段を作って `[commands.test]` に登録するよう `auto-fixable` の指摘を返す。登録はループ自身の変更として `[approval] meta_loop_edit` に従い確認し、次のラウンドのスナップショットから使う。
-
-`devkit init` は人が導入内容を確認したあと、導入したファイルをコミットする。`devkit init --no-commit` で省略した場合は手動でコミットする。HEAD がない場合、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合は `start` を拒否し、理由と直し方を返す。
-
-`[briefs] max_bytes` は依頼文の本文の上限であり、超える分はファイルにして一覧で渡す。役割ごとの並行数の上限は `[roles.judge] max_concurrent = 2` などと書けるが、全体の上限も同時に満たす。`[limits] max_total_rounds` は既定では設定しない。例えば10なら累計10で人に確認し、そのときの累計が10で続行を承認したら次は20で確認する。戻り・作り直し・担当変更でも累計を減らさない。
-
-ステージ・check の `history` は `none`・`stage_run`・`check`・`all` から選ぶ。本文の採用された成果はステージ・check・単位の `outputs` で選ぶ。計画の `instructions` は各担当へそのまま渡し、雛形には書かない。単位の成果に依存する仕事は別のステージにする。`brief_by_planner = true` は必要な check だけに付けられるが、既定の雛形では使わない。
+```json
+{
+  "text": "保存後に一覧へ戻る利用場面も作業で確かめる"
+}
+```
 
 ## 観点と検出試験
 
@@ -1006,7 +1032,7 @@ rules = ["Bash(git push *)", "Agent(fork)"]
 元の問い合わせ記録: 「あれを削除したい」。出典は削除要求 R1 の発言であり、「あれ」は手順の対象の日報を指す。発言と照合するため引用内の原語を保持する。principles/writing.md の原則2の適用除外は、この引用だけに適用する。
 ```
 
-各例は要求・完了条件・検証方法・対象を含む匿名の本文として、`criteria` で選んだ基準の文書、出力の約束とともに渡す。判定者には種別・期待判定・`spec.json`・対応表と、それらを含む履歴や参照先を渡さない。devkit が判定と期待を照合する。合格の識別には担当の定義、判定規則を含む判定依頼テンプレート、実際に渡した基準の文書の集合と内容ハッシュ、例の文書の内容ハッシュを含める。必要な別の文書は選び方に明示し、文中の参照は解析しない。既存の違反例・適合例・許容例の期待判定を保つことを確かめる。設定と合格の扱いは[検出試験](guarantees.md#検出試験)に従う。
+各例は要求・完了条件・検証方法・対象を含む匿名の本文として、`criteria` で選んだ基準の文書、出力の約束とともに渡す。判定者には種別・期待判定・`spec.json`・対応表と、それらを含む履歴や参照先を渡さない。devkit が判定と期待を照合する。合格の識別には `[checks.<観点>]` の定義、担当の定義、判定規則を含む判定依頼テンプレート、実際に渡した基準の文書の集合と内容ハッシュ、例の文書の内容ハッシュを含める。必要な別の文書は選び方に明示し、文中の参照は解析しない。既存の違反例・適合例・許容例の期待判定を保つことを確かめる。設定と合格の扱いは[検出試験](guarantees.md#検出試験)に従う。
 
 ## pre-commit
 

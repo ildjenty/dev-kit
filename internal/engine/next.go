@@ -573,8 +573,7 @@ func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run
 	return tree, &q, err
 }
 
-func (e *Engine) planApprovalText(state *ledger.State, template plan.PlanTemplate, p plan.Plan) (string, error) {
-	template = state.ApprovalTemplate(template, p)
+func (e *Engine) planApprovalText(ctx context.Context, state *ledger.State, p plan.Plan, ref string) (string, error) {
 	work, _ := state.Work()
 	original := originalRequest(work)
 	if work.OriginalRequest == nil {
@@ -584,62 +583,84 @@ func (e *Engine) planApprovalText(state *ledger.State, template plan.PlanTemplat
 	if err != nil {
 		return "", err
 	}
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+	before, label, err := e.approvalBaseline(ctx, state, p, ref)
+	if err != nil {
+		return "", err
+	}
 	var text strings.Builder
 	fmt.Fprintf(&text, "Approve this checked plan?\n\nOriginal user request:\n%s\n\nTask supplied to start:\n%s\n\nCompletion conditions:\n", original, task)
 	for _, condition := range p.CompletionConditions {
 		fmt.Fprintf(&text, "- %s: %s\n", condition.ID, condition.Description)
 	}
-	text.WriteString("\nAdopted stages and required checks:\n")
-	for _, stage := range p.Stages {
-		fmt.Fprintf(&text, "- %s\n", stage.ID)
-		for _, item := range stage.RequiredChecks() {
-			fmt.Fprintf(&text, "  - %s (%s), conditions: %s; target: %s\n", item.Aspect, item.Runner, strings.Join(item.CompletionConditionIDs, ", "), item.Target)
-		}
-	}
-	text.WriteString("\nRemoved stages (deviations):\n")
-	for _, stage := range template.Stages {
-		if _, ok := p.Stage(stage.ID); !ok {
-			fmt.Fprintf(&text, "- %s (deviation)\n", stage.ID)
-		}
-	}
+	text.WriteString(planChainText(p, checkCatalog(settings)))
 	text.WriteString(planInstructionsText(p))
-	deviations := plan.Deviations(template, p)
-	fmt.Fprintf(&text, "\nDeviations:\n%s\n%s\nIrreversible items:\n%s\n\nExternal operations:\n%s\n\nOpen questions (answer with revision instructions):\n%s",
-		approvalJSON(deviations, len(deviations)), selectionDifferences(template, p, deviations)+roleDifferences(template, p, deviations), approvalList(p.IrreversibleDecisions), approvalJSON(p.ExternalOperations, len(p.ExternalOperations)), approvalList(p.OpenQuestions))
+	changes := plan.StructuralDifference(before, p)
+	fmt.Fprintf(&text, "\nStructural difference from %s (shown for review, not a reason for approval):\n%s\n\nIrreversible items:\n%s\n\nExternal operations:\n%s\n\nOpen questions (answer with revision instructions):\n%s",
+		label, approvalJSON(changes, len(changes)), approvalList(p.IrreversibleDecisions), approvalJSON(p.ExternalOperations, len(p.ExternalOperations)), approvalList(p.OpenQuestions))
 	return text.String(), nil
 }
 
-// selectionDifferences shows the template and plan selections of checks whose criteria or
-// examples deviate from the template.
-func selectionDifferences(template plan.PlanTemplate, p plan.Plan, deviations []plan.Deviation) string {
-	var text strings.Builder
-	for _, deviation := range deviations {
-		if deviation.Kind != plan.ChangedCriteria && deviation.Kind != plan.ChangedExamples {
-			continue
+// approvalBaseline returns the remaining part of the last approved plan, or the cited pattern
+// for the first plan, as the structure the proposal is compared with.
+func (e *Engine) approvalBaseline(ctx context.Context, state *ledger.State, p plan.Plan, ref string) (plan.Plan, string, error) {
+	var last *plan.Plan
+	for _, previous := range state.PlanEvaluations(nil) {
+		if previous.Plan.Version < p.Version && previous.Approved && !previous.Rejected && !previous.Withdrawn {
+			approved := previous.Plan
+			last = &approved
 		}
-		before, after := stageCheck(append(slices.Clone(template.Stages), template.OptionalStages...), deviation), stageCheck(p.Stages, deviation)
-		fmt.Fprintf(&text, "\n%s of %s (%s) in %s:\n- Template: %s\n- Plan: %s\n", deviation.Kind, deviation.Aspect, deviation.Runner, deviation.StageID,
-			approvalJSON(selectionsOf(before, deviation.Kind), 1), approvalJSON(selectionsOf(after, deviation.Kind), 1))
+	}
+	if last != nil {
+		completed, err := e.approvalCompleted(state)
+		return plan.RemainingPlan(*last, completed), fmt.Sprintf("the last approved plan (version %d)", last.Version), err
+	}
+	pattern, _, err := e.pattern(ctx, ref, p.Pattern.Name)
+	if err != nil {
+		return plan.Plan{}, "", err
+	}
+	return plan.Plan{StartStage: pattern.StartStage, Stages: pattern.Stages}, "the cited pattern " + pattern.Name, nil
+}
+
+// planChainText lists the plan's stages along done transitions with their definition, assignee,
+// gate, and required checks; stages off the chain follow.
+func planChainText(p plan.Plan, catalog map[string]plan.CheckDefinition) string {
+	var text strings.Builder
+	fmt.Fprintf(&text, "\nPlan chain from %s:\n", p.StartStage)
+	listed := map[string]bool{}
+	for id := &p.StartStage; id != nil && *id != "replan" && !listed[*id]; {
+		stage, ok := p.Stage(*id)
+		if !ok {
+			break
+		}
+		listed[stage.ID] = true
+		writeChainStage(&text, stage, catalog)
+		id = stage.Transitions.Done
+	}
+	for _, stage := range p.Stages {
+		if !listed[stage.ID] {
+			writeChainStage(&text, stage, catalog)
+		}
 	}
 	return text.String()
 }
 
-func stageCheck(stages []plan.Stage, deviation plan.Deviation) plan.Check {
-	for _, stage := range stages {
-		for _, item := range stage.Checks {
-			if stage.ID == deviation.StageID && item.Aspect == deviation.Aspect && item.Runner == deviation.Runner {
-				return item
-			}
-		}
+func writeChainStage(text *strings.Builder, stage plan.Stage, catalog map[string]plan.CheckDefinition) {
+	gate := "none"
+	if stage.Gate.Required {
+		gate = "required (" + stage.Gate.Reason + ")"
 	}
-	return plan.Check{}
-}
-
-func selectionsOf(item plan.Check, kind plan.DeviationKind) any {
-	if kind == plan.ChangedCriteria {
-		return item.Criteria
+	done := "null"
+	if stage.Transitions.Done != nil {
+		done = *stage.Transitions.Done
 	}
-	return item.Examples
+	fmt.Fprintf(text, "- %s: definition %s, assignee %s, gate %s, done %s\n", stage.ID, stage.DefinitionID(), stage.Assignee, gate, done)
+	for _, item := range stage.RequiredChecks() {
+		fmt.Fprintf(text, "  - required check %s (%s), conditions: %s; target: %s\n", item.Aspect, catalog[item.Aspect].Runner, strings.Join(item.CompletionConditionIDs, ", "), item.Target)
+	}
 }
 
 // approvalList renders strings as a bulleted list, or "None" when empty.
@@ -958,7 +979,7 @@ func (e *Engine) advanceQuestion(ctx context.Context, state *ledger.State, q for
 	return r, true, err
 }
 
-func (e *Engine) pendingPlanner(ctx context.Context, state *ledger.State, proposals []plan.VersionEvaluation, head string) (Result, bool, error) {
+func (e *Engine) pendingPlanner(ctx context.Context, state *ledger.State, proposals []plan.VersionEvaluation) (Result, bool, error) {
 	highest := 0
 	for _, proposal := range proposals {
 		highest = max(highest, proposal.Plan.Version)
@@ -969,11 +990,7 @@ func (e *Engine) pendingPlanner(ctx context.Context, state *ledger.State, propos
 			if err != nil {
 				return Result{}, true, err
 			}
-			t, source, err := e.template(ctx, head, data.TemplateName)
-			if err != nil {
-				return Result{}, true, err
-			}
-			r, err := e.planner(ctx, t, source, issued.PlanVersion, data.Origin)
+			r, err := e.planner(ctx, data.PatternName, issued.PlanVersion, data.Origin, "")
 			return r, true, err
 		}
 	}
@@ -985,28 +1002,28 @@ func (e *Engine) pendingPlanner(ctx context.Context, state *ledger.State, propos
 					return Result{}, true, err
 				}
 				if i.SessionID != e.sessionID {
-					t, source, err := e.template(ctx, data.Reference, data.TemplateName)
-					if err != nil {
-						return Result{}, true, err
-					}
-					r, err := e.planner(ctx, t, source, i.PlanVersion, data.Origin)
+					r, err := e.planner(ctx, data.PatternName, i.PlanVersion, data.Origin, "")
 					return r, true, err
 				}
 				r, err := e.publishInstruction(i, false, data, "")
 				return r, true, err
 			}
 		}
-		return Result{}, true, errors.New("initial planning instruction is missing; retry devkit start with the original task and template")
+		return Result{}, true, errors.New("initial planning instruction is missing; retry devkit start with the original task and pattern")
 	}
 	return Result{}, false, nil
 }
 
-func (e *Engine) reviseFailedPlan(ctx context.Context, state *ledger.State, latest plan.VersionEvaluation, t plan.PlanTemplate, source []byte) (Result, error) {
+func (e *Engine) reviseFailedPlan(ctx context.Context, state *ledger.State, latest plan.VersionEvaluation, head string) (Result, error) {
 	rounds, err := e.planRounds()
 	if err != nil {
 		return Result{}, err
 	}
-	if !latest.Rejected && !latest.Withdrawn && t.PlanRoundsReached(rounds) {
+	settings, err := e.settings(ctx, head)
+	if err != nil {
+		return Result{}, err
+	}
+	if !latest.Rejected && !latest.Withdrawn && rounds >= settings.PlanningMaxRounds() {
 		q := e.question(form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: latest.Plan.Version}, "plan_round_limit", "The plan check round limit was reached. Explain how to continue.", "")
 		if _, answered := state.ResolveAnswer(q.ApprovalTarget); !answered {
 			q, err = e.saveQuestion(state, q, "")
@@ -1020,7 +1037,7 @@ func (e *Engine) reviseFailedPlan(ctx context.Context, state *ledger.State, late
 	if err != nil {
 		return Result{}, err
 	}
-	return e.planner(ctx, t, source, n+1, latest.Origin)
+	return e.planner(ctx, latest.Plan.Pattern.Name, n+1, latest.Origin, "")
 }
 
 func (e *Engine) advancePlan(ctx context.Context, state *ledger.State) (Result, bool, error) {
@@ -1037,7 +1054,7 @@ func (e *Engine) advancePlan(ctx context.Context, state *ledger.State) (Result, 
 		return Result{}, false, err
 	}
 	proposals := state.PlanEvaluations(norms)
-	if r, ready, err := e.pendingPlanner(ctx, state, proposals, head); err != nil || ready {
+	if r, ready, err := e.pendingPlanner(ctx, state, proposals); err != nil || ready {
 		return r, ready, err
 	}
 	latest := proposals[len(proposals)-1]
@@ -1045,16 +1062,12 @@ func (e *Engine) advancePlan(ctx context.Context, state *ledger.State) (Result, 
 		proposals = proposals[:len(proposals)-1]
 		latest = proposals[len(proposals)-1]
 	}
-	t, source, err := e.template(ctx, head, latest.Plan.Template.Name)
-	if err != nil {
-		return Result{}, false, err
-	}
-	return e.advanceProposal(ctx, state, latest, t, source, head, norms, proposals)
+	return e.advanceProposal(ctx, state, latest, head, norms)
 }
 
-func (e *Engine) advanceProposal(ctx context.Context, state *ledger.State, latest plan.VersionEvaluation, t plan.PlanTemplate, source []byte, head string, norms []form.NormReference, proposals []plan.VersionEvaluation) (Result, bool, error) {
+func (e *Engine) advanceProposal(ctx context.Context, state *ledger.State, latest plan.VersionEvaluation, head string, norms []form.NormReference) (Result, bool, error) {
 	if latest.Withdrawn || latest.Rejected || latest.Judgment == plan.PlanFail {
-		r, err := e.reviseFailedPlan(ctx, state, latest, t, source)
+		r, err := e.reviseFailedPlan(ctx, state, latest, head)
 		return r, true, err
 	}
 	if latest.Judgment == plan.PlanPending {
@@ -1073,23 +1086,27 @@ func (e *Engine) advanceProposal(ctx context.Context, state *ledger.State, lates
 		r, err := e.issueQuestion(state, q)
 		return r, true, err
 	}
-	return e.advanceApprovedPlan(ctx, state, latest, t, source, head, norms, proposals)
+	return e.advanceApprovedPlan(ctx, state, latest, head, norms)
 }
 
-func (e *Engine) advanceApprovedPlan(ctx context.Context, state *ledger.State, latest plan.VersionEvaluation, t plan.PlanTemplate, source []byte, head string, norms []form.NormReference, proposals []plan.VersionEvaluation) (Result, bool, error) {
+func (e *Engine) advanceApprovedPlan(ctx context.Context, state *ledger.State, latest plan.VersionEvaluation, head string, norms []form.NormReference) (Result, bool, error) {
 	settings, err := e.settings(ctx, head)
+	if err != nil {
+		return Result{}, false, err
+	}
+	completed, err := e.approvalCompleted(state)
 	if err != nil {
 		return Result{}, false, err
 	}
 	var lastApproved *plan.Plan
 	for _, previous := range state.PlanEvaluations(nil) {
 		if previous.Plan.Version < latest.Plan.Version && previous.Approved && !previous.Rejected && !previous.Withdrawn {
-			p := previous.Plan
-			lastApproved = &p
+			remaining := plan.RemainingPlan(previous.Plan, completed)
+			lastApproved = &remaining
 		}
 	}
-	if !latest.Executable(state.ApprovalTemplate(t, latest.Plan), settings.PlanApproval(), lastApproved) {
-		text, err := e.planApprovalText(state, t, latest.Plan)
+	if !latest.Executable(settings.PlanApproval(), lastApproved) {
+		text, err := e.planApprovalText(ctx, state, latest.Plan, head)
 		if err != nil {
 			return Result{}, false, err
 		}
@@ -1101,74 +1118,69 @@ func (e *Engine) advanceApprovedPlan(ctx context.Context, state *ledger.State, l
 		r, err := e.issueQuestion(state, q)
 		return r, true, err
 	}
-	p, executable := state.ExecutablePlan(t, norms, settings.PlanApproval())
+	p, executable := state.ExecutablePlan(norms, settings.PlanApproval(), completed)
 	if !executable {
-		n, err := e.highestPlan()
-		if err != nil {
-			return Result{}, false, err
-		}
-		r, err := e.planner(ctx, t, source, n+1, plan.BackProposal)
+		r, err := e.replan(ctx, latest.Plan.Pattern.Name, "")
 		return r, true, err
 	}
-	return e.advanceStages(ctx, state, p, proposals)
+	return e.advanceStages(ctx, state, p, settings)
 }
 
-func (e *Engine) advanceStages(ctx context.Context, state *ledger.State, p plan.Plan, proposals []plan.VersionEvaluation) (Result, bool, error) {
-	run, ok := state.LatestStageRun()
-	if !ok {
-		return Result{}, false, e.startStage(p, p.StartStage)
+// replan issues the planner for the next plan version to rebuild the remaining work.
+func (e *Engine) replan(ctx context.Context, pattern, rejection string) (Result, error) {
+	n, err := e.highestPlan()
+	if err != nil {
+		return Result{}, err
 	}
-	switch run.State {
-	case ledger.StageInvalidated:
-		return Result{}, false, e.restartInvalidatedStage(state, p, run, proposals)
-	case ledger.StageCompleted:
-		return Result{}, false, e.advanceCompletedStage(p, run)
-	default:
+	return e.planner(ctx, pattern, n+1, plan.BackProposal, rejection)
+}
+
+// advanceStages continues the active stage run or starts the instance where the work continues.
+// Before a new run starts, the fixed loop rules are evaluated again on the work path.
+func (e *Engine) advanceStages(ctx context.Context, state *ledger.State, p plan.Plan, settings config.Config) (Result, bool, error) {
+	run, ok := state.LatestStageRun()
+	if ok && run.State != ledger.StageInvalidated && run.State != ledger.StageCompleted {
 		return e.advanceActiveStage(ctx, state, run)
 	}
-}
-
-func (e *Engine) restartInvalidatedStage(state *ledger.State, p plan.Plan, run *ledger.StageRun, proposals []plan.VersionEvaluation) error {
-	stageID := run.StageID
-	rounds := state.Rounds(run.ID)
-	if len(rounds) > 0 && rounds[len(rounds)-1].Decision != nil && rounds[len(rounds)-1].Decision.Action == plan.Back {
-		old, ok := findPlan(proposals, run.PlanVersion)
-		if !ok {
-			return errors.New("bound plan is missing")
+	if ok && run.State == ledger.StageCompleted {
+		finished, err := e.finishedWork(run)
+		if err != nil || finished {
+			return Result{}, false, err
 		}
-		target, err := old.Next(run.StageID, plan.Back)
-		if err != nil {
-			return err
-		}
-		stageID = *target
 	}
-	return e.startStage(p, stageID)
+	stageID, err := e.pathStart(state, p)
+	if err != nil {
+		return Result{}, false, err
+	}
+	violations, err := e.ruleViolations(state, p, settings)
+	if err != nil {
+		return Result{}, false, err
+	}
+	if len(violations) > 0 {
+		r, err := e.replan(ctx, p.Pattern.Name, violationText(violations))
+		return r, true, err
+	}
+	return Result{}, false, e.startStage(p, stageID)
 }
 
-func (e *Engine) advanceCompletedStage(p plan.Plan, run *ledger.StageRun) error {
+// finishedWork completes the work when the completed run's bound plan ends after it.
+func (e *Engine) finishedWork(run *ledger.StageRun) (bool, error) {
 	old, ok, err := e.boundPlan(run.PlanVersion)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if !ok {
-		return errors.New("bound plan is missing")
+		return false, errors.New("bound plan is missing")
 	}
 	target, err := old.Next(run.StageID, plan.Done)
-	if err != nil {
-		return err
+	if err != nil || target != nil {
+		return false, err
 	}
-	if target == nil {
-		if err := e.active(); err != nil {
-			return err
-		}
-		_, err := e.append(&ledger.StateChange{WorkStatus: ledger.WorkCompleted})
-		return err
+	if err := e.active(); err != nil {
+		return false, err
 	}
-	stageID := *target
-	if stageID == "replan" {
-		stageID = p.StartStage
-	}
-	return e.startStage(p, stageID)
+	_, err = e.append(&ledger.StateChange{WorkStatus: ledger.WorkCompleted})
+	return true, err
 }
 
 func (e *Engine) startStage(p plan.Plan, stageID string) error {
@@ -1309,7 +1321,11 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 	if r, ready, err := e.checkRoundBudget(ctx, state, startRef, snapshot.Tree); err != nil || ready {
 		return r, ready, err
 	}
-	if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), startRef, run.ID); err != nil || pending {
+	required, err := e.catalogChecks(ctx, startRef, stage.RequiredChecks())
+	if err != nil {
+		return Result{}, false, err
+	}
+	if r, pending, err := e.ensureDetection(ctx, state, required, startRef, run.ID); err != nil || pending {
 		if err != nil || r.Instruction != nil || r.Paused {
 			return r, true, err
 		}
@@ -1557,7 +1573,7 @@ func planInstructionsText(p plan.Plan) string {
 		}
 		for _, item := range stage.Checks {
 			for _, instruction := range item.Instructions {
-				fmt.Fprintf(&text, "- %s check %s (%s): %s\n", stage.ID, item.Aspect, item.Runner, instruction)
+				fmt.Fprintf(&text, "- %s check %s: %s\n", stage.ID, item.Aspect, instruction)
 			}
 		}
 		for _, unit := range stage.Units {

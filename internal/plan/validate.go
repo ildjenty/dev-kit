@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -143,10 +145,19 @@ func validateStages(start string, stages, optional []Stage, conditions map[strin
 			return err
 		}
 	}
-	return validateDoneChains(all)
+	if err := validateDoneChains(all); err != nil {
+		return err
+	}
+	if conditions != nil {
+		return validateReachable(start, stages)
+	}
+	return nil
 }
 
 func validateStageTransitions(stage Stage, stages []Stage, ids map[string]bool, plannedBack bool) error {
+	if stage.Transitions.Ask != stage.ID {
+		return fmt.Errorf("%s: ask must target the current stage", stage.ID)
+	}
 	if stage.Transitions.FixRules == nil && stage.Transitions.Fix != stage.ID {
 		return fmt.Errorf("%s: fix must target the current stage", stage.ID)
 	}
@@ -159,7 +170,7 @@ func validateStageTransitions(stage Stage, stages []Stage, ids map[string]bool, 
 			continue
 		}
 		// A back transition replans from its target, so in a plan it may name a stage that
-		// already ran and is no longer selected. ValidateBackTargets checks it against the template.
+		// already ran and is no longer selected. ValidateBackTargets checks it against run IDs.
 		if action == Back && plannedBack && target != nil && *target != "replan" {
 			continue
 		}
@@ -177,21 +188,9 @@ func validateStageTransitions(stage Stage, stages []Stage, ids map[string]bool, 
 func validateStageChecks(stage Stage, conditions map[string]bool) error {
 	for i, check := range stage.Checks {
 		if slices.ContainsFunc(stage.Checks[:i], func(previous Check) bool {
-			return previous.Aspect == check.Aspect && previous.Runner == check.Runner &&
-				(previous.Target != check.Target || !slices.Equal(previous.CompletionConditionIDs, check.CompletionConditionIDs) ||
-					!slices.Equal(previous.Criteria, check.Criteria) || !equalSelection(previous.Examples, check.Examples) ||
-					conflictingCheckFlow(previous, check))
+			return previous.Aspect == check.Aspect && !reflect.DeepEqual(previous, check)
 		}) {
-			return fmt.Errorf("%s: conflicting check mappings for aspect %q and runner %q", stage.ID, check.Aspect, check.Runner)
-		}
-		if check.Runner.IsCommand() && (len(check.Criteria) > 0 || check.Examples != nil) {
-			return fmt.Errorf("%s: command checks must not select criteria or examples", stage.ID)
-		}
-		if check.Runner == "command:" {
-			return fmt.Errorf("%s: command name is missing", stage.ID)
-		}
-		if (check.Runner.IsCommand() || strings.HasPrefix(check.Aspect, "command:")) && check.Aspect != string(check.Runner) {
-			return fmt.Errorf("%s: command aspect and runner differ", stage.ID)
+			return fmt.Errorf("%s: conflicting check mappings for aspect %q", stage.ID, check.Aspect)
 		}
 		for _, id := range check.CompletionConditionIDs {
 			if conditions != nil && !conditions[id] {
@@ -202,10 +201,29 @@ func validateStageChecks(stage Stage, conditions map[string]bool) error {
 	return nil
 }
 
-func conflictingCheckFlow(a, b Check) bool {
-	return a.JudgmentHistory() != b.JudgmentHistory() || !slices.Equal(a.Schemas, b.Schemas) ||
-		!slices.Equal(a.Instructions, b.Instructions) || a.BriefByPlanner != b.BriefByPlanner ||
-		!slices.Equal(a.Outputs, b.Outputs) || (a.Outputs == nil) != (b.Outputs == nil)
+func validateReachable(start string, stages []Stage) error {
+	known := map[string]Stage{}
+	for _, stage := range stages {
+		known[stage.ID] = stage
+	}
+	seen := map[string]bool{}
+	for id := &start; id != nil && *id != "replan"; {
+		stage, ok := known[*id]
+		if !ok {
+			return fmt.Errorf("done transition target not found: %q", *id)
+		}
+		if seen[*id] {
+			return fmt.Errorf("done transitions contain a cycle at stage %q", *id)
+		}
+		seen[*id] = true
+		id = stage.Transitions.Done
+	}
+	for _, stage := range stages {
+		if !seen[stage.ID] {
+			return fmt.Errorf("stage is unreachable from start_stage through done: %q", stage.ID)
+		}
+	}
+	return nil
 }
 
 func validateDoneChains(stages []Stage) error {
@@ -229,26 +247,32 @@ func validateDoneChains(stages []Stage) error {
 	return nil
 }
 
-// ValidateBackTargets checks that every back transition of the plan names a stage of the
-// plan or of its template, including optional stages.
-func ValidateBackTargets(template PlanTemplate, p Plan) error {
-	known := map[string]bool{}
-	for _, stage := range append(append(slices.Clone(template.Stages), template.OptionalStages...), p.Stages...) {
+// ValidateBackTargets accepts only current instance IDs or IDs that ran in this work.
+func ValidateBackTargets(p Plan, runIDs map[string]bool) error {
+	known := maps.Clone(runIDs)
+	if known == nil {
+		known = map[string]bool{}
+	}
+	for _, stage := range p.Stages {
 		known[stage.ID] = true
 	}
 	for _, stage := range p.Stages {
-		if target, _ := stage.Transitions.Next(Back); target != nil && !known[*target] {
-			return fmt.Errorf("%s: back transition target not found: %q", stage.ID, *target)
+		if !known[stage.Transitions.Back] {
+			return fmt.Errorf("%s: back transition target not found: %q", stage.ID, stage.Transitions.Back)
 		}
 	}
 	return nil
 }
 
-func equalSelection(a, b *Selection) bool {
-	if a == nil || b == nil {
-		return a == b
+// ValidateReturnTarget requires a back-triggered proposal to contain its return instance.
+func ValidateReturnTarget(p Plan, returnTarget string) error {
+	if returnTarget == "" {
+		return nil
 	}
-	return *a == *b
+	if _, ok := p.Stage(returnTarget); !ok {
+		return fmt.Errorf("return stage is missing: %q", returnTarget)
+	}
+	return nil
 }
 
 func normalizeFixTargets(stages []Stage) {

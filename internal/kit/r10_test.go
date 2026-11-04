@@ -14,6 +14,27 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
+// bundledCatalog returns the default [checks.<aspect>] catalog written by init and the default
+// plan check, keyed by aspect.
+func bundledCatalog(t *testing.T) map[string]config.CheckDefinition {
+	t.Helper()
+	fragment, err := kit.HostFragment("roles.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings, err := config.Parse(append([]byte("kit_version = \"v3\"\n"), fragment...))
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog := map[string]config.CheckDefinition{}
+	for aspect, item := range settings.Checks {
+		catalog[aspect] = item
+	}
+	defaults := settings.PlanCheckSettings()
+	catalog[defaults.Aspect] = config.CheckDefinition{Runner: defaults.Runner, Criteria: defaults.Criteria}
+	return catalog
+}
+
 func TestBundledCriteriaSelectTheirRequiredDocuments(t *testing.T) {
 	schemas, err := kit.Schema("plan-template")
 	if err != nil {
@@ -27,12 +48,7 @@ func TestBundledCriteriaSelectTheirRequiredDocuments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defaults := (config.Config{}).PlanCheckSettings()
-	planCriteria := []plan.Selection{}
-	for _, selection := range defaults.Criteria {
-		planCriteria = append(planCriteria, plan.Selection{Source: selection.Source, Select: selection.Select})
-	}
-	checks := []plan.Check{{Aspect: defaults.Aspect, Criteria: planCriteria}}
+	catalog := bundledCatalog(t)
 	for _, name := range []string{"default", "fix", "docs"} {
 		data, err := fs.ReadFile(kit.FS(), "plans/"+name+".json")
 		if err != nil {
@@ -42,22 +58,23 @@ func TestBundledCriteriaSelectTheirRequiredDocuments(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !slices.Equal(template.PlannerInputs, plan.DefaultInputs()) || !slices.Equal(template.JudgeInputs, plan.DefaultInputs()) {
-			t.Fatalf("%s does not express default role inputs as data", name)
-		}
 		for _, stage := range append(template.Stages, template.OptionalStages...) {
 			if !slices.Equal(stage.Inputs, append(plan.DefaultInputs(), plan.Selection{Source: "git"})) {
 				t.Fatalf("%s/%s does not express worker inputs as data", name, stage.ID)
 			}
-			checks = append(checks, stage.Checks...)
+			for _, item := range stage.Checks {
+				if _, ok := catalog[item.Aspect]; !ok {
+					t.Errorf("%s/%s selects unconfigured check %s", name, stage.ID, item.Aspect)
+				}
+			}
 		}
 	}
 	references := regexp.MustCompile("`((?:principles|stages|plans|templates|examples)/[^`]+|rules[.]md)`")
-	for _, item := range checks {
-		if item.Runner.IsCommand() {
+	for aspect, item := range catalog {
+		if strings.HasPrefix(item.Runner, "command:") {
 			continue
 		}
-		review, err := fs.ReadFile(kit.FS(), "principles/review/"+item.Aspect+".md")
+		review, err := fs.ReadFile(kit.FS(), "principles/review/"+aspect+".md")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +93,7 @@ func TestBundledCriteriaSelectTheirRequiredDocuments(t *testing.T) {
 				document = "rules/"
 			}
 			if !selected[document] {
-				t.Errorf("%s omits required criteria document %s", item.Aspect, reference[1])
+				t.Errorf("%s omits required criteria document %s", aspect, reference[1])
 			}
 		}
 	}
@@ -87,18 +104,10 @@ func TestTemplateExampleCriteriaMatchBundledTemplates(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fix, err := fs.ReadFile(kit.FS(), "plans/fix.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var template plan.PlanTemplate
-	if err := json.Unmarshal(fix, &template); err != nil {
-		t.Fatal(err)
-	}
-	checks := map[string]plan.Check{}
-	for _, stage := range template.Stages {
-		for _, item := range stage.Checks {
-			checks[item.Aspect] = item
+	checks := map[string][]plan.Selection{}
+	for aspect, item := range bundledCatalog(t) {
+		for _, selection := range item.Criteria {
+			checks[aspect] = append(checks[aspect], plan.Selection{Source: selection.Source, Select: selection.Select})
 		}
 	}
 	blocks := regexp.MustCompile("(?s)```json\\n(.*?)\\n```").FindAllStringSubmatch(string(data), -1)
@@ -111,7 +120,7 @@ func TestTemplateExampleCriteriaMatchBundledTemplates(t *testing.T) {
 	}
 }
 
-func compareExampleCriteria(t *testing.T, value any, checks map[string]plan.Check) {
+func compareExampleCriteria(t *testing.T, value any, checks map[string][]plan.Selection) {
 	t.Helper()
 	switch value := value.(type) {
 	case []any:
@@ -119,7 +128,7 @@ func compareExampleCriteria(t *testing.T, value any, checks map[string]plan.Chec
 			compareExampleCriteria(t, child, checks)
 		}
 	case map[string]any:
-		if aspect, ok := value["aspect"].(string); ok && (aspect == "diff" || aspect == "harness") {
+		if aspect, ok := value["aspect"].(string); ok && (aspect == "diff" || aspect == "harness") && value["criteria"] != nil {
 			body, err := json.Marshal(value["criteria"])
 			if err != nil {
 				t.Fatal(err)
@@ -128,8 +137,8 @@ func compareExampleCriteria(t *testing.T, value any, checks map[string]plan.Chec
 			if err := json.Unmarshal(body, &selections); err != nil {
 				t.Fatal(err)
 			}
-			if !slices.Equal(selections, checks[aspect].Criteria) {
-				t.Errorf("example %s criteria differ from the bundled template", aspect)
+			if !slices.Equal(selections, checks[aspect]) {
+				t.Errorf("example %s criteria differ from the bundled check catalog", aspect)
 			}
 		}
 		for _, child := range value {

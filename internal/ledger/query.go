@@ -368,7 +368,13 @@ func (s *State) PlanEvaluations(norms []form.NormReference) []plan.VersionEvalua
 }
 
 // ExecutablePlan applies plan's version selection only when opening a new stage run.
-func (s *State) ExecutablePlan(template plan.PlanTemplate, norms []form.NormReference, policy string) (plan.Plan, bool) {
+// completedIDs holds the adopted completed instances used to compare with the last approved plan.
+func (s *State) ExecutablePlan(norms []form.NormReference, policy string, completedIDs map[string]bool) (plan.Plan, bool) {
+	return plan.ExecutableVersion(s.PlanEvaluations(norms), s.replanAfter(), policy, completedIDs)
+}
+
+// replanAfter returns the highest plan version awaiting replanning after back or replan.
+func (s *State) replanAfter() int {
 	replanAfter := 0
 	for _, record := range s.records {
 		if round, ok := record.Payload.(*Round); ok && round.Decision != nil && round.Decision.Action == plan.Back {
@@ -392,22 +398,22 @@ func (s *State) ExecutablePlan(template plan.PlanTemplate, norms []form.NormRefe
 			}
 		}
 	}
-	versions := s.PlanEvaluations(norms)
-	for i := len(versions) - 1; i >= 0; i-- {
-		if versions[i].Withdrawn && versions[i].Origin == plan.HumanProposal {
-			continue
-		}
-		template = s.ApprovalTemplate(template, versions[i].Plan)
-		break
-	}
-	return plan.ExecutableVersion(template, versions, replanAfter, policy)
+	return replanAfter
 }
 
-// StageMetrics counts the rounds of one stage across all of its runs.
+// StageMetrics counts the rounds of one stage instance across all of its runs.
 type StageMetrics struct {
 	StageID string `json:"stage_id"`
 	Runs    int    `json:"runs"`
 	Rounds  int    `json:"rounds"`
+}
+
+// DefinitionMetrics counts the runs and rounds of every instance of one stage definition.
+type DefinitionMetrics struct {
+	Definition string `json:"definition"`
+	Instances  int    `json:"instances"`
+	Runs       int    `json:"runs"`
+	Rounds     int    `json:"rounds"`
 }
 
 // StopCount counts human questions of one stop category.
@@ -418,7 +424,8 @@ type StopCount struct {
 
 // Metrics is derived from existing records for status and view; it is never stored.
 type Metrics struct {
-	Stages          []StageMetrics `json:"stages"`
+	Stages          []StageMetrics      `json:"stages"`
+	Definitions     []DefinitionMetrics `json:"definitions"`
 	TotalRounds     int            `json:"total_rounds"`
 	HumanStops      int            `json:"human_stops"`
 	StopReasons     []StopCount    `json:"stop_reasons"`
@@ -433,8 +440,9 @@ type Metrics struct {
 // Metrics counts per-work rounds by stage, human stops and their reasons, assignee changes,
 // detection tests, and request sizes. Counts never decrease after backs or replans.
 func (s *State) Metrics() Metrics {
-	m := Metrics{Stages: []StageMetrics{}, StopReasons: []StopCount{}}
+	m := Metrics{Stages: []StageMetrics{}, Definitions: []DefinitionMetrics{}, StopReasons: []StopCount{}}
 	for _, run := range s.StageRuns() {
+		s.countDefinition(&m, run)
 		index := slices.IndexFunc(m.Stages, func(item StageMetrics) bool { return item.StageID == run.StageID })
 		if index < 0 {
 			m.Stages = append(m.Stages, StageMetrics{StageID: run.StageID})
@@ -461,6 +469,28 @@ func (s *State) Metrics() Metrics {
 	}
 	s.briefMetrics(&m)
 	return m
+}
+
+// countDefinition adds one run to its definition, found through the run's bound plan.
+func (s *State) countDefinition(m *Metrics, run *StageRun) {
+	definition := run.StageID
+	for _, record := range s.records {
+		if proposal, ok := record.Payload.(*PlanVersion); ok && proposal.Plan.Version == run.PlanVersion {
+			if stage, found := proposal.Plan.Stage(run.StageID); found {
+				definition = stage.DefinitionID()
+			}
+		}
+	}
+	index := slices.IndexFunc(m.Definitions, func(item DefinitionMetrics) bool { return item.Definition == definition })
+	if index < 0 {
+		m.Definitions = append(m.Definitions, DefinitionMetrics{Definition: definition})
+		index = len(m.Definitions) - 1
+	}
+	if !slices.ContainsFunc(m.Stages, func(item StageMetrics) bool { return item.StageID == run.StageID }) {
+		m.Definitions[index].Instances++
+	}
+	m.Definitions[index].Runs++
+	m.Definitions[index].Rounds += len(s.Rounds(run.ID))
 }
 
 func (s *State) briefMetrics(m *Metrics) {

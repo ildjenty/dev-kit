@@ -11,7 +11,6 @@ const (
 	TemplateSchemaPath = "schemas/plan-template.json"
 	PlanSchemaPath     = "schemas/plan.json"
 	PlanSchemaVersion  = 1
-	DefaultPlanRounds  = 3
 )
 
 type Assignee string
@@ -63,10 +62,6 @@ func (l Limits) Reached(rounds, noProgress int) bool {
 	return rounds >= l.MaxRounds || noProgress >= l.MaxNoProgress
 }
 
-type PlanLimits struct {
-	MaxRounds int `json:"max_rounds"`
-}
-
 type Gate struct {
 	Required bool   `json:"required"`
 	Reason   string `json:"reason"`
@@ -97,20 +92,23 @@ func DefaultInputs() []Selection {
 	return []Selection{{Source: "requirements", Select: ""}, {Source: "rules", Select: ""}, {Source: "structure", Select: ""}}
 }
 
-// The caller resolves judge role IDs and judgment command names.
+// Check selects a configured check and binds it to this task.
 type Check struct {
-	History                History     `json:"history,omitempty"`
-	Schemas                []string    `json:"schemas,omitempty"`
-	Outputs                []string    `json:"outputs"`
-	BriefByPlanner         bool        `json:"brief_by_planner,omitempty"`
-	Instructions           []string    `json:"instructions,omitempty"`
-	Criteria               []Selection `json:"criteria,omitempty"`
-	Examples               *Selection  `json:"examples,omitempty"`
-	Aspect                 string      `json:"aspect"`
-	Runner                 Runner      `json:"runner"`
-	Required               bool        `json:"required"`
-	CompletionConditionIDs []string    `json:"completion_condition_ids,omitempty"`
-	Target                 string      `json:"target,omitempty"`
+	Aspect                 string   `json:"aspect"`
+	Required               bool     `json:"required"`
+	Target                 string   `json:"target,omitempty"`
+	CompletionConditionIDs []string `json:"completion_condition_ids,omitempty"`
+	Instructions           []string `json:"instructions,omitempty"`
+}
+
+// CheckDefinition is the fixed configuration for a named check.
+type CheckDefinition struct {
+	Runner         Runner      `json:"runner"`
+	Criteria       []Selection `json:"criteria,omitempty"`
+	Examples       *Selection  `json:"examples,omitempty"`
+	Schemas        []string    `json:"schemas,omitempty"`
+	History        History     `json:"history,omitempty"`
+	BriefByPlanner bool        `json:"brief_by_planner,omitempty"`
 }
 
 type Stage struct {
@@ -123,6 +121,7 @@ type Stage struct {
 	Instructions []string    `json:"instructions,omitempty"`
 	Inputs       []Selection `json:"inputs"`
 	ID           string      `json:"id"`
+	Definition   string      `json:"definition,omitempty"`
 	Split        bool        `json:"split,omitempty"`
 	Units        []Unit      `json:"units,omitempty"`
 	Assignee     Assignee    `json:"assignee"`
@@ -151,7 +150,7 @@ func (s Stage) WorkerHistory() History {
 }
 
 // JudgmentHistory returns the optional history scope; required evidence is always supplied.
-func (c Check) JudgmentHistory() History {
+func (c CheckDefinition) JudgmentHistory() History {
 	if c.History == "" {
 		return HistoryCheck
 	}
@@ -180,28 +179,18 @@ func (s Stage) CompletionRule() CompletionRule {
 	return CompletionRule{s.RequiredChecks(), true, true, true}
 }
 
+// PlanTemplate is a reference pattern, not a constraint on task plans.
 type PlanTemplate struct {
-	PlannerInputs  []Selection `json:"planner_inputs"`
-	JudgeInputs    []Selection `json:"judge_inputs"`
-	Name           string      `json:"name"`
-	StartStage     string      `json:"start_stage"`
-	Stages         []Stage     `json:"stages"`
-	OptionalStages []Stage     `json:"optional_stages"`
-	PlanLimits     *PlanLimits `json:"plan_limits,omitempty"`
+	Name           string  `json:"name"`
+	StartStage     string  `json:"start_stage"`
+	Stages         []Stage `json:"stages"`
+	OptionalStages []Stage `json:"optional_stages"`
 }
 
-func (t PlanTemplate) PlanRoundsReached(rounds int) bool {
-	limit := DefaultPlanRounds
-	if t.PlanLimits != nil {
-		limit = t.PlanLimits.MaxRounds
-	}
-	return rounds >= limit
-}
-
-// ContentHash hashes the original template bytes, including any trailing newline.
+// ContentHash hashes the original pattern bytes, including any trailing newline.
 func ContentHash(data []byte) string { return fmt.Sprintf("%x", sha256.Sum256(data)) }
 
-type TemplateRef struct {
+type PatternRef struct {
 	Name        string `json:"name"`
 	ContentHash string `json:"content_hash"`
 }
@@ -221,7 +210,7 @@ type ExternalOperation struct {
 
 type Plan struct {
 	Version               int                   `json:"version"`
-	Template              TemplateRef           `json:"template"`
+	Pattern               PatternRef            `json:"pattern"`
 	Task                  string                `json:"task"`
 	OpenQuestions         []string              `json:"open_questions,omitempty"`
 	CompletionConditions  []CompletionCondition `json:"completion_conditions"`
@@ -259,12 +248,6 @@ func (p Plan) Declares(operation ExternalOperation) bool {
 // WorkerInputs returns the stage selections, or the defaults when omitted.
 func (s Stage) WorkerInputs() []Selection { return roleInputs(s.Inputs) }
 
-// PlannerSelections returns the planner selections, or the defaults when omitted.
-func (t PlanTemplate) PlannerSelections() []Selection { return roleInputs(t.PlannerInputs) }
-
-// JudgeSelections returns the judge selections, or the defaults when omitted.
-func (t PlanTemplate) JudgeSelections() []Selection { return roleInputs(t.JudgeInputs) }
-
 func roleInputs(inputs []Selection) []Selection {
 	if inputs == nil {
 		return DefaultInputs()
@@ -273,16 +256,17 @@ func roleInputs(inputs []Selection) []Selection {
 }
 
 func cloneCheck(c Check) Check {
-	c.Schemas = slices.Clone(c.Schemas)
-	c.Outputs = slices.Clone(c.Outputs)
 	c.Instructions = slices.Clone(c.Instructions)
-	c.Criteria = slices.Clone(c.Criteria)
-	if c.Examples != nil {
-		examples := *c.Examples
-		c.Examples = &examples
-	}
 	c.CompletionConditionIDs = slices.Clone(c.CompletionConditionIDs)
 	return c
+}
+
+// DefinitionID returns the stage definition, defaulting to the instance ID.
+func (s Stage) DefinitionID() string {
+	if s.Definition == "" {
+		return s.ID
+	}
+	return s.Definition
 }
 
 func cloneStage(s Stage) Stage {

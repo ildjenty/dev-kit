@@ -428,7 +428,7 @@ func runExternalCommand(ctx context.Context, e *engine.Engine, f *flag.FlagSet, 
 }
 
 func runStartCommand(ctx context.Context, e *engine.Engine, f *flag.FlagSet, args []string) (engine.Result, error) {
-	template := f.String("plan", "", "Repository plan template")
+	pattern := f.String("plan", "", "Loop pattern the planner prioritizes (default_plan when omitted)")
 	taskFile := f.String("task-file", "", "File containing the task text")
 	if err := parse(f, args, 0, len(args)); err != nil {
 		return engine.Result{}, err
@@ -450,5 +450,5 @@ func runStartCommand(ctx context.Context, e *engine.Engine, f *flag.FlagSet, arg
 		}
 		task = string(data)
 	}
-	return e.Start(ctx, engine.StartRequest{Template: *template, Task: task})
+	return e.Start(ctx, engine.StartRequest{Pattern: *pattern, Task: task})
 }

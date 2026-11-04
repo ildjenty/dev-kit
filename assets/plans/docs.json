@@ -1,29 +1,14 @@
 {
   "name": "docs",
-  "start_stage": "implement",
+  "start_stage": "edit",
   "stages": [
     {
-      "id": "implement",
+      "id": "edit",
       "assignee": "worker",
       "checks": [
         {
           "aspect": "wording",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/wording.md"
-            },
-            {
-              "source": "principles",
-              "select": "writing.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "wording/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -35,9 +20,9 @@
         "max_no_progress": 2
       },
       "transitions": {
-        "fix": "implement",
-        "ask": "implement",
-        "back": "implement",
+        "fix": "edit",
+        "ask": "edit",
+        "back": "edit",
         "done": "retrospective"
       },
       "inputs": [
@@ -69,51 +54,7 @@
       "checks": [
         {
           "aspect": "harness",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/harness.md"
-            },
-            {
-              "source": "principles",
-              "select": "harness.md"
-            },
-            {
-              "source": "principles",
-              "select": "working.md"
-            },
-            {
-              "source": "principles",
-              "select": "review/README.md"
-            },
-            {
-              "source": "stages",
-              "select": "README.md"
-            },
-            {
-              "source": "stages",
-              "select": "retrospective.md"
-            },
-            {
-              "source": "plans",
-              "select": "README.md"
-            },
-            {
-              "source": "examples",
-              "select": "README.md"
-            },
-            {
-              "source": "templates",
-              "select": "brief/judgment.md.tmpl"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "harness/spec.json"
-          },
-          "history": "all"
+          "required": true
         }
       ],
       "gate": {
@@ -127,7 +68,7 @@
       "transitions": {
         "fix": "retrospective",
         "ask": "retrospective",
-        "back": "implement",
+        "back": "edit",
         "done": null
       },
       "inputs": [
@@ -172,7 +113,7 @@
         "fix": "research",
         "ask": "research",
         "back": "research",
-        "done": "implement"
+        "done": "edit"
       },
       "inputs": [
         {
@@ -203,26 +144,7 @@
       "checks": [
         {
           "aspect": "contract",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/contract.md"
-            },
-            {
-              "source": "principles",
-              "select": "data.md"
-            },
-            {
-              "source": "principles",
-              "select": "engineering.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "contract/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -237,7 +159,7 @@
         "fix": "prototype",
         "ask": "prototype",
         "back": "prototype",
-        "done": "implement"
+        "done": "edit"
       },
       "inputs": [
         {
@@ -261,34 +183,6 @@
         "source": "templates",
         "select": "reports/prototype.json"
       }
-    }
-  ],
-  "planner_inputs": [
-    {
-      "source": "requirements",
-      "select": ""
-    },
-    {
-      "source": "rules",
-      "select": ""
-    },
-    {
-      "source": "structure",
-      "select": ""
-    }
-  ],
-  "judge_inputs": [
-    {
-      "source": "requirements",
-      "select": ""
-    },
-    {
-      "source": "rules",
-      "select": ""
-    },
-    {
-      "source": "structure",
-      "select": ""
     }
   ]
 }

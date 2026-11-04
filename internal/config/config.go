@@ -15,6 +15,8 @@ import (
 
 // Config represents validated devkit.toml settings.
 type Config struct {
+	Checks         map[string]CheckDefinition   `toml:"checks"`
+	Loop           LoopRules                    `toml:"loop"`
 	Roles          Roles                        `toml:"roles"`
 	Planning       Planning                     `toml:"planning"`
 	KitVersion     string                       `toml:"kit_version"`
@@ -71,6 +73,7 @@ type Approval struct {
 
 // PlanCheck selects the name, runner, criteria, and detection specification for plan judgments.
 type PlanCheck struct {
+	Inputs   []Selection `toml:"inputs"`
 	Aspect   string      `toml:"aspect"`
 	Runner   string      `toml:"runner"`
 	Criteria []Selection `toml:"criteria"`
@@ -81,6 +84,7 @@ type PlanCheck struct {
 // PlanCheckSettings returns the effective plan judgment settings.
 func (c Config) PlanCheckSettings() PlanCheck {
 	settings := c.PlanCheck
+	settings.Inputs = effectiveInputs(settings.Inputs)
 	if settings.Aspect == "" {
 		settings.Aspect = "plan"
 	}
@@ -117,10 +121,12 @@ type Classification struct {
 	DependencyFiles []string `toml:"dependency_files"`
 }
 
-// Limits holds continuation limits and an optional work-wide round budget.
+// Limits holds continuation limits, stage ceilings, and the work-wide round budget.
 type Limits struct {
-	StopContinuation int  `toml:"stop_continuation"`
-	MaxTotalRounds   *int `toml:"max_total_rounds"`
+	StopContinuation     int  `toml:"stop_continuation"`
+	MaxRoundsCeiling     int  `toml:"max_rounds_ceiling"`
+	MaxNoProgressCeiling int  `toml:"max_no_progress_ceiling"`
+	MaxTotalRounds       *int `toml:"max_total_rounds"`
 }
 
 // Lessons holds the priority order of repository lesson destinations.
@@ -145,7 +151,7 @@ const (
 	TargetChangedAgain = "target_changed_again"
 )
 
-// DefaultPlanName returns the effective plan template name.
+// DefaultPlanName returns the effective prioritized pattern name.
 func (c Config) DefaultPlanName() string {
 	if c.DefaultPlan == "" {
 		return "default"
@@ -280,6 +286,12 @@ func Parse(data []byte) (Config, error) {
 	c.Router.HumanConfirmation = c.HumanConfirmation()
 	c.PlanCheck = c.PlanCheckSettings()
 	c.Limits.StopContinuation = c.StopContinuation()
+	c.Limits.MaxRoundsCeiling = 3
+	c.Limits.MaxNoProgressCeiling = 2
+	totalRounds := 40
+	c.Limits.MaxTotalRounds = &totalRounds
+	c.Planning.MaxRounds = 3
+	c.Planning.Inputs = effectiveInputs(nil)
 	c.Lessons.Destinations = c.LessonDestinations()
 	c.Parallel.MaxConcurrent = c.MaxConcurrent()
 	c.Briefs.MaxBytes = c.BriefMaxBytes()
@@ -327,6 +339,9 @@ func (c Config) Validate() error {
 		return err
 	}
 	if err := c.validateRoles(); err != nil {
+		return err
+	}
+	if err := c.validateDynamicSettings(); err != nil {
 		return err
 	}
 	if err := c.validatePlanSettings(); err != nil {

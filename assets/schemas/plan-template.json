@@ -21,37 +21,6 @@
       "items": {
         "$ref": "#/$defs/template-stage"
       }
-    },
-    "plan_limits": {
-      "type": "object",
-      "properties": {
-        "max_rounds": {
-          "type": "integer",
-          "minimum": 1
-        }
-      },
-      "required": [
-        "max_rounds"
-      ],
-      "additionalProperties": false
-    },
-    "planner_inputs": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/$defs/selection"
-      }
-    },
-    "judge_inputs": {
-      "type": [
-        "array",
-        "null"
-      ],
-      "items": {
-        "$ref": "#/$defs/selection"
-      }
     }
   },
   "required": [
@@ -308,6 +277,10 @@
         },
         "instructions": {
           "$ref": "#/$defs/instructions"
+        },
+        "definition": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -327,10 +300,6 @@
           "type": "string",
           "minLength": 1
         },
-        "runner": {
-          "type": "string",
-          "minLength": 1
-        },
         "required": {
           "type": "boolean"
         },
@@ -347,34 +316,12 @@
           "type": "string",
           "minLength": 1
         },
-        "criteria": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/selection"
-          }
-        },
-        "examples": {
-          "$ref": "#/$defs/selection"
-        },
-        "history": {
-          "$ref": "#/$defs/history"
-        },
-        "schemas": {
-          "$ref": "#/$defs/schema-names"
-        },
-        "outputs": {
-          "$ref": "#/$defs/outputs"
-        },
-        "brief_by_planner": {
-          "type": "boolean"
-        },
         "instructions": {
           "$ref": "#/$defs/instructions"
         }
       },
       "required": [
         "aspect",
-        "runner",
         "required"
       ],
       "additionalProperties": false
@@ -406,7 +353,7 @@
       ]
     },
     "outputs": {
-      "description": "Stage IDs whose adopted outputs are inline. Omitted or null selects all; an empty array selects none. Other adopted outputs remain available through the fixed index.",
+      "description": "Instance IDs or definition IDs whose adopted outputs are inline. A definition selects all its instances. Omitted or null selects all; an empty array selects none.",
       "type": [
         "array",
         "null"

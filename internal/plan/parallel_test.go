@@ -5,21 +5,18 @@ import (
 	"testing"
 )
 
-func TestSplitUnitsValidationAndDeviation(t *testing.T) {
+func TestSplitUnitsValidation(t *testing.T) {
 	v := validator(t)
 	template, hash := loadTemplate(t, v, "docs")
 	template.Stages[0].Split = true
 	if err := v.ValidateTemplate(template); err != nil {
 		t.Fatal(err)
 	}
-	p := NewPlan(template, hash, "Update documentation", []CompletionCondition{{ID: "C1", Description: "Updated documents"}})
+	p := newTestPlan(template, hash, "Update documentation", []CompletionCondition{{ID: "C1", Description: "Updated documents"}})
 	bindChecks(&p)
 	p.Stages[0].Units = []Unit{{ID: "one", Description: "First change", Scope: "docs/"}, {ID: "two", Description: "Second change", Scope: "docs/"}}
 	if err := v.ValidatePlan(p); err != nil {
 		t.Fatalf("scope overlap must be checked by the plan judge: %v", err)
-	}
-	if len(Deviations(template, p)) != 0 {
-		t.Fatal("adding units to a split stage is a deviation")
 	}
 	next, _ := Replan(p, p)
 	next.Stages[0].Units[0].Scope = "other/"
@@ -40,16 +37,6 @@ func TestSplitUnitsValidationAndDeviation(t *testing.T) {
 		change(&candidate)
 		if err := v.ValidatePlan(candidate); err == nil {
 			t.Fatal("accepted invalid unit data")
-		}
-	}
-	for _, split := range []bool{false, true} {
-		original := template
-		original.Stages = slices.Clone(template.Stages)
-		original.Stages[0].Split = split
-		candidate := clonePlan(p)
-		candidate.Stages[0].Split = !split
-		if !slices.ContainsFunc(Deviations(original, candidate), func(d Deviation) bool { return d.Kind == ChangedSplit }) {
-			t.Fatal("changing split was not a deviation")
 		}
 	}
 	template.Stages[0].Units = p.Stages[0].Units

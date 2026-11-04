@@ -65,7 +65,7 @@ func (e *Engine) outputSchema(ctx context.Context, ref, runner string) ([]byte, 
 	schema, err := form.CompileSchemaWithResources(source, resources)
 	return source, schema, err
 }
-func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, item plan.Check, kind form.InstructionKind, key, ref string, target form.TargetVersion, path string, round *ledger.Round, version int) (ledger.Instruction, instructionData, bool, error) {
+func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, item catalogCheck, kind form.InstructionKind, key, ref string, target form.TargetVersion, path string, round *ledger.Round, version int) (ledger.Instruction, instructionData, bool, error) {
 	meta, fresh, err := e.issuance(kind, key, round, version, "")
 	if err != nil {
 		return meta, instructionData{}, false, err
@@ -99,7 +99,7 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 
 // judgmentRequest records the judgment identity: norms by reference, criteria by hash, and the
 // judged report, findings, and approvals. Document bodies are rendered once in the brief.
-func (e *Engine) judgmentRequest(ctx context.Context, state *ledger.State, item plan.Check, meta *ledger.Instruction, ref string, target form.TargetVersion, path string, round *ledger.Round, version int) (check.Request, []plan.Selection, error) {
+func (e *Engine) judgmentRequest(ctx context.Context, state *ledger.State, item catalogCheck, meta *ledger.Instruction, ref string, target form.TargetVersion, path string, round *ledger.Round, version int) (check.Request, []plan.Selection, error) {
 	norms, _, err := e.normDocuments(ctx, ref)
 	if err != nil {
 		return check.Request{}, nil, err
@@ -107,7 +107,7 @@ func (e *Engine) judgmentRequest(ctx context.Context, state *ledger.State, item 
 	for i := range norms {
 		norms[i].Content = ""
 	}
-	inputs, err := e.judgeInputs(ctx, ref, version)
+	inputs, err := e.judgeInputs(ctx, state, ref, version, round)
 	if err != nil {
 		return check.Request{}, nil, err
 	}
@@ -159,14 +159,14 @@ func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan
 		return Result{}, err
 	}
 	selected := settings.PlanCheckSettings()
-	item := plan.Check{Aspect: selected.Aspect, Runner: plan.Runner(selected.Runner), Required: true, Criteria: planSelections(selected.Criteria), Schemas: selected.Schemas}
+	item := catalogCheck{plan.Check{Aspect: selected.Aspect, Required: true}, plan.CheckDefinition{Runner: plan.Runner(selected.Runner), Criteria: planSelections(selected.Criteria), Schemas: selected.Schemas}}
 	if selected.Examples != nil {
 		item.Examples = &plan.Selection{Source: selected.Examples.Source, Select: selected.Examples.Select}
 	}
 	if ref, err = e.refreshSources(ctx, ref); err != nil {
 		return Result{}, err
 	}
-	if r, pending, err := e.ensureDetection(ctx, state, []plan.Check{item}, ref); pending || err != nil {
+	if r, pending, err := e.ensureDetection(ctx, state, []catalogCheck{item}, ref); pending || err != nil {
 		return r, err
 	}
 	// A plan check is tied to the proposal and the norms at issuance.
@@ -272,7 +272,11 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 		return Result{}, err
 	}
 	batch := &judgeBatch{free: newSlots(state, settings)}
-	for _, item := range orderedChecks(stage.Checks, settings) {
+	items, err := resolveChecks(settings, stage.Checks)
+	if err != nil {
+		return Result{}, err
+	}
+	for _, item := range orderedChecks(items, settings) {
 		state, err = e.load()
 		if err != nil {
 			return Result{}, err
@@ -598,7 +602,7 @@ func humanStageAnswer(state *ledger.State, run *ledger.StageRun, round *ledger.R
 	return answer.Answer, ok && answer.Answer.Target == question.ApprovalTarget && answer.Answer.Interpretation != ledger.AnswerDeferred
 }
 
-func (e *Engine) reuseJudgment(ctx context.Context, meta *ledger.Instruction, item plan.Check, target form.TargetVersion, ref string) (instructionData, bool, error) {
+func (e *Engine) reuseJudgment(ctx context.Context, meta *ledger.Instruction, item catalogCheck, target form.TargetVersion, ref string) (instructionData, bool, error) {
 	data, err := e.readInstruction(meta.ID)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return instructionData{}, false, err
@@ -712,7 +716,7 @@ func (e *Engine) pendingRequestCurrent(ctx context.Context, state *ledger.State,
 		return false, false, err
 	}
 	if request.Detection != nil {
-		current, _, err := e.detectionInput(ctx, ref, request.Detection.Check)
+		current, _, err := e.detectionInput(ctx, ref, catalogCheck{request.Detection.Check, request.Detection.Definition})
 		if err != nil {
 			return false, false, err
 		}
@@ -780,19 +784,10 @@ func (e *Engine) acceptPlannerResult(ctx context.Context, state *ledger.State, i
 	if err != nil {
 		return e.rejectResult(instruction, obs, err)
 	}
-	source, err := e.asset(ctx, request.Reference, "plans/"+request.TemplateName+".json")
-	if err != nil {
-		return false, err
-	}
-	if p.Template.Name != request.TemplateName || p.Template.ContentHash != plan.ContentHash(source) {
-		return e.rejectResult(instruction, obs, errors.New("planner template does not match its instruction"))
-	}
-	if template, err := e.plans.ParseTemplate(source); err != nil {
-		return false, err
-	} else if err := plan.ValidateBackTargets(template, p); err != nil {
+	if err := e.validateProposal(ctx, state, p, request.Reference); err != nil {
 		return e.rejectResult(instruction, obs, err)
 	}
-	return true, e.acceptPlan(ctx, state, p, request.Origin, instruction.ID)
+	return true, e.acceptPlan(p, request.Origin, instruction.ID)
 }
 
 func (e *Engine) parsePlannerResult(instruction ledger.Instruction, content []byte) (plan.Plan, error) {
@@ -822,8 +817,8 @@ type judgeBatch struct {
 
 // orderedChecks runs verification commands first, then registered judgment commands, and
 // subagent judges last so that their instructions are issued together.
-func orderedChecks(checks []plan.Check, settings config.Config) []plan.Check {
-	rank := func(item plan.Check) int {
+func orderedChecks(checks []catalogCheck, settings config.Config) []catalogCheck {
+	rank := func(item catalogCheck) int {
 		if item.Runner.IsCommand() {
 			return 0
 		}
@@ -833,11 +828,11 @@ func orderedChecks(checks []plan.Check, settings config.Config) []plan.Check {
 		return 2
 	}
 	items := slices.Clone(checks)
-	slices.SortStableFunc(items, func(a, b plan.Check) int { return rank(a) - rank(b) })
+	slices.SortStableFunc(items, func(a, b catalogCheck) int { return rank(a) - rank(b) })
 	return items
 }
 
-func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item plan.Check, path string, batch *judgeBatch) (Result, bool, error) {
+func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item catalogCheck, path string, batch *judgeBatch) (Result, bool, error) {
 	target := *round.ReturnedTarget
 	judgments, err := e.roundJudgments(round)
 	if err != nil {
@@ -898,7 +893,7 @@ func (e *Engine) judgeRoundCheck(ctx context.Context, state *ledger.State, p pla
 
 // issueRoundJudge issues a subagent judgment, preceded by a pre-judgment planner instruction for
 // brief_by_planner checks, when a slot is free under both concurrency limits.
-func (e *Engine) issueRoundJudge(ctx context.Context, state *ledger.State, p plan.Plan, round *ledger.Round, item plan.Check, path string, settings config.Config, batch *judgeBatch) (Result, bool, error) {
+func (e *Engine) issueRoundJudge(ctx context.Context, state *ledger.State, p plan.Plan, round *ledger.Round, item catalogCheck, path string, settings config.Config, batch *judgeBatch) (Result, bool, error) {
 	if role, ok := settings.RoleSettings()[string(item.Runner)]; !ok || role.Kind != "judge" {
 		return Result{}, false, fmt.Errorf("judge %q is neither a registered command nor a devkit subagent", item.Runner)
 	}
@@ -932,7 +927,7 @@ func (e *Engine) issueRoundJudge(ctx context.Context, state *ledger.State, p pla
 	return Result{}, false, nil
 }
 
-func (e *Engine) judgeCommandCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item plan.Check, request instructionData, settings config.Config) (Result, bool, error) {
+func (e *Engine) judgeCommandCheck(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, run *ledger.StageRun, round *ledger.Round, item catalogCheck, request instructionData, settings config.Config) (Result, bool, error) {
 	target := *round.ReturnedTarget
 	var err error
 	command, ok := settings.Commands[strings.TrimPrefix(string(item.Runner), "command:")]
@@ -1056,11 +1051,15 @@ func (e *Engine) decideRound(ctx context.Context, p plan.Plan, stage plan.Stage,
 	for _, item := range stage.Checks {
 		targets[item.Target] = target
 	}
-	requirements, tests, err := e.detectionContext(ctx, stage.RequiredChecks(), roundReference(round))
+	settings, err := e.settings(ctx, roundReference(round))
 	if err != nil {
 		return Result{}, err
 	}
-	settings, err := e.settings(ctx, roundReference(round))
+	required, err := resolveChecks(settings, stage.RequiredChecks())
+	if err != nil {
+		return Result{}, err
+	}
+	requirements, tests, err := e.detectionContext(ctx, required, roundReference(round))
 	if err != nil {
 		return Result{}, err
 	}
@@ -1069,7 +1068,7 @@ func (e *Engine) decideRound(ctx context.Context, p plan.Plan, stage plan.Stage,
 	}
 	rule := stage.CompletionRule()
 	rule.RequireDetectionTests = settings.DetectionRequired()
-	completion := router.CheckCompletion(router.CompletionInput{Rule: rule, TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments, Detection: requirements, DetectionTests: tests})
+	completion := router.CheckCompletion(router.CompletionInput{Rule: rule, Runners: checkRunners(required), TargetVersion: target, Targets: targets, Norms: round.Norms, Judgments: judgments, Detection: requirements, DetectionTests: tests})
 	summary := check.Aggregate(judgments)
 	categories, err := e.roundConfirmationCategories(ctx, state, round, settings)
 	if err != nil {
@@ -1148,7 +1147,16 @@ func (e *Engine) rejectReadOnlyEdits(ctx context.Context, state *ledger.State, p
 	return r, true, err
 }
 
-func (e *Engine) judgeInputs(ctx context.Context, ref string, version int) ([]plan.Selection, error) {
+// judgeInputs selects the judge's knowledge inputs: [plan_check] inputs for a plan check and the
+// judged stage's inputs for a round judgment.
+func (e *Engine) judgeInputs(ctx context.Context, state *ledger.State, ref string, version int, round *ledger.Round) ([]plan.Selection, error) {
+	if round == nil {
+		settings, err := e.settings(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		return planSelections(settings.PlanCheckSettings().Inputs), nil
+	}
 	p, ok, err := e.boundPlan(version)
 	if err != nil {
 		return nil, err
@@ -1156,8 +1164,16 @@ func (e *Engine) judgeInputs(ctx context.Context, ref string, version int) ([]pl
 	if !ok {
 		return nil, errors.New("bound plan is missing")
 	}
-	template, _, err := e.template(ctx, ref, p.Template.Name)
-	return template.JudgeSelections(), err
+	for _, run := range state.StageRuns() {
+		if run.ID == round.StageRunID {
+			stage, found := p.Stage(run.StageID)
+			if !found {
+				return nil, errors.New("bound stage is missing")
+			}
+			return stage.WorkerInputs(), nil
+		}
+	}
+	return nil, errors.New("judged stage run is missing")
 }
 
 // judgmentCommandInput keeps recorded document identities separate from runtime bodies.
@@ -1186,6 +1202,6 @@ func (e *Engine) judgmentCommandInput(ctx context.Context, data instructionData,
 
 // judgmentKey identifies a round judgment by round, aspect, and runner. Pre-judgment
 // instructions, history scope, and reissues bind to the same key.
-func judgmentKey(round *ledger.Round, item plan.Check) string {
+func judgmentKey(round *ledger.Round, item catalogCheck) string {
 	return round.ID + ":" + item.Aspect + ":" + string(item.Runner)
 }

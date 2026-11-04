@@ -80,7 +80,7 @@ func TestReadOnlyOutsideProductsIdentifyEveryRound(t *testing.T) {
 	outside := t.TempDir()
 	write(t, outside, "requirements.md", "First read-only requirements.\n")
 	configure(t, e, "[detection]\nrequired = false\n[sources.requirements]\npath = "+strconv.Quote(outside)+"\nwritable = false\n")
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,16 +122,14 @@ func TestReadOnlyOutsideProductsIdentifyEveryRound(t *testing.T) {
 
 func TestTemplateRoleInputsReachPlannerWorkerAndJudge(t *testing.T) {
 	e, ctx := fixture(t)
-	configure(t, e, "[detection]\nrequired = false\n[sources.context]\npath = 'context'\nnorm = true\n")
+	configure(t, e, "[detection]\nrequired = false\n[sources.context]\npath = 'context'\nnorm = true\n[planning]\ninputs = [{ source = 'context', select = 'planner.md' }]\n[plan_check]\ninputs = [{ source = 'context', select = 'judge.md' }]\n")
 	for _, role := range []string{"planner", "worker", "judge"} {
 		write(t, e.Root(), "context/"+role+".md", "Only the "+role+" receives this context.")
 	}
-	template, _, err := e.template(ctx, "HEAD", "test")
+	template, _, err := e.pattern(ctx, "HEAD", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	template.PlannerInputs = []plan.Selection{{Source: "context", Select: "planner.md"}}
-	template.JudgeInputs = []plan.Selection{{Source: "context", Select: "judge.md"}}
 	template.Stages[0].Inputs = []plan.Selection{{Source: "context", Select: "worker.md"}}
 	template.Stages[0].Checks = []plan.Check{judgeCheck("wording", false)}
 	write(t, e.Root(), ".devkit/plans/test.json", string(marshal(t, template)))
@@ -139,7 +137,7 @@ func TestTemplateRoleInputsReachPlannerWorkerAndJudge(t *testing.T) {
 	write(t, e.Root(), ".devkit/rules.md", "Default rules body must not be selected.")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure role inputs")
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,6 +155,7 @@ func TestTemplateRoleInputsReachPlannerWorkerAndJudge(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	work = approvedNext(t, e, work)
 	submitWork(t, e, work)
 	judgment, err := e.Next(ctx)
 	if err != nil {
@@ -165,7 +164,7 @@ func TestTemplateRoleInputsReachPlannerWorkerAndJudge(t *testing.T) {
 	for _, item := range []struct {
 		role        string
 		instruction *form.Instruction
-	}{{"planner", start.Instruction}, {"worker", work.Instruction}, {"judge", review.Instruction}, {"judge", judgment.Instruction}} {
+	}{{"planner", start.Instruction}, {"worker", work.Instruction}, {"judge", review.Instruction}, {"worker", judgment.Instruction}} {
 		body := briefText(t, item.instruction)
 		if strings.Contains(body, "## Repository requirements") || strings.Contains(body, "## Rules and enforcement") {
 			t.Fatalf("unselected default inputs are shown for %s", item.role)
@@ -232,19 +231,17 @@ func TestRegisteredJudgesReceiveFixedBodiesRulesAndContracts(t *testing.T) {
 	const criteriaBody = "Fixed outside criteria body for the registered judgment command."
 	write(t, outside, "criteria.md", criteriaBody)
 	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
-	configure(t, e, "[sources.guides]\npath = "+strconv.Quote(outside)+"\nnorm = true\n[plan_check]\nrunner = 'capture'\ncriteria = [{source='principles',select='review/plan.md'}, {source='plans',select='README.md'}, {source='guides',select='criteria.md'}]\n[judges.capture]\nexecutable = "+strconv.Quote(executable)+"\nargs = ['-test.run=^TestR10JudgeCommandProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n")
+	configure(t, e, "[sources.guides]\npath = "+strconv.Quote(outside)+"\nnorm = true\n[plan_check]\nrunner = 'capture'\ncriteria = [{source='principles',select='review/plan.md'}, {source='plans',select='README.md'}, {source='guides',select='criteria.md'}]\n[judges.capture]\nexecutable = "+strconv.Quote(executable)+"\nargs = ['-test.run=^TestR10JudgeCommandProcess$']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n[checks.wording]\nrunner = 'capture'\ncriteria = [{ source = 'principles', select = 'review/wording.md' }, { source = 'guides', select = 'criteria.md' }]\nexamples = { source = 'examples', select = 'wording/spec.json' }\n")
 	configureStage(t, e, func(stage *plan.Stage) {
-		item := judgeCheck("wording", false)
-		item.Runner = "capture"
-		item.Criteria = append(item.Criteria, plan.Selection{Source: "guides", Select: "criteria.md"})
-		stage.Checks = []plan.Check{item}
+		stage.Checks = []plan.Check{judgeCheck("wording", false)}
 	})
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	planResult(t, e, start)
 	work, err := e.Next(ctx)
+	work = approvedNext(t, e, work)
 	if err != nil || work.Instruction == nil || work.Instruction.Kind != form.InstructionWork {
 		t.Fatalf("registered command did not complete detection and plan judgment: %+v, %v", work, err)
 	}
@@ -290,7 +287,7 @@ func TestRegisteredJudgesReceiveFixedBodiesRulesAndContracts(t *testing.T) {
 
 func TestPlanDetectionIncludesRequiredCriteriaAndBundledSchemas(t *testing.T) {
 	e, ctx := fixture(t)
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +326,7 @@ func TestPlanDetectionIncludesRequiredCriteriaAndBundledSchemas(t *testing.T) {
 func TestPlannerUsesPinnedOutsideTemplateAtIssuance(t *testing.T) {
 	e, ctx := fixture(t)
 	outside := t.TempDir()
-	template, _, err := e.template(ctx, "HEAD", "test")
+	template, _, err := e.pattern(ctx, "HEAD", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,7 +338,7 @@ func TestPlannerUsesPinnedOutsideTemplateAtIssuance(t *testing.T) {
 		write(t, outside, "test.json", string(marshal(t, template)))
 		return newWork()
 	}
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}

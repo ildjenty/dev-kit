@@ -8,11 +8,11 @@ func TestDoneTransitionsRejectCycles(t *testing.T) {
 		done    map[string]*string
 		invalid bool
 	}{
-		{"self cycle", map[string]*string{"implement": doneTarget("implement")}, true},
-		{"two stage cycle", map[string]*string{"implement": doneTarget("retrospective"), "retrospective": doneTarget("implement")}, true},
-		{"disconnected cycle", map[string]*string{"implement": nil, "retrospective": doneTarget("retrospective")}, true},
-		{"null terminates", map[string]*string{"implement": doneTarget("retrospective"), "retrospective": nil}, false},
-		{"replan terminates", map[string]*string{"implement": doneTarget("replan"), "retrospective": doneTarget("implement")}, false},
+		{"self cycle", map[string]*string{"edit": doneTarget("edit")}, true},
+		{"two stage cycle", map[string]*string{"edit": doneTarget("retrospective"), "retrospective": doneTarget("edit")}, true},
+		{"disconnected cycle", map[string]*string{"edit": nil, "retrospective": doneTarget("retrospective")}, true},
+		{"null terminates", map[string]*string{"edit": doneTarget("retrospective"), "retrospective": nil}, false},
+		{"replan leaves unreachable stage", map[string]*string{"edit": doneTarget("replan"), "retrospective": doneTarget("edit")}, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			v := validator(t)
@@ -20,10 +20,11 @@ func TestDoneTransitionsRejectCycles(t *testing.T) {
 			for i := range template.Stages {
 				template.Stages[i].Transitions.Done = tc.done[template.Stages[i].ID]
 			}
-			if err := v.ValidateTemplate(template); (err != nil) != tc.invalid {
+			if err := v.ValidateTemplate(template); (err != nil) != (tc.invalid && tc.name != "replan leaves unreachable stage") {
 				t.Fatalf("template validation: %v; invalid=%v", err, tc.invalid)
 			}
-			p := NewPlan(template, hash, "Update documentation", []CompletionCondition{{ID: "C1", Description: "Documentation is complete"}})
+			p := newTestPlan(template, hash, "Update documentation", []CompletionCondition{{ID: "C1", Description: "Documentation is complete"}})
+			p.Stages = template.Stages
 			bindChecks(&p)
 			if err := v.ValidatePlan(p); (err != nil) != tc.invalid {
 				t.Fatalf("plan validation: %v; invalid=%v", err, tc.invalid)
@@ -37,10 +38,11 @@ func doneTarget(id string) *string { return &id }
 func TestReplannedPlanMayGoBackToARemovedStage(t *testing.T) {
 	v := validator(t)
 	template, hash := loadTemplate(t, v, "default")
-	p := NewPlan(template, hash, "Build a CLI", []CompletionCondition{{"C1", "The CLI works"}})
+	p := newTestPlan(template, hash, "Build a CLI", []CompletionCondition{{"C1", "The CLI works"}})
 	bindChecks(&p)
 	// After purpose completes, the replanned plan starts at scope and keeps scope's back edge to purpose.
-	p.Stages = p.Stages[1:]
+	p.Stages = clonePlan(Plan{Stages: template.Stages[1:]}).Stages
+	bindChecks(&p)
 	p.StartStage = p.Stages[0].ID
 	if back, _ := p.Stages[0].Transitions.Next(Back); back == nil || *back != "purpose" {
 		t.Fatalf("test premise: scope must go back to purpose, got %v", back)

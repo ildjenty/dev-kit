@@ -39,7 +39,7 @@ func Difference(before, after Plan) Diff {
 		before any
 		after  any
 	}{
-		{"template", before.Template, after.Template},
+		{"pattern", before.Pattern, after.Pattern},
 		{"task", before.Task, after.Task},
 		{"completion_conditions", before.CompletionConditions, after.CompletionConditions},
 		{"start_stage", before.StartStage, after.StartStage},
@@ -91,15 +91,15 @@ type VersionEvaluation struct {
 	Withdrawn bool
 }
 
-func (v VersionEvaluation) Executable(template PlanTemplate, policy string, lastApproved *Plan) bool {
+func (v VersionEvaluation) Executable(policy string, lastApproved *Plan) bool {
 	return v.Judgment == PlanPass && !v.Rejected && !v.Withdrawn &&
-		(!v.Plan.RequiresApproval(template, policy, lastApproved) || v.Approved)
+		(!v.Plan.RequiresApproval(policy, lastApproved) || v.Approved)
 }
 
 // ExecutableVersion is used only at stage start. The caller maintains the binding during execution.
 // replanAfterVersion is the old plan version awaiting replanning; normally pass zero.
 // It prevents returning to old plans and skips only voluntarily withdrawn human proposals.
-func ExecutableVersion(template PlanTemplate, versions []VersionEvaluation, replanAfterVersion int, policy string) (Plan, bool) {
+func ExecutableVersion(versions []VersionEvaluation, replanAfterVersion int, policy string, completedIDs map[string]bool) (Plan, bool) {
 	ordered := slices.Clone(versions)
 	slices.SortFunc(ordered, func(a, b VersionEvaluation) int {
 		switch {
@@ -121,11 +121,12 @@ func ExecutableVersion(template PlanTemplate, versions []VersionEvaluation, repl
 		var lastApproved *Plan
 		for _, previous := range ordered {
 			if previous.Plan.Version < version.Plan.Version && previous.Approved && !previous.Rejected && !previous.Withdrawn {
-				lastApproved = &previous.Plan
+				remaining := RemainingPlan(previous.Plan, completedIDs)
+				lastApproved = &remaining
 				break
 			}
 		}
-		if version.Executable(template, policy, lastApproved) {
+		if version.Executable(policy, lastApproved) {
 			return clonePlan(version.Plan), true
 		}
 		return Plan{}, false

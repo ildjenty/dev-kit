@@ -12,7 +12,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
-func hasJudgmentBrief(state *ledger.State, round *ledger.Round, item plan.Check) bool {
+func hasJudgmentBrief(state *ledger.State, round *ledger.Round, item catalogCheck) bool {
 	for _, planned := range state.JudgmentBriefs(round.ID) {
 		if planned.Aspect == item.Aspect && planned.Runner == string(item.Runner) {
 			return true
@@ -23,7 +23,7 @@ func hasJudgmentBrief(state *ledger.State, round *ledger.Round, item plan.Check)
 
 // judgmentBriefInstruction asks the planner how to check this round before a brief_by_planner
 // judgment. It uses the same round, aspect, and runner key as the judgment.
-func (e *Engine) judgmentBriefInstruction(ctx context.Context, state *ledger.State, p plan.Plan, round *ledger.Round, item plan.Check) (Result, error) {
+func (e *Engine) judgmentBriefInstruction(ctx context.Context, state *ledger.State, p plan.Plan, round *ledger.Round, item catalogCheck) (Result, error) {
 	meta, fresh, err := e.issuance(form.InstructionJudgmentBrief, judgmentKey(round, item), round, p.Version, "")
 	if err != nil {
 		return Result{}, err
@@ -52,7 +52,7 @@ func (e *Engine) judgmentBriefInstruction(ctx context.Context, state *ledger.Sta
 	return e.publishInstruction(meta, true, data, b.Text)
 }
 
-func (e *Engine) judgmentBriefText(ctx context.Context, state *ledger.State, p plan.Plan, round *ledger.Round, item plan.Check, meta *ledger.Instruction) (brief.Brief, error) {
+func (e *Engine) judgmentBriefText(ctx context.Context, state *ledger.State, p plan.Plan, round *ledger.Round, item catalogCheck, meta *ledger.Instruction) (brief.Brief, error) {
 	ref := roundReference(round)
 	template, err := e.asset(ctx, ref, "templates/brief/judgment-brief.md.tmpl")
 	if err != nil {
@@ -89,7 +89,7 @@ func (e *Engine) judgmentBriefText(ctx context.Context, state *ledger.State, p p
 		}
 		meta.Context = &ledger.InstructionContext{MainInstructions: main, CurrentMaterial: material}
 	}
-	body, err := brief.BuildJudgmentBrief(brief.JudgmentBriefInput{RequestTemplate: string(template), InstructionID: meta.ID, Check: item, Plan: p, Requirements: facts.Requirements, CurrentMaterial: meta.Context.CurrentMaterial, OutputSchema: string(schema)})
+	body, err := brief.BuildJudgmentBrief(brief.JudgmentBriefInput{RequestTemplate: string(template), InstructionID: meta.ID, Check: item.Check, Runner: string(item.Runner), Plan: p, Requirements: facts.Requirements, CurrentMaterial: meta.Context.CurrentMaterial, OutputSchema: string(schema)})
 	return mainInstructionBrief(body, meta.Context.MainInstructions), err
 }
 
@@ -103,7 +103,11 @@ func (e *Engine) regenerateJudgmentBrief(ctx context.Context, state *ledger.Stat
 			if err != nil {
 				return brief.Brief{}, err
 			}
-			for _, item := range stage.Checks {
+			items, err := e.catalogChecks(ctx, roundReference(round), stage.Checks)
+			if err != nil {
+				return brief.Brief{}, err
+			}
+			for _, item := range items {
 				if judgmentKey(round, item) == meta.TargetKey {
 					return e.judgmentBriefText(ctx, state, p, round, item, &meta)
 				}

@@ -131,10 +131,10 @@ func completeAnswerFixture(a *Answer) {
 }
 
 func completePlanFixture(p plan.Plan) plan.Plan {
-	if p.Template.Name == "" {
-		p.Template.Name = "simple"
+	if p.Pattern.Name == "" {
+		p.Pattern.Name = "simple"
 	}
-	p.Template.ContentHash = strings.Repeat("a", 64)
+	p.Pattern.ContentHash = strings.Repeat("a", 64)
 	if p.Task == "" {
 		p.Task = "Implement the task"
 	}

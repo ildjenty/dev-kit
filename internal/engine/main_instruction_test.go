@@ -24,12 +24,12 @@ func TestMainInstructionsReachOnlyMatchingPlannerAndWorkerBriefs(t *testing.T) {
 				factory = fixture
 			}
 			e, ctx := factory(t)
+			configureCatalogEntry(t, e, "wording", "history = 'all'")
 			configureStage(t, e, func(stage *plan.Stage) {
 				stage.Checks = []plan.Check{judgeCheck("wording", true)}
 				stage.History = plan.HistoryAll
-				stage.Checks[0].History = plan.HistoryAll
 			})
-			start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Keep the main task intact"})
+			start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Keep the main task intact"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -101,11 +101,7 @@ func TestMainInstructionsReachOnlyMatchingPlannerAndWorkerBriefs(t *testing.T) {
 				t.Fatal(err)
 			}
 			assertNoMainInstructions(t, string(judgeHistory), instructions)
-			template, source, err := e.template(ctx, "HEAD", "test")
-			if err != nil {
-				t.Fatal(err)
-			}
-			planner, err := e.planner(ctx, template, source, 2, plan.HumanProposal)
+			planner, err := e.planner(ctx, "test", 2, plan.HumanProposal, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -144,7 +140,7 @@ func TestInstructRejectsInvalidInputAndInactiveWork(t *testing.T) {
 	if _, err := e.Instruct(ctx, []byte(`{"text":"No work yet"}`)); err == nil {
 		t.Fatal("accepted an instruction without active work")
 	}
-	if _, err := e.Start(ctx, StartRequest{Template: "test", Task: "Validate instructions"}); err != nil {
+	if _, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Validate instructions"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, data := range []string{`{}`, `{"text":""}`, `{"text":"   "}`, `{"text":"x","stage_id":""}`, `{"text":"x","audience":"judge"}`, `{"text":"x","audience":"both"}`, `{"text":"x","extra":true}`} {

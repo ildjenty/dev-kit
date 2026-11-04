@@ -5,7 +5,7 @@
       "type": "integer",
       "minimum": 1
     },
-    "template": {
+    "pattern": {
       "type": "object",
       "properties": {
         "name": {
@@ -130,7 +130,7 @@
   },
   "required": [
     "version",
-    "template",
+    "pattern",
     "task",
     "completion_conditions",
     "start_stage",

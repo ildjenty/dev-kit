@@ -2,9 +2,6 @@ package ledger
 
 import (
 	"fmt"
-	"slices"
-
-	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
 // UnitResults returns accepted results for one round, in acceptance order.
@@ -26,22 +23,6 @@ func (s *State) RoundMerge(roundID string) (*Merge, bool) {
 		}
 	}
 	return nil, false
-}
-
-// ApprovalTemplate excludes stages completed before this proposal and absent from it.
-// The retained stage configuration remains available for deviation checks.
-func (s *State) ApprovalTemplate(template plan.PlanTemplate, p plan.Plan) plan.PlanTemplate {
-	completed := map[string]bool{}
-	for _, run := range s.StageRuns() {
-		if run.State == StageCompleted && run.PlanVersion < p.Version {
-			completed[run.StageID] = true
-		}
-	}
-	template.Stages = slices.DeleteFunc(slices.Clone(template.Stages), func(stage plan.Stage) bool {
-		_, retained := p.Stage(stage.ID)
-		return completed[stage.ID] && !retained
-	})
-	return template
 }
 
 func validateMerge(m *Merge) error {

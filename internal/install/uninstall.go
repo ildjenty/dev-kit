@@ -312,6 +312,7 @@ func stripSettings(current, installed map[string]any) bool {
 		if !exists {
 			continue
 		}
+		have, want = tableArray(have), tableArray(want)
 		switch want := want.(type) {
 		case map[string]any:
 			if object, ok := have.(map[string]any); ok {
@@ -335,6 +336,19 @@ func stripSettings(current, installed map[string]any) bool {
 		}
 	}
 	return changed
+}
+
+// tableArray decodes arrays of tables and inline arrays of tables to the same shape.
+func tableArray(value any) any {
+	tables, ok := value.([]map[string]any)
+	if !ok {
+		return value
+	}
+	items := make([]any, len(tables))
+	for i, table := range tables {
+		items[i] = table
+	}
+	return items
 }
 
 func stripLines(before, fragment []byte) ([]byte, error) {

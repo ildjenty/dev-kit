@@ -308,7 +308,7 @@ func TestMissingBriefIsRegenerated(t *testing.T) {
 			var issued Result
 			var err error
 			if kind == "planner" {
-				issued, err = e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+				issued, err = e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 			} else {
 				issued = working(t, e, ctx)
 			}
@@ -412,7 +412,7 @@ func TestDetectionUsesCurrentIndexAndFrozenIdentity(t *testing.T) {
 	if err := os.Remove(filepath.Join(e.Root(), ".devkit/detect.json")); err != nil {
 		t.Fatal(err)
 	}
-	requirements, tests, err := e.detectionContext(ctx, []plan.Check{judgeCheck("plan", true)}, round.StartTarget.Tree)
+	requirements, tests, err := e.detectionContext(ctx, []catalogCheck{catalogJudge("plan", true)}, round.StartTarget.Tree)
 	if err != nil || len(check.MissingDetection(requirements, tests)) != 1 {
 		t.Fatalf("current index was not consulted: %v", err)
 	}
@@ -450,7 +450,7 @@ func TestDetectionCommandRetriesAfterHumanAnswer(t *testing.T) {
 	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Register detection command")
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,6 +501,7 @@ func TestDetectionCommandRetriesAfterHumanAnswer(t *testing.T) {
 		t.Fatal(err)
 	}
 	result, err := e.Next(ctx)
+	result = approvedNext(t, e, result)
 	if err != nil || result.Instruction == nil || result.Instruction.Kind != form.InstructionWork {
 		t.Fatalf("registered command was not retried: %+v, %v", result, err)
 	}
@@ -556,14 +557,18 @@ func TestAuthorizationsIncludeDecisionsAndDelegation(t *testing.T) {
 		}
 	}
 	round, _ := state.OpenRound()
-	_, data, _, err := e.judgmentInstruction(ctx, state, judgeCheck("plan", false), form.InstructionPlanCheck, "authorization-test", round.StartTarget.Tree, form.TargetVersion{Kind: form.TargetPlan, Plan: 1}, e.Root(), nil, 1)
+	_, data, _, err := e.judgmentInstruction(ctx, state, catalogJudge("plan", false), form.InstructionPlanCheck, "authorization-test", round.StartTarget.Tree, form.TargetVersion{Kind: form.TargetPlan, Plan: 1}, e.Root(), nil, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(data.Request.Authorizations) != len(targets) {
+	// The approval of the first plan is an authorization of plan 1 as well.
+	if len(data.Request.Authorizations) != len(targets)+1 {
 		t.Fatalf("missing authorization inputs: %+v", data.Request.Authorizations)
 	}
 	for _, authorization := range data.Request.Authorizations {
+		if authorization.Target.Kind == form.ApprovalPlan {
+			continue
+		}
 		if len(authorization.Evidence) != 1 || authorization.Evidence[0].RecordID == "" || !strings.Contains(authorization.Scope, "Update documentation within this scope") || !strings.Contains(authorization.Scope, "I delegate documentation edits") {
 			t.Fatalf("authorization lost its scope or provenance: %+v", authorization)
 		}
@@ -594,15 +599,7 @@ func TestPlannerOmitsCorrectedHumanInstructions(t *testing.T) {
 	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: q.ID, Interpretation: ledger.AnswerText, Text: "Current instruction marker", Supersedes: previous.RecordID}); err != nil {
 		t.Fatal(err)
 	}
-	head, err := e.workspace.Head(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	template, source, err := e.template(ctx, head, "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	result, err := e.planner(ctx, template, source, 2, plan.HumanProposal)
+	result, err := e.planner(ctx, "test", 2, plan.HumanProposal, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -629,7 +626,7 @@ func TestSuccessfulVerificationCommand(t *testing.T) {
 	}
 	write(t, e.Root(), "devkit.toml", string(settings)+"\n[commands.verify]\nexecutable = '/bin/sh'\nargs = ['-c', \"printf 'Verified target\\\\n'\"]\ntimeout_seconds = 5\n")
 	configureStage(t, e, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "command:verify", Runner: "command:verify", Required: true}}
+		stage.Checks = []plan.Check{{Aspect: "command:verify", Required: true}}
 	})
 	work := working(t, e, ctx)
 	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
@@ -914,7 +911,7 @@ func TestVerificationRunsAgainInNewRound(t *testing.T) {
 	}
 	write(t, e.Root(), "devkit.toml", string(settings)+"\n[commands.verify]\nexecutable = '/bin/sh'\nargs = ['-c', \"printf 'attempt\\\\n' >> .devkit/run/attempts; test -f .devkit/run/retry\"]\ntimeout_seconds = 5\n")
 	configureStage(t, e, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "command:verify", Runner: "command:verify", Required: true}}
+		stage.Checks = []plan.Check{{Aspect: "command:verify", Required: true}}
 	})
 	work := working(t, e, ctx)
 	for attempt := 0; attempt < 2; attempt++ {
@@ -949,7 +946,7 @@ func TestOptionalCommandMutationStopsBeforeJudge(t *testing.T) {
 	}
 	write(t, e.Root(), "devkit.toml", string(settings)+"\n[commands.verify]\nexecutable = '/bin/sh'\nargs = ['-c', \"printf 'Changed target\\\\n' > README.md\"]\ntimeout_seconds = 5\n")
 	configureStage(t, e, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "command:verify", Runner: "command:verify"}, judgeCheck("plan", false)}
+		stage.Checks = []plan.Check{{Aspect: "command:verify"}, judgeCheck("plan", false)}
 	})
 	work := working(t, e, ctx)
 	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
@@ -1010,7 +1007,7 @@ func TestUnrelatedApprovalDoesNotClearChangeConfirmation(t *testing.T) {
 func TestHumanStageUsesItsOwnAnswer(t *testing.T) {
 	e, ctx := fixture(t)
 	configureStage(t, e, func(stage *plan.Stage) { stage.Assignee = plan.Human })
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1030,6 +1027,7 @@ func TestHumanStageUsesItsOwnAnswer(t *testing.T) {
 	}
 	collect(t, e, review.Instruction, pass(*data.Request))
 	asked, err := e.Next(ctx)
+	asked = approvedNext(t, e, asked)
 	if err != nil || asked.Instruction == nil || asked.Instruction.Question == nil {
 		t.Fatalf("human stage did not ask for output: %+v, %v", asked, err)
 	}
@@ -1182,7 +1180,7 @@ func TestDetectionPassRestoresMissingIndex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	checks := []plan.Check{judgeCheck("plan", true)}
+	checks := []catalogCheck{catalogJudge("plan", true)}
 	result, pending, err := e.ensureDetection(ctx, state, checks, tree)
 	if err != nil || !pending || result.Instruction != nil {
 		t.Fatalf("accepted detection pass was not restored: %+v, %v", result, err)
@@ -1201,7 +1199,7 @@ func TestStartRefusesUnfinishedWorkBeforeInitialInstruction(t *testing.T) {
 	for _, bound := range []bool{false, true} {
 		t.Run(map[bool]string{false: "before_binding", true: "after_binding"}[bound], func(t *testing.T) {
 			e, ctx := fixture(t)
-			request := StartRequest{Template: "test", Task: "Update documentation"}
+			request := StartRequest{Pattern: "test", Task: "Update documentation"}
 			initial, err := e.Start(ctx, request)
 			if err != nil {
 				t.Fatal(err)

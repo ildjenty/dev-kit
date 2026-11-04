@@ -204,12 +204,17 @@ func metricFields(m ledger.Metrics) []field {
 	for _, stage := range m.Stages {
 		stages = append(stages, fmt.Sprintf("%s %d rounds in %d runs", stage.StageID, stage.Rounds, stage.Runs))
 	}
+	definitions := []string{}
+	for _, definition := range m.Definitions {
+		definitions = append(definitions, fmt.Sprintf("%s %d rounds in %d runs of %d instances", definition.Definition, definition.Rounds, definition.Runs, definition.Instances))
+	}
 	reasons := []string{}
 	for _, reason := range m.StopReasons {
 		reasons = append(reasons, fmt.Sprintf("%s %d", reason.Category, reason.Count))
 	}
 	return []field{
 		{"Rounds", fmt.Sprintf("%d in total. %s", m.TotalRounds, strings.Join(stages, "; "))},
+		{"Rounds by definition", strings.Join(definitions, "; ")},
 		{"Human stops", fmt.Sprintf("%d. %s", m.HumanStops, strings.Join(reasons, "; "))},
 		{"Assignee changes", fmt.Sprint(m.AssigneeChanges)},
 		{"Detection tests", fmt.Sprint(m.DetectionTests)},
@@ -221,7 +226,7 @@ func stageLabel(input Input, run *ledger.StageRun) string {
 	for _, record := range input.Records {
 		if proposal, ok := record.Payload.(*ledger.PlanVersion); ok && proposal.Plan.Version == run.PlanVersion {
 			if stage, exists := proposal.Plan.Stage(run.StageID); exists {
-				return stage.ID + " (" + string(stage.Assignee) + ")"
+				return stage.ID + " (" + stage.DefinitionID() + ", " + string(stage.Assignee) + ")"
 			}
 		}
 	}
@@ -301,9 +306,9 @@ func judgmentFields(input Input, judgment *ledger.Judgment) []field {
 			}
 			stage, _ := proposal.Plan.Stage(run.StageID)
 			if !slices.ContainsFunc(stage.Checks, func(check plan.Check) bool {
-				return check.Aspect == judgment.Aspect && string(check.Runner) == judgment.Runner
+				return check.Aspect == judgment.Aspect
 			}) {
-				fields = append(fields, field{"Runner mismatch", "The recorded aspect and runner do not match the bound stage checks."})
+				fields = append(fields, field{"Aspect mismatch", "The recorded aspect does not match the bound stage checks."})
 			}
 		}
 	}

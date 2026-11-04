@@ -3,9 +3,7 @@ package plan
 import (
 	"encoding/json"
 	"io/fs"
-	"os"
 	"reflect"
-	"slices"
 	"strings"
 	"testing"
 
@@ -51,61 +49,17 @@ func bindChecks(p *Plan) {
 	}
 }
 
-func TestDefaultsAndExamples(t *testing.T) {
-	v := validator(t)
-	for _, name := range []string{"default", "fix", "docs"} {
-		t.Run(name, func(t *testing.T) {
-			template, hash := loadTemplate(t, v, name)
-			p := NewPlan(template, hash, "Fix wording", []CompletionCondition{{"C1", "Wording is correct"}})
-			bindChecks(&p)
-			if err := v.ValidatePlan(p); err != nil {
-				t.Fatal(err)
-			}
-			if got := Deviations(template, p); len(got) != 0 {
-				t.Fatalf("original plan was classified as a deviation: %+v", got)
-			}
-		})
-	}
-	data, err := os.ReadFile("../../docs/architecture/examples.md")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, block := range strings.Split(string(data), "```json\n")[1:] {
-		body := []byte(strings.Split(block, "```")[0])
-		var fields map[string]json.RawMessage
-		if len(body) == 0 || body[0] != '{' {
-			continue
-		}
-		if err := json.Unmarshal(body, &fields); err != nil {
-			t.Fatal(err)
-		}
-		if fields["name"] != nil {
-			if _, err := v.ParseTemplate(body); err != nil {
-				t.Fatal(err)
-			}
-		}
-		if fields["version"] != nil {
-			if _, err := v.ParsePlan(body); err != nil {
-				t.Fatal(err)
-			}
-		}
-	}
-}
-
 func TestSchemaAndReferences(t *testing.T) {
 	v := validator(t)
 	template, hash := loadTemplate(t, v, "default")
-	p := NewPlan(template, hash, "Fix wording", []CompletionCondition{{"C1", "Wording is correct"}})
+	p := newTestPlan(template, hash, "Fix wording", []CompletionCondition{{"C1", "Wording is correct"}})
 	if err := v.ValidatePlan(p); err == nil {
 		t.Fatal("accepted a plan without check targets and completion condition mappings")
 	}
 	bindChecks(&p)
 	for _, change := range []func(*Plan){
 		func(p *Plan) { p.Stages[0].Checks[0].CompletionConditionIDs = []string{"missing"} },
-		func(p *Plan) {
-			p.Stages[0].Checks[0].Runner = "command:test"
-			p.Stages[0].Checks[0].Aspect = "different"
-		},
+		func(p *Plan) { p.Stages[0].Definition = ""; p.Stages[0].Transitions.Ask = "other" },
 		func(p *Plan) { p.Stages = append(p.Stages, p.Stages[0]) },
 		func(p *Plan) { p.Stages[0].Limits.MaxRounds = 0 },
 		func(p *Plan) { p.Stages[0].Assignee = "" },
@@ -118,7 +72,7 @@ func TestSchemaAndReferences(t *testing.T) {
 	}
 	missingBack := clonePlan(p)
 	missingBack.Stages[0].Transitions.Back = "missing"
-	if err := ValidateBackTargets(template, missingBack); err == nil {
+	if err := ValidateBackTargets(missingBack, nil); err == nil {
 		t.Fatal("accepted a back transition to a stage absent from the plan and the template")
 	}
 	data, err := json.Marshal(p)
@@ -130,80 +84,6 @@ func TestSchemaAndReferences(t *testing.T) {
 	}
 	if _, err := v.ParsePlan([]byte(strings.Replace(string(data), `"version":1`, `"version":1,"unknown":true`, 1))); err == nil {
 		t.Fatal("accepted a key absent from the schema")
-	}
-}
-
-func TestSelectionAndDeviations(t *testing.T) {
-	v := validator(t)
-	template, hash := loadTemplate(t, v, "default")
-	p := NewPlan(template, hash, "Fix internal behavior", []CompletionCondition{{"C1", "Works as expected"}})
-	selected, err := p.SelectStages(template, []string{"research", "contract", "implement", "retrospective"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	bindChecks(&selected)
-	if err := v.ValidatePlan(selected); err != nil {
-		t.Fatal(err)
-	}
-	wantSelection := []Deviation{
-		{Kind: RemovedStage, StageID: "purpose"},
-		{Kind: RemovedStage, StageID: "scope"},
-		{Kind: RemovedStage, StageID: "structure"},
-		{Kind: RemovedStage, StageID: "steps"},
-		{Kind: RemovedStage, StageID: "verification"},
-		{Kind: ChangedTransition, StageID: "research", Transition: Done},
-		{Kind: ChangedTransition, StageID: "contract", Transition: Back},
-		{Kind: ChangedTransition, StageID: "contract", Transition: Done},
-		{Kind: ChangedTransition, StageID: "implement", Transition: Back},
-		{Kind: ChangedTransition, StageID: "implement", Transition: Done},
-	}
-	if got := Deviations(template, selected); !reflect.DeepEqual(got, wantSelection) {
-		t.Fatalf("stage selection deviations: got %+v, want %+v", got, wantSelection)
-	}
-	if selected.StartStage != "research" || *selected.Stages[0].Transitions.Done != "contract" {
-		t.Fatal("optional stage insertion and start stage change were not applied")
-	}
-	if template.Stages[3].Transitions.Back != "structure" || p.Stages[0].Checks[0].Target != "" {
-		t.Fatal("modified the original template or plan")
-	}
-	leading, err := p.SelectStages(template, []string{"contract", "steps", "implement", "retrospective"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantLeading := []Deviation{
-		{Kind: RemovedStage, StageID: "purpose"},
-		{Kind: RemovedStage, StageID: "scope"},
-		{Kind: RemovedStage, StageID: "structure"},
-		{Kind: RemovedStage, StageID: "verification"},
-		{Kind: ChangedTransition, StageID: "contract", Transition: Back},
-		{Kind: ChangedTransition, StageID: "implement", Transition: Done},
-	}
-	if got := Deviations(template, leading); !reflect.DeepEqual(got, wantLeading) {
-		t.Fatalf("omitted leading stages and redirected transitions: %+v", got)
-	}
-	leading.StartStage = "implement"
-	wantLeading = append(wantLeading[:4], append([]Deviation{{Kind: ChangedStartStage, StageID: "implement"}}, wantLeading[4:]...)...)
-	if got := Deviations(template, leading); !reflect.DeepEqual(got, wantLeading) {
-		t.Fatalf("missed a change to a retained start stage: %+v", got)
-	}
-	p.Stages[1].Gate.Required = false
-	p.Stages[1].Transitions.Back = "implement"
-	p.Stages[1].Checks = nil
-	got := Deviations(template, p)
-	want := []DeviationKind{RemovedGate, ChangedTransition, RemovedRequiredCheck}
-	if len(got) != len(want) {
-		t.Fatalf("deviations: %+v", got)
-	}
-	for i, kind := range want {
-		if got[i].Kind != kind {
-			t.Fatalf("deviations: %+v", got)
-		}
-	}
-	unknown := cloneStage(p.Stages[0])
-	unknown.ID = "custom"
-	p.Stages = append(p.Stages, unknown)
-	if got := Deviations(template, p); got[len(got)-1].Kind != AddedStage {
-		t.Fatalf("addition of a stage absent from optional stages: %+v", got)
 	}
 }
 
@@ -220,7 +100,7 @@ func TestTemplateChecksExcludeTaskFields(t *testing.T) {
 				stage := &template.Stages[0]
 				if optional {
 					stage = &template.OptionalStages[0]
-					stage.Checks = []Check{{Aspect: "wording", Runner: "review", Required: true}}
+					stage.Checks = []Check{{Aspect: "wording", Required: true}}
 				}
 				if field == "completion_condition_ids" {
 					stage.Checks[0].CompletionConditionIDs = []string{"C1"}
@@ -235,117 +115,10 @@ func TestTemplateChecksExcludeTaskFields(t *testing.T) {
 	}
 }
 
-func TestTemplateStartStageDeviations(t *testing.T) {
+func TestCheckMappingsWithSharedAspect(t *testing.T) {
 	v := validator(t)
 	template, hash := loadTemplate(t, v, "default")
-	template.StartStage = "scope"
-	p := NewPlan(template, hash, "Fix behavior", []CompletionCondition{{"C1", "Works as expected"}})
-	if got := Deviations(template, p); len(got) != 0 {
-		t.Fatalf("template start stage was classified as a deviation: %+v", got)
-	}
-	p.StartStage = "purpose"
-	if got := Deviations(template, p); len(got) != 1 || got[0].Kind != ChangedStartStage {
-		t.Fatalf("missed a change from the template start stage: %+v", got)
-	}
-}
-
-func TestOptionalStageTransitionRedirection(t *testing.T) {
-	v := validator(t)
-	template, hash := loadTemplate(t, v, "default")
-	template.OptionalStages[0].Transitions.Fix = "steps"
-	template.OptionalStages[0].Transitions.Ask = "structure"
-	template.OptionalStages[0].Transitions.Back = "steps"
-	p := NewPlan(template, hash, "Fix behavior", []CompletionCondition{{"C1", "Works as expected"}})
-	selected, err := p.SelectStages(template, []string{"research", "contract", "implement", "retrospective"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	bindChecks(&selected)
-	if err := v.ValidatePlan(selected); err != nil {
-		t.Fatal(err)
-	}
-	stage, _ := selected.Stage("research")
-	if stage.Transitions.Fix != "research" || stage.Transitions.Ask != "research" || stage.Transitions.Back != "contract" {
-		t.Fatalf("optional stage transitions were not redirected: %+v", stage.Transitions)
-	}
-	got := Deviations(template, selected)
-	if len(got) != 13 {
-		t.Fatalf("redirected stage transition deviations: %+v", got)
-	}
-	for _, action := range []Transition{Fix, Ask, Back, Done} {
-		if !slices.Contains(got, Deviation{Kind: ChangedTransition, StageID: "research", Transition: action}) {
-			t.Fatalf("missed a redirected optional stage transition: %s", action)
-		}
-	}
-}
-
-func TestStageSelectionRequiresTransitionApproval(t *testing.T) {
-	v := validator(t)
-	template, hash := loadTemplate(t, v, "default")
-	p := NewPlan(template, hash, "Fix behavior", []CompletionCondition{{"C1", "Works as expected"}})
-	selected, err := p.SelectStages(template, []string{"purpose", "implement", "retrospective"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	bindChecks(&selected)
-	if err := v.ValidatePlan(selected); err != nil {
-		t.Fatal(err)
-	}
-	want := []Deviation{
-		{Kind: RemovedStage, StageID: "scope"},
-		{Kind: RemovedStage, StageID: "structure"},
-		{Kind: RemovedStage, StageID: "contract"},
-		{Kind: RemovedStage, StageID: "steps"},
-		{Kind: RemovedStage, StageID: "verification"},
-		{Kind: ChangedTransition, StageID: "implement", Transition: Back},
-		{Kind: ChangedTransition, StageID: "implement", Transition: Done},
-	}
-	if got := Deviations(template, selected); !reflect.DeepEqual(got, want) {
-		t.Fatalf("stage selection deviations: got %+v, want %+v", got, want)
-	}
-	evaluation := VersionEvaluation{Plan: selected, Judgment: PlanPass, Origin: InitialProposal}
-	if evaluation.Executable(template, "requirements", nil) {
-		t.Fatal("made redirected transitions executable without approval")
-	}
-	evaluation.Approved = true
-	if !evaluation.Executable(template, "requirements", nil) {
-		t.Fatal("could not execute approved redirected transitions")
-	}
-}
-
-func TestDeviationsWithUnselectedOptionalTransition(t *testing.T) {
-	v := validator(t)
-	template, hash := loadTemplate(t, v, "default")
-	template.OptionalStages[0].Transitions.Back = "prototype"
-	template.OptionalStages[0].Gate.Required = true
-	template.OptionalStages[0].Checks = []Check{{Aspect: "research", Runner: "review", Required: true}}
-	if err := v.ValidateTemplate(template); err != nil {
-		t.Fatal(err)
-	}
-	p := NewPlan(template, hash, "Fix behavior", []CompletionCondition{{"C1", "Works as expected"}})
-	research := cloneStage(template.OptionalStages[0])
-	research.Transitions.Back = "research"
-	research.Gate.Required = false
-	research.Checks = []Check{}
-	p.Stages = append(p.Stages, research)
-	bindChecks(&p)
-	if err := v.ValidatePlan(p); err != nil {
-		t.Fatal(err)
-	}
-	want := []Deviation{
-		{Kind: RemovedGate, StageID: "research"},
-		{Kind: ChangedTransition, StageID: "research", Transition: Back},
-		{Kind: RemovedRequiredCheck, StageID: "research", Aspect: "research", Runner: "review"},
-	}
-	if got := Deviations(template, p); !reflect.DeepEqual(got, want) {
-		t.Fatalf("optional stage deviations: got %+v, want %+v", got, want)
-	}
-}
-
-func TestCheckMappingsWithSharedAspectAndRunner(t *testing.T) {
-	v := validator(t)
-	template, hash := loadTemplate(t, v, "default")
-	p := NewPlan(template, hash, "Fix behavior", []CompletionCondition{
+	p := newTestPlan(template, hash, "Fix behavior", []CompletionCondition{
 		{"C1", "First target is correct"},
 		{"C2", "Second target is correct"},
 	})
@@ -360,10 +133,6 @@ func TestCheckMappingsWithSharedAspectAndRunner(t *testing.T) {
 		{"identical mapping", func(c *Check) {}, true},
 		{"different aspect", func(c *Check) {
 			c.Aspect = "behavior"
-			c.Target = "another target"
-		}, true},
-		{"different runner", func(c *Check) {
-			c.Runner = "other-review"
 			c.Target = "another target"
 		}, true},
 	} {
@@ -383,20 +152,10 @@ func TestCheckMappingsWithSharedAspectAndRunner(t *testing.T) {
 	}
 }
 
-func TestSelectionRejectsUnresolvedTransitions(t *testing.T) {
-	v := validator(t)
-	template, hash := loadTemplate(t, v, "default")
-	template.OptionalStages[0].Transitions.Back = "prototype"
-	p := NewPlan(template, hash, "Fix behavior", nil)
-	if _, err := p.SelectStages(template, []string{"research", "implement"}); err == nil {
-		t.Fatal("accepted a reference to an unselected optional stage")
-	}
-}
-
 func TestWithdrawnHumanProposalAfterReplanning(t *testing.T) {
 	v := validator(t)
 	template, hash := loadTemplate(t, v, "default")
-	p := NewPlan(template, hash, "Fix behavior", []CompletionCondition{{"C1", "Works as expected"}})
+	p := newTestPlan(template, hash, "Fix behavior", []CompletionCondition{{"C1", "Works as expected"}})
 	bindChecks(&p)
 	replan, _ := Replan(p, p)
 	proposal, _ := Replan(replan, replan)
@@ -405,10 +164,10 @@ func TestWithdrawnHumanProposalAfterReplanning(t *testing.T) {
 		{Plan: replan, Judgment: PlanPass, Origin: BackProposal, Approved: true},
 		{Plan: proposal, Origin: HumanProposal, Withdrawn: true},
 	}
-	if got, ok := ExecutableVersion(template, versions, 1, "requirements"); !ok || got.Version != 2 {
+	if got, ok := ExecutableVersion(versions, 1, "requirements", nil); !ok || got.Version != 2 {
 		t.Fatal("could not select an approved replan after a voluntary human withdrawal")
 	}
-	if _, ok := ExecutableVersion(template, versions, 2, "requirements"); ok {
+	if _, ok := ExecutableVersion(versions, 2, "requirements", nil); ok {
 		t.Fatal("selected an old version after a voluntary human withdrawal")
 	}
 }
@@ -416,7 +175,7 @@ func TestWithdrawnHumanProposalAfterReplanning(t *testing.T) {
 func TestVersionsAndExternalApproval(t *testing.T) {
 	v := validator(t)
 	template, hash := loadTemplate(t, v, "default")
-	p := NewPlan(template, hash, "Fix", []CompletionCondition{{"C1", "Correct"}})
+	p := newTestPlan(template, hash, "Fix", []CompletionCondition{{"C1", "Correct"}})
 	bindChecks(&p)
 	next, diff := Replan(p, p)
 	if next.Version != 2 || len(diff.ChangedFields) != 0 || len(diff.ChangedStages) != 0 {
@@ -428,32 +187,32 @@ func TestVersionsAndExternalApproval(t *testing.T) {
 	}
 	old := VersionEvaluation{Plan: p, Judgment: PlanPass, Origin: InitialProposal, Approved: true}
 	proposal := VersionEvaluation{Plan: next, Origin: HumanProposal}
-	if _, ok := ExecutableVersion(template, []VersionEvaluation{old, proposal}, 0, "requirements"); ok {
+	if _, ok := ExecutableVersion([]VersionEvaluation{old, proposal}, 0, "requirements", nil); ok {
 		t.Fatal("selected an old plan while a proposal was pending")
 	}
 	proposal.Withdrawn = true
-	if got, ok := ExecutableVersion(template, []VersionEvaluation{proposal, old}, 0, "requirements"); !ok || got.Version != 1 {
+	if got, ok := ExecutableVersion([]VersionEvaluation{proposal, old}, 0, "requirements", nil); !ok || got.Version != 1 {
 		t.Fatal("could not return to the old plan after a voluntary human withdrawal")
 	}
 	proposal.Origin = BackProposal
-	if _, ok := ExecutableVersion(template, []VersionEvaluation{proposal, old}, 1, "requirements"); ok {
+	if _, ok := ExecutableVersion([]VersionEvaluation{proposal, old}, 1, "requirements", nil); ok {
 		t.Fatal("selected an old plan after a replanning withdrawal")
 	}
 	proposal.Withdrawn = false
 	proposal.Judgment = PlanPass
-	if proposal.Executable(template, "requirements", nil) {
+	if proposal.Executable("requirements", nil) {
 		t.Fatal("made a back-triggered replan executable without human approval")
 	}
 	proposal.Approved = true
-	if got, ok := ExecutableVersion(template, []VersionEvaluation{proposal, old}, 1, "requirements"); !ok || got.Version != 2 {
+	if got, ok := ExecutableVersion([]VersionEvaluation{proposal, old}, 1, "requirements", nil); !ok || got.Version != 2 {
 		t.Fatal("could not select an approved replan")
 	}
-	if _, ok := ExecutableVersion(template, []VersionEvaluation{proposal, old}, 2, "requirements"); ok {
+	if _, ok := ExecutableVersion([]VersionEvaluation{proposal, old}, 2, "requirements", nil); ok {
 		t.Fatal("selected the previous replan after another back transition")
 	}
 	operation := ExternalOperation{"publish", "repo", hash, hash, hash}
 	p.ExternalOperations = []ExternalOperation{operation}
-	if !p.RequiresApproval(template, "requirements", nil) || !p.Declares(operation) {
+	if !p.RequiresApproval("requirements", nil) || !p.Declares(operation) {
 		t.Fatal("could not match an external operation declaration")
 	}
 	changed := operation
@@ -462,11 +221,11 @@ func TestVersionsAndExternalApproval(t *testing.T) {
 		t.Fatal("accepted a declaration with a changed executable")
 	}
 	approved := VersionEvaluation{Plan: p, Judgment: PlanPass}
-	if approved.Executable(template, "requirements", nil) {
+	if approved.Executable("requirements", nil) {
 		t.Fatal("made an unapproved external operation executable")
 	}
 	approved.Approved = true
-	if !approved.Executable(template, "requirements", nil) {
+	if !approved.Executable("requirements", nil) {
 		t.Fatal("could not make a passed and approved plan executable")
 	}
 }
@@ -475,17 +234,6 @@ func TestStageLimits(t *testing.T) {
 	limits := Limits{MaxRounds: 3, MaxNoProgress: 2}
 	if limits.Reached(2, 1) || !limits.Reached(3, 0) || !limits.Reached(1, 2) {
 		t.Fatal("incorrect stage limits")
-	}
-}
-
-func TestPlanLimits(t *testing.T) {
-	template := PlanTemplate{}
-	if template.PlanRoundsReached(2) || !template.PlanRoundsReached(3) {
-		t.Fatal("incorrect default plan limit")
-	}
-	template.PlanLimits = &PlanLimits{MaxRounds: 5}
-	if template.PlanRoundsReached(3) || !template.PlanRoundsReached(5) {
-		t.Fatal("plan limit override was not applied")
 	}
 }
 
@@ -514,7 +262,7 @@ func TestReplanTransition(t *testing.T) {
 	if template.Stages[0].Transitions.Done == nil || *template.Stages[0].Transitions.Done != "replan" {
 		t.Fatal("default purpose does not replan")
 	}
-	p := NewPlan(template, hash, "Define requirements", []CompletionCondition{{ID: "C1", Description: "Requirements are agreed"}})
+	p := newTestPlan(template, hash, "Define requirements", []CompletionCondition{{ID: "C1", Description: "Requirements are agreed"}})
 	bindChecks(&p)
 	if err := v.ValidatePlan(p); err != nil {
 		t.Fatal(err)
@@ -522,7 +270,14 @@ func TestReplanTransition(t *testing.T) {
 	for _, action := range []Transition{Fix, Ask, Back} {
 		bad := clonePlan(p)
 		target := "replan"
-		setTransition(&bad.Stages[0].Transitions, action, &target)
+		switch action {
+		case Fix:
+			bad.Stages[0].Transitions.Fix = target
+		case Ask:
+			bad.Stages[0].Transitions.Ask = target
+		case Back:
+			bad.Stages[0].Transitions.Back = target
+		}
 		if err := v.ValidatePlan(bad); err == nil {
 			t.Fatalf("accepted replan for %s", action)
 		}
@@ -530,5 +285,31 @@ func TestReplanTransition(t *testing.T) {
 	p.Stages[0].ID = "replan"
 	if err := v.ValidatePlan(p); err == nil {
 		t.Fatal("accepted reserved stage name")
+	}
+}
+
+func newTestPlan(pattern PlanTemplate, hash, task string, conditions []CompletionCondition) Plan {
+	p := Plan{Version: 1, Pattern: PatternRef{pattern.Name, hash}, Task: task, CompletionConditions: conditions, StartStage: pattern.StartStage, Stages: pattern.Stages, ExternalOperations: []ExternalOperation{}}
+	for i, stage := range p.Stages {
+		if stage.Transitions.Done != nil && *stage.Transitions.Done == "replan" {
+			p.Stages = p.Stages[:i+1]
+			break
+		}
+	}
+	return clonePlan(p)
+}
+
+func TestBundledPatterns(t *testing.T) {
+	v := validator(t)
+	for _, name := range []string{"default", "fix", "docs"} {
+		pattern, hash := loadTemplate(t, v, name)
+		p := newTestPlan(pattern, hash, "Complete the task", []CompletionCondition{{"C1", "Expected behavior"}})
+		bindChecks(&p)
+		if err := v.ValidatePlan(p); err != nil {
+			t.Fatal(err)
+		}
+		if p.Pattern.Name != name {
+			t.Fatal("pattern reference was lost")
+		}
 	}
 }

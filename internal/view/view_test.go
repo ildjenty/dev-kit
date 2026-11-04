@@ -169,10 +169,10 @@ func coverageInput(t *testing.T) Input {
 	t.Helper()
 	target := form.TargetVersion{Kind: form.TargetTree, Tree: "current"}
 	norms := []form.NormReference{{Path: "AGENTS.md", BlobID: "norm-current"}}
-	p := plan.Plan{Version: 1, Template: plan.TemplateRef{Name: "docs", ContentHash: strings.Repeat("a", 64)}, Task: "Preserve the contract",
+	p := plan.Plan{Version: 1, Pattern: plan.PatternRef{Name: "docs", ContentHash: strings.Repeat("a", 64)}, Task: "Preserve the contract",
 		CompletionConditions: []plan.CompletionCondition{{ID: "C1", Description: "Existing output is preserved"}, {ID: "C2", Description: "The guide is updated"}},
 		StartStage:           "implement", ExternalOperations: []plan.ExternalOperation{}, Stages: []plan.Stage{{ID: "implement", Assignee: plan.Worker,
-			Checks: []plan.Check{{Aspect: "contract", Runner: "review", Required: true, CompletionConditionIDs: []string{"C1"}, Target: "returned tree"}},
+			Checks: []plan.Check{{Aspect: "contract", Required: true, CompletionConditionIDs: []string{"C1"}, Target: "returned tree"}},
 			Gate:   plan.Gate{Reason: "Review the result"}, Limits: plan.Limits{MaxRounds: 3, MaxNoProgress: 2},
 			Transitions: plan.Transitions{Fix: "implement", Ask: "implement", Back: "implement"}}}}
 	decision := form.Decision{ID: "D1", Content: "Keep the current format", Validity: "While the contract applies", Provisional: true,
@@ -191,7 +191,6 @@ func coverageInput(t *testing.T) Input {
 	current := judgment
 	current.InstructionID, current.Runner = "check-current", "current-review"
 	current.Provenance.InstructionID, current.Provenance.Runner = current.InstructionID, current.Runner
-	p.Stages[0].Checks = append(p.Stages[0].Checks, plan.Check{Aspect: "contract", Runner: "current-review", Required: true, CompletionConditionIDs: []string{"C1"}, Target: "returned tree"})
 	input := loadInput(t, nil, &ledger.PlanVersion{Plan: p, Origin: plan.InitialProposal},
 		&ledger.StageRun{ID: recordID(3), StageID: "implement", PlanVersion: 1, State: ledger.StageJudgmentWait, StopReason: "Checks are pending", NextActor: "judge"},
 		&ledger.Round{ID: recordID(4), StageRunID: recordID(3), SessionID: "session", StartTarget: target, ReturnedTarget: &target, Norms: norms},

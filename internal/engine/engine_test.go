@@ -91,8 +91,8 @@ func fixtureWith(t *testing.T, roles func(string) string) (*Engine, context.Cont
 	if err != nil {
 		t.Fatal(err)
 	}
-	configured := roles(string(settings))
-	write(t, root, "devkit.toml", configured+"\n[approval]\nplan = 'deviation'\n")
+	configured := roles(withoutLoopRules(string(settings)))
+	write(t, root, "devkit.toml", configured+planCatalog+"\n[approval]\nplan = 'deviation'\n")
 	template := plan.PlanTemplate{Name: "test", StartStage: "implement", Stages: []plan.Stage{{ID: "implement", Assignee: plan.Worker, Gate: plan.Gate{Reason: "Documentation task"}, Checks: []plan.Check{}, Limits: plan.Limits{MaxRounds: 3, MaxNoProgress: 2}, Transitions: plan.Transitions{Fix: "implement", Ask: "implement", Back: "implement"}}}, OptionalStages: []plan.Stage{}}
 	source, err := json.Marshal(template)
 	if err != nil {
@@ -134,6 +134,12 @@ func pass(request check.Request) form.JudgmentResult {
 }
 func planResult(t *testing.T, e *Engine, start Result) plan.Plan {
 	t.Helper()
+	return planResultWith(t, e, start, nil)
+}
+
+// planResultWith returns the pattern's plan after change, which may select its stages.
+func planResultWith(t *testing.T, e *Engine, start Result, change func(*plan.Plan)) plan.Plan {
+	t.Helper()
 	data, err := e.readInstruction(start.Instruction.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -146,12 +152,15 @@ func planResult(t *testing.T, e *Engine, start Result) plan.Plan {
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := plan.NewPlan(template, plan.ContentHash(source), "Update documentation", []plan.CompletionCondition{{ID: "C1", Description: "The documentation is updated"}})
+	p := newPlan(template, plan.ContentHash(source), "Update documentation", []plan.CompletionCondition{{ID: "C1", Description: "The documentation is updated"}})
 	for i := range p.Stages {
 		for j := range p.Stages[i].Checks {
 			p.Stages[i].Checks[j].CompletionConditionIDs = []string{"C1"}
 			p.Stages[i].Checks[j].Target = "Documentation"
 		}
+	}
+	if change != nil {
+		change(&p)
 	}
 	collect(t, e, start.Instruction, form.PlannerResult{InstructionID: start.Instruction.ID, Plan: marshal(t, p)})
 	return p
@@ -192,7 +201,7 @@ func acceptDetectionResult(t *testing.T, e *Engine, instruction *form.Instructio
 }
 func working(t *testing.T, e *Engine, ctx context.Context) Result {
 	t.Helper()
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -221,6 +230,7 @@ func working(t *testing.T, e *Engine, ctx context.Context) Result {
 	if err != nil {
 		t.Fatal(err)
 	}
+	work = approvedNext(t, e, work)
 	if work.Instruction == nil || work.Instruction.Kind != form.InstructionWork {
 		t.Fatalf("expected work: %+v", work)
 	}
@@ -402,7 +412,7 @@ func TestAnswerKeepsObservedInputAndCorrection(t *testing.T) {
 }
 func TestNewSessionReissuesPlannerAndWork(t *testing.T) {
 	e, ctx := fixture(t)
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -447,7 +457,7 @@ func TestRequiredCommandFailsBeforeJudgeAndStopsAtLimit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	template.Stages[0].Checks = []plan.Check{judgeCheck("plan", false), {Aspect: "command:fail", Runner: "command:fail", Required: true}}
+	template.Stages[0].Checks = []plan.Check{judgeCheck("plan", false), {Aspect: "command:fail", Required: true}}
 	template.Stages[0].Limits = plan.Limits{MaxRounds: 1, MaxNoProgress: 1}
 	write(t, e.Root(), ".devkit/plans/test.json", string(marshal(t, template)))
 	git(t, e.Root(), "add", ".")
@@ -560,7 +570,7 @@ func TestCommitTargetRefreshAndReassessment(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	template.Stages[0].Checks = []plan.Check{{Aspect: "command:verify", Runner: "command:verify", Required: true}}
+	template.Stages[0].Checks = []plan.Check{{Aspect: "command:verify", Required: true}}
 	write(t, e.Root(), ".devkit/plans/test.json", string(marshal(t, template)))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Require verification after formatting")
@@ -682,7 +692,7 @@ func TestJudgeAcceptanceUsesFirstCollectedResult(t *testing.T) {
 
 func TestAbortWhilePausedIsTerminal(t *testing.T) {
 	e, ctx := fixture(t)
-	if _, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"}); err != nil {
+	if _, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update documentation"}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := e.Pause(ctx, "Stop for now"); err != nil {

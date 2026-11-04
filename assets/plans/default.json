@@ -8,18 +8,7 @@
       "checks": [
         {
           "aspect": "purpose",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/purpose.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "purpose/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -65,22 +54,7 @@
       "checks": [
         {
           "aspect": "irreversible",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/irreversible.md"
-            },
-            {
-              "source": "principles",
-              "select": "designing.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "irreversible/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -126,30 +100,7 @@
       "checks": [
         {
           "aspect": "structure",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/structure.md"
-            },
-            {
-              "source": "principles",
-              "select": "designing.md"
-            },
-            {
-              "source": "principles",
-              "select": "structure.md"
-            },
-            {
-              "source": "principles",
-              "select": "data.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "structure/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -195,26 +146,7 @@
       "checks": [
         {
           "aspect": "contract",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/contract.md"
-            },
-            {
-              "source": "principles",
-              "select": "data.md"
-            },
-            {
-              "source": "principles",
-              "select": "engineering.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "contract/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -260,18 +192,7 @@
       "checks": [
         {
           "aspect": "steps",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/steps.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "steps/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -317,74 +238,15 @@
       "checks": [
         {
           "aspect": "command:test",
-          "runner": "command:test",
           "required": true
         },
         {
           "aspect": "test",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/test.md"
-            },
-            {
-              "source": "principles",
-              "select": "testing.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "test/spec.json"
-          }
+          "required": true
         },
         {
           "aspect": "diff",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/diff.md"
-            },
-            {
-              "source": "principles",
-              "select": "engineering.md"
-            },
-            {
-              "source": "principles",
-              "select": "working.md"
-            },
-            {
-              "source": "principles",
-              "select": "designing.md"
-            },
-            {
-              "source": "principles",
-              "select": "writing.md"
-            },
-            {
-              "source": "principles",
-              "select": "verification.md"
-            },
-            {
-              "source": "principles",
-              "select": "security.md"
-            },
-            {
-              "source": "templates",
-              "select": "pr.md.tmpl"
-            },
-            {
-              "source": "rules",
-              "select": ""
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "diff/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -430,39 +292,11 @@
       "checks": [
         {
           "aspect": "command:e2e",
-          "runner": "command:e2e",
           "required": true
         },
         {
           "aspect": "behavior",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/behavior.md"
-            },
-            {
-              "source": "principles",
-              "select": "verification.md"
-            },
-            {
-              "source": "principles",
-              "select": "testing.md"
-            },
-            {
-              "source": "principles",
-              "select": "ui.md"
-            },
-            {
-              "source": "rules",
-              "select": ""
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "behavior/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -508,75 +342,15 @@
       "checks": [
         {
           "aspect": "command:test",
-          "runner": "command:test",
           "required": true
         },
         {
           "aspect": "test",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/test.md"
-            },
-            {
-              "source": "principles",
-              "select": "testing.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "test/spec.json"
-          }
+          "required": true
         },
         {
           "aspect": "harness",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/harness.md"
-            },
-            {
-              "source": "principles",
-              "select": "harness.md"
-            },
-            {
-              "source": "principles",
-              "select": "working.md"
-            },
-            {
-              "source": "principles",
-              "select": "review/README.md"
-            },
-            {
-              "source": "stages",
-              "select": "README.md"
-            },
-            {
-              "source": "stages",
-              "select": "retrospective.md"
-            },
-            {
-              "source": "plans",
-              "select": "README.md"
-            },
-            {
-              "source": "examples",
-              "select": "README.md"
-            },
-            {
-              "source": "templates",
-              "select": "brief/judgment.md.tmpl"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "harness/spec.json"
-          },
-          "history": "all"
+          "required": true
         }
       ],
       "gate": {
@@ -666,26 +440,7 @@
       "checks": [
         {
           "aspect": "contract",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/contract.md"
-            },
-            {
-              "source": "principles",
-              "select": "data.md"
-            },
-            {
-              "source": "principles",
-              "select": "engineering.md"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "contract/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -731,26 +486,7 @@
       "checks": [
         {
           "aspect": "wording",
-          "runner": "judge",
-          "required": true,
-          "criteria": [
-            {
-              "source": "principles",
-              "select": "review/wording.md"
-            },
-            {
-              "source": "principles",
-              "select": "writing.md"
-            },
-            {
-              "source": "templates",
-              "select": "pr.md.tmpl"
-            }
-          ],
-          "examples": {
-            "source": "examples",
-            "select": "wording/spec.json"
-          }
+          "required": true
         }
       ],
       "gate": {
@@ -789,34 +525,6 @@
         "source": "templates",
         "select": "reports/handoff.json"
       }
-    }
-  ],
-  "planner_inputs": [
-    {
-      "source": "requirements",
-      "select": ""
-    },
-    {
-      "source": "rules",
-      "select": ""
-    },
-    {
-      "source": "structure",
-      "select": ""
-    }
-  ],
-  "judge_inputs": [
-    {
-      "source": "requirements",
-      "select": ""
-    },
-    {
-      "source": "rules",
-      "select": ""
-    },
-    {
-      "source": "structure",
-      "select": ""
     }
   ]
 }

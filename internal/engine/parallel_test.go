@@ -42,7 +42,7 @@ func splitWork(t *testing.T, maxWorkers int, extraUnits ...plan.Unit) (*Engine, 
 	write(t, e.Root(), "devkit.toml", string(settings)+extra)
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Enable split work")
-	start, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update two documents"})
+	start, err := e.Start(ctx, StartRequest{Pattern: "test", Task: "Update two documents"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func splitWork(t *testing.T, maxWorkers int, extraUnits ...plan.Unit) (*Engine, 
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := plan.NewPlan(template, plan.ContentHash(source), "Update two documents", []plan.CompletionCondition{{ID: "C1", Description: "Both documents are updated"}})
+	p := newPlan(template, plan.ContentHash(source), "Update two documents", []plan.CompletionCondition{{ID: "C1", Description: "Both documents are updated"}})
 	p.Stages[0].Units = []plan.Unit{{ID: "first/unit", Description: "Update the first document", Scope: "first.md"}, {ID: "second", Description: "Update the second document", Scope: "second.md"}}
 	p.Stages[0].Units = append(p.Stages[0].Units, extraUnits...)
 	p.Stages[0].Checks[0].Target = "Documents"
@@ -74,7 +74,7 @@ func nextResult(t *testing.T, e *Engine, ctx context.Context) Result {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return r
+	return approvedNext(t, e, r)
 }
 
 func finishUnit(t *testing.T, e *Engine, i form.Instruction, file, body string) {

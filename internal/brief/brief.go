@@ -50,36 +50,21 @@ func BuildJudgment(input JudgmentInput) (Brief, error) {
 	}{input, id})
 }
 
-// BuildPlanner assembles a planning request from the loop template, task, and revision or replanning inputs.
+// BuildPlanner assembles a planning request from the prioritized pattern, catalogs, task, and revision or replanning inputs.
 func BuildPlanner(input PlannerInput) (Brief, error) {
-	template, err := jsonText(input.Template)
-	if err != nil {
-		return Brief{}, err
-	}
-	current, err := jsonText(input.CurrentPlan)
-	if err != nil {
-		return Brief{}, err
-	}
-	remaining, err := jsonText(input.RemainingPlan)
-	if err != nil {
-		return Brief{}, err
-	}
-	checks, err := jsonText(input.Repository.AvailableChecks)
-	if err != nil {
-		return Brief{}, err
-	}
-	findings, err := jsonText(input.PreviousFindings)
-	if err != nil {
-		return Brief{}, err
-	}
-	id, err := jsonText(input.InstructionID)
-	if err != nil {
-		return Brief{}, err
+	values := []any{input.Pattern, input.CurrentPlan, input.RemainingPlan, input.Checks, input.PreviousFindings, input.InstructionID, input.Roles, input.LoopRules}
+	texts := make([]string, len(values))
+	for i, value := range values {
+		text, err := jsonText(value)
+		if err != nil {
+			return Brief{}, err
+		}
+		texts[i] = text
 	}
 	return render(input.InstructionID, input.RequestTemplate, struct {
 		PlannerInput
-		TemplateJSON, CurrentJSON, RemainingJSON, ChecksJSON, FindingsJSON, InstructionIDJSON string
-	}{input, template, current, remaining, checks, findings, id})
+		PatternJSON, CurrentJSON, RemainingJSON, ChecksJSON, FindingsJSON, InstructionIDJSON, RolesJSON, LoopRulesJSON string
+	}{input, texts[0], texts[1], texts[2], texts[3], texts[4], texts[5], texts[6], texts[7]})
 }
 
 func jsonText(value any) (string, error) {

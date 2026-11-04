@@ -20,13 +20,13 @@ const sessionWorker = "[roles.worker]\nkind = 'work'\nagent = ''\n"
 // instruction after planning.
 func flowWork(t *testing.T, e *Engine, settings string, change func(*plan.Stage), instruct func(*plan.Plan)) Result {
 	t.Helper()
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n"+settings)
+	write(t, e.Root(), "devkit.toml", withCatalog("kit_version = 'v3'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n"+settings))
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure flow")
 	if change != nil {
 		configureStage(t, e, change)
 	}
-	start, err := e.Start(t.Context(), StartRequest{Template: "test", Task: "Update documentation"})
+	start, err := e.Start(t.Context(), StartRequest{Pattern: "test", Task: "Update documentation"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func flowWork(t *testing.T, e *Engine, settings string, change func(*plan.Stage)
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := plan.NewPlan(template, plan.ContentHash(source), "Update documentation", []plan.CompletionCondition{{ID: "C1", Description: "The documentation is updated"}})
+	p := newPlan(template, plan.ContentHash(source), "Update documentation", []plan.CompletionCondition{{ID: "C1", Description: "The documentation is updated"}})
 	for i := range p.Stages[0].Checks {
 		p.Stages[0].Checks[i].CompletionConditionIDs = []string{"C1"}
 		p.Stages[0].Checks[i].Target = "Documentation"
@@ -198,11 +198,9 @@ func TestConfirmationIsRenderedVerbatimIntoTheQuestion(t *testing.T) {
 
 func TestHistoryScopeNeverDropsRequiredEvidence(t *testing.T) {
 	e, ctx := fixture(t)
-	settings := sessionWorker + "[commands.verify]\nexecutable = '/bin/sh'\nargs = ['-c', 'echo verified-output-marker']\ntimeout_seconds = 5\n"
+	settings := sessionWorker + "[commands.verify]\nexecutable = '/bin/sh'\nargs = ['-c', 'echo verified-output-marker']\ntimeout_seconds = 5\n" + judgeEntry("wording", "history = 'none'")
 	work := flowWork(t, e, settings, func(stage *plan.Stage) {
-		judge := judgeCheck("wording", false)
-		judge.History = plan.HistoryNone
-		stage.Checks = []plan.Check{{Aspect: "command:verify", Runner: "command:verify", Required: true}, judge}
+		stage.Checks = []plan.Check{{Aspect: "command:verify", Required: true}, judgeCheck("wording", false)}
 	}, nil)
 	write(t, e.Root(), "README.md", "# Judged change\n")
 	submitWork(t, e, work)
@@ -227,10 +225,8 @@ func TestHistoryScopeNeverDropsRequiredEvidence(t *testing.T) {
 
 func TestBriefByPlannerAddsSupplementaryInstructionBeforeJudging(t *testing.T) {
 	e, ctx := fixture(t)
-	work := flowWork(t, e, sessionWorker, func(stage *plan.Stage) {
-		judge := judgeCheck("wording", false)
-		judge.BriefByPlanner = true
-		stage.Checks = []plan.Check{judge}
+	work := flowWork(t, e, sessionWorker+judgeEntry("wording", "brief_by_planner = true"), func(stage *plan.Stage) {
+		stage.Checks = []plan.Check{judgeCheck("wording", false)}
 	}, nil)
 	submitWork(t, e, work)
 	planned := nextResult(t, e, ctx)
@@ -265,11 +261,7 @@ func TestPlanInstructionsAndDelegationsReachBriefsVerbatim(t *testing.T) {
 		t.Fatal(err)
 	}
 	p, _ := latestPlan(state)
-	template, _, err := e.template(ctx, "HEAD", "test")
-	if err != nil {
-		t.Fatal(err)
-	}
-	approval, err := e.planApprovalText(state, template, p.Plan)
+	approval, err := e.planApprovalText(ctx, state, p.Plan, "HEAD")
 	if err != nil || !strings.Contains(approval, "Keep the README under ten lines.") || !strings.Contains(approval, "Check the heading wording.") {
 		t.Fatalf("plan approval omitted the instructions: %v", err)
 	}
@@ -283,9 +275,9 @@ func TestPlanInstructionsAndDelegationsReachBriefsVerbatim(t *testing.T) {
 
 func TestWorkWideRoundLimitAsksAndExtendsFromCurrentTotal(t *testing.T) {
 	e, ctx := fixture(t)
-	settings := sessionWorker + "[limits]\nmax_total_rounds = 1\n[commands.fail]\nexecutable = '/usr/bin/false'\ntimeout_seconds = 5\n"
+	settings := sessionWorker + "[limits]\nmax_total_rounds = 1\nmax_rounds_ceiling = 5\nmax_no_progress_ceiling = 5\n[commands.fail]\nexecutable = '/usr/bin/false'\ntimeout_seconds = 5\n"
 	work := flowWork(t, e, settings, func(stage *plan.Stage) {
-		stage.Checks = []plan.Check{{Aspect: "command:fail", Runner: "command:fail", Required: true}}
+		stage.Checks = []plan.Check{{Aspect: "command:fail", Required: true}}
 		stage.Limits = plan.Limits{MaxRounds: 5, MaxNoProgress: 5}
 	}, nil)
 	submitWork(t, e, work)
@@ -305,7 +297,7 @@ func TestWorkWideRoundLimitAsksAndExtendsFromCurrentTotal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status.Metrics.TotalRounds != 2 || status.Metrics.HumanStops != 1 || status.Metrics.Briefs == 0 || len(status.Metrics.Stages) != 1 {
+	if status.Metrics.TotalRounds != 2 || status.Metrics.HumanStops != 2 || status.Metrics.Briefs == 0 || len(status.Metrics.Stages) != 1 {
 		t.Fatalf("status metrics do not match the records: %+v", status.Metrics)
 	}
 }
@@ -339,7 +331,7 @@ func TestBriefOverflowMovesWholeBodiesToFiles(t *testing.T) {
 
 func TestDetectionIdentityIncludesDeclaredModelOnly(t *testing.T) {
 	e, ctx := fixture(t)
-	item := judgeCheck("plan", true)
+	item := catalogJudge("plan", true)
 	inherited, _, err := e.detectionInput(ctx, "HEAD", item)
 	if err != nil {
 		t.Fatal(err)

@@ -6,13 +6,11 @@ import (
 	"testing"
 )
 
-func TestRoleSelectionSchemaAndExplicitEmptyInputs(t *testing.T) {
+func TestStageInputsAndRemovedPatternSettings(t *testing.T) {
 	v := validator(t)
-	template, _ := loadTemplate(t, v, "docs")
-	template.PlannerInputs = []Selection{}
-	template.JudgeInputs = []Selection{{Source: "context", Select: "judgment.md"}}
-	template.Stages[0].Inputs = []Selection{}
-	data, err := json.Marshal(template)
+	pattern, _ := loadTemplate(t, v, "docs")
+	pattern.Stages[0].Inputs = []Selection{}
+	data, err := json.Marshal(pattern)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,24 +18,24 @@ func TestRoleSelectionSchemaAndExplicitEmptyInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if parsed.PlannerInputs == nil || len(parsed.PlannerSelections()) != 0 || parsed.Stages[0].Inputs == nil || len(parsed.Stages[0].WorkerInputs()) != 0 || !slices.Equal(parsed.JudgeSelections(), template.JudgeInputs) {
-		t.Fatal("role selection round trip lost an explicit override")
+	if parsed.Stages[0].Inputs == nil || len(parsed.Stages[0].WorkerInputs()) != 0 {
+		t.Fatal("lost explicit empty inputs")
 	}
-	if !slices.Equal((PlanTemplate{}).PlannerSelections(), DefaultInputs()) || !slices.Equal((PlanTemplate{}).JudgeSelections(), DefaultInputs()) || !slices.Equal((Stage{}).WorkerInputs(), DefaultInputs()) {
-		t.Fatal("omitted role inputs lost the default data")
+	if !slices.Equal((Stage{}).WorkerInputs(), DefaultInputs()) {
+		t.Fatal("lost default inputs")
 	}
-	for _, role := range []string{"planner_inputs", "judge_inputs"} {
-		var document map[string]any
-		if err := json.Unmarshal(data, &document); err != nil {
+	for _, field := range []string{"planner_inputs", "judge_inputs", "plan_limits"} {
+		var doc map[string]any
+		if err := json.Unmarshal(data, &doc); err != nil {
 			t.Fatal(err)
 		}
-		document[role] = []map[string]string{{"source": "bad/name", "select": ""}}
-		malformed, err := json.Marshal(document)
+		doc[field] = nil
+		body, err := json.Marshal(doc)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := v.ParseTemplate(malformed); err == nil {
-			t.Fatalf("%s accepted an invalid selection", role)
+		if _, err := v.ParseTemplate(body); err == nil {
+			t.Fatalf("accepted removed pattern field: %s", field)
 		}
 	}
 }
