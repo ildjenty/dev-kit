@@ -30,7 +30,26 @@ func (e *Engine) roundStartNorms(ctx context.Context, state *ledger.State, run *
 			return roundReference(previous), nil, nil
 		}
 	}
+	if _, err := e.settings(ctx, tree); err != nil {
+		ref := ""
+		if len(rounds) > 0 {
+			ref = roundReference(rounds[len(rounds)-1])
+		} else {
+			work, _ := state.Work()
+			ref = work.BaseCommit
+		}
+		update := *run
+		update.StopReason = configurationFix(err)
+		if _, err := e.append(&update); err != nil {
+			return "", nil, err
+		}
+		return ref, nil, nil
+	}
 	return e.confirmRoundNorms(ctx, state, run, tree)
+}
+
+func configurationFix(err error) string {
+	return "Fix devkit.toml. Its snapshot configuration was not applied; the last valid norms remain in use.\n" + err.Error()
 }
 
 func (e *Engine) prepareUnitRetry(ctx context.Context, state *ledger.State, meta ledger.Instruction) error {

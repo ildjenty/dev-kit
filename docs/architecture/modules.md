@@ -57,13 +57,13 @@ brief の入力は[依頼の入力](data.md#依頼の入力)に従い、採用�
 - **依存**: 判定依頼テンプレートと `Judgment` のスキーマを扱う form に依存する。
 - **置くもの・置かないもの**: 入出力を伴わない判定の意味論、依頼の内容の決定、結果の解析・受理、検出試験の仕様を置く。判定者サブエージェントの起動と hook による結果の受け取りは[判定結果の受理](guarantees.md#判定結果の受理)、判定コマンドの実行は [engine](#engine)に従う。結果の保存は ledger に、次の行動の判断は router に置く。
 
-検出試験には、`criteria` で選んだ基準の文書、`examples` で選んだ匿名の例の本文、出力の約束だけを渡す。試験仕様・期待判定・対応表と、それらを含む作業履歴や参照先は渡さない。照合は check が行う。合格の識別には `[checks.<観点>]` の定義、担当の定義、判定規則を含む判定依頼テンプレート、実際に渡した基準の文書の集合と内容ハッシュ、例の文書の内容ハッシュを含める。
+検出試験には、`criteria` で選んだ基準の文書、`examples` で選んだ匿名の例の本文、選択した入力契約のスキーマ、出力の約束を渡す。試験仕様・期待判定・対応表と、それらを含む作業履歴や参照先は渡さない。照合は check が行う。合格の識別には `[checks.<観点>]` の定義、担当の定義、判定規則を含む判定依頼テンプレート、実際に渡した基準の文書の集合と内容ハッシュ、例の文書の内容ハッシュを含める。
 
 観点 `test` は、完了条件ごとの具体的なテスト、登録済みコマンドからの実行、利用者から見える入口での契約の確認、実装をなぞっていないことを `principles/testing.md` に照らして判定する。観点 `harness` は、振り返りでの問題の捕捉先と再発防止、どの原則がどの観点・パターンで使われているか、使われない仕組みや負担に見合わない仕組み、前提の確認を扱う。
 
 基準の文書が別の文書を必要とする場合は、その文書も `criteria` に明示する。文中の参照を解析して文書を補わない。`criteria` と `examples` は `[checks.<観点>]` で定め、計画とパターンには書かない。
 
-判定直前の計画者指示、経緯の範囲と出し直しは、ラウンド・観点・runner の組へ結び付ける。check の `schemas` には判定に必要な入力契約のスキーマ名を列挙できる。出力の参照先との和集合だけを同梱し、計画の判定の既定は `plan` と `plan-template` である。`brief_by_planner` の補助の指示は固定した基準や確認範囲を狭めず、原資料を別に渡す。検出試験の結果は例 ID ごとの判定値・blocking の指摘・根拠だけとし、共通の識別は1回だけ扱う。合格の識別は agent 定義のモデル・推論量の指定を含め、継承時の観測値は来歴にだけ残す。
+判定直前の計画者指示、経緯の範囲と出し直しは、ラウンド・観点・runner の組へ結び付ける。check の `schemas` には判定に必要な入力契約のスキーマ名を列挙できる。出力の参照先との和集合だけを同梱し、計画の判定とその検出試験の既定は `plan`・`plan-template`・`finding` である。`brief_by_planner` の補助の指示は固定した基準や確認範囲を狭めず、原資料を別に渡す。検出試験の結果は例 ID ごとの判定値・blocking の指摘・根拠だけとし、共通の識別は1回だけ扱う。合格の識別は agent 定義のモデル・推論量の指定を含め、継承時の観測値は来歴にだけ残す。
 
 ### router
 
@@ -198,12 +198,12 @@ PreToolUse と SubagentStop は、agent の名前から `devkit.toml` の[役割
 - `kit_version = "v3"` は記録形式とバイナリの互換性を識別する。`init` はこの値を書く。
 - `[roles.<id>]` は任意の並行数の上限 `max_concurrent` と[役割](data.md#役割-role)を定義し、`kind`(`work`・`judge`・`plan`・`human`)と任意の `agent` を持つ。既定は `worker`・`judge`・`planner`・`human` の4つであり、同じ ID で上書き、新しい ID で追加する。`agent` は `devkit-` で始まる名前に限る。`human` の種類の役割は1つだけである。同じ agent を種類の違う役割に重ねる設定と、役割の ID と `[judges]` の名前の重なりは設定エラーにする。
 - `[roles] read_only_tools = ["Read", "Glob", "Grep"]` は、Claude Code の `judge`・`plan` の役割の agent の定義に許す `tools` の集合である。
-- `[checks.<観点>]` は runner・criteria・examples・schemas・history・brief_by_planner の一覧である。計画とパターンは観点名を参照する。
+- `[checks.<観点>]` は任意の description と runner・criteria・examples・schemas・history・brief_by_planner の一覧である。description は計画者の check 一覧に使い、未指定または空なら従来の基準文書やコマンドからの説明を使う。計画とパターンは観点名を参照する。
 - `[[loop.stage]]` と `[[loop.path]]` は[ループの決まり](data.md#ループの決まり)を定める。定義の決まりと作業の経路の決まりを、固定した規範で検査する。
 - `[planning] max_rounds = 3` は計画の判定のやり直しの上限である。`[planning] inputs` と `[plan_check] inputs` は既定で要件・規則・構造を選ぶ。パターンには置かない。
 - `[limits] max_rounds_ceiling = 3` と `max_no_progress_ceiling = 2` はステージ上限の天井である。超える計画を拒否する。
 - `[planning] role = "planner"` は計画を作る役割であり、`plan` の種類でなければならない。
-- `[plan_check] aspect = "plan"`・`runner = "judge"` は計画の check の名前と実行主体である。runner は `judge` の種類の役割の ID か、登録済みの判定コマンドの名前である。runner の agent は計画者の役割の agent と違うものにする。`criteria` と `examples` に基準と例の選び方も持ち、`schemas` の既定は `["plan", "plan-template"]` である。判定コマンドなら devkit が実行し、役割ならその agent への指示を出す。
+- `[plan_check] aspect = "plan"`・`runner = "judge"` は計画の check の名前と実行主体である。runner は `judge` の種類の役割の ID か、登録済みの判定コマンドの名前である。runner の agent は計画者の役割の agent と違うものにする。`criteria` と `examples` に基準と例の選び方も持ち、`schemas` の既定は `["plan", "plan-template", "finding"]` である。判定コマンドなら devkit が実行し、役割ならその agent への指示を出す。
 - `[router] human_confirmation` は `dependency_changed` と `target_changed_again` の分類だけを変更できる。check の結果から次の行動への対応は固定である。ループ自身の変更の確認は `[approval] meta_loop_edit` だけで決まる。
 - `[sources.<名前>]` は名前付きの知識の接続先を定める。`adapter = "files"`、`path`、`norm`、書き込み能力 `writable` を持つ。既定は[所有と生存期間](data.md#所有と生存期間)に従い、principles・stages・plans・rules・git・examples・templates を規範、requirements・structure を成果とする。規範は空の選び方で全体を列挙できなければならない。リポジトリ外のソースは読み取り専用であり、`writable = true` を書くと設定エラーになる。
 - `[state] detect = ".devkit/detect.json"` は検出試験の合格の索引の保存先であり、ソースではない。実行の記録と生成物の `.devkit/run/` は固定である。

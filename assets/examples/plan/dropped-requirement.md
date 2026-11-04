@@ -12,7 +12,7 @@ Template: implement, with behavior and command:test checks and no stage gate. Th
 
 Completion conditions: C1: The save button reads "Save".
 Open questions: none.
-Adopted stages: implement, preserving template checks and transitions. No deviations or external operations.
+Adopted stages: implement, preserving template checks and transitions. No structural differences or external operations.
 Verification: behavior checks the rendered button for C1; command:test also runs.
 Plan approval: Obtain human approval before starting work.
 The plan explicitly excludes storage compatibility because the task supplied to start did not mention it.

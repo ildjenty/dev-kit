@@ -41,6 +41,12 @@ func (e *Engine) remainingPlan(state *ledger.State) (*plan.Plan, error) {
 	if next != nil && *next == "replan" {
 		next = nil
 	}
+	if action == plan.Back && next != nil {
+		bound, err = e.backPlan(state, run, *next, bound)
+		if err != nil {
+			return nil, err
+		}
+	}
 	remaining := bound
 	remaining.Stages, remaining.StartStage = nil, ""
 	if next != nil {
@@ -57,4 +63,27 @@ func (e *Engine) remainingPlan(state *ledger.State) (*plan.Plan, error) {
 		next = stage.Transitions.Done
 	}
 	return &remaining, nil
+}
+
+// backPlan uses the return instance's adopted execution when it belongs to an older plan.
+func (e *Engine) backPlan(state *ledger.State, run *ledger.StageRun, target string, bound plan.Plan) (plan.Plan, error) {
+	if _, ok := bound.Stage(target); ok {
+		return bound, nil
+	}
+	adopted, err := e.adoptedBefore(state, run.ID)
+	if err != nil {
+		return plan.Plan{}, err
+	}
+	for _, previous := range adopted {
+		if previous.StageID == target {
+			p, ok, err := e.boundPlan(previous.PlanVersion)
+			if err != nil {
+				return plan.Plan{}, err
+			}
+			if ok {
+				return p, nil
+			}
+		}
+	}
+	return plan.Plan{}, errors.New("return instance is missing from the adopted execution path")
 }

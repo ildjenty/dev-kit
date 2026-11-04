@@ -336,7 +336,12 @@ func TestMalformedSubagentResultsReissueAndEscalate(t *testing.T) {
 						t.Fatalf("invalid result did not reissue: %+v", result)
 					}
 					reissued, err := e.readInstruction(result.Instruction.ID)
-					if err != nil || reissued.Reference != initial.Reference || reissued.Origin != initial.Origin || !reflect.DeepEqual(reissued.Context, initial.Context) {
+					if err != nil {
+						t.Fatal(err)
+					}
+					fixed := *reissued.Context
+					fixed.BriefBytes = initial.Context.BriefBytes
+					if reissued.Reference != initial.Reference || reissued.Origin != initial.Origin || !reflect.DeepEqual(&fixed, initial.Context) {
 						t.Fatalf("reissue changed fixed inputs: %+v, %v", reissued, err)
 					}
 					brief, err := os.ReadFile(result.Instruction.Brief)

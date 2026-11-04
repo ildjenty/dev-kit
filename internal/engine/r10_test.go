@@ -316,9 +316,9 @@ func TestPlanDetectionIncludesRequiredCriteriaAndBundledSchemas(t *testing.T) {
 		if _, err := form.CompileSchema(schema); err != nil {
 			t.Fatalf("%s is not self-contained: %v", name, err)
 		}
-		// Detection requests carry only the bundled output contract, not other schemas.
-		if strings.Contains(body, "### schemas/"+name+".json") {
-			t.Fatalf("detection supplied an unselected supporting schema %s", name)
+		selected := slices.Contains([]string{"plan", "plan-template", "finding"}, name)
+		if strings.Contains(body, "### schemas/"+name+".json") != selected {
+			t.Fatalf("detection input contract selection differs for %s", name)
 		}
 	}
 }

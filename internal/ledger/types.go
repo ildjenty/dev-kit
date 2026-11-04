@@ -323,8 +323,9 @@ type InstructionDetection struct {
 
 // InstructionOutput preserves a prior output supplied when an instruction was issued.
 type InstructionOutput struct {
-	StageID string `json:"stage_id"`
-	Content string `json:"content"`
+	StageID    string `json:"stage_id"`
+	Definition string `json:"definition,omitempty"`
+	Content    string `json:"content"`
 }
 
 // InstructionContext keeps issuance-time facts, without storing rendered briefs.

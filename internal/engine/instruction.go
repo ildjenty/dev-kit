@@ -337,7 +337,7 @@ func (e *Engine) issuance(kind form.InstructionKind, key string, round *ledger.R
 	return i, true, nil
 }
 func (e *Engine) publishInstruction(meta ledger.Instruction, fresh bool, data instructionData, text string) (Result, error) {
-	if err := e.active(); err != nil {
+	if err := e.writable(externalQuestion(data.Instruction.Question)); err != nil {
 		return Result{}, err
 	}
 	i := data.Instruction
@@ -359,7 +359,15 @@ func (e *Engine) publishInstruction(meta ledger.Instruction, fresh bool, data in
 			return Result{}, err
 		}
 	}
+	if data.Context != nil {
+		meta.Context = data.Context
+	}
 	if text != "" {
+		body, err := e.limitInstruction(context.Background(), &meta, data, brief.Brief{InstructionID: meta.ID, Text: text})
+		if err != nil {
+			return Result{}, err
+		}
+		text, data.Context = body.Text, meta.Context
 		data.BriefText = text
 		i.Brief = filepath.Join(e.workRoot(), "brief", i.ID+".md")
 		if err := e.store().Publish("brief/"+i.ID+".md", []byte(text)); err != nil {
@@ -463,6 +471,14 @@ func (e *Engine) instructionBrief(id string) ([]byte, error) {
 }
 
 func (e *Engine) regenerateBrief(ctx context.Context, meta ledger.Instruction, data instructionData) (brief.Brief, error) {
+	body, err := e.buildInstructionBrief(ctx, meta, data)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	return e.limitInstruction(ctx, &meta, data, body)
+}
+
+func (e *Engine) buildInstructionBrief(ctx context.Context, meta ledger.Instruction, data instructionData) (brief.Brief, error) {
 	state, err := e.load()
 	if err != nil {
 		return brief.Brief{}, err
@@ -626,7 +642,7 @@ func (e *Engine) plannerInput(ctx context.Context, state *ledger.State, name str
 	}
 	input := brief.PlannerInput{RequestTemplate: string(template), InstructionID: meta.ID, Version: version, Pattern: pattern, PatternHash: plan.ContentHash(source),
 		Task: string(task), OriginalRequest: originalRequest(work), Repository: facts, Norms: docs, NormPaths: paths, OutputSchema: string(outputSchema)}
-	return input, e.plannerCatalogs(ctx, ref, name, settings, &input)
+	return input, e.plannerCatalogs(ctx, ref, settings, &input)
 }
 
 // plannerMaterial adds the current and remaining plans, human instructions, findings, and adopted
@@ -661,7 +677,7 @@ func (e *Engine) plannerMaterial(state *ledger.State, origin plan.ProposalOrigin
 	}
 	meta.Context = &ledger.InstructionContext{MainInstructions: main, Findings: input.PreviousFindings, CurrentPlan: input.CurrentPlan, RemainingPlan: input.RemainingPlan, HumanInstructions: input.HumanInstructions}
 	for _, output := range input.PreviousOutputs {
-		meta.Context.Outputs = append(meta.Context.Outputs, ledger.InstructionOutput{StageID: output.StageID, Content: output.Content})
+		meta.Context.Outputs = append(meta.Context.Outputs, ledger.InstructionOutput{StageID: output.StageID, Definition: output.Definition, Content: output.Content})
 	}
 	return nil
 }
@@ -805,7 +821,7 @@ func (e *Engine) workContext(state *ledger.State, stage plan.Stage, round *ledge
 func contextOutputs(outputs []brief.StageOutput) []ledger.InstructionOutput {
 	result := []ledger.InstructionOutput{}
 	for _, output := range outputs {
-		result = append(result, ledger.InstructionOutput{StageID: output.StageID, Content: output.Content})
+		result = append(result, ledger.InstructionOutput{StageID: output.StageID, Definition: output.Definition, Content: output.Content})
 	}
 	return result
 }
@@ -851,7 +867,7 @@ func workSpills(input *brief.WorkInput) []spill {
 func instructionOutputs(context *ledger.InstructionContext) []brief.StageOutput {
 	var outputs []brief.StageOutput
 	for _, output := range context.Outputs {
-		outputs = append(outputs, brief.StageOutput{StageID: output.StageID, Content: output.Content})
+		outputs = append(outputs, brief.StageOutput{StageID: output.StageID, Definition: output.Definition, Content: output.Content})
 	}
 	return outputs
 }
@@ -908,7 +924,7 @@ func (e *Engine) saveQuestion(state *ledger.State, q form.Question, supersedes s
 			}
 		}
 	}
-	if err := e.active(); err != nil {
+	if err := e.writable(externalQuestion(&q)); err != nil {
 		return q, err
 	}
 	_, err := e.append(&ledger.Question{Question: q, Supersedes: supersedes})
@@ -968,7 +984,7 @@ func (e *Engine) recordInstruction(meta ledger.Instruction, data instructionData
 			}
 		}
 	}
-	if err := e.active(); err != nil {
+	if err := e.writable(externalQuestion(data.Instruction.Question)); err != nil {
 		return err
 	}
 	if _, err := e.append(&meta); err != nil {
@@ -1031,4 +1047,27 @@ func (e *Engine) workCommandOutputs(state *ledger.State, stageRunID string, inpu
 		}
 	}
 	return commands, nil
+}
+
+func externalQuestion(question *form.Question) bool {
+	return question != nil && question.ApprovalTarget.Kind == form.ApprovalExternal
+}
+
+func (e *Engine) limitInstruction(ctx context.Context, meta *ledger.Instruction, data instructionData, body brief.Brief) (brief.Brief, error) {
+	ref := data.Reference
+	if ref == "" {
+		state, err := e.load()
+		if err != nil {
+			return brief.Brief{}, err
+		}
+		ref, err = e.reference(ctx, state)
+		if err != nil {
+			return brief.Brief{}, err
+		}
+	}
+	settings, err := e.settings(ctx, ref)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	return e.fitRequest(meta, settings.BriefMaxBytes(), body)
 }

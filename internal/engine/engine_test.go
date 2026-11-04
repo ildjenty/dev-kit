@@ -493,7 +493,7 @@ func TestRequiredCommandFailsBeforeJudgeAndStopsAtLimit(t *testing.T) {
 		t.Fatal("required command result was not recorded")
 	}
 	observeAnswer(t, e, "Try one more round.")
-	if _, err = e.Answer(ctx, AnswerRequest{QuestionID: result.Instruction.Question.ID, Interpretation: ledger.AnswerText, Text: "Try another round"}); err != nil {
+	if _, err = e.Answer(ctx, AnswerRequest{QuestionID: result.Instruction.Question.ID, Interpretation: ledger.AnswerApproved, Text: "Try another round"}); err != nil {
 		t.Fatal(err)
 	}
 	continued, err := e.Next(ctx)

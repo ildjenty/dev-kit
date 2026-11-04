@@ -250,6 +250,9 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 			return Result{}, err
 		}
 	}
+	if _, err := e.settings(ctx, round.ReturnedTarget.Tree); err != nil {
+		return e.preserveFixRound(ctx, state, p, stage, run, round, configurationFix(err))
+	}
 	if gitReference(roundReference(round)) != round.StartTarget.Tree {
 		ref, question, err := e.confirmRoundNorms(ctx, state, run, round.ReturnedTarget.Tree)
 		if err != nil {
@@ -457,16 +460,17 @@ func (e *Engine) roundWindow(state *ledger.State, runID string, current *ledger.
 	rounds := []*ledger.Round{}
 	indices := map[string]int{}
 	for _, record := range records {
-		questionID := ""
+		var answer *ledger.Answer
 		switch p := record.Payload.(type) {
 		case *ledger.Answer:
-			questionID = p.QuestionID
+			answer = p
 		case *ledger.Approval:
-			questionID = p.QuestionID
+			answer = &p.Answer
 		}
-		if questionID != "" {
-			q := questions[questionID]
-			if q.StoppedStage == stage || q.ApprovalTarget.Kind == form.ApprovalWork {
+		if answer != nil {
+			q := questions[answer.QuestionID]
+			effective := state.AnsweredQuestions()[answer.QuestionID]
+			if effective.RecordID == record.ID && q.StopCategory == "round_limit" && q.StoppedStage == stage && continuesRound(q, *answer) {
 				rounds = nil
 				indices = map[string]int{}
 			}
@@ -702,7 +706,7 @@ func (e *Engine) pendingRequestCurrent(ctx context.Context, state *ledger.State,
 		if !ok || run.ID != instruction.StageRunID {
 			return false, false, nil
 		}
-		confirmed, question, err := e.confirmRoundNorms(ctx, state, run, tree)
+		confirmed, question, err := e.roundStartNorms(ctx, state, run, tree)
 		if err != nil {
 			return false, false, err
 		}
@@ -1193,11 +1197,19 @@ func (e *Engine) judgmentCommandInput(ctx context.Context, data instructionData,
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(struct {
+	encoded, err := json.Marshal(struct {
 		check.Request
 		CriteriaBodies []brief.Document `json:"criteria_bodies"`
 		Brief          string           `json:"brief"`
 	}{request, criteria, body.Text})
+	if err != nil {
+		return nil, err
+	}
+	settings, err := e.settings(ctx, data.Reference)
+	if err != nil {
+		return nil, err
+	}
+	return e.fitCommandRequest(request, settings.BriefMaxBytes(), encoded)
 }
 
 // judgmentKey identifies a round judgment by round, aspect, and runner. Pre-judgment

@@ -8,7 +8,7 @@
 
 用途別の判定基準は観点ごとに選ぶ。runner・criteria・examples・schemas・history・brief_by_planner は `devkit.toml` の `[checks.<観点>]` に定める。計画とパターンは観点名・必須か・対象・完了条件 ID で check を参照し、計画には指示も書ける。パターンとの違いは承認理由にしない。出力形式と共通規則は判定依頼テンプレートに一度だけ記す。
 
-検出試験の例と `spec.json` は `examples` ソース(既定 `.devkit/checks/`)から選ぶ。合格の索引は `[state] detect`(既定 `.devkit/detect.json`)で設定する。試験には基準の文書、匿名の例の本文、出力の約束だけを渡し、仕様・期待判定・対応表と、それらを含む履歴や参照先は渡さない。合格の識別と実行時期は[検出試験](architecture/guarantees.md#検出試験)に従う。用途別の判定基準は、違反例・適合例・許容例の期待判定を保つことを確かめる。
+検出試験の例と `spec.json` は `examples` ソース(既定 `.devkit/checks/`)から選ぶ。合格の索引は `[state] detect`(既定 `.devkit/detect.json`)で設定する。試験には基準の文書、匿名の例の本文、選択した入力契約のスキーマ、出力の約束を渡し、仕様・期待判定・対応表と、それらを含む履歴や参照先は渡さない。合格の識別と実行時期は[検出試験](architecture/guarantees.md#検出試験)に従う。用途別の判定基準は、違反例・適合例・許容例の期待判定を保つことを確かめる。
 
 ## 目的
 

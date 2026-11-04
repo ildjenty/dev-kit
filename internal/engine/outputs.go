@@ -14,58 +14,46 @@ import (
 // adoptedRuns returns the completed StageRuns on the current execution path in start order.
 // A back decision supersedes earlier completed runs of the back target and the stages after it.
 func (e *Engine) adoptedRuns(state *ledger.State) ([]*ledger.StageRun, error) {
-	adopted := map[string]*ledger.StageRun{}
-	order := []string{}
+	return e.adoptedBefore(state, "")
+}
+
+// adoptedBefore replays the adopted path up to stop, excluding that run.
+func (e *Engine) adoptedBefore(state *ledger.State, stop string) ([]*ledger.StageRun, error) {
+	adopted := []*ledger.StageRun{}
 	for _, run := range state.StageRuns() {
+		if run.ID == stop {
+			break
+		}
 		switch run.State {
 		case ledger.StageCompleted:
-			if _, ok := adopted[run.StageID]; !ok {
-				order = append(order, run.StageID)
-			}
-			adopted[run.StageID] = run
+			adopted = slices.DeleteFunc(adopted, func(old *ledger.StageRun) bool { return old.StageID == run.StageID })
+			adopted = append(adopted, run)
 		case ledger.StageInvalidated:
-			superseded, err := e.backSuperseded(state, run)
+			target, err := e.backTarget(state, run)
 			if err != nil {
 				return nil, err
 			}
-			for _, id := range superseded {
-				delete(adopted, id)
+			if index := slices.IndexFunc(adopted, func(old *ledger.StageRun) bool { return old.StageID == target }); index >= 0 {
+				adopted = adopted[:index]
 			}
 		}
 	}
-	runs := []*ledger.StageRun{}
-	for _, id := range order {
-		if run, ok := adopted[id]; ok && !slices.Contains(runs, run) {
-			runs = append(runs, run)
-		}
-	}
-	slices.SortStableFunc(runs, func(a, b *ledger.StageRun) int { return strings.Compare(a.ID, b.ID) })
-	return runs, nil
+	return adopted, nil
 }
 
-// backSuperseded returns the stage IDs whose adopted outputs a back decision of run invalidates.
-func (e *Engine) backSuperseded(state *ledger.State, run *ledger.StageRun) ([]string, error) {
-	rounds := state.Rounds(run.ID)
-	if len(rounds) == 0 || rounds[len(rounds)-1].Decision == nil || rounds[len(rounds)-1].Decision.Action != plan.Back {
-		return nil, nil
+func (e *Engine) backTarget(state *ledger.State, run *ledger.StageRun) (string, error) {
+	if !backDecided(state, run) {
+		return "", nil
 	}
 	p, ok, err := e.boundPlan(run.PlanVersion)
 	if err != nil || !ok {
-		return nil, err
+		return "", err
 	}
 	target, err := p.Next(run.StageID, plan.Back)
 	if err != nil || target == nil {
-		return nil, err
+		return "", err
 	}
-	ids := []string{}
-	found := false
-	for _, stage := range p.Stages {
-		found = found || stage.ID == *target
-		if found {
-			ids = append(ids, stage.ID)
-		}
-	}
-	return ids, nil
+	return *target, nil
 }
 
 // adoptedOutputs returns the report and fixed artifact references of the last adopted round
@@ -85,7 +73,15 @@ func (e *Engine) adoptedOutputs(state *ledger.State) ([]brief.StageOutput, error
 		if len(rounds) == 0 {
 			continue
 		}
-		outputs = append(outputs, brief.StageOutput{StageID: run.StageID, Content: roundOutput(state, records, run, rounds[len(rounds)-1])})
+		bound, ok, err := e.boundPlan(run.PlanVersion)
+		if err != nil {
+			return nil, err
+		}
+		stage, found := bound.Stage(run.StageID)
+		if !ok || !found {
+			return nil, fmt.Errorf("bound stage %q is missing from plan %d", run.StageID, run.PlanVersion)
+		}
+		outputs = append(outputs, brief.StageOutput{StageID: run.StageID, Definition: stage.DefinitionID(), Content: roundOutput(state, records, run, rounds[len(rounds)-1])})
 	}
 	return outputs, nil
 }
@@ -135,6 +131,6 @@ func selectOutputs(outputs []brief.StageOutput, selection []string) []brief.Stag
 		return slices.Clone(outputs)
 	}
 	return slices.DeleteFunc(slices.Clone(outputs), func(output brief.StageOutput) bool {
-		return !slices.Contains(selection, output.StageID)
+		return !slices.Contains(selection, output.StageID) && (output.Definition == "" || !slices.Contains(selection, output.Definition))
 	})
 }

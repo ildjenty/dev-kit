@@ -299,12 +299,14 @@ func response(state *ledger.State) Result {
 	}
 	return r
 }
-func (e *Engine) active() error {
+func (e *Engine) active() error { return e.writable(false) }
+
+func (e *Engine) writable(completed bool) error {
 	state, err := e.load()
 	if err != nil {
 		return err
 	}
-	if state.WorkStatus() != ledger.WorkActive {
+	if state.WorkStatus() != ledger.WorkActive && !(completed && state.WorkStatus() == ledger.WorkCompleted) {
 		return errors.New("work has ended")
 	}
 	if _, _, paused := state.Paused(); paused {
@@ -313,6 +315,10 @@ func (e *Engine) active() error {
 	return nil
 }
 func (e *Engine) mutation(ctx context.Context) (*fsstore.Lock, error) {
+	return e.mutationState(ctx, false)
+}
+
+func (e *Engine) mutationState(ctx context.Context, completed bool) (*fsstore.Lock, error) {
 	_, warning, err := e.resolve(ctx, false)
 	if err != nil {
 		return nil, err
@@ -327,7 +333,7 @@ func (e *Engine) mutation(ctx context.Context) (*fsstore.Lock, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err = e.active(); err != nil {
+	if err = e.writable(completed); err != nil {
 		lock.Close()
 		return nil, err
 	}
@@ -617,6 +623,7 @@ func (e *Engine) highestPlan() (int, error) {
 	}
 	return n, nil
 }
+
 // acceptPlan records a validated proposal with the next plan version.
 func (e *Engine) acceptPlan(p plan.Plan, origin plan.ProposalOrigin, instructionID string) error {
 	n, err := e.highestPlan()
@@ -632,7 +639,7 @@ func (e *Engine) acceptPlan(p plan.Plan, origin plan.ProposalOrigin, instruction
 
 // External delegates an approved operation to the sole external write executor.
 func (e *Engine) External(ctx context.Context, request external.Request) (Result, error) {
-	lock, err := e.mutation(ctx)
+	lock, err := e.mutationState(ctx, true)
 	if err != nil {
 		return Result{}, err
 	}

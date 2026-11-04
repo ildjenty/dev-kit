@@ -9,12 +9,11 @@ import (
 	"github.com/ildjenty/dev-kit/internal/engine"
 	"github.com/ildjenty/dev-kit/internal/hook"
 	"github.com/ildjenty/dev-kit/internal/kit"
-	"github.com/ildjenty/dev-kit/internal/workspace"
 	"github.com/oklog/ulid/v2"
 )
 
 func newEngine(ctx context.Context, cwd, session string) (*engine.Engine, error) {
-	w, err := workspace.Open(ctx, cwd)
+	w, err := hookWorkspace(ctx, cwd)
 	if err != nil {
 		return nil, err
 	}

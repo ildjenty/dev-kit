@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"time"
 
@@ -415,4 +416,31 @@ func needsCorrectionAnswer(rounds []*ledger.Round, run *ledger.StageRun, questio
 		return question.NextStage == run.StageID && question.StopCategory != "round_limit"
 	}
 	return request.Interpretation == ledger.AnswerRejected || run.State == ledger.StageApprovalWait && request.Interpretation != ledger.AnswerApproved
+}
+
+func continuesRound(question form.Question, answer ledger.Answer) bool {
+	return answer.Interpretation == ledger.AnswerApproved || answer.Interpretation == ledger.AnswerText && strings.HasPrefix(answer.Text, "continue:") && slices.Contains(question.Options, answer.Text)
+}
+
+func roundLimitWaiting(state *ledger.State) bool {
+	run, ok := state.LatestStageRun()
+	if !ok {
+		return false
+	}
+	for _, version := range state.PlanEvaluations(nil) {
+		if version.Plan.Version > run.PlanVersion && !version.Withdrawn {
+			return false
+		}
+	}
+	answers := state.AnsweredQuestions()
+	questions := state.Questions()
+	for i := len(questions) - 1; i >= 0; i-- {
+		q := questions[i]
+		if q.StopCategory != "round_limit" || !slices.Contains(q.Evidence, form.Reference{RecordID: run.ID}) {
+			continue
+		}
+		answer, ok := answers[q.ID]
+		return ok && !continuesRound(q, answer.Answer) && answer.Answer.Interpretation != ledger.AnswerBack
+	}
+	return false
 }

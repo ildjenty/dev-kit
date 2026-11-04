@@ -14,7 +14,7 @@ Scope: {{.Unit.Scope}}
 
 Absolute worktree path: {{.WorktreePath}}
 
-Edit only this detached worktree and the assigned scope. Do not edit the work checkout, other unit worktrees, or runtime records. Do not commit, merge, or run devkit submit. Return only the progress JSON as your final message; SubagentStop stores it and devkit merges the units before the stage judgment.
+Edit only this detached worktree and the assigned scope. Do not edit the work checkout, other unit worktrees, or runtime records directly. Run `devkit note <kind> <file>` from this worktree to record intermediate decisions, evidence, and lessons on the parent work; devkit resolves its parent checkout and unfinished work. Read and record commands such as status and view use that same parent work. Do not commit, merge, or run devkit submit. Return only the progress JSON as your final message; SubagentStop stores it and devkit merges the units before the stage judgment.
 
 ## Plan instructions
 {{range .Stage.Instructions}}

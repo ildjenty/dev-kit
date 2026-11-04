@@ -12,6 +12,6 @@ Template: implement, with behavior and command:test checks and no stage gate. Th
 
 Completion conditions: C1: The save button reads "Save". C2: Existing storage behavior is preserved. C3: Saving also requires entering a new mandatory account identifier.
 Open questions: none. The planner decided C3 was required without asking the human.
-Adopted stages: implement, preserving template checks and transitions. No deviations or external operations.
+Adopted stages: implement, preserving template checks and transitions. No structural differences or external operations.
 Verification: behavior checks C1 and C3 through the UI; command:test checks C2.
 Plan approval: Obtain human approval before starting work.

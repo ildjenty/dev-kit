@@ -54,6 +54,8 @@ check の `aspect` は判定の名前、`criteria` は基準の選び方、`exam
 
 同じ runner の未受理の指示が複数あり、指示 ID のない不正な最終メッセージをどの指示にも結び付けられない場合は、観測を残して人に問う。
 
+判定コマンドの標準入力にも `[briefs] max_bytes` を適用する。依頼全体が収まらない場合は本文を JSON ファイルへ移し、`InstructionID`・`Kind`・絶対パスの `request_path` を持つ JSON を渡す。コマンドは `request_path` があればそのファイル全体を入力として読む。最小の参照も収まらなければ設定エラーで実行を拒否する。
+
 コマンド実行結果の Judgment への変換は[作業結果の判定](../architecture/flow.md#作業結果の判定)と[受理境界](../architecture/guarantees.md#判定結果の受理)に従う。結果の保存の責務は [check のモジュール契約](../architecture/modules.md#check)に従い、判定の有効性は[対象のバージョンと規範の識別](../architecture/data.md#check-の結果-judgment)で照合する。
 
 ラウンド開始時の `devkit.toml` に `command:<name>` が登録されていない場合、その check を `FAIL` とし、`auto-fixable` の指摘「検証コマンド `<name>` が登録されていない。検証の手段を作り `devkit.toml` の `[commands.<name>]` に登録する」を返す。登録はループ自身の変更として `[approval] meta_loop_edit` に従い確認し、次のラウンドのスナップショットから使う。検証コマンドがツリーを変更した場合の指摘には、出力先を ignore する案内を含める。
@@ -62,7 +64,7 @@ check の `aspect` は判定の名前、`criteria` は基準の選び方、`exam
 
 検出試験の対象・実行時期・合格記録の再利用・原則の適用除外は[検出試験の保証](../architecture/guarantees.md#検出試験)、合格記録の同一性は [DetectionTest](../architecture/data.md#検出試験の記録-detectiontest)(check の試験記録)に従う。
 
-判定者への依頼には、基準の文書、匿名の例の本文、出力の約束だけを渡す。試験仕様・期待判定・対応表と、それらを含む作業履歴や参照先を渡さず、devkit が結果と期待を照合する。
+判定者への依頼には、基準の文書、匿名の例の本文、選択した入力契約のスキーマ、出力の約束を渡す。試験仕様・期待判定・対応表と、それらを含む作業履歴や参照先を渡さず、devkit が結果と期待を照合する。
 
 結果は例 ID ごとの判定値・blocking の指摘・根拠だけの専用の小さい形式とし、共通の識別は1回だけ扱う。agent の定義にあるモデル・推論量の指定を合格の識別に含める。親から引き継ぐ場合は観測できた値を来歴にだけ残し、推測せず、その定義での合格として扱う。
 

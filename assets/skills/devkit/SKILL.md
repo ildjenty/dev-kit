@@ -11,7 +11,7 @@ The brief supplies the current stage definition, the criteria documents selected
 
 ## Invoking commands
 
-Invoke `devkit` as a standalone command with cwd set to the target checkout. Do not add `cd`, redirection, command chaining, or substitution. This lets it run outside the sandbox through the path allowed by the host. Write input JSON to a file first, then pass it as a command argument.
+Invoke `devkit` as a standalone command with cwd set to the target checkout. Inside a devkit-created `.devkit/worktrees/...` worktree, devkit resolves the parent checkout and its unfinished work, as hooks do; `note`, `status`, and other applicable read/record commands attach to that parent work. Keep file arguments relative to the invoking cwd. Do not add `cd`, redirection, command chaining, or substitution. This lets it run outside the sandbox through the path allowed by the host. Write input JSON to a file first, then pass it as a command argument.
 
 When `next` runs verification commands or the completion commit, set the host timeout to match the operation's deadline. Do not treat failures or timeouts as success or completion; convey the returned reason.
 
@@ -74,7 +74,7 @@ Keep runtime records under the fixed, untracked `.devkit/run/` location. Preserv
 
 ## Plan approval
 
-When `next` returns a plan approval question, present it as generated, including the original request, completion conditions, stages, deviations, required checks, and `open_questions`. Do not replace it with your own summary. The human may answer freely; record the answer with `devkit answer`. A nonempty `open_questions` array requires human approval under every plan approval policy. Answers to open questions and revision requests go back to the planner as rejection and replanning instructions.
+When `next` returns a plan approval question, present it as generated, including the original request, completion conditions, stages, structural differences, required checks, and `open_questions`. Do not replace it with your own summary. The human may answer freely; record the answer with `devkit answer`. A nonempty `open_questions` array requires human approval under every plan approval policy. Answers to open questions and revision requests go back to the planner as rejection and replanning instructions.
 
 ## Changes to the loop
 
@@ -104,6 +104,8 @@ Call `devkit resume` only when the human explicitly requests resume, then contin
 
 ## External operations
 
+Completed work also accepts external operations through this same approval and recording path: a declaration in an approved executable plan or an individual human approval authorizes each operation. Completion does not permit new work rounds. Keep the work branch checked out while executing approved push and pull request operations, then integrate following the git rules.
+
 Route external writes through registered `devkit external --target <target> <kind> <input_file>` operations. If confirmation is pending, present the question, record the answer with `answer`, then make the same call. Follow the returned state for running, unknown-result, and successful operations; do not resend through another path.
 
 ## Retrospective
@@ -115,4 +117,4 @@ For each problem, identify where it should have been caught and where to prevent
 Check which principles are used by which review documents, check criteria, and templates, and whether any relevant mechanism is unused or costs more than it contributes. Focus on the task's problems, misses, gaps, and burdens; inventory all norms only when a need is evident. Reflect repository requirements from approved completion conditions in `requirements.md` if purpose did not already do so, including when purpose is absent. Follow the loop-edit confirmation policy for norm changes; without loop edits, no loop-edit confirmation is needed.
 
 
-Roles are configured in devkit.toml and resolved from the fixed instruction snapshot. Follow returned agent names instead of substituting defaults. Agent-backed work assignees run as one worktree unit. When a limit question offers continue:<role>, record the human-selected option exactly as text with interpretation text; do not choose it yourself. A premise_broken finding recommends back, and only a human back answer authorizes the return. Outside knowledge sources are read-only; do not edit or write them back. Record improvements as lessons for their maintainers.
+Roles are configured in devkit.toml and resolved from the fixed instruction snapshot. Follow returned agent names instead of substituting defaults. Agent-backed work assignees run as one worktree unit. When a limit question offers continue:<role>, record the human-selected option exactly as text with interpretation text; do not choose it yourself. A rejected round_limit answer leaves the stage waiting for a new plan via `devkit plan`, `devkit abort`, or a later corrected answer; only approval to continue or an offered continue:<role> choice resets the round limit window. A premise_broken finding recommends back, and only a human back answer authorizes the return. Outside knowledge sources are read-only; do not edit or write them back. Record improvements as lessons for their maintainers.

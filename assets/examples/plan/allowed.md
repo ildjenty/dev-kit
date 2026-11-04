@@ -10,8 +10,8 @@ The template is purpose → implement. C1 requires the save button text to be "S
 
 # Plan
 
-- Adopted: purpose → implement. Preserve the approved stages, transitions, gates, and required checks. There are no deviations, declared external operations, or open questions.
+- Adopted: implement. Purpose is unnecessary for this retry and is omitted within the configured loop rules. Show the removed purpose stage in the symmetric structural difference against the approved remaining plan. Preserve the required behavior and command:test checks. There are no declared external operations or open questions.
 - Checks in implement: behavior verifies rendering and interaction on the C1 target screen; command:test verifies existing storage behavior for C2.
-- Plan approval: Under the default approval policy, do not request renewed approval for this retry because completion conditions are unchanged and there are no deviations, external operations, or open questions.
+- Plan approval: Under the default approval policy, do not request renewed approval for this retry because completion conditions are unchanged and there are no external operations or open questions; the structural difference alone does not require approval.
 - Stage gate: No additional gate is required by this template.
-- Size: Retain only the two template stages; do not add stages only to define return destinations.
+- Size: Retain only the necessary implement stage; do not add stages only to define return destinations.

@@ -20,6 +20,7 @@ type Document struct {
 
 // NormPath maps a logical name to its fixed snapshot location.
 type NormPath struct {
+	ContentHash  string
 	Path         string
 	SnapshotPath string
 }
@@ -83,7 +84,8 @@ type WorkInput struct {
 // JudgmentInput receives the request content and output schema selected by check.
 // Content includes the target and its location, norms, progress block, and previous finding IDs.
 // Criteria holds the fixed documents selected by the check's criteria. A detection request
-// sets Detection and receives only criteria, anonymous examples in Content, and the output contract.
+// sets Detection and receives criteria, anonymous examples in Content, selected input schemas,
+// and the output contract.
 type JudgmentInput struct {
 	// RequestTemplate is the request text resolved by the caller from the fixed repository snapshot.
 	RequestTemplate   string

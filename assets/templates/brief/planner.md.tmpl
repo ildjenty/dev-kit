@@ -18,9 +18,9 @@ Content hash: {{.PatternHash}}
 {{.PatternJSON}}
 ```
 
-## Other patterns
+## Available patterns (name, path, and content hash)
 {{range .Patterns}}
-- {{.Path}}: {{.SnapshotPath}}
+- {{.Path}}: {{.SnapshotPath}}; content hash: {{.ContentHash}}
 {{end}}
 
 ## Stage definition catalog
@@ -97,7 +97,7 @@ Put undecidable requirements in `open_questions` for the human. Answers remain f
 
 ## Plan contents
 
-Use the original user request, task, repository requirements, and available patterns to propose the smallest sufficient loop. The prioritized pattern is a reference, not a constraint. You may reference any listed pattern; read its exact content at the fixed path and record its name and hash in `pattern`.
+Use the original user request, task, repository requirements, and available patterns to propose the smallest sufficient loop. The prioritized pattern is a reference, not a constraint. You may reference any listed pattern; read its exact content at the fixed path and copy its name and the supplied content hash into `pattern`. Do not compute hashes yourself.
 List undecidable requirements in `open_questions`; incorporate human clarification in the next proposal. Human-approved completion conditions define completion. Give every completion condition an appropriate verification check or human gate; the plan judge and human assess coverage.
 
 Assign each stage a unique instance `id` and a catalog `definition` (omitting definition uses id). Reuse definitions freely with distinct instance IDs. Reuse an ID that ran in this work only when rerunning that work. A back-triggered plan must contain its return instance. Back targets are current instances or instances that ran in this work. All planned instances must be reachable from start_stage by done transitions. Ask and scalar fix target the same instance. Done may name the next instance, replan, or null.

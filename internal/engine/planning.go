@@ -288,14 +288,14 @@ func violationText(violations []plan.RuleViolation) string {
 	return strings.Join(lines, "\n")
 }
 
-// plannerCatalogs fills the planner's lists: stage definitions with fixed paths, other patterns
-// by path, roles, loop rules, and check names with one-line descriptions.
-func (e *Engine) plannerCatalogs(ctx context.Context, ref, preferred string, settings config.Config, input *brief.PlannerInput) error {
+// plannerCatalogs fills the planner lists with fixed stage paths, pattern paths and hashes,
+// roles, loop rules, and check names with one-line descriptions.
+func (e *Engine) plannerCatalogs(ctx context.Context, ref string, settings config.Config, input *brief.PlannerInput) error {
 	var err error
 	if input.StageCatalog, input.StageDefinitions, err = e.stageCatalog(ctx, ref); err != nil {
 		return err
 	}
-	if input.Patterns, err = e.sourcePaths(ctx, ref, "plans", func(id string) bool { return strings.HasSuffix(id, ".json") && id != preferred+".json" }); err != nil {
+	if input.Patterns, err = e.sourcePaths(ctx, ref, "plans", func(id string) bool { return strings.HasSuffix(id, ".json") }); err != nil {
 		return err
 	}
 	for _, id := range slices.Sorted(maps.Keys(settings.RoleSettings())) {
@@ -306,9 +306,12 @@ func (e *Engine) plannerCatalogs(ctx context.Context, ref, preferred string, set
 	input.LoopRules = brief.LoopRules{Stage: rules.Stage, Path: rules.Path, Ceilings: ceiling}
 	catalog := checkCatalog(settings)
 	for _, aspect := range slices.Sorted(maps.Keys(catalog)) {
-		description, err := e.checkDescription(ctx, ref, aspect, catalog[aspect])
-		if err != nil {
-			return err
+		description := settings.Checks[aspect].Description
+		if description == "" {
+			description, err = e.checkDescription(ctx, ref, aspect, catalog[aspect])
+			if err != nil {
+				return err
+			}
 		}
 		input.Checks = append(input.Checks, brief.CheckEntry{Aspect: aspect, Description: description})
 	}
@@ -354,7 +357,7 @@ func (e *Engine) sourcePaths(ctx context.Context, ref, name string, keep func(st
 	paths := []brief.NormPath{}
 	for _, document := range documents {
 		if keep(document.ID) {
-			paths = append(paths, brief.NormPath{Path: name + "/" + document.ID, SnapshotPath: filepath.Join(directory, filepath.FromSlash(document.ID))})
+			paths = append(paths, brief.NormPath{Path: name + "/" + document.ID, SnapshotPath: filepath.Join(directory, filepath.FromSlash(document.ID)), ContentHash: plan.ContentHash([]byte(document.Body))})
 		}
 	}
 	slices.SortFunc(paths, func(a, b brief.NormPath) int { return strings.Compare(a.Path, b.Path) })

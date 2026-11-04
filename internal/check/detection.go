@@ -182,11 +182,11 @@ func AssessDetection(spec DetectionSpec, runner string, identity DetectionIdenti
 	for _, example := range spec.Cases {
 		observation, ok := byFile[example.ID]
 		if !ok {
-			return DetectionTest{}, fmt.Errorf("detection test result not found: %q", example.File)
+			return DetectionTest{}, fmt.Errorf("detection test result not found: %q", example.ID)
 		}
 		judgment := observation.Judgment
 		if judgment.Aspect != spec.Aspect || judgment.Runner != runner {
-			return DetectionTest{}, fmt.Errorf("detection test aspect or runner does not match: %q", example.File)
+			return DetectionTest{}, fmt.Errorf("detection test aspect or runner does not match: %q", example.ID)
 		}
 		blocking := slices.ContainsFunc(judgment.Findings, func(f Finding) bool { return f.Blocking })
 		passed := judgment.Judgment == example.Expected && observation.Reason != ""

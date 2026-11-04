@@ -116,7 +116,7 @@ func (e *External) Execute(ctx context.Context, request Request) (Result, error)
 	if _, _, paused := state.Paused(); paused {
 		return Result{}, errors.New("work is paused; use devkit resume before starting an external operation")
 	}
-	if state.WorkStatus() != ledger.WorkActive {
+	if state.WorkStatus() != ledger.WorkActive && state.WorkStatus() != ledger.WorkCompleted {
 		return Result{}, errors.New("work has ended")
 	}
 	if err := ctx.Err(); err != nil {

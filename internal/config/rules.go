@@ -4,6 +4,7 @@ import "fmt"
 
 // CheckDefinition fixes how a named aspect is evaluated.
 type CheckDefinition struct {
+	Description    string      `toml:"description"`
 	Runner         string      `toml:"runner"`
 	Criteria       []Selection `toml:"criteria"`
 	Examples       *Selection  `toml:"examples"`

@@ -227,7 +227,10 @@ func allRounds(state *ledger.State) []*ledger.Round {
 }
 
 func judgmentSpills(input *brief.JudgmentInput) []spill {
-	items := []spill{{"Current material", &input.CurrentMaterial}, {"Rules", &input.Repository.Rules.Content}, {"Requirements", &input.Repository.Requirements.Content}}
+	items := []spill{{"Request", &input.Content}, {"Output schema", &input.OutputSchema}, {"Current material", &input.CurrentMaterial}, {"Rules", &input.Repository.Rules.Content}, {"Requirements", &input.Repository.Requirements.Content}}
+	for i := range input.Criteria {
+		items = append(items, spill{"Criterion " + input.Criteria[i].Path, &input.Criteria[i].Content})
+	}
 	for i := range input.PreviousOutputs {
 		items = append(items, spill{"Adopted output " + input.PreviousOutputs[i].StageID, &input.PreviousOutputs[i].Content})
 	}

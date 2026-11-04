@@ -146,6 +146,13 @@ func (e *Engine) importStops(state *ledger.State) error {
 	return nil
 }
 func (e *Engine) terminal(ctx context.Context, state *ledger.State) (Result, error) {
+	if state.WorkStatus() == ledger.WorkCompleted {
+		for _, q := range state.UnansweredQuestions() {
+			if externalQuestion(&q) {
+				return e.issueQuestion(state, q)
+			}
+		}
+	}
 	retained, err := e.cleanupUnits(ctx, state)
 	if err != nil {
 		return Result{}, err
@@ -943,6 +950,11 @@ func (e *Engine) advanceNext(ctx context.Context, state *ledger.State) (Result, 
 			}
 			return Result{}, false, nil
 		}
+	}
+	if roundLimitWaiting(state) {
+		r := response(state)
+		r.Message = "The stage round limit was reached and continuation was not approved. Submit a new plan with devkit plan, run devkit abort, or correct the answer to continue."
+		return r, true, nil
 	}
 	return e.advancePlan(ctx, state)
 }

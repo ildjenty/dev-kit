@@ -103,7 +103,7 @@ func (c Config) PlanCheckSettings() PlanCheck {
 		settings.Examples = &examples
 	}
 	if settings.Schemas == nil {
-		settings.Schemas = []string{"plan", "plan-template"}
+		settings.Schemas = []string{"plan", "plan-template", "finding"}
 	} else {
 		settings.Schemas = slices.Clone(settings.Schemas)
 	}

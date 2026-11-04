@@ -180,7 +180,8 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 }
 
 // issueDetection requests a detection test. The request holds only the criteria, the anonymous
-// example bodies, and the output contract; it carries no norms, work history, or specification.
+// example bodies, selected input schemas, and the output contract; it carries no work history
+// or private specification.
 func (e *Engine) issueDetection(ctx context.Context, state *ledger.State, input detectionInput, criteria []check.Criterion, ref string, stageRunID ...string) (Result, bool, error) {
 	item := catalogCheck{input.Check, input.Definition}
 	identity, _ := json.Marshal(input.Identity)
@@ -212,6 +213,7 @@ func (e *Engine) issueDetection(ctx context.Context, state *ledger.State, input 
 	if err != nil {
 		return Result{}, false, err
 	}
+	meta.Context = &ledger.InstructionContext{}
 	data := instructionData{Reference: ref, Context: meta.Context, Instruction: form.Instruction{ID: meta.ID, Kind: form.InstructionDetectionTest, Runner: runner, TargetPath: path, Text: "Run the detection test with the assigned judge: devkit-instruction " + meta.ID}, Request: &request, Detection: &input}
 	b, err := e.detectionBrief(ctx, data)
 	if err != nil {
@@ -225,7 +227,7 @@ func (e *Engine) issueDetection(ctx context.Context, state *ledger.State, input 
 }
 
 // detectionBrief gives the judge only the criteria documents, the anonymous example bodies,
-// and the output contract.
+// selected input schemas, and the output contract.
 func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brief.Brief, error) {
 	template, err := e.asset(ctx, data.Reference, "templates/brief/judgment.md.tmpl")
 	if err != nil {
@@ -252,11 +254,17 @@ func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brie
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	supporting, err := e.inputSchemas(ctx, data.Reference, nil)
+	supporting, err := e.inputSchemas(ctx, data.Reference, data.Detection.Definition.Schemas)
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, SupportingSchemas: supporting, Criteria: criteria, Detection: true, OutputSchema: string(schema), Repository: brief.RepositoryFacts{LayoutGuides: []brief.Document{}}, Norms: []brief.Document{}, NormPaths: []brief.NormPath{}})
+	input := brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, SupportingSchemas: supporting, Criteria: criteria, Detection: true, OutputSchema: string(schema), Repository: brief.RepositoryFacts{LayoutGuides: []brief.Document{}}, Norms: []brief.Document{}, NormPaths: []brief.NormPath{}}
+	settings, err := e.settings(ctx, data.Reference)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	meta := &ledger.Instruction{ID: data.Instruction.ID, Context: data.Context}
+	return e.fitBrief(meta, settings.BriefMaxBytes(), judgmentSpills(&input), func() (brief.Brief, error) { return brief.BuildJudgment(input) })
 }
 
 func detectionRequest(data instructionData) (check.Request, error) {

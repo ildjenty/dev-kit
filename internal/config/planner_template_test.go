@@ -20,7 +20,7 @@ func TestPlannerTemplateCatalogs(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := func(logical, fixed string) map[string]string {
-		return map[string]string{"Path": logical, "SnapshotPath": fixed, "Content": "definition body must remain at its fixed path"}
+		return map[string]string{"ContentHash": "supplied-hash", "Path": logical, "SnapshotPath": fixed, "Content": "definition body must remain at its fixed path"}
 	}
 	data := map[string]any{
 		"InstructionID": "instruction-1", "InstructionIDJSON": `"instruction-1"`, "OriginalRequest": "Edit a guide", "Task": "Edit a guide",
