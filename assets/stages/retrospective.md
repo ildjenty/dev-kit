@@ -2,7 +2,7 @@
 
 ## Inputs
 
-The task and human-approved completion conditions with IDs; all judgments and findings, including nonblocking findings; the sequence of `FAIL` and `NOT ASSESSED` results; round counts; human answers, including rejections, corrections, and replanning instructions; human-discovered misses recorded as lessons with `devkit note`; and the norms inventory. Use `requirements.md`, relevant `structure.json` records, and `rules.md` together with outputs from adopted preceding stages.
+The task and human-approved completion conditions with IDs; the work-history file referenced in the brief, fixed when the instruction was issued; and the norms inventory. Read that file for all judgments and findings, including nonblocking findings, the sequence of `FAIL` and `NOT ASSESSED` results, round counts per stage run, human questions and answers including rejections, corrections and replanning instructions, and human-discovered misses recorded as lessons with `devkit note`. Use `requirements.md`, relevant `structure.json` records, and `rules.md` together with outputs from adopted preceding stages.
 
 Common inputs are the frozen norms, plan limits, placement guides for the change targets, difficult-to-change decisions in `rules.md` and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required `command:` check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
@@ -34,4 +34,4 @@ Account for the task's findings, failed or unavailable assessments, human correc
 
 Changes made in this stage, including changes to tests and verification methods, are verified by this stage's checks in the plan. If a required verification command is unregistered, create the verification method and register it in `devkit.toml`, following `stages/implement.md`; registration follows loop-edit confirmation and takes effect from the next round's snapshot.
 
-All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and completion is finalized following `stages/README.md#completion-finalization`.
+All required checks valid for the returned target and norms are `PASS`, the detection requirements in `checks/README.md#detection-tests` are satisfied, and completion is finalized following `stages/README.md#completion-finalization`.

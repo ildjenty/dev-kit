@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/ildjenty/dev-kit/internal/check"
-	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
@@ -76,22 +75,6 @@ func MergeTables(base, additions Table) Table {
 	maps.Copy(result.ConfirmationRules, additions.ConfirmationRules)
 	if additions.Lessons.Destinations != nil {
 		result.Lessons.Destinations = slices.Clone(additions.Lessons.Destinations)
-	}
-	return result
-}
-
-// WithConfig applies effective repository confirmation and lesson settings.
-func (t Table) WithConfig(settings config.Config) Table {
-	destinations := []LessonDestination{}
-	for _, destination := range settings.LessonDestinations() {
-		destinations = append(destinations, LessonDestination(destination))
-	}
-	result := MergeTables(t, Table{
-		HumanConfirmation: settings.HumanConfirmation(),
-		Lessons:           Lessons{Destinations: destinations},
-	})
-	if settings.MetaLoopEditApproval() == "allow" {
-		result.ConfirmationRules[config.MetaLoopEdit] = NoConfirm
 	}
 	return result
 }

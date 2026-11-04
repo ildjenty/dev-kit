@@ -108,6 +108,13 @@ func TestInitAndDoctor(t *testing.T) {
 	if !confirmed || len(result.Changes) == 0 || len(result.Guidance) == 0 {
 		t.Fatalf("missing installation result: %+v", result)
 	}
+	if !bytes.Contains(readFile(t, root, "devkit.toml"), []byte(`kit_version = "v2"`)) {
+		t.Fatal("init did not write kit version v2")
+	}
+	wantGuidance := "The bundled default and fix templates require command:test. If it is not registered, the first work creates the tests and registers the command under [commands.test] in devkit.toml, and a human confirms the registration."
+	if !slices.Contains(result.Guidance, wantGuidance) {
+		t.Fatalf("missing first-work test guidance: %v", result.Guidance)
+	}
 	for _, pair := range [][2]string{
 		{"principles/harness.md", ".devkit/principles/harness.md"},
 		{"stages/implement.md", ".devkit/stages/implement.md"},
@@ -176,7 +183,7 @@ func TestInitAndDoctor(t *testing.T) {
 func TestInitPreservesExistingFilesAndSettings(t *testing.T) {
 	root := repository(t)
 	preserved := map[string]string{
-		"devkit.toml":                       "kit_version = 'v1'\n[router]\nhuman_confirmation = ['dependency_changed']\n",
+		"devkit.toml":                       "kit_version = 'v2'\n[router]\nhuman_confirmation = ['dependency_changed']\n",
 		".agents/skills/devkit/SKILL.md":    "Custom skill.\n",
 		".devkit/plans/default.json":        `{"custom":true}`,
 		".devkit/checks/contract.md":        "Custom aspect.\n",
@@ -304,14 +311,15 @@ func TestDoctorVersionsAndSessionScope(t *testing.T) {
 	}
 	const workID = "01ARZ3NDEKTSV4RRFFQ69G5FAV"
 	store := fsstore.New(filepath.Join(root, ".devkit/run/work", workID))
-	if err := store.AppendRecord(workID, string(ledger.KindWork), ledger.Work{ID: workID, TaskRef: "task.md", Branch: "main", BaseCommit: "base", KitVersion: "v0"}); err != nil {
+	if err := store.AppendRecord(workID, string(ledger.KindWork), ledger.Work{ID: workID, TaskRef: "task.md", Branch: "main", BaseCommit: "base", KitVersion: "v1"}); err != nil {
 		t.Fatal(err)
 	}
 	report, err = Doctor(ctx, root, "current-session")
-	if err != nil || checkNamed(t, report, "work_version/"+workID).OK || !strings.Contains(checkNamed(t, report, "work_version/"+workID).Message, "unreadable kit version") {
+	check := checkNamed(t, report, "work_version/"+workID)
+	if err != nil || check.OK || !strings.Contains(check.Message, "kit version") || !strings.Contains(check.Message, `"v1"`) || !strings.Contains(check.Message, `"v2"`) {
 		t.Fatalf("incompatible Work was accepted: %+v, %v", report, err)
 	}
-	writeFile(t, root, "devkit.toml", "kit_version = 'v0'\n")
+	writeFile(t, root, "devkit.toml", "kit_version = 'v1'\n")
 	report, err = Doctor(ctx, root, "current-session")
 	if err != nil || checkNamed(t, report, "kit_version").OK {
 		t.Fatalf("incompatible configuration was accepted: %+v, %v", report, err)
@@ -407,7 +415,7 @@ func TestDoctorValidatesLedgerRecords(t *testing.T) {
 		reason string
 	}{
 		{"valid", "", "", ""},
-		{"incomplete-work", "work", `{"kit_version":"v1"}`, `record field "id" is required`},
+		{"incomplete-work", "work", `{"kit_version":"v2"}`, `record field "id" is required`},
 		{"unknown-kind", "unknown", `{}`, "unknown record kind"},
 		{"invalid-lesson", "lesson", `{"content":"","evidence":[]}`, "required record field is empty"},
 	} {
@@ -683,7 +691,7 @@ func TestInitNoCommitAndDoctorCommitState(t *testing.T) {
 func TestConfiguredNormPathsAndUninstall(t *testing.T) {
 	ctx := context.Background()
 	root := repository(t)
-	writeFile(t, root, "devkit.toml", `kit_version = "v1"
+	writeFile(t, root, "devkit.toml", `kit_version = "v2"
 [paths]
 principles = "norms/principles"
 stages = "norms/stages"

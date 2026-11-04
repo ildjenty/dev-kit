@@ -104,6 +104,17 @@ func Uninstall(ctx context.Context, cwd string, confirm func([]Change) error) (R
 			return result, err
 		}
 	}
+	if err := filepath.WalkDir(filepath.Join(result.Root, ".devkit/run"), func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return os.Chmod(name, 0o755)
+		}
+		return nil
+	}); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return result, err
+	}
 	for _, change := range result.Changes {
 		target := filepath.Join(result.Root, filepath.FromSlash(change.Path))
 		if change.Remove {

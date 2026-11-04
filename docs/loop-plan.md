@@ -26,7 +26,7 @@ kit は、[雛形から計画を作る手順](architecture/flow.md#作業の開�
 
 `default` は `purpose` の遷移 `done` を `"replan"` にする。最初の計画には、要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md` に書き、完了条件の案を作る。置き場所は `[paths] requirements` で変更できる。`purpose` の完了後、計画者が合意した完了条件で残りの計画を作り直し、人が承認する。`fix` と `docs` はこの形を使わない。
 
-すべての既定の雛形の `retrospective` は作業者が担当し、必須の `command:test` と観点 `harness` の check を置く。観点の判定者(runner)は、`init` が配る `devkit-judge` である。`--plan` の省略時は `default_plan` の値を使い、既定は `"default"` である。計画者は不要なステージを外してよく、外したステージは逸脱として承認の問いに載せる。
+すべての既定の雛形の `retrospective` は作業者が担当する。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけを置く。観点の判定者(runner)は、`init` が配る `devkit-judge` である。`--plan` の省略時は `default_plan` の値を使い、既定は `"default"` である。計画者は不要なステージを外してよく、外したステージは逸脱として承認の問いに載せる。
 
 ## 例
 
@@ -68,7 +68,11 @@ check とゲート(人の承認を待つ関門)は、次の規則で組む。
 
 計画自体に観点[「計画」](checks.md#計画)の check を適用し、雛形からの逸脱と承認条件は[計画](architecture/data.md#計画-plan)に従って確認する。
 
-要件の合意として、既定では最初の計画、直前に人が承認した完了条件の ID または文面を変える計画、雛形から逸脱する計画、外部操作を宣言する計画を人が承認する。完了条件が同じで逸脱も外部操作もない作り直しは再確認しない。`[approval] plan` は `"requirements"`(既定)、`"always"`(すべての計画を確認)、`"deviation"`(逸脱か外部操作の宣言があるときに確認)から選ぶ。
+観点と実行主体は `[plan_check] aspect = "plan"`・`runner = "devkit-judge"` が既定である。登録済みの判定コマンドは devkit が実行し、それ以外はサブエージェントへ指示する。
+
+要件の合意として、既定では最初の計画、直前に人が承認した完了条件の ID または文面を変える計画、雛形から逸脱する計画、外部操作を宣言する計画を人が承認する。完了条件が同じで逸脱も外部操作も未決事項もない作り直しは再確認しない。`[approval] plan` は `"requirements"`(既定)、`"always"`(すべての計画を確認)、`"deviation"`(逸脱か外部操作の宣言があるときに確認)から選ぶ。
+
+`open_questions` が空でない計画は、承認方針によらず人の承認を必須とする。
 
 承認の問いは、エージェントの要約に頼らず、`devkit` が原文と計画から組み立てる。
 

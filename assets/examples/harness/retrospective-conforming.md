@@ -1,10 +1,10 @@
 ## Request
 
-Review the retrospective using the supplied independent records. Existing judgment processing, skill placement, and fresh-session instructions meet their contracts. The lesson destination order is the default.
+Review the retrospective using the work-history file referenced in the brief. Its content, fixed at instruction issue time, is supplied below as independent records. Existing judgment processing, skill placement, and fresh-session instructions meet their contracts. The lesson destination order is the default.
 
 ## Target
 
-# Work inputs
+# Work-history file
 
 - Rounds: Two. The first had a broken-link FAIL, NOT ASSESSED because no test command was registered, and a nonblocking finding that two checks duplicated link inspection. The second passed after repair and registration.
 - Human responses: The first proposal was rejected for omitting a document from the agreed scope. The corrected plan includes it. A note lesson reports an earlier broken-link miss.

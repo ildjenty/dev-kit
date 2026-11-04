@@ -11,7 +11,7 @@ import (
 )
 
 // ReadableKitVersion identifies the record format understood by this binary.
-const ReadableKitVersion = "v1"
+const ReadableKitVersion = "v2"
 
 type Kind string
 
@@ -128,6 +128,7 @@ const (
 	AnswerRejected Interpretation = "rejected"
 	AnswerDeferred Interpretation = "deferred"
 	AnswerText     Interpretation = "text"
+	AnswerBack     Interpretation = "back"
 )
 
 // Answer keeps the original input after its observation file is deleted.
@@ -214,6 +215,7 @@ type Round struct {
 	StartTarget    form.TargetVersion   `json:"start_target"`
 	ReturnedTarget *form.TargetVersion  `json:"returned_target,omitempty"`
 	Norms          []form.NormReference `json:"norms"`
+	NormReference  string               `json:"norm_reference,omitempty"`
 	Decision       *router.Decision     `json:"decision,omitempty"`
 }
 
@@ -253,14 +255,14 @@ type InstructionOutput struct {
 
 // InstructionContext keeps issuance-time facts, without storing rendered briefs.
 type InstructionContext struct {
-	Outputs              []InstructionOutput `json:"outputs"`
-	Findings             []check.Finding     `json:"findings"`
-	CurrentPlan          *plan.Plan          `json:"current_plan,omitempty"`
-	RemainingPlan        *plan.Plan          `json:"remaining_plan,omitempty"`
-	HumanInstructions    string              `json:"human_instructions,omitempty"`
-	Commands             []check.Judgment    `json:"commands,omitempty"`
-	PreCommitOutput      string              `json:"pre_commit_output,omitempty"`
-	RetrospectiveContext string              `json:"retrospective_context,omitempty"`
+	Outputs           []InstructionOutput `json:"outputs"`
+	Findings          []check.Finding     `json:"findings"`
+	CurrentPlan       *plan.Plan          `json:"current_plan,omitempty"`
+	RemainingPlan     *plan.Plan          `json:"remaining_plan,omitempty"`
+	HumanInstructions string              `json:"human_instructions,omitempty"`
+	Commands          []check.Judgment    `json:"commands,omitempty"`
+	PreCommitOutput   string              `json:"pre_commit_output,omitempty"`
+	WorkHistory       string              `json:"work_history,omitempty"`
 }
 
 type Artifact struct {

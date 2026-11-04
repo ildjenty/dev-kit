@@ -44,13 +44,11 @@ Items from the plan:
 {{template "norms" .Norms}}
 {{template "normPaths" .NormPaths}}
 {{template "previousOutputs" .PreviousOutputs}}
-{{if eq .Stage.ID "retrospective"}}
-## Retrospective inputs
+## Work history
 
-{{.RetrospectiveContext}}
+Work-history file: {{.WorkHistoryPath}}
 
-Review all judgments and findings, including non-blocking findings, FAIL and NOT ASSESSED history, round counts, human rejections, corrections and revision instructions, lessons about missed issues, and the norm inventory supplied here.
-{{end}}
+Use the work-history file referenced here as required by the stage definition. It is fixed when this instruction is issued.
 {{if .PreviousFindings}}
 ## Previous findings and finding IDs
 
@@ -86,14 +84,25 @@ devkit confirms completion and runs git commit.
 {{.ProgressJSON}}
 ```
 {{if .OutputSchema}}
-### Progress block JSON Schema
+### Progress block and supporting JSON Schemas
 
 {{.OutputSchema}}
 {{end}}
+
+Supported `devkit note` kinds: `decision`, `evidence`, `lesson`. The `structure` schema describes the structure product at the working-tree path above.
+{{range .SupportingSchemas}}
+### {{.Path}} JSON Schema
+
+```json
+{{.Content}}
+```
+{{end}}
 {{define "repository"}}
 ## Relevant structure records
+
+Working-tree product: structure.json -> {{.Structure.Path}} ({{if .Structure.Exists}}exists{{else}}not created yet{{end}})
 {{range .LayoutGuides}}
-Reference: {{.Path}}
+Reference: structure.json -> {{.Path}}
 
 {{.Content}}
 {{end}}
@@ -105,13 +114,13 @@ Reference: {{.Rules.Path}}
 
 ## Repository requirements
 
-Reference: requirements.md
+Reference: requirements.md -> {{.Requirements.Path}} ({{if .Requirements.Exists}}exists{{else}}not created yet{{end}})
 
 {{.Requirements.Content}}
 
 ## Irreversible decisions
 
-Items from the rules:
+Shared difficult-to-change decisions from `rules.md`:
 {{range .IrreversibleDecisions}}
 - {{.}}
 {{end}}
@@ -125,7 +134,7 @@ Reference: {{.Path}}
 {{end}}{{define "normPaths"}}
 ## Other fixed norms
 
-Read additional norms only when needed, using these paths into the fixed snapshot expansion. The snapshot is fixed at round start, or when an instruction outside a round is issued. Do not substitute norms from the working tree.
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
 {{range .}}
 - Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}

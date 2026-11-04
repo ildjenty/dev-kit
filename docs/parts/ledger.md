@@ -10,7 +10,7 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 
 ### 作業
 
-作業の単位と識別は [Work](../architecture/data.md#作業-work)(課題単位のループ)の定義に従う。`kit_version` は記録形式とバイナリの互換性の識別として保存する。`start` に渡した課題と、UserPromptSubmit で観測した人の要求の原文を結び付け、観測がなければ原文なしと記録する。
+作業の単位と識別は [Work](../architecture/data.md#作業-work)(課題単位のループ)の定義に従う。`kit_version` は記録形式とバイナリの互換性の識別として保存し、バイナリと `init` の設定値は `"v2"` である。`start` に渡した課題と、UserPromptSubmit で観測した人の要求の原文を結び付け、観測がなければ原文なしと記録する。
 
 作業の中断・再開と現在地の関係は[状態遷移と受理条件](../architecture/data.md#状態遷移と受理条件)、受理条件は[中断](../architecture/guarantees.md#中断)に従う。
 
@@ -29,6 +29,8 @@ ledger は、作業ごとの[実行の記録](../architecture/data.md#所有と�
 [問い](../architecture/data.md#問い-question)(人への確認事項)と[回答・承認](../architecture/data.md#回答承認-answer--approval)(問いへの判断)の保存項目は各定義、受理と訂正は[回答の受理](../architecture/guarantees.md#回答の受理)に従う。
 
 ループ自身の変更の確認済みの範囲は、確認したスナップショットの規範の識別で表す。計画承認では人が承認した完了条件の ID と文面を比較の基準とする。
+
+確認済みの規範の識別は作業対象と別に保持する。却下しても対象を古いツリーに差し替えず、変更を取り消す作業ラウンドを指示する。ステージの問いへの解釈 `back` は router の戻りの判断として記録する。
 
 ### ステージの実行
 

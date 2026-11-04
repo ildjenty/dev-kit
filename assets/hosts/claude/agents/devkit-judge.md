@@ -9,7 +9,7 @@ tools: Read, Glob, Grep
 
 The launch message is the single line `devkit-instruction <instruction_id>`. Do not execute it as a command. Resolve `.devkit/run/work/<work_id>/brief/<instruction_id>.md` using the work ID contained in the instruction ID, then read the request body and references.
 
-Compare the target, norms, aspects, repository requirements, relevant structure records, and agreed conditions specified by the request. For tree evaluation, read only the read-only expansion supplied by the request. Use the norm text included in the brief; read additional norms only from the listed fixed snapshot expansion paths under `snap/`. Norms are fixed at round start, or when an instruction outside a round is issued. Do not substitute the current working tree or changed norms. Follow the request's sources for instruction files, principles, rules, and aspects.
+Compare the target, norms, aspects, repository requirements, relevant structure records, and agreed conditions specified by the request. For tree evaluation, read only the read-only expansion supplied by the request. Use the norm text included in the brief; read additional norms only from the listed fixed snapshot expansion paths under `snap/`. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time. Do not substitute the current working tree or changed norms. Follow the request's sources for instruction files, principles, rules, and aspects.
 
 For detection tests, evaluate each example body independently without case kinds or expected judgments. Return actual judgments and grounds; devkit compares them with expectations.
 

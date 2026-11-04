@@ -17,7 +17,7 @@ func TestConfiguredNormsExcludeRepositoryOutcomes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ids, err := w.NormativeIDs(ctx, before.Tree)
+	ids, err := w.NormativeIDs(ctx, before.Tree, "norms/principles", "norms/stages", "norms/checks", "norms/plans", "norms/templates", "norms/rules.md", "devkit.toml", "AGENTS.md", "CLAUDE.md", ".claude/agents", ".codex/agents")
 	if err != nil || len(ids) != 11 || ids["norms/principles"] == "" || ids["norms/rules.md"] == "" {
 		t.Fatalf("configured norms: %v, %v", ids, err)
 	}
@@ -28,7 +28,7 @@ func TestConfiguredNormsExcludeRepositoryOutcomes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	actual, err := w.NormativeIDs(ctx, after.Tree)
+	actual, err := w.NormativeIDs(ctx, after.Tree, "norms/principles", "norms/stages", "norms/checks", "norms/plans", "norms/templates", "norms/rules.md", "devkit.toml", "AGENTS.md", "CLAUDE.md", ".claude/agents", ".codex/agents")
 	if err != nil || !reflect.DeepEqual(ids, actual) {
 		t.Fatalf("outcomes changed norm identities: %v, %v", actual, err)
 	}
@@ -37,7 +37,7 @@ func TestConfiguredNormsExcludeRepositoryOutcomes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	actual, err = w.NormativeIDs(ctx, changed.Tree)
+	actual, err = w.NormativeIDs(ctx, changed.Tree, "norms/principles", "norms/stages", "norms/checks", "norms/plans", "norms/templates", "norms/rules.md", "devkit.toml", "AGENTS.md", "CLAUDE.md", ".claude/agents", ".codex/agents")
 	if err != nil || actual["norms/principles"] == ids["norms/principles"] {
 		t.Fatalf("norm edit did not change its identity: %v, %v", actual, err)
 	}

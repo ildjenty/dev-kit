@@ -67,8 +67,6 @@ func fixture(t *testing.T) (*Engine, context.Context) {
 	git(t, root, "config", "user.name", "Engine Test")
 	git(t, root, "config", "commit.gpgsign", "false")
 	write(t, root, "README.md", "# Test repository\n")
-	git(t, root, "add", ".")
-	git(t, root, "commit", "-qm", "Initial")
 	if _, err := install.Init(ctx, root, func([]install.Change) error { return nil }); err != nil {
 		t.Fatal(err)
 	}

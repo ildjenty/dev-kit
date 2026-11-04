@@ -3,7 +3,6 @@ package router
 import (
 	"slices"
 
-	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/plan"
 )
 
@@ -34,7 +33,7 @@ func (t Table) ClassifyConfirmation(input ConfirmationInput) Confirmation {
 		if !ok && slices.Contains(t.HumanConfirmation, category) {
 			mode, ok = ConfirmNow, true
 		}
-		if !ok && (category == config.DependencyChanged || category == config.MetaLoopEdit || category == config.TargetChangedAgain) {
+		if !ok && (category == "dependency_changed" || category == "meta_loop_edit" || category == "target_changed_again") {
 			mode, ok = NoConfirm, true
 		}
 		if !ok {

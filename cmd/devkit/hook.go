@@ -15,6 +15,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/hook"
 	"github.com/ildjenty/dev-kit/internal/host/event"
 	"github.com/ildjenty/dev-kit/internal/ledger"
+	"github.com/ildjenty/dev-kit/internal/ledger/fsstore"
 	"github.com/ildjenty/dev-kit/internal/workspace"
 )
 
@@ -111,15 +112,25 @@ func processHook(ctx context.Context, e event.Event) (event.Result, error) {
 		}
 		return event.Result{}, err
 	}
+	state, err := ledger.Load(fsstore.New(filepath.Join(w.Root(), ".devkit/run/work", h.WorkID)), nil, h.Validator)
+	if err != nil {
+		return event.Result{}, err
+	}
+	normativeRef := func(ref string) string {
+		if round, ok := state.OpenRound(); ok && round.StartTarget.Tree == ref && round.NormReference != "" {
+			return round.NormReference
+		}
+		return ref
+	}
 	h.ReadConfig = func(ref string) (config.Config, error) {
-		data, err := w.ReadFile(ctx, ref, "devkit.toml")
+		data, err := w.ReadFile(ctx, normativeRef(ref), "devkit.toml")
 		if err != nil {
 			return config.Config{}, err
 		}
 		return config.Parse(data)
 	}
 	h.ReadAgent = func(ref string, host event.Host, name string) (hook.AgentDefinition, error) {
-		return readAgent(ctx, w, ref, host, name)
+		return readAgent(ctx, w, normativeRef(ref), host, name)
 	}
 	h.InstructionRunner = func(instruction ledger.Instruction) (string, error) {
 		runtime, err := newEngine(ctx, w.Root(), e.SessionID)

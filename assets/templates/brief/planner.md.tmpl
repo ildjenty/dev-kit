@@ -66,8 +66,7 @@ If a requirement is ambiguous or cannot be decided from the inputs, do not fill 
 Remove unrelated stages and select any necessary research or prototyping from the template candidates. Specify each check's target and completion condition IDs. Give each completion condition a way to verify it: a check run by a verification command, a judge, or a judgment command, or a human gate. Checks are not necessarily mechanical.
 Fill in task-specific irreversible decisions and declarations of required external operations. Use values confirmed in the inputs for each external operation's kind, target, input hash, registration definition hash, and executable content hash.
 Report removal of template stages, additions of stages outside the candidates, removal of gates, changes to transitions, and removal of required checks as deviations.
-Under the default approval policy, human approval is required for the first plan, changes to completion condition IDs or descriptions since the last human-approved plan, deviations, and declarations of external operations. Replanning with unchanged completion conditions and no deviations or external operations stays within the approved agreement. Human-approved completion conditions define completion of the work.
-Changes to the loop itself require human confirmation before they first take effect under the default policy, regardless of stage.
+Human-approved completion conditions define completion of the work.
 For a revised proposal, incorporate human revision instructions and check findings. For replanning, rebuild the supplied remaining work.
 
 ## Returning the result
@@ -82,8 +81,10 @@ Set `instruction_id` to {{.InstructionIDJSON}}.
 {{end}}
 {{define "repository"}}
 ## Relevant structure records
+
+Working-tree product: structure.json -> {{.Structure.Path}} ({{if .Structure.Exists}}exists{{else}}not created yet{{end}})
 {{range .LayoutGuides}}
-Reference: {{.Path}}
+Reference: structure.json -> {{.Path}}
 
 {{.Content}}
 {{end}}
@@ -95,16 +96,13 @@ Reference: {{.Rules.Path}}
 
 ## Repository requirements
 
-Reference: requirements.md
+Reference: requirements.md -> {{.Requirements.Path}} ({{if .Requirements.Exists}}exists{{else}}not created yet{{end}})
 
 {{.Requirements.Content}}
 
 ## Irreversible decisions
 
-Items from the rules:
-{{range .IrreversibleDecisions}}
-- {{.}}
-{{end}}
+Use the shared difficult-to-change decisions in the rules section supplied above. Keep task-specific irreversible decisions in the plan.
 {{end}}{{define "norms"}}
 ## Norms supplied in full
 {{range .}}
@@ -115,7 +113,7 @@ Reference: {{.Path}}
 {{end}}{{define "normPaths"}}
 ## Other fixed norms
 
-Read additional norms only when needed, using these paths into the fixed snapshot expansion. The snapshot is fixed at round start, or when an instruction outside a round is issued. Do not substitute norms from the working tree.
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
 {{range .}}
 - Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}

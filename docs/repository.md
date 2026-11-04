@@ -6,6 +6,8 @@
 
 `init` が配布物の文章の規範をリポジトリの所有する場所へコピーし、作業ごとに育てる。資産の既定の配置は `devkit.toml` の `[paths]` で変更できる。
 
+規範のパス同士の重なりと、成果のパス(requirements・structure・detect)が規範のパスと同じか配下にある設定は拒否する。
+
 - `principles = ".devkit/principles"`: 原則。
 - `stages = ".devkit/stages"`: ステージ定義。
 - `checks = ".devkit/checks"`: 観点ファイルと `<観点ID>/` の検出試験の例。
@@ -26,17 +28,17 @@
 - **規則と強制手段**: 複数の作業で守る変更困難な決定を残す。更新はループ自身の変更として人が確認する。「手段: 未実装」と振り返りで繰り返し見つかる違反は、機械の検査へ移す候補にする。
 - **設定ファイル**: `devkit.toml` の項目は [config](architecture/modules.md#config)、配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。[判定コマンド](architecture/modules.md#config)(`[judges]`)は別エンジンによる判定に使う。[検証コマンド](architecture/modules.md#config)(`[commands]`)はテスト・型検査などに使い、`command:<name>` の [check](parts/check.md)(評価と判定の部品)から呼ぶ。実行の扱いは[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
 - **実行の記録と生成物**: `.devkit/run/` に固定し、git 管理しない。サブエージェント定義・hook・保護の設定・ignore がこの場所を前提にし、途中で変えると記録を見失うためである。後の作業に効かせたい決定は要件・構造・規則へ残す。記録から組み立てる [checkpoint](architecture/data.md#checkpoint)(再開用の派生状態)は保存する記録と区別する。
-- **バイナリが持つもの**: 記録とバイナリの約束である JSON Schema、分類表とロールの既定、ホスト設定の断片を持つ。分類表の既定は `devkit.toml` で上書き・追加・削除できる。`kit_version` は記録形式とバイナリの互換性の識別であり、各作業に記録する。
+- **バイナリが持つもの**: 記録とバイナリの約束である JSON Schema、分類表とロールの既定、ホスト設定の断片を持つ。人への確認の分類は `devkit.toml` の `[router] human_confirmation` で上書き・追加・削除できる。check の結果から次の行動への対応とロールは固定である。`kit_version` は記録形式とバイナリの互換性の識別であり、各作業に記録する。
 
 規範の識別に含めるのは、principles・stages・checks・plans・templates・rules・`devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md である。ラウンド開始時のスナップショットで固定する。requirements・structure・detect・`.devkit/run/` は含めず、これらの更新では規範の識別が変わらず、判定も失効しない。
 
-ループ自身の変更(`meta_loop_edit`)は、規範・ホスト設定・skill・リポジトリで有効な pre-commit の設定の変更である。要件と構造の更新は作業の成果としてステージの判定で見る。既定の `[approval] meta_loop_edit = "confirm"` では、どのステージの変更でも効力を持つ前に人が確認する。未確認の変更を含むラウンドは開かず、最後のラウンドの変更は完了時のコミット前に確認する。`"allow"` も選べる。
+ループ自身の変更(`meta_loop_edit`)は、規範・ホスト設定・skill・リポジトリで有効な pre-commit の設定の変更である。要件と構造の更新は作業の成果としてステージの判定で見る。既定の `[approval] meta_loop_edit = "confirm"` では、どのステージの変更でも効力を持つ前に人が確認する。新たな未確認の変更はラウンドを開く前に問いで確認し、最後のラウンドの変更は完了時のコミット前に確認する。却下された変更が同じまま残る場合は、作業対象を保持して取り消す作業ラウンドを指示し、再確認を求めない。`"allow"` も選べる。
 
 バイナリの配布、導入時に `init` が用意するものと `uninstall` による削除は [install](architecture/modules.md#install)、hook の登録先と設定の追記は[権限の境界](architecture/guarantees.md#権限の境界)に従う。
 
 導入後の照合は [doctor](architecture/modules.md#doctor-の確認項目)に従う。
 
-`devkit init` は人の確認後に導入したファイルをコミットし、`--no-commit` で省略できる。HEAD がない場合や導入したファイルがコミットされていない場合は、`start` が理由と直し方を返して拒否する。
+`devkit init` は人の確認後に導入したファイルをコミットし、`--no-commit` で省略できる。HEAD がない場合や、作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合は、`start` が理由と直し方を返して拒否する。
 
 ## 実行の仕組みとの対応
 
@@ -46,7 +48,9 @@
 
 skill は `.agents/skills/devkit/`、サブエージェント定義は `.claude/agents/` と `.codex/agents/` に置く。
 
-brief の本文には、そのステージ定義、その判定の観点と参照する原則、規則、要件、関係する構造の記録だけを入れる。他の規範は論理名とパスの一覧で渡し、必要に応じて読ませる。パスはラウンド開始時、ラウンド外の判定なら指示を出す時点のスナップショットを `snap/` に展開した場所である。編集中の規範を参照させない。作業の範囲はスコープの出力と規則で渡す。
+brief の本文には、そのステージ定義、その判定の観点と参照する原則、規則、要件、関係する構造の記録だけを入れる。他の規範は論理名とパスの一覧で渡し、必要に応じて読ませる。パスはラウンド開始時のスナップショット、ラウンド外の判定なら指示を出す時点の作業ブランチの `HEAD` を `snap/` に展開した場所である。編集中の規範を参照させない。作業の範囲はスコープの出力と規則で渡す。
+
+成果の requirements と structure は設定済みの作業ツリー上のパスと存在の有無を示し、requirements が未作成なら作成先を案内する。規則は固定した参照元に必須である。出力スキーマは参照先をすべて同梱し、作業の brief には note の種別と各スキーマを含める。すべての作業の brief と判定依頼が指示発行時点の作業履歴ファイルを参照する。
 
 規範にあるコード書式の `principles/…`・`checks/…`・`stages/…`・`templates/…`・`rules.md` は、リポジトリ側の資産の論理名である。brief が設定で解決した実際のパスとの対応を示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
 

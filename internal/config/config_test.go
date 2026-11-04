@@ -56,7 +56,7 @@ func TestDefaults(t *testing.T) {
 		Requirements: ".devkit/requirements.md", Structure: ".devkit/structure.json", Detect: ".devkit/detect.json",
 	}
 	wantDependencies := []string{"go.mod", "go.sum", "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "uv.lock", "composer.json", "composer.lock"}
-	wantConfirmation := []string{DependencyChanged, MetaLoopEdit, TargetChangedAgain}
+	wantConfirmation := []string{DependencyChanged, TargetChangedAgain}
 	wantDestinations := []string{"hook_lint_type", "plan_template", "aspect", "principle", "skill"}
 	if c.DefaultPlan != "default" || c.Paths != wantPaths || c.Approval != (Approval{Plan: "requirements", MetaLoopEdit: "confirm"}) || c.Git.Branch != "devkit/{work_id}" || c.Git.CommitMessage != "devkit: {stage} ({work_id})" || c.Git.AllowEmptyCommit == nil || !*c.Git.AllowEmptyCommit || c.Limits.StopContinuation != 3 {
 		t.Fatalf("parsed defaults do not match: %+v", c)
@@ -227,6 +227,10 @@ func TestInvalidNewSettings(t *testing.T) {
 		{"[approval]\nplan = ''", "approval.plan"},
 		{"[approval]\nmeta_loop_edit = 'deny'", "approval.meta_loop_edit"},
 		{"[approval]\nmeta_loop_edit = ''", "approval.meta_loop_edit"},
+		{"[plan_check]\naspect = ''", "plan_check.aspect"},
+		{"[plan_check]\naspect = ' '", "plan_check.aspect"},
+		{"[plan_check]\nrunner = ''", "plan_check.runner"},
+		{"[plan_check]\nrunner = ' '", "plan_check.runner"},
 		{"[git]\nbranch = 'topic'", "git.branch"},
 		{"[git]\nbranch = ''", "git.branch"},
 		{"[git]\ncommit_message = ''", "git.commit_message"},
@@ -236,6 +240,7 @@ func TestInvalidNewSettings(t *testing.T) {
 		{"[git]\ncommit_message = '{{stage}}'", "git.commit_message"},
 		{"[classification]\ndependency_files = ['[']", "classification.dependency_files"},
 		{"[router]\nhuman_confirmation = ['billing_changed']", "router.human_confirmation"},
+		{"[router]\nhuman_confirmation = ['meta_loop_edit']", "router.human_confirmation"},
 		{"[router]\nhuman_confirmation = ['undeclared_meta_loop_edit']", "router.human_confirmation"},
 		{"[limits]\nstop_continuation = 0", "limits.stop_continuation"},
 		{"[limits]\nstop_continuation = -1", "limits.stop_continuation"},

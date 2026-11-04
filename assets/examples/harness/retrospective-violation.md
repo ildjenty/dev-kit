@@ -1,10 +1,10 @@
 ## Request
 
-Review the retrospective using the supplied independent records. Existing judgment processing, skill placement, and fresh-session instructions meet their contracts. The lesson destination order is the default. Required command:test passed on the final tree.
+Review the retrospective using the work-history file referenced in the brief. Its content, fixed at instruction issue time, is supplied below as independent records. Existing judgment processing, skill placement, and fresh-session instructions meet their contracts. The lesson destination order is the default. Required command:test passed on the final tree.
 
 ## Target
 
-# Work inputs
+# Work-history file
 
 - Rounds: Two. The first had a blocking broken-link finding and a nonblocking finding that two checks duplicated the same link inspection. The second passed after the link was repaired.
 - Human correction: A note lesson identifies the same broken-link miss in an earlier task.

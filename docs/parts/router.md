@@ -17,9 +17,13 @@ router は、分類表に基づいて次の行動を分類する。
 
 ループ自身の変更は、規範・ホスト設定・skill・有効な pre-commit の設定の変更であり、requirements と structure は含めない。`[approval] meta_loop_edit` の既定は `"confirm"` であり、ステージにかかわらず、変更が効く最初のラウンドの前に確認する。最後のラウンドの変更は、判定後、完了時のコミット前に確認する。`"allow"` も設定できる。
 
-計画承認は `[approval] plan` に従い、既定の `"requirements"` では、最初の計画、完了条件の ID または文面が直前に人が承認した計画から変わる計画、逸脱のある計画、外部操作を宣言した計画を確認する。同じ完了条件で逸脱も外部操作もない再計画には再確認を求めない。`"always"` は毎バージョン、`"deviation"` は逸脱または外部操作の宣言がある場合に確認する。
+計画承認は `[approval] plan` に従い、既定の `"requirements"` では、最初の計画、完了条件の ID または文面が直前に人が承認した計画から変わる計画、逸脱のある計画、外部操作を宣言した計画を確認する。同じ完了条件で逸脱も外部操作も未決事項もない再計画には再確認を求めない。`"always"` は毎バージョン、`"deviation"` は逸脱または外部操作の宣言がある場合に確認する。
+
+`open_questions` が空でない計画は、承認方針によらず人の承認を必須とする。
 
 分類表の追加・削除に未知の分類名があれば設定エラーとする。依存の宣言として扱うファイルは `[classification] dependency_files` で指定する。
+
+`[router] human_confirmation` で変更できる分類名は `dependency_changed` と `target_changed_again` だけである。`meta_loop_edit` の確認は `[approval] meta_loop_edit` だけに従い、分類表から削除できない。check の結果から次の行動への対応とロールは固定であり、計画の check は `[plan_check] aspect`・`runner` で指定する。
 
 #### check の結果
 

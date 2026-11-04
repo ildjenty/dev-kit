@@ -1,10 +1,10 @@
 ## Request
 
-Review the retrospective using the supplied independent records. Existing judgment processing, skill placement, and fresh-session instructions meet their contracts. The lesson destination order is the default.
+Review the retrospective using the work-history file referenced in the brief. Its content, fixed at instruction issue time, is supplied below as independent records. Existing judgment processing, skill placement, and fresh-session instructions meet their contracts. The lesson destination order is the default.
 
 ## Target
 
-# Work inputs and review
+# Work-history file and review
 
 - Rounds: One. All judgments passed. There are no blocking or nonblocking findings, FAIL or NOT ASSESSED outcomes, human rejections, corrections, replanning instructions, or missed issues reported through note.
 - Norms inventory: The relevant writing principle is used by the wording aspect and document plan. No unused mechanism, unmet need, or burden was observed in this work.

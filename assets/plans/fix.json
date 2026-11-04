@@ -47,6 +47,11 @@
           "required": true
         },
         {
+          "aspect": "test",
+          "runner": "devkit-judge",
+          "required": true
+        },
+        {
           "aspect": "harness",
           "runner": "devkit-judge",
           "required": true

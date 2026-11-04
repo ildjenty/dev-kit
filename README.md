@@ -2,7 +2,7 @@
 
 dev-kit is a tool for running a repository-specific development loop inside Claude Code or Codex CLI sessions.
 
-dev-kit is this repository, kit is the name for everything it provides, and `devkit` is the binary. The repository owner composes a [loop template](docs/architecture/data.md#ループの雛形-plantemplate) (a combination of work stages, judgments and approvals). The kit provides the [seven parts](docs/design.md#部品), the principles, the [fixed assets](docs/architecture/modules.md#kit) (versioned assets) and `devkit`.
+dev-kit is this repository, kit is the name for everything it provides, and `devkit` is the binary. The repository owner composes a loop template from stages, checks, and human gates. Devkit enforces the chosen order, independent judgments, approvals, and records. The repository owns and maintains the installed principles, stages, aspects, plan templates, brief templates, and rules; the binary owns the record schemas and host configuration fragments.
 
 ## Installation
 
@@ -22,20 +22,22 @@ cd /path/to/your-repository
 devkit init
 ```
 
-`devkit init` preserves existing repository settings and assets and merges missing kit settings, including deny defaults.
+`devkit init` preserves existing repository settings and assets and merges missing kit settings, including deny defaults. After showing the changes and receiving confirmation, it installs and commits the files; `--no-commit` skips that commit. Before creating a branch or records, `devkit start` requires an existing HEAD and checks that existing configured norm paths, `devkit.toml`, and agent definitions are committed and unmodified. Commit the installation changes first if start refuses them. Init writes `kit_version = "v2"`, which identifies record-format compatibility rather than an installed norm copy.
 
-The bundled templates in `.devkit/plans/` use judge checks only, so they work in a repository that has no tests yet. Once the repository has tests or other mechanical checks, register them in `devkit.toml` and add `command:<name>` checks to your templates:
+The `default` and `fix` templates require `command:test`, `test`, and `diff` during implementation, and `command:test`, `test`, and `harness` during retrospective. The `docs` template requires `wording` during implementation and only `harness` during retrospective. If `command:test` is not registered, its check returns a fixable failure: the first work creates the tests and verification method and registers it in `devkit.toml`. A human confirms the registration before it takes effect in the next round. A registration looks like this:
 
 ```toml
-[commands]
-test = { executable = "./scripts/test", args = [], timeout_seconds = 120 }
+[commands.test]
+executable = "./scripts/test"
+args = []
+timeout_seconds = 120
 ```
 
 ```json
 { "aspect": "command:test", "runner": "command:test", "required": true }
 ```
 
-To remove devkit from a repository, run `devkit uninstall` there. It shows the changes and asks for confirmation (`--yes` skips it), then removes the kit copy, runtime state, the skill link and installed files that still match the kit, and strips the kit settings from host settings, `devkit.toml` and `.gitignore`. Files you changed are left in place and listed. To remove the binary, delete `devkit` from the `--bin` directory.
+To remove devkit from a repository, run `devkit uninstall` there. It shows the changes and asks for confirmation (`--yes` skips it), then removes runtime state, the skill link, and installed norms and agent definitions that still match the bundled defaults. It strips installed fragments from host settings and `.gitignore`, and removes `devkit.toml` only when it contains no repository-specific settings. Modified files and repository products such as requirements and structure records are preserved; retained configuration and modified installed files are listed. To remove the binary, delete `devkit` from the `--bin` directory.
 
 In Codex, trust the project interactively and trust each project hook through `/hooks`. In Claude Code, accept workspace trust. Start a new host session and run `devkit doctor`, then use `/devkit` to begin. Run `devkit help` for command arguments. See [install](docs/architecture/modules.md#install) and [doctor](docs/architecture/modules.md#doctor-の確認項目) for the design.
 
@@ -70,5 +72,5 @@ The design documents under `docs/` and the principles under `assets/principles/`
 - [docs/rules.md](docs/rules.md): The design-level list of rules imposed on target code and documents, and their enforcement. The canonical version in a using repository follows [Rules](docs/architecture/data.md#規則と強制手段-rules).
 - [docs/repository.md](docs/repository.md): How the using repository's layout maps to the execution mechanisms.
 - [docs/meta-loop.md](docs/meta-loop.md): The procedure for improving the loop itself.
-- [assets/](assets/): Everything devkit distributes. `devkit init` copies it into `.devkit/kit/<version>/` in the using repository.
+- [assets/](assets/): Everything devkit distributes. `devkit init` installs repository-owned norms at their configured locations, defaulting to `.devkit/principles/`, `.devkit/stages/`, `.devkit/checks/`, `.devkit/plans/`, `.devkit/templates/`, and `.devkit/rules.md`. Requirements and structure records are repository products. Execution records stay in the fixed, untracked `.devkit/run/` directory; skills and subagent definitions are installed in their host locations.
   - [principles/](assets/principles/): The principles, split into files by where they apply.

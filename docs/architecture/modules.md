@@ -31,7 +31,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### brief
 
-- **責務**: ステージ定義、計画(ID 付きの完了条件と上限)、前のステージの出力、要件の正本(既定 `.devkit/requirements.md`)、リポジトリの事実(変更対象のディレクトリの README([配置ガイド](layout.md#利用側のリポジトリ))、[`rules.md` と計画の元に戻せないもの](data.md#規則と強制手段-rules)、利用可能な check)から brief を組み立てる。修正ラウンドでは前回の指摘と指摘 ID、必須の `command:` の check の出力、pre-commit の出力を取り込む。判定者・計画者のサブエージェントに渡す依頼文も brief の一種として組み立てる。判定依頼は [check が決めた内容](#check)を受け取り、依頼文に組み立てる。本文に含める規範は、そのステージ定義、判定の観点と参照する原則、rules、requirements、関係する構造の記録とする。計画者・作業者・判定者の brief には requirements を必ず入れる。その他の規範は論理名と `snap/` 内の実際のパスの一覧で渡す。パスはラウンド開始時、ラウンド外の判定では指示を出す時点のスナップショットを展開した場所を指す。JSON Schema はバイナリから受け取った本文を出力スキーマとして渡す。配置の既定値と変更方法は [paths](#config)に従う。
+- **責務**: ステージ定義、計画(ID 付きの完了条件と上限)、前のステージの出力、要件の正本(既定 `.devkit/requirements.md`)、リポジトリの事実(変更対象のディレクトリの README([配置ガイド](layout.md#利用側のリポジトリ))、[`rules.md` と計画の元に戻せないもの](data.md#規則と強制手段-rules)、利用可能な check)から brief を組み立てる。修正ラウンドでは前回の指摘と指摘 ID、必須の `command:` の check の出力、pre-commit の出力を取り込む。判定者・計画者のサブエージェントに渡す依頼文も brief の一種として組み立てる。判定依頼は [check が決めた内容](#check)を受け取り、依頼文に組み立てる。本文に含める規範は、そのステージ定義、判定の観点と参照する原則、rules、requirements、関係する構造の記録とする。計画者・作業者・判定者の brief には requirements の本文、未作成なら作成先の案内を必ず入れる。その他の規範は論理名と `snap/` 内の実際のパスの一覧で渡す。パスはラウンド開始時のスナップショット、ラウンド外の判定では指示を出す時点の作業ブランチの `HEAD` を展開した場所を指す。JSON Schema はバイナリから受け取り、すべての参照先を同梱した出力スキーマとして渡す。requirements と structure は設定済みの作業ツリー上のパスと存在の有無も示し、requirements が未作成なら作成先を案内する。作業の brief は note の種別と同梱済みスキーマを含める。配置の既定値と変更方法は [paths](#config)に従う。
 - **持つデータ**: brief の型を持つ。
 - **公開する契約**: brief の型と、brief を組み立てる関数を公開する。
 - **依存**: ステージの型を持つ plan と、テンプレートを持つ form に依存する。
@@ -53,14 +53,16 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 観点 `test` は、完了条件ごとの具体的なテスト、登録済みコマンドからの実行、利用者から見える入口での契約の確認、実装をなぞっていないことを `principles/testing.md` に照らして判定する。観点 `harness` は、振り返りでの問題の捕捉先と再発防止、どの原則がどの観点・雛形で使われているか、使われない仕組みや負担に見合わない仕組み、前提の確認を扱う。
 
+観点中のコード書式の参照はアンカーを除いて原則・規則のファイルを特定する。`rules.md#screens` は `rules.md`、`principles/x.md#anchor` は `principles/x.md` として読み、合格の識別に内容ハッシュを含める。
+
 ### router
 
 メタループは専用モジュールを持たず、リポジトリの規範と[改善の手順](../meta-loop.md#メタループ)で扱う。
 
-- **責務**: 分類表の既定とリポジトリ側の上書き・追加・削除を解析済みの値として受け取り、check の集約、ラウンド数、engine が計算した進展の有無、計画の上限、終了ブロックの終了の種別([進捗](data.md#進捗-progress))から[次の行動](flow.md#router-の判断)を選ぶ。plan の[完了条件](guarantees.md#完了条件)を照合し、[人への確認対象](guarantees.md#人への確認対象)を扱う。
+- **責務**: 分類表の既定と、人への確認の分類に対するリポジトリ側の上書き・追加・削除を解析済みの値として受け取り、check の集約、ラウンド数、engine が計算した進展の有無、計画の上限、終了ブロックの終了の種別([進捗](data.md#進捗-progress))から[次の行動](flow.md#router-の判断)を選ぶ。plan の[完了条件](guarantees.md#完了条件)を照合し、[人への確認対象](guarantees.md#人への確認対象)を扱う。
 - **持つデータ**: 人への確認、check の結果、ロールと実行主体に関する分類表の型と内容を持つ。router はロールの語彙(作業者・人・判定者・計画者)を持つだけで、実行主体は雛形の check の runner で決まる。
 - **公開する契約**: 分類表の型と、渡された分類表による判断、完了条件の照合、人への確認の分類を公開する。
-- **依存**: 上限と遷移の語彙を持つ plan、判定の型を持つ check に依存する。
+- **依存**: 上限と遷移の語彙を持つ plan、判定の型を持つ check に依存する。router と workspace は config を import しない。呼び出し側がパスと分類表を解決し、値として渡す。
 - **置くもの・置かないもの**: 分類と判断を置く。判断に従ってループを進める処理は engine に置く。
 
 ### form
@@ -94,12 +96,14 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **責務**: [処理の流れ](flow.md)の状態機械を進める。`start --plan <name>` の雛形の指定(`--plan` 省略時は `default_plan`)、人の要求の原文の結び付けと作業作成、`next` の結果の受理と指示の計算、brief・判定依頼の書き出し、`submit` の終了ブロックと成果物の受理、判定コマンドの判定の実行、[`command:` の check の実行](flow.md#作業結果の判定)、router の判断の記録を担う。`plan` の提案とゲート、`answer` の回答、`external` の要求、`note` の決定と証拠を受理する。教訓は内容と根拠を記録し、反映先の提案は[メタループ](../meta-loop.md#メタループ)で行う。完了時は `[git]` の設定に従って workspace へ `git commit` を依頼する。`allow_empty_commit = false` で変更がないステージはコミットせず、その時点の HEAD を完了記録に使う。commit の成否、完了の記録は[完了条件](guarantees.md#完了条件)に従う。受理の境界は[整合性](data.md#整合性の境界)と[保証](guarantees.md)に従う。
 - **持つデータ**: 現在の作業、StageRun、ラウンド、指示の計算結果を扱う。受理した状態はすべて ledger に記録する。
 - **公開する契約**: `start`・`next`・`submit`・`plan`・`answer`・`external`・`note`・`pause`・`resume`・`abort` に対応する操作を公開する。`pause`・`resume` による中断・再開の直接の記録、中断中の `next` の応答と新しい指示・処理の抑止は[中断](guarantees.md#中断)に従う。継続上限の問いも停止の観測から受理する。実装の接続は[ポート](#モジュール境界と入出力の集約)の方針に従う。
-- **依存**: plan、brief、check、router、ledger、form、workspace、external、ledger/fsstore に依存する。
+- **依存**: plan、brief、check、router、ledger、form、workspace、external、ledger/fsstore、config、hook、kit に依存する。
 - **置くもの・置かないもの**: 状態機械の進行、指示の計算、判定コマンドと検証コマンドの実行、判定者の結果の受理を置く。git の操作は workspace に、外部書き込みの実行は external に、保存の実装は ledger/fsstore に置く。判定者・計画者のサブエージェントを起動する処理は置かない。
 
-`start` は HEAD がない場合、または導入したファイルがコミットされていない場合に、理由と直し方を返して拒否する。作業ブランチ名には `[git] branch` を使う。束縛前のセッションで観測した最新の人の入力を要求の原文として作業に結び付け、観測がなければ原文なしと記録する。
+`start` は HEAD がない場合、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合に、理由と直し方を返して拒否する。作業ブランチ名には `[git] branch` を使う。束縛前のセッションで観測した最新の人の入力を要求の原文として作業に結び付け、観測がなければ原文なしと記録する。
 
-計画承認は `[approval] plan` に従う。既定の `requirements` では、最初の計画、直前に人が承認した計画から完了条件の ID または文面が変わった計画、雛形からの逸脱がある計画、外部操作を宣言した計画を人に確認する。完了条件が同じで逸脱も外部操作もない再計画には再確認を求めない。`open_questions` への人の回答は、計画の却下と作り直しの指示として計画者に渡し、人による再提案の回数には上限を設けない。人が承認した完了条件を作業の完了基準とする。
+計画承認は `[approval] plan` に従う。既定の `requirements` では、最初の計画、直前に人が承認した計画から完了条件の ID または文面が変わった計画、雛形からの逸脱がある計画、外部操作を宣言した計画を人に確認する。完了条件が同じで逸脱も外部操作も未決事項もない再計画には再確認を求めない。`open_questions` への人の回答は、計画の却下と作り直しの指示として計画者に渡し、人による再提案の回数には上限を設けない。人が承認した完了条件を作業の完了基準とする。
+
+`open_questions` が空でない計画は、承認方針によらず人の承認を必須とする。
 
 ステージの完了が確定し、遷移 `done` が `"replan"` なら、既存の再計画の経路で計画者へ残りの計画の作り直しを依頼する。作り直した計画にも計画の check と承認の条件を適用する。要件定義を先に行って再計画するかは雛形が決め、engine は要件定義を特別扱いしない。
 
@@ -109,7 +113,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 未登録の `command:` は check の `FAIL` として作業者に返し、検証の手段と登録を作らせる。`devkit.toml` の登録はループ自身の変更として `[approval] meta_loop_edit` に従い確認し、次のラウンド開始時のスナップショットから使う。
 
-振り返りには、すべての判定と指摘、FAIL と NOT ASSESSED の経緯、ラウンド数、人の却下・訂正・作り直しの指示、note の教訓で伝えた見逃し、規範の一覧を渡す。再発防止の反映先は `[lessons] destinations` の優先順に従い、反映しない理由も残す。`rules` の強制手段が未実装の項目と繰り返す違反は、機械の検査に移す候補とする。規範全体の棚卸しは必要が見えた場合に行う。振り返りの必須 check は `command:test` と `harness` である。
+すべての作業の brief と判定依頼は、指示発行時点で固定した作業履歴ファイルを参照する。全判定と指摘、FAIL と NOT ASSESSED の経緯、ラウンド数、人の却下・訂正・作り直しの指示、note の教訓で伝えた見逃しを devkit が履歴にまとめ、規範の一覧とともに渡す。振り返りのステージ定義と観点 `harness` がこの履歴を使う。再発防止の反映先は `[lessons] destinations` の優先順に従い、反映しない理由も残す。`rules` の強制手段が未実装の項目と繰り返す違反は、機械の検査に移す候補とする。規範全体の棚卸しは必要が見えた場合に行う。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。
 
 ### external
 
@@ -121,7 +125,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### hook
 
-- **責務**: [5つのイベント](hooks.md)を決定的に処理し、観測と結果を生成物にする。UserPromptSubmit は作業に束縛されていないセッションでも、人の最新の入力をセッションごとに1件保持する。
+- **責務**: [5つのイベント](hooks.md)を決定的に処理し、観測と結果を生成物にする。UserPromptSubmit は作業への束縛の有無によらず、人の入力ごとにセッションの最新入力1件を更新する。タスクの完了通知は除き、束縛後は作業ごとの入力の観測も残す。
 - **持つデータ**: 共通イベント、解決した作業 ID、組み立てた checkpoint、観測を扱う。
 - **公開する契約**: `devkit hook <event>` の処理結果を返す。出力の形式と上限は host/event を通してホストに合わせる。
 - **依存**: ledger、config、host/event、form、ledger/fsstore(生成物の公開)に依存する。ルートは cmd/devkit が workspace で解決し、作業 ID はセッションの観測の束縛から取得して渡す。cmd/devkit は workspace で解決した「規範の参照元から `devkit.toml` を読む関数値」も hook に渡し、hook が[規範の固定](guarantees.md#規範の固定)に従って読み出す。
@@ -152,7 +156,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 設定ファイルは `devkit.toml` とし、TOML で記述する。
 
-- **責務**: 渡された TOML の解析と検証を行う。記録形式とバイナリの互換性を識別する `kit_version`、`default_plan`、`[paths]`、`[approval]`、`[git]`、`[classification]`、`[limits]`、`[lessons]`、`[detection]`、`[judges]` の判定コマンド(名前・実行ファイル・固定引数・期限・出力スキーマの指定)、`[commands]` の検証コマンド(名前・実行ファイル・固定引数・期限)、外部操作の登録、`[deny]`、分類表の上書き・追加・削除を扱う。分類表の追加・削除に未知の分類名があれば設定エラーとする。配置は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に従う。
+- **責務**: 渡された TOML の解析と検証を行う。記録形式とバイナリの互換性を識別する `kit_version`、`default_plan`、`[paths]`、`[approval]`、`[git]`、`[classification]`、`[limits]`、`[lessons]`、`[detection]`、`[plan_check]`、`[judges]` の判定コマンド(名前・実行ファイル・固定引数・期限・出力スキーマの指定)、`[commands]` の検証コマンド(名前・実行ファイル・固定引数・期限)、外部操作の登録、`[deny]`、`[router] human_confirmation` の上書き・追加・削除を扱う。分類表の追加・削除に未知の分類名があれば設定エラーとする。配置は[利用側のリポジトリ](layout.md#利用側のリポジトリ)に従う。
 - **持つデータ**: 解析・検証した設定値と、各コマンドの登録定義を持つ。
 - **公開する契約**: 設定の解析・検証と内部の型への変換を公開する。
 - **依存**: 他のモジュールに依存しない。
@@ -161,8 +165,11 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 設定項目と既定値は次のとおりである。
 
 - `default_plan = "default"` は `--plan` を省略したときの雛形名である。
+- `kit_version = "v2"` は記録形式とバイナリの互換性を識別する。`init` はこの値を書く。
+- `[plan_check] aspect = "plan"`・`runner = "devkit-judge"` は計画の check の観点と実行主体である。登録済みの判定コマンドなら devkit が実行し、それ以外はサブエージェントの指示を出す。
+- `[router] human_confirmation` は `dependency_changed` と `target_changed_again` の分類だけを変更できる。check の結果から次の行動への対応とロールは固定である。ループ自身の変更の確認は `[approval] meta_loop_edit` だけで決まる。
 - `[paths]` は `principles = ".devkit/principles"`、`stages = ".devkit/stages"`、`checks = ".devkit/checks"`、`plans = ".devkit/plans"`、`templates = ".devkit/templates"`、`rules = ".devkit/rules.md"`、`requirements = ".devkit/requirements.md"`、`structure = ".devkit/structure.json"`、`detect = ".devkit/detect.json"` を既定とする。実行の記録と生成物の `.devkit/run/` は固定である。
-- `[approval] plan = "requirements"` は最初の計画、完了条件が変わる計画、逸脱または外部操作の宣言がある計画を確認する。`"always"` は計画のバージョンごとに確認し、`"deviation"` は逸脱または外部操作の宣言がある場合に確認する。
+- `[approval] plan = "requirements"` は最初の計画、完了条件が変わる計画、逸脱または外部操作の宣言がある計画を確認する。`"always"` は計画のバージョンごとに確認し、`"deviation"` は逸脱または外部操作の宣言がある場合に確認する。`open_questions` が空でなければ、この設定によらず人の承認を必須とする。
 - `[approval] meta_loop_edit = "confirm"` はどのステージでもループ自身の変更を確認する。`"allow"` も指定できる。
 - `[git] branch = "devkit/{work_id}"` は `{work_id}` を必須とする。`commit_message = "devkit: {stage} ({work_id})"` は `{stage}`・`{work_id}`・`{task}` を使える。`allow_empty_commit = true` は変更のないステージも空のコミットを作る。false ならコミットせず、その時点の HEAD で完了を記録する。
 - `[classification] dependency_files` は依存の宣言として扱うファイルの glob の一覧である。既定は各ディレクトリの `go.mod`・`go.sum`・`package.json`・`package-lock.json`・`yarn.lock`・`pnpm-lock.yaml`・`Cargo.toml`・`Cargo.lock`・`Gemfile`・`Gemfile.lock`・`requirements.txt`・`pyproject.toml`・`poetry.lock`・`uv.lock`・`composer.json`・`composer.lock` を対象とする。
@@ -170,7 +177,9 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - `[detection] required = true` は判定者が担当する必須 check に検出試験の合格を課す。`false` なら検出試験を指示せず、合格記録なしで判定を受理する。
 - `[lessons] destinations` の既定の優先順は、機械の検査(hook・lint・型・検証コマンド) → 雛形 → 観点 → 原則 → skill である。反映先はリポジトリの資産である。
 
-判定コマンドと検証コマンドの期限は登録ごとに必須である。人による中断、ループの有限性、JSON Schema、判定結果の受理境界、外部操作の承認と二重適用の防止は設定で無効にできない。
+判定コマンドと検証コマンドの期限は登録ごとに必須である。
+
+`[paths]` では、requirements・structure・detect の成果のパスが principles・stages・checks・plans・templates・rules の規範のパスと同じ、またはその配下になる設定を拒否する。規範のパス同士の重なりも拒否する。人による中断、ループの有限性、JSON Schema、判定結果の受理境界、外部操作の承認と二重適用の防止は設定で無効にできない。
 
 ### install
 
@@ -182,11 +191,13 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 - **依存**: config、kit、ledger、workspace に依存する。
 - **置くもの・置かないもの**: 導入先の構成と登録・削除・照合を置く。
 
-`uninstall` は実行の記録 `.devkit/run/` と skill のリンクを削除する。`init` が `[paths]` の場所に置いた原則・ステージ定義・観点と検出試験の例・雛形・テンプレート・規則、および skill・サブエージェント定義は、配布した初期内容と一致するものを削除する。ホスト設定(`.claude/settings.json`・`.codex/hooks.json`・`.codex/config.toml`・`.codex/rules/devkit.rules`)、`devkit.toml`、`.gitignore` から kit の断片を取り除き、空になったファイルとディレクトリを削除する。利用者が書き換えたファイルと、利用者の設定が残る `devkit.toml` は削除せず、一覧で知らせる。処理は冪等であり、git hook とバイナリは扱わない。
+`uninstall` はスナップショット展開先のディレクトリに書き込み権限を戻してから、実行の記録 `.devkit/run/` と skill のリンクを削除する。`init` が `[paths]` の場所に置いた原則・ステージ定義・観点と検出試験の例・雛形・テンプレート・規則、および skill・サブエージェント定義は、配布した初期内容と一致するものを削除する。ホスト設定(`.claude/settings.json`・`.codex/hooks.json`・`.codex/config.toml`・`.codex/rules/devkit.rules`)、`devkit.toml`、`.gitignore` から kit の断片を取り除き、空になったファイルとディレクトリを削除する。利用者が書き換えたファイルと、利用者の設定が残る `devkit.toml` は削除せず、一覧で知らせる。処理は冪等であり、git hook とバイナリは扱わない。
+
+導入時の案内は、`default` と `fix` が `command:test` を必須とし、未登録なら最初の作業がテストと検証コマンドを作って登録し、人が登録を確認することを伝える。
 
 ### kit
 
-kit は [assets パッケージ](#assets-パッケージ)がバイナリに埋め込む配布物を供給する。JSON Schema、分類表とロールの既定値、ホスト設定の断片はバイナリから供給する。JSON Schema は記録とバイナリの約束であり、リポジトリで育てる対象にはしない。分類表の既定値は `devkit.toml` で上書き・追加・削除できる。
+kit は [assets パッケージ](#assets-パッケージ)がバイナリに埋め込む配布物を供給する。JSON Schema、分類表とロールの既定値、ホスト設定の断片はバイナリから供給する。JSON Schema は記録とバイナリの約束であり、リポジトリで育てる対象にはしない。人への確認の分類は `devkit.toml` の `[router] human_confirmation` で上書き・追加・削除できる。check の結果から次の行動への対応とロールは固定である。
 
 原則・ステージ定義・観点と検出試験の例・雛形・テンプレート・規則の初期内容は `init` に渡す。コピーは install が `[paths]` の置き場所へ行い、以後はリポジトリが所有する規範として育てる。skill とサブエージェント定義もリポジトリに置く。規則の既定は、どのリポジトリにも当てはまるものだけとする。`docs/` とリポジトリ直下の `README.md` は配布しない。
 
@@ -259,6 +270,9 @@ graph TD
   engine --> workspace
   engine --> external
   engine --> fsstore
+  engine --> config
+  engine --> hook
+  engine --> kit
   external --> ledger
   hook --> ledger
   hook --> config

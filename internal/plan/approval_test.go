@@ -29,7 +29,9 @@ func TestPlanApprovalPolicies(t *testing.T) {
 			p.CompletionConditions = append(p.CompletionConditions, CompletionCondition{ID: "C3", Description: "Third condition"})
 		}, true},
 		{"reordered conditions", "requirements", &approved, func(p *Plan) { slices.Reverse(p.CompletionConditions) }, false},
-		{"task and questions", "requirements", &approved, func(p *Plan) { p.Task = "Replan behavior"; p.OpenQuestions = []string{"Clarify wording"} }, false},
+		{"changed task", "requirements", &approved, func(p *Plan) { p.Task = "Replan behavior" }, false},
+		{"open questions", "requirements", &approved, func(p *Plan) { p.OpenQuestions = []string{"Clarify wording"} }, true},
+		{"deviation open questions", "deviation", &approved, func(p *Plan) { p.OpenQuestions = []string{"Clarify wording"} }, true},
 		{"deviation", "requirements", &approved, func(p *Plan) { p.Stages[1].Gate.Required = false }, true},
 		{"external operation", "requirements", &approved, func(p *Plan) { p.ExternalOperations = []ExternalOperation{{Kind: "publish"}} }, true},
 		{"always first", "always", nil, func(*Plan) {}, true},

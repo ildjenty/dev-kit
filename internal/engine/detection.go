@@ -85,15 +85,11 @@ func (e *Engine) detectionInput(ctx context.Context, ref string, item plan.Check
 	return detectionInput{Spec: spec, Identity: identity, Examples: texts}, err
 }
 func (e *Engine) detectionRecords(ctx context.Context, ref string) ([]check.DetectionTest, error) {
-	path, err := e.expanded(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
 	settings, err := e.settings(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(filepath.Join(path, settings.RepositoryPaths().Detect))
+	data, err := os.ReadFile(filepath.Join(e.Root(), settings.RepositoryPaths().Detect))
 	if errors.Is(err, os.ErrNotExist) {
 		return []check.DetectionTest{}, nil
 	}
@@ -128,7 +124,7 @@ func (e *Engine) detectionContext(ctx context.Context, items []plan.Check, ref s
 	records, err := e.detectionRecords(ctx, ref)
 	return requirements, records, err
 }
-func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items []plan.Check, ref string) (Result, bool, error) {
+func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items []plan.Check, ref string, stageRunID ...string) (Result, bool, error) {
 	requirements, records, err := e.detectionContext(ctx, items, ref)
 	if err != nil {
 		return Result{}, false, err
@@ -148,6 +144,9 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 	meta, fresh, err := e.issuance(form.InstructionDetectionTest, key, nil, 0, "")
 	if err != nil {
 		return Result{}, false, err
+	}
+	if len(stageRunID) > 0 {
+		meta.StageRunID = stageRunID[0]
 	}
 	if !fresh {
 		data, err := e.readInstruction(meta.ID)
@@ -208,12 +207,22 @@ func (e *Engine) ensureDetection(ctx context.Context, state *ledger.State, items
 	if err := e.requestNorms(ctx, ref, plan.Check{Aspect: item.Aspect, Runner: item.Runner, Target: "detection"}, norms); err != nil {
 		return Result{}, false, err
 	}
-	output := e.schemas["detection-result"]
+	output, err := e.bundledSchema(e.schemas["detection-result"])
+	if err != nil {
+		return Result{}, false, err
+	}
+	evidence, err := e.judgmentEvidence(ctx, &meta, state, nil)
+	if err != nil {
+		return Result{}, false, err
+	}
+	if len(norms) > 0 {
+		norms[0].Content += "\n" + evidence
+	}
 	request, err := check.PrepareRequest(check.RequestInput{Kind: check.DetectionRequest, InstructionID: meta.ID, Runner: string(item.Runner), Aspect: aspect, TargetVersion: form.TargetVersion{Kind: form.TargetTree, Tree: tree}, TargetPath: path, Norms: norms, OutputSchema: output, CompletionConditionIDs: []string{}})
 	if err != nil {
 		return Result{}, false, err
 	}
-	data := instructionData{Reference: ref, Instruction: form.Instruction{ID: meta.ID, Kind: form.InstructionDetectionTest, Runner: string(item.Runner), TargetPath: path, Text: "Run the detection test with the assigned judge: devkit-instruction " + meta.ID}, Request: &request, Detection: &input}
+	data := instructionData{Reference: ref, Context: meta.Context, Instruction: form.Instruction{ID: meta.ID, Kind: form.InstructionDetectionTest, Runner: string(item.Runner), TargetPath: path, Text: "Run the detection test with the assigned judge: devkit-instruction " + meta.ID}, Request: &request, Detection: &input}
 	b, err := e.detectionBrief(ctx, data)
 	if err != nil {
 		return Result{}, false, err
@@ -253,9 +262,16 @@ func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brie
 	if err != nil {
 		return brief.Brief{}, err
 	}
+	paths, err := e.normPaths(ctx, data.Reference)
+	if err != nil {
+		return brief.Brief{}, err
+	}
 	// Detection inputs contain only the aspect and its referenced principles and rules.
-	facts.LayoutGuides, facts.Requirements.Content = nil, ""
-	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, OutputSchema: string(schema), Repository: facts, Norms: docs})
+	facts.LayoutGuides = nil
+	if facts.Requirements.Exists {
+		facts.Requirements.Content = ""
+	}
+	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, OutputSchema: string(schema), Repository: facts, Norms: docs, NormPaths: paths})
 }
 
 func detectionRequest(data instructionData) (check.Request, error) {

@@ -80,13 +80,15 @@ dev-kit/
         inbox/               終了ブロック・計画・note の入力 JSON の既定の場所
         prompts/             人の入力の観測(UserPromptSubmit が書く)
         stops/<ULID>.json    作業単位の継続回数と上限到達時の問い(Stop が書く)
-        brief/               next が書く brief と判定依頼
+        brief/               next が書く brief、判定依頼、差分ファイル
         snap/<対象のバージョン>/   判定対象と固定した規範の展開(read-tree と checkout-index --prefix)
         results/<指示ID>-<agent_id>.json   判定者・計画者のサブエージェントの結果(SubagentStop が書く)
         view.html
 ```
 
-UserPromptSubmit は束縛のないセッションでも、人の最新の入力をセッションごとに1件保持する。`start` はその原文を作業に結び付け、観測がなければ原文なしと記録する。
+UserPromptSubmit は束縛の有無によらず、人の入力ごとにセッションの最新入力1件を更新し、束縛後は作業ごとの観測も残す。タスクの完了通知は入力に含めない。`start` はその原文を作業に結び付け、観測がなければ原文なしと記録する。
+
+作業履歴ファイルは指示発行時点の内容で固定した作業の生成物であり、すべての作業の brief と判定依頼がそのパスを参照する。
 
 入力ファイルの場所と内容の保存は[状態遷移と受理条件](data.md#状態遷移と受理条件)、記録 ID の形式は[記録の範囲](data.md#記録の範囲)、停止の観測の保持条件は[停止の観測](data.md#停止の観測-stopobservation)に従う。
 
@@ -96,7 +98,7 @@ UserPromptSubmit は束縛のないセッションでも、人の最新の入力
 
 規範の識別には principles・stages・checks・plans・templates・rules・`devkit.toml`・サブエージェント定義・AGENTS.md・CLAUDE.md を含める。requirements・structure・detect・`.devkit/run/` は含めず、これらを変えても判定は失効しない。JSON Schema、分類表とロールの既定値、ホスト設定の断片はバイナリが供給する。規範内のコード書式の参照は論理名であり、brief が論理名と `snap/` 内のパスの対応を渡す。`schemas/…` は出力スキーマの本文として渡す。
 
-`init` は導入するファイルを人が確認したあとコミットする。`--no-commit` を指定した場合は手動でコミットする。HEAD がない場合、または導入したファイルが未コミットの場合、`start` は理由と直し方を返して拒否する。
+`init` は導入するファイルを人が確認したあとコミットする。`--no-commit` を指定した場合は手動でコミットする。HEAD がない場合、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合、`start` は理由と直し方を返して拒否する。
 
 同じ機械で複数の作業を並行するときは、ホストや git の worktree 機能で別のチェックアウトを開く。それぞれが自分の `.devkit/run/` を持つ。育てるものの読み出しは[規範の固定](guarantees.md#規範の固定)に従う。
 

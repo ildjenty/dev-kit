@@ -108,6 +108,9 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 					replacement := q
 					replacement.ID = ulidString()
 					replacement.ApprovalTarget.Tree = tree
+					if err := e.refreshQuestionEvidence(ctx, state, &replacement); err != nil {
+						return result, err
+					}
 					if round, ok := state.OpenRound(); ok && round.ReturnedTarget != nil && q.StopCategory != "detection_failed" {
 						if err = e.replaceQuestionTarget(ctx, round, tree); err != nil {
 							return result, err
@@ -387,7 +390,7 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		if question != nil {
 			return e.issueQuestion(state, *question)
 		}
-		if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), startRef); err != nil || pending {
+		if r, pending, err := e.ensureDetection(ctx, state, stage.RequiredChecks(), startRef, run.ID); err != nil || pending {
 			if err != nil || r.Instruction != nil || r.Paused {
 				return r, err
 			}
@@ -397,7 +400,7 @@ func (e *Engine) Next(ctx context.Context) (result Result, err error) {
 		if err != nil {
 			return result, err
 		}
-		round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: startRef}, Norms: norms}
+		round := &ledger.Round{StageRunID: run.ID, SessionID: e.sessionID, StartTarget: form.TargetVersion{Kind: form.TargetTree, Tree: snapshot.Tree}, NormReference: startRef, Norms: norms}
 		if _, err = e.append(round); err != nil {
 			return result, err
 		}
@@ -821,14 +824,14 @@ func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run
 			return "", nil, err
 		}
 		if !changed {
-			fixed, err := e.workspace.CommitTree(ctx, base)
-			if err != nil {
-				fixed = base
-			}
-			return fixed, nil, nil
+			return base, nil, nil
 		}
 	}
-	q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: tree}, config.MetaLoopEdit, "Approve development loop edits before opening the next round? If rejected, the worker must undo the edits.", run.StageID)
+	text, err := e.loopEditText(ctx, base, tree, "Approve development loop edits before opening the next round? If rejected, the worker must undo the edits.")
+	if err != nil {
+		return "", nil, err
+	}
+	q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: tree}, config.MetaLoopEdit, text, run.StageID)
 	q.Evidence = []form.Reference{{RecordID: run.ID}}
 	q, err = e.saveQuestion(state, q, "")
 	return tree, &q, err
@@ -987,7 +990,7 @@ func (e *Engine) finishCommit(ctx context.Context, state *ledger.State, p plan.P
 		if err := e.active(); err != nil {
 			return Result{}, err
 		}
-		settings, settingsErr := e.settings(ctx, round.StartTarget.Tree)
+		settings, settingsErr := e.settings(ctx, roundReference(round))
 		if settingsErr != nil {
 			return Result{}, settingsErr
 		}

@@ -15,6 +15,7 @@ type Brief struct {
 type Document struct {
 	Path    string
 	Content string
+	Exists  bool
 }
 
 // NormPath maps a logical name to its fixed snapshot location.
@@ -30,11 +31,12 @@ type StageOutput struct {
 }
 
 // RepositoryFacts contains layout guides, rules and their irreversible decisions, and available checks.
-// IrreversibleDecisions receives items from rules.md; plan items come from Plan.
+// IrreversibleDecisions refers to shared rules; plan items come from Plan.
 type RepositoryFacts struct {
 	LayoutGuides          []Document
 	Rules                 Document
 	Requirements          Document
+	Structure             Document
 	IrreversibleDecisions []string
 	AvailableChecks       []plan.Check
 }
@@ -50,22 +52,23 @@ type CommandOutput struct {
 // Read Norms and documents from the fixed reference source and preserve conditions with their items.
 type WorkInput struct {
 	// RequestTemplate is the request text resolved by the caller from the fixed repository snapshot.
-	RequestTemplate      string
-	InstructionID        string
-	Stage                plan.Stage
-	StageDefinition      string
-	Plan                 plan.Plan
-	Purpose              string
-	Verification         []string
-	PreviousOutputs      []StageOutput
-	Repository           RepositoryFacts
-	Norms                []Document
-	NormPaths            []NormPath
-	RetrospectiveContext string
-	PreviousFindings     []form.Finding
-	CommandOutputs       []CommandOutput
-	PreCommitOutput      string
-	OutputSchema         string
+	RequestTemplate   string
+	InstructionID     string
+	Stage             plan.Stage
+	StageDefinition   string
+	Plan              plan.Plan
+	Purpose           string
+	Verification      []string
+	PreviousOutputs   []StageOutput
+	Repository        RepositoryFacts
+	Norms             []Document
+	NormPaths         []NormPath
+	WorkHistoryPath   string
+	SupportingSchemas []Document
+	PreviousFindings  []form.Finding
+	CommandOutputs    []CommandOutput
+	PreCommitOutput   string
+	OutputSchema      string
 }
 
 // JudgmentInput receives the request content and output schema selected by check.

@@ -29,11 +29,11 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 - **中断**: 人の依頼でエージェントが呼ぶ `devkit pause`・`devkit resume`、または人による直接の実行を受け付ける。中断中の `next` の応答を含む条件は[中断](../architecture/guarantees.md#中断)、CLI の呼び分けは [cmd/devkit](../architecture/modules.md#cmddevkit)、中断・再開の直接の記録は [engine](../architecture/modules.md#engine)に従う。
 - **指示と表示**: CLI は次の指示と [brief](../architecture/modules.md#brief)(作業や判定の依頼文)、問い、状態、操作の結果を返す。出力の長さと返し方は[性能と出力の上限](../architecture/guarantees.md#性能と出力の上限)に従う。
 
-`init` は導入内容を人が確認したあとコミットし、`--no-commit` で省略できる。HEAD がない、または導入したファイルが未コミットの場合は、`start` を拒否して理由と直し方を返す。雛形の省略時は `default_plan`、ブランチと完了時のコミットは `[git]`、Stop の継続上限は `[limits] stop_continuation` に従う。
+`init` は導入内容を人が確認したあとコミットし、`--no-commit` で省略できる。HEAD がない、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合は、`start` を拒否して理由と直し方を返す。雛形の省略時は `default_plan`、ブランチと完了時のコミットは `[git]`、Stop の継続上限は `[limits] stop_continuation` に従う。
 
 ラウンド開始時に未登録の検証コマンドは、`auto-fixable` の指摘を伴う check の `FAIL` とする。作業者が検証の手段を作って登録し、既定では人の確認を経た次のラウンドから使う。
 
-既定の雛形は `default`・`fix`・`docs` であり、最後に作業者の retrospective を置く。振り返りにはすべての判定と指摘、人の回答や note の見逃しを渡し、必須の `command:test` と `harness` で確認する。規範を変えた場合はループ自身の変更として確認する。
+既定の雛形は `default`・`fix`・`docs` であり、最後に作業者の retrospective を置く。すべての作業の brief と判定依頼が指示発行時点の作業履歴ファイルを参照し、振り返りはそこからすべての判定と指摘、人の回答や note の見逃しを確認する。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。規範を変えた場合はループ自身の変更として確認する。
 
 ### ホストの差分と共通の仕組み
 

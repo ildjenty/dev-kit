@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/ildjenty/dev-kit/internal/config"
 )
 
 // Workspace runs the git CLI in a single checkout.
@@ -161,24 +159,8 @@ func (w *Workspace) ReadFile(ctx context.Context, ref, path string) ([]byte, err
 }
 
 // NormativeIDs returns tree and blob IDs for each normative root, omitting missing roots.
-func (w *Workspace) NormativeIDs(ctx context.Context, ref string) (map[string]string, error) {
-	settings := config.Config{}
-	entries, err := w.treeEntries(ctx, ref, "devkit.toml")
-	if err != nil {
-		return nil, err
-	}
-	if entries["devkit.toml"] != "" {
-		source, err := w.ReadFile(ctx, ref, "devkit.toml")
-		if err != nil {
-			return nil, err
-		}
-		settings, err = config.Parse(source)
-		if err != nil {
-			return nil, err
-		}
-	}
-	p := settings.RepositoryPaths()
-	return w.treeEntries(ctx, ref, p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, "devkit.toml", ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md")
+func (w *Workspace) NormativeIDs(ctx context.Context, ref string, paths ...string) (map[string]string, error) {
+	return w.treeEntries(ctx, ref, paths...)
 }
 
 // RequireCommitted checks that each path exists in HEAD and has no pending changes.
@@ -187,9 +169,10 @@ func (w *Workspace) RequireCommitted(ctx context.Context, paths ...string) error
 	if err != nil {
 		return err
 	}
+	pending := []string{}
 	for _, path := range paths {
 		if entries[path] == "" {
-			return fmt.Errorf("%s is not committed; commit the devkit init changes first", path)
+			pending = append(pending, path+" (not committed)")
 		}
 	}
 	args := append([]string{"status", "--porcelain", "--untracked-files=all", "--"}, paths...)
@@ -198,7 +181,10 @@ func (w *Workspace) RequireCommitted(ctx context.Context, paths ...string) error
 		return err
 	}
 	if len(status) != 0 {
-		return fmt.Errorf("initialization files have pending changes; commit the devkit init changes first")
+		pending = append(pending, strings.TrimSpace(string(status)))
+	}
+	if len(pending) != 0 {
+		return fmt.Errorf("initialization files have pending changes: %s; commit the devkit init changes first", strings.Join(pending, "\n"))
 	}
 	return nil
 }
@@ -281,17 +267,13 @@ func (w *Workspace) ChangedFiles(ctx context.Context, before, after string) ([]s
 	return strings.Split(strings.TrimSuffix(string(output), "\x00"), "\x00"), nil
 }
 
+// Diff returns the patch between two fixed targets.
+func (w *Workspace) Diff(ctx context.Context, before, after string) ([]byte, error) {
+	return w.run(ctx, nil, "diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--binary", before, after, "--")
+}
+
 // StructureHistory reads additions, changes, and deletions of structure.json from the given reference.
-func (w *Workspace) StructureHistory(ctx context.Context, ref string) ([]StructureRevision, error) {
-	source, err := w.ReadFile(ctx, ref, "devkit.toml")
-	if err != nil {
-		return nil, err
-	}
-	settings, err := config.Parse(source)
-	if err != nil {
-		return nil, err
-	}
-	path := settings.RepositoryPaths().Structure
+func (w *Workspace) StructureHistory(ctx context.Context, ref, path string) ([]StructureRevision, error) {
 	output, err := w.run(ctx, nil, "log", "--format=%H", ref, "--", path)
 	if err != nil {
 		return nil, err

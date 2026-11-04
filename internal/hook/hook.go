@@ -66,17 +66,19 @@ func (h Handler) Process(e event.Event) (result event.Result, err error) {
 		}
 		return result, nil
 	}
-	if h.WorkID == "" {
-		if e.Name == event.UserPromptSubmit && !(e.Host == event.ClaudeCode && strings.HasPrefix(e.Prompt, "<task-notification>")) {
-			return event.Result{}, fsstore.New(h.runRoot()).Publish(filepath.Join("sessions", e.SessionID, "latest-prompt.txt"), []byte(e.Prompt))
+	if e.Name == event.UserPromptSubmit {
+		if e.Host == event.ClaudeCode && strings.HasPrefix(e.Prompt, "<task-notification>") {
+			return event.Result{}, nil
 		}
+		if err := fsstore.New(h.runRoot()).Publish(filepath.Join("sessions", e.SessionID, "latest-prompt.txt"), []byte(e.Prompt)); err != nil {
+			return event.Result{}, err
+		}
+	}
+	if h.WorkID == "" {
 		return event.Result{}, nil
 	}
 	switch e.Name {
 	case event.UserPromptSubmit:
-		if e.Host == event.ClaudeCode && strings.HasPrefix(e.Prompt, "<task-notification>") {
-			return event.Result{}, nil
-		}
 		name := filepath.Join("prompts", e.SessionID+"-"+timestamp(now)+".txt")
 		return event.Result{}, fsstore.New(h.workRoot()).Publish(name, []byte(e.Prompt))
 	case event.SessionStart, event.PreToolUse, event.Stop, event.SubagentStop:

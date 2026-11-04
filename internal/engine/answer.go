@@ -111,6 +111,9 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 			replacement := *question
 			replacement.ID = ulidString()
 			replacement.ApprovalTarget.Tree = actual
+			if err := e.refreshQuestionEvidence(ctx, state, &replacement); err != nil {
+				return Result{}, err
+			}
 			if round, ok := state.OpenRound(); ok && round.ReturnedTarget != nil && question.StopCategory != "detection_failed" {
 				if err = e.replaceQuestionTarget(ctx, round, actual); err != nil {
 					return Result{}, err
@@ -120,6 +123,12 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 				return Result{}, err
 			}
 			return Result{}, fmt.Errorf("approval target changed; answer the new question %s", replacement.ID)
+		}
+	}
+	if request.Interpretation == ledger.AnswerBack {
+		run, ok := state.LatestStageRun()
+		if !ok || question.StoppedStage != run.StageID || question.ApprovalTarget.Kind != form.ApprovalTree {
+			return Result{}, errors.New("back requires a question for the current stage")
 		}
 	}
 	original, observedAt, err := e.prompt(request.Observation)
@@ -220,9 +229,24 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 		}
 	}
 	if run, ok := state.LatestStageRun(); ok && question.StoppedStage == run.StageID {
+		if request.Interpretation == ledger.AnswerBack {
+			rounds := state.Rounds(run.ID)
+			if len(rounds) == 0 {
+				return Result{}, errors.New("the stage has no round to return from")
+			}
+			round := rounds[len(rounds)-1]
+			if err := e.closeRound(state, run, round, router.Decision{Action: plan.Back, Reason: "The human requested a return to an earlier stage: " + request.Text}); err != nil {
+				return Result{}, err
+			}
+			state, err = e.load()
+			if err != nil {
+				return Result{}, err
+			}
+			return response(state), nil
+		}
 		if question.StopCategory == config.MetaLoopEdit && request.Interpretation != ledger.AnswerApproved {
 			update := *run
-			update.StopReason = "Undo the rejected development loop edits using the previously confirmed norms. Human instructions: " + request.Text
+			update.StopReason = "Undo the rejected development loop edits using the previously confirmed norms.\n" + question.Text + "\nHuman instructions: " + request.Text
 			if _, err := e.append(&update); err != nil {
 				return Result{}, err
 			}
@@ -273,7 +297,7 @@ func (e *Engine) prompt(name string) (string, time.Time, error) {
 }
 
 func (e *Engine) recordDecisionAnswer(answer ledger.Answer, id string) error {
-	if answer.Target.Kind != form.ApprovalDecision || answer.Interpretation == ledger.AnswerText {
+	if answer.Target.Kind != form.ApprovalDecision || (answer.Interpretation == ledger.AnswerText || answer.Interpretation == ledger.AnswerBack) {
 		return nil
 	}
 	records, err := e.records()

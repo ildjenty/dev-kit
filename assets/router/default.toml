@@ -1,7 +1,7 @@
-# Human confirmation and lesson destination defaults belong to internal/config.
+# Human confirmation and lesson destination defaults are supplied by the binary.
 
 # PASS does not finalize completion until the plan's completion conditions are met.
-# Limits, progress, return stages for broken premises, and termination kinds are also inputs.
+# Limits, progress, human back answers, and termination kinds are also inputs.
 [check_results]
 "FAIL" = "fix"
 "NOT ASSESSED" = "ask"

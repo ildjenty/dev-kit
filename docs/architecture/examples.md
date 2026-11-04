@@ -34,7 +34,7 @@
 
 遷移 `done` は、次のステージ ID、作業の終了を表す `null`、ステージの完了後に残りを再計画する `"replan"` を取る。要件定義を先に行って再計画するかは雛形の組み方で決まり、kit は要件定義を特別扱いしない。`fix` と `docs` は `purpose` の後に再計画する形を使わない。
 
-retrospective は作業者が担当し、必須 check は `command:test` と `harness` である。判定者の runner は `init` が配るサブエージェント `devkit-judge` とする。`--plan` の省略時は `default_plan` の値(既定 `"default"`)を使う。不要なステージを外す場合は、逸脱として承認の問いに示す。
+retrospective は作業者が担当する。必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。判定者の runner は `init` が配るサブエージェント `devkit-judge` とする。`--plan` の省略時は `default_plan` の値(既定 `"default"`)を使う。不要なステージを外す場合は、逸脱として承認の問いに示す。
 
 `init` が用意する `.devkit/plans/fix.json` の例である。`assignee` の `worker` は作業者(セッション自身)を表す。遷移の `fix`・`ask`・`back`・`done` は、修正・人への確認・前のステージへの戻り・完了を表し、`done` の `null` は最後のステージを示す。
 
@@ -60,6 +60,7 @@ retrospective は作業者が担当し、必須 check は `command:test` と `ha
       "assignee": "worker",
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true },
+        { "aspect": "test", "runner": "devkit-judge", "required": true },
         { "aspect": "harness", "runner": "devkit-judge", "required": true }
       ],
       "gate": { "required": false, "reason": "作業の問題と再発防止を確認する" },
@@ -96,7 +97,7 @@ retrospective は作業者が担当し、必須 check は `command:test` と `ha
 ```json
 {
   "version": 1,
-  "template": { "name": "fix", "content_hash": "2b6eb6bff421d47ee988e7b7fe649c456916677b09217be1ef7a73d430079c9d" },
+  "template": { "name": "fix", "content_hash": "200d25fc141a446fa1546108b62373ebbc4126c356c34ae76ba0a843d241d023" },
   "task": "保存ボタンの文言を「登録」から「保存」に変える",
   "completion_conditions": [
     { "id": "C1", "description": "保存ボタンに「保存」と表示され、その表示を確かめるテストが登録済みのコマンドから実行されて通る" }
@@ -120,6 +121,7 @@ retrospective は作業者が担当し、必須 check は `command:test` と `ha
       "assignee": "worker",
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "返却後のツリー" },
+        { "aspect": "test", "runner": "devkit-judge", "required": true, "completion_condition_ids": ["C1"], "target": "最終のツリーのテストと登録済みコマンド" },
         { "aspect": "harness", "runner": "devkit-judge", "required": true, "completion_condition_ids": ["C1"], "target": "その作業の判定と指摘、要件への反映、規範の不足と再発防止" }
       ],
       "gate": { "required": false, "reason": "作業の問題と再発防止を確認する" },
@@ -132,14 +134,16 @@ retrospective は作業者が担当し、必須 check は `command:test` と `ha
 }
 ```
 
-`open_questions` は任意の文字列配列であり、計画者が決められなかった要求を入れる。人が承認した完了条件が作業の完了基準となる。既定の `[approval] plan = "requirements"` では最初の計画を確認する。同じ完了条件で逸脱も外部操作もない再計画には再確認を求めない。未決事項への回答は、計画の却下と作り直しの指示として計画者に渡す。
+`open_questions` は任意の文字列配列であり、計画者が決められなかった要求を入れる。人が承認した完了条件が作業の完了基準となる。既定の `[approval] plan = "requirements"` では最初の計画を確認する。同じ完了条件で逸脱も外部操作も未決事項もない再計画には再確認を求めない。未決事項への回答は、計画の却下と作り直しの指示として計画者に渡す。
+
+`open_questions` が空でなければ、承認方針によらず人の承認を必須とする。
 
 implement の終了ブロックの例である。`instruction_id` は作業の指示で受け取った ID とする。提出は[作業結果の提出](flow.md#作業結果の提出)、受理は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
 
 ```json
 {
   "instruction_id": "<作業指示 ID>",
-  "termination_kind": "完了を主張",
+  "termination_kind": "completion-claimed",
   "work_performed": [
     "保存ボタンの文言を「登録」から「保存」に変更し、表示を確かめるテストを追加した"
   ],
@@ -160,7 +164,7 @@ retrospective は、その作業の判定と指摘、人の回答や教訓を確
 `devkit.toml` の例である。`devkit-judge` はサブエージェント定義を使うため、判定コマンドの登録は不要である。検証コマンド `test` の実行ファイルは利用側で用意する。
 
 ```toml
-kit_version = "v1"
+kit_version = "v2"
 default_plan = "default"
 
 [paths]
@@ -177,6 +181,10 @@ detect = ".devkit/detect.json"
 [approval]
 plan = "requirements"
 meta_loop_edit = "confirm"
+
+[plan_check]
+aspect = "plan"
+runner = "devkit-judge"
 
 [git]
 branch = "devkit/{work_id}"
@@ -206,35 +214,24 @@ rules = ["Bash(git push *)", "Agent(fork)"]
 
 `kit_version` は記録形式とバイナリの互換性を識別する値であり、作業にも記録する。`[paths]` の値は変更できる。実行の記録と生成物の `.devkit/run/` は固定である。`[detection] required` は既定 `true` であり、`false` なら検出試験を指示せず、合格記録なしで判定を受理する。`[lessons] destinations` は、機械の検査 → 雛形 → 観点 → 原則 → skill の優先順を表す。
 
-分類表は既定を上書き・追加・削除でき、未知の分類名を指定すると設定エラーになる。`[classification] dependency_files` は依存の宣言として扱うファイルの glob である。`[deny]` の構文は [PreToolUse](hooks.md#pretooluse)、結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)に従う。
+`[router] human_confirmation` は `dependency_changed` と `target_changed_again` だけを変更でき、未知の分類名は設定エラーになる。check の結果から次の行動への対応とロールは固定である。ループ自身の変更の確認は `[approval] meta_loop_edit` だけに従う。`[plan_check]` は計画の check の観点と runner を指定し、登録済みの判定コマンドなら devkit が実行する。`[classification] dependency_files` は依存の宣言として扱うファイルの glob である。`[deny]` の構文は [PreToolUse](hooks.md#pretooluse)、結果ファイルの保護は[操作の禁止](guarantees.md#操作の禁止とサブエージェントの制限)に従う。
 
 検証コマンドの期限は登録ごとに必須である。ラウンド開始時に `test` が未登録なら、`command:test` は `FAIL` となり、検証の手段を作って `[commands.test]` に登録するよう `auto-fixable` の指摘を返す。登録はループ自身の変更として `[approval] meta_loop_edit` に従い確認し、次のラウンドのスナップショットから使う。
 
-`devkit init` は人が導入内容を確認したあと、導入したファイルをコミットする。`devkit init --no-commit` で省略した場合は手動でコミットする。HEAD がない場合、または導入したファイルが未コミットの場合は `start` を拒否し、理由と直し方を返す。
+`devkit init` は人が導入内容を確認したあと、導入したファイルをコミットする。`devkit init --no-commit` で省略した場合は手動でコミットする。HEAD がない場合、または作業ツリーに存在する設定済みの規範・`devkit.toml`・サブエージェント定義が未コミットまたは変更されている場合は `start` を拒否し、理由と直し方を返す。
 
 ## 観点と検出試験
 
-観点ファイル `.devkit/checks/wording.md` の例である。[Judgment](data.md#check-の結果-judgment)(観点ごとの判定結果)を返し、`NOT ASSESSED`(未評価)の判定値は同じ定義に従う。
-
-```markdown
-# wording
-
-- 確認事項: 指定されたボタンの文言が完了条件と一致するか。
-- blocking: 指定された文言と表示が異なる。
-- 報告しない事項: 対象外のボタンの文言。
-- 出力形式: 依頼で渡された Judgment の JSON Schema に従う。表示を確認できなければ NOT ASSESSED とする。
-```
-
-試験仕様と例の配置は次のようにする。
+観点ファイル `.devkit/checks/wording.md` は、`principles/writing.md` の原則2・3に照らし、想定読者の前提と表現の具体性を確認する。種別や期待判定を伏せても判定できるように、各例の本文に要求、完了条件、検証方法、対象を含める。違反・適合・許容の構成は `assets/examples/wording/` と揃える。
 
 ```text
 .devkit/checks/
   wording.md
   wording/
     spec.json
-    case-a.html
-    case-b.html
-    case-c.html
+    case-a.md
+    case-b.md
+    case-c.md
 ```
 
 `.devkit/checks/wording/spec.json` は例のファイル名と期待判定を持つ。
@@ -243,14 +240,89 @@ rules = ["Bash(git push *)", "Agent(fork)"]
 {
   "aspect": "wording",
   "cases": [
-    { "kind": "violation", "file": "case-a.html", "expected": "FAIL" },
-    { "kind": "conforming", "file": "case-b.html", "expected": "PASS" },
-    { "kind": "allowed", "file": "case-c.html", "expected": "PASS" }
+    { "kind": "violation", "file": "case-a.md", "expected": "FAIL" },
+    { "kind": "conforming", "file": "case-b.md", "expected": "PASS" },
+    { "kind": "allowed", "file": "case-c.md", "expected": "PASS" }
   ]
 }
 ```
 
-各 HTML の最小の内容は、case-a.html が `<button id="save">登録</button>`、case-b.html が `<button id="save">保存</button>`、case-c.html が `<button id="save">保存</button><button id="other">登録</button>`である。試験の完了条件は「`save` の文言が『保存』」とする。起動と画面の確認方法も依頼に含め、サブエージェント `devkit-judge` に判定を依頼する。例は本文だけを渡し、種別と期待判定は渡さない。spec.json は判定者に渡さず、期待との照合は devkit が行う。合格の識別には観点・試験仕様・担当の定義に加え、観点が参照する原則と規則の内容ハッシュを含める。原則や規則が変われば、それを参照する観点の合格記録は再利用できない。合格の扱いは[検出試験](guarantees.md#検出試験)に従う。
+`case-a.md` の本文である。
+
+```markdown
+## 要求
+
+会話を読んでいない担当者が、保存済みの日報を削除する手順を読んで実行する。
+
+## 完了条件
+
+担当者が、この手順だけで削除対象、操作する画面、操作の順序、削除の確認方法を特定できる。
+
+## 検証方法
+
+対象の手順を読み、完了条件と principles/writing.md の原則2・3に照合する。
+
+## 対象
+
+# 日報の削除手順
+
+1. あの画面であれを削除する。
+2. いつもの場所を確認する。
+```
+
+`case-b.md` の本文である。
+
+```markdown
+## 要求
+
+会話を読んでいない担当者が、保存済みの日報を削除する手順を読んで実行する。
+
+## 完了条件
+
+担当者が、この手順だけで削除対象、操作する画面、操作の順序、削除の確認方法を特定できる。
+
+## 検証方法
+
+対象の手順を読み、完了条件と principles/writing.md の原則2・3に照合する。
+
+## 対象
+
+# 日報の削除手順
+
+1. 日報一覧で、削除する日報のタイトルを選ぶ。
+2. 日報詳細で「削除」を押す。
+3. 確認画面のタイトルが削除する日報と一致したら「削除を確定」を押す。
+4. 日報一覧に対象のタイトルがないことを確認する。
+```
+
+`case-c.md` の本文である。
+
+```markdown
+## 要求
+
+会話を読んでいない担当者が、保存済みの日報を削除する手順を読んで実行する。
+
+## 完了条件
+
+担当者が、この手順だけで削除対象、操作する画面、操作の順序、削除の確認方法を特定できる。
+
+## 検証方法
+
+対象の手順を読み、完了条件と principles/writing.md の原則2・3に照合する。
+
+## 対象
+
+# 日報の削除手順
+
+1. 日報一覧で、削除する日報のタイトルを選ぶ。
+2. 日報詳細で「削除」を押す。
+3. 確認画面のタイトルが削除する日報と一致したら「削除を確定」を押す。
+4. 日報一覧に対象のタイトルがないことを確認する。
+
+元の問い合わせ記録: 「あれを削除したい」。出典は削除要求 R1 の発言であり、「あれ」は手順の対象の日報を指す。発言と照合するため引用内の原語を保持する。principles/writing.md の原則2の適用除外は、この引用だけに適用する。
+```
+
+各例は要求・完了条件・検証方法・対象をすべて含む1つの本文として渡す。判定者に種別、期待判定、spec.json を渡さず、devkit が返却された判定と期待を照合する。合格の識別には観点・試験仕様・担当の定義に加え、観点が参照する原則と規則の内容ハッシュを含める。原則や規則が変われば、それを参照する観点の合格記録は再利用できない。設定と合格の扱いは[検出試験](guarantees.md#検出試験)に従う。
 
 ## pre-commit
 

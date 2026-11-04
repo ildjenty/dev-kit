@@ -220,7 +220,7 @@ func TestNormativeIDsAndReadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ids, err := w.NormativeIDs(ctx, before.Tree)
+	ids, err := w.NormativeIDs(ctx, before.Tree, "devkit.toml", ".devkit/rules.md", ".claude/agents")
 	if err != nil || len(ids) != 3 || ids[".claude/agents"] == "" {
 		t.Fatalf("normative IDs: %v, %v", ids, err)
 	}
@@ -229,7 +229,7 @@ func TestNormativeIDsAndReadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newIDs, err := w.NormativeIDs(ctx, after.Tree)
+	newIDs, err := w.NormativeIDs(ctx, after.Tree, "devkit.toml", ".devkit/rules.md", ".claude/agents")
 	if err != nil || !reflect.DeepEqual(ids, newIDs) {
 		t.Fatalf("normative IDs changed after a code-only change: %v, %v", newIDs, err)
 	}
@@ -238,7 +238,7 @@ func TestNormativeIDsAndReadFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	changedIDs, err := w.NormativeIDs(ctx, changed.Tree)
+	changedIDs, err := w.NormativeIDs(ctx, changed.Tree, "devkit.toml", ".devkit/rules.md", ".claude/agents")
 	if err != nil || changedIDs["devkit.toml"] == ids["devkit.toml"] {
 		t.Fatalf("normative ID did not change after a configuration change: %v, %v", changedIDs, err)
 	}
@@ -322,7 +322,7 @@ func TestStructureHistory(t *testing.T) {
 	}
 	git(t, w.Root(), "rm", path)
 	git(t, w.Root(), "commit", "-m", "delete structure")
-	history, err := w.StructureHistory(ctx, "HEAD")
+	history, err := w.StructureHistory(ctx, "HEAD", path)
 	if err != nil || len(history) != 3 {
 		t.Fatalf("history: %+v, %v", history, err)
 	}

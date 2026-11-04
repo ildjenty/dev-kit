@@ -13,7 +13,7 @@ import (
 // Aspect is a parsed form aspect template.
 type Aspect = form.AspectTemplate
 
-var aspectReference = regexp.MustCompile("`(principles/[^`\r\n]+\\.md|rules\\.md)`")
+var aspectReference = regexp.MustCompile("`(principles/[^`#\r\n]+\\.md|rules\\.md)(?:#[^`\r\n]*)?`")
 
 // AspectReferences returns sorted, unique logical principle and rules references.
 func AspectReferences(source string) []string {

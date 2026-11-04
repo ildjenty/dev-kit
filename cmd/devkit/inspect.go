@@ -138,7 +138,7 @@ func inspect(ctx context.Context, e *engine.Engine, name string, f *flag.FlagSet
 	if structure != nil {
 		targets = append(targets, form.TargetVersion{Kind: form.TargetStructure, Structure: structure.Version})
 	}
-	history, err := w.StructureHistory(ctx, "HEAD")
+	history, err := w.StructureHistory(ctx, "HEAD", settings.RepositoryPaths().Structure)
 	if err != nil {
 		return err
 	}

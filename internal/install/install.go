@@ -38,7 +38,7 @@ type Result struct {
 
 const trustGuidance = "Open Codex interactively, trust the project, and trust each project hook through /hooks. In Claude Code, accept workspace trust and check the project hook settings. Start a new session and run devkit doctor to verify SessionStart observation."
 
-const commandGuidance = "Register the repository test command under [commands.test] in devkit.toml. The bundled default and fix templates require command:test."
+const commandGuidance = "The bundled default and fix templates require command:test. If it is not registered, the first work creates the tests and registers the command under [commands.test] in devkit.toml, and a human confirms the registration."
 
 // InitOptions controls whether initialization commits the files it writes.
 type InitOptions struct {

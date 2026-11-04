@@ -5,9 +5,9 @@ description: Advance the devkit planning, work, and judgment loop. Use when star
 
 # Using devkit
 
-Carry out the instructions returned by `devkit`. It determines stage order, judgment, approval, and completion. Follow repository-owned norms through the logical names in the brief: `principles/…`, `stages/…`, `checks/…`, `plans/…`, `templates/…`, and `rules.md`. Read the supplied output schemas identified by `schemas/…`; they are owned by the binary. Read `requirements.md` as the repository's requirements source and use relevant records from `structure.json`.
+Carry out the instructions returned by `devkit`. It determines stage order, judgment, approval, and completion. Follow repository-owned norms through the logical names in the brief: `principles/…`, `stages/…`, `checks/…`, `plans/…`, `templates/…`, and `rules.md`. Read the supplied self-contained output schemas identified by `schemas/…`; they include all referenced definitions and are owned by the binary. Work briefs also include the supported note kinds and their schemas, and `schemas/structure.json`. Read `requirements.md` as the repository's requirements source and use relevant records from `structure.json`. Use the actual working-tree paths and existence information shown for these products in the brief; create a missing product at its indicated path.
 
-The brief supplies the current stage definition, the aspect being judged and its referenced principles, rules, requirements, and relevant structure records. For other norms, use the listed paths under the frozen `snap/` snapshot for that round, or the snapshot taken when an instruction outside a round is issued. Do not replace frozen inputs with norms being edited in the working tree. Work records retain `kit_version` to identify compatibility with the binary's record format.
+The brief supplies the current stage definition, the aspect being judged and its referenced principles, rules, requirements, and relevant structure records. For other norms, use the listed paths under the frozen `snap/` snapshot for that round. Plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time. Do not replace frozen inputs with norms being edited in the working tree. Work records retain `kit_version` (`v2`) to identify compatibility with the binary's record format. Every work brief and judgment request references a work-history file fixed at instruction issue time; use it as required by the stage or aspect. Round judgments also include the expanded round-start comparison base, changed-file list, and patch to the returned target.
 
 ## Invoking commands
 
@@ -23,7 +23,7 @@ When `next` runs verification commands or the completion commit, set the host ti
 
 If start is refused because no SessionStart observation exists, use `devkit doctor` to check what is missing. After Codex installation, the human must trust the project in interactive mode and trust each hook through `/hooks`. Do not substitute temporary configuration overrides.
 
-`devkit init` commits installed files after confirmation unless `--no-commit` is used. Start requires an existing HEAD and committed installation files; if refused for either reason, follow the returned repair instructions.
+`devkit init` commits installed files after confirmation unless `--no-commit` is used. Before creating a branch or records, start requires an existing HEAD and verifies that existing configured norms, `devkit.toml`, and agent definitions are committed and unmodified; if refused, commit the installation changes first as instructed.
 
 ## Following next instructions
 
@@ -52,7 +52,7 @@ Subagents return results in their final messages. The parent must not transcribe
 
 ## Recording and submitting
 
-Record intermediate decisions, evidence, and lessons with `devkit note <kind> <file>`. Record the reproduction procedure's location and version before starting a fix, and a hypothesis result before starting the next hypothesis. For classifications allowing provisional decisions, record the decision and applicability in a note so a human can check them at the next gate or PR review.
+Record intermediate decisions, evidence, and lessons with `devkit note <kind> <file>`, using the supported kinds and bundled schemas in the work brief. Record the reproduction procedure's location and version before starting a fix, and a hypothesis result before starting the next hypothesis. For classifications allowing provisional decisions, record the decision and applicability in a note so a human can check them at the next gate or PR review.
 
 Write round results to a file following the termination block JSON Schema specified by the request, then submit with `devkit submit <file>`. The default input location is `.devkit/run/work/<work_id>/inbox/`.
 
@@ -64,11 +64,11 @@ Keep runtime records under the fixed, untracked `.devkit/run/` location. Preserv
 
 ## Plan approval
 
-When `next` returns a plan approval question, present it as generated, including the original request, completion conditions, stages, deviations, required checks, and `open_questions`. Do not replace it with your own summary. The human may answer freely; record the answer with `devkit answer`. Answers to open questions and revision requests go back to the planner as replanning instructions.
+When `next` returns a plan approval question, present it as generated, including the original request, completion conditions, stages, deviations, required checks, and `open_questions`. Do not replace it with your own summary. The human may answer freely; record the answer with `devkit answer`. A nonempty `open_questions` array requires human approval under every plan approval policy. Answers to open questions and revision requests go back to the planner as rejection and replanning instructions.
 
 ## Changes to the loop
 
-Edits to norms, host settings, skills, and the active pre-commit configuration are changes to the loop. When devkit asks for confirmation of such changes, present the question and wait for the human. If the human rejects them, undo the rejected changes.
+Edits to norms, host settings, skills, and the active pre-commit configuration are changes to the loop. Confirmation follows only `[approval] meta_loop_edit` in `devkit.toml`, independently of `[router] human_confirmation`. When devkit asks, present the generated question unchanged, including the changed norm, host-setting and skill files and the diff reference, and wait for the human. If the human rejects the changes, follow the next work round to undo the listed rejected changes. Devkit retains the work target and tracks confirmed norms separately; do not restore an older work tree or discard unrelated work. Unchanged rejected edits are returned to the worker for removal rather than repeatedly asking for confirmation.
 
 ## Verification commands
 
@@ -76,9 +76,9 @@ If a `command:<name>` check fails because the command is not registered, create 
 
 ## Questions and answers
 
-Show questions returned by `next` or Stop in chat, preserving the form's wording. Include the question ID, approval target, paused stage and reason, options, recommendation and reason, stage to proceed to after the answer, and references to grounds. Explain that the human may answer freely, give an unlisted or conditional answer, or respond with a question.
+Show questions returned by `next` or Stop in chat as generated, preserving the form's wording. Gate questions include the plan's gate reason, the termination block's work performed and confirmed and unconfirmed matters, and the diff reference. Loop-edit questions include the changed files and diff reference. Do not replace either with an agent-written summary. Include the question ID, approval target, paused stage and reason, options, recommendation and reason, stage to proceed to after the answer, and references to grounds. Explain that the human may answer freely, give an unlisted or conditional answer, or respond with a question.
 
-When the human answers, interpret it against the original input observed by the hook and record it with `devkit answer <question_id>`. Do not reinterpret quotations, explanations, or another actor's report as approval. If the meaning is ambiguous, clarify rather than proceeding as approved. Follow the CLI's required answer input format; after acceptance, continue with `devkit next`. Record corrections as new answers referencing the answer being replaced.
+When the human answers, interpret it against the original input observed by the hook and record it with `devkit answer <question_id>`. Do not reinterpret quotations, explanations, or another actor's report as approval. If the meaning is ambiguous, clarify rather than proceeding as approved. Follow the CLI's required answer input format; after acceptance, continue with `devkit next`. When the human asks to return to an earlier stage in a stage question, record the answer with `--interpretation back`; devkit follows the plan's back transition and replanning path. Record corrections as new answers referencing the answer being replaced.
 
 Record human-requested plan changes with `devkit plan <file>`, withdrawals with `devkit plan --withdraw`, and work cancellation with `devkit abort` at the human's request.
 
@@ -96,7 +96,7 @@ Route external writes through registered `devkit external <kind> <input_file>` o
 
 ## Retrospective
 
-Carry out `stages/retrospective.md` when the plan includes it. Use all judgments and findings, including nonblocking findings, the sequence of `FAIL` and `NOT ASSESSED` results, round counts, human rejections and corrections, replanning instructions, human-discovered misses recorded as lessons with `devkit note`, and the norms inventory. Investigate conversation records and causes as needed.
+Carry out `stages/retrospective.md` when the plan includes it. Read the work-history file referenced in the brief for all judgments and findings, including nonblocking findings, the sequence of `FAIL` and `NOT ASSESSED` results, round counts, human rejections and corrections, replanning instructions, human-discovered misses recorded as lessons with `devkit note`, and the norms inventory. Investigate conversation records and causes as needed.
 
 For each problem, identify where it should have been caught and where to prevent recurrence. Follow `[lessons] destinations`; the default priority is machine checks (hooks, lint, types, and verification commands), plan templates, aspects, principles, then skills. Apply changes to repository-owned norms, update detection examples with aspect changes, and record adoption, rejection, or deferral with reasons. Consider unenforced rules and recurring violations for machine checks, weighing the failure prevented against execution, maintenance, and false-positive burden.
 

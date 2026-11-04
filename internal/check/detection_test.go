@@ -9,9 +9,11 @@ import (
 
 func TestAspectReferences(t *testing.T) {
 	source := "Use `principles/testing.md`, `rules.md`, and `principles/designing.md`.\n" +
+		"Read `rules.md#screens` and `principles/anchored.md#test-cases`.\n" +
+		"Repeat `principles/testing.md#coverage` and `rules.md#another-section`.\n" +
 		"Repeat `principles/testing.md`; ignore principles/working.md and `checks/test.md`.\n" +
 		"Ignore `principles/../secret.md` and `principles/bad\\name.md`."
-	want := []string{"principles/designing.md", "principles/testing.md", "rules.md"}
+	want := []string{"principles/anchored.md", "principles/designing.md", "principles/testing.md", "rules.md"}
 	if got := AspectReferences(source); !slices.Equal(got, want) {
 		t.Fatalf("references: %v; want: %v", got, want)
 	}
@@ -60,7 +62,7 @@ func TestDetectionExamplesHideExpectations(t *testing.T) {
 }
 
 func TestDetectionIdentityIncludesReferencedNorms(t *testing.T) {
-	aspect := []byte("Read `principles/testing.md` and `rules.md`.")
+	aspect := []byte("Read `principles/testing.md#coverage` and `rules.md#screens`.")
 	source := asset(t, "examples/purpose/spec.json")
 	spec, err := ParseDetectionSpec(source)
 	if err != nil {

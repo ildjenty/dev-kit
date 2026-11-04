@@ -32,11 +32,6 @@
       "assignee": "worker",
       "checks": [
         {
-          "aspect": "command:test",
-          "runner": "command:test",
-          "required": true
-        },
-        {
           "aspect": "harness",
           "runner": "devkit-judge",
           "required": true

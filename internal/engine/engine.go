@@ -130,7 +130,7 @@ func (e *Engine) initialize() error {
 
 // SchemaNames returns the kit schema names required by forward operations.
 func SchemaNames() []string {
-	return []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan", "planner-result", "detection-result"}
+	return []string{"decision", "evidence", "progress", "question", "judgment", "finding", "reference", "instruction", "plan-template", "plan", "planner-result", "detection-result", "structure"}
 }
 
 // Historical record validation remains available while forward assets are edited.
@@ -342,18 +342,33 @@ func (e *Engine) Start(ctx context.Context, request StartRequest) (Result, error
 	if err != nil {
 		return Result{}, errors.New("HEAD does not exist; commit the devkit init changes first")
 	}
-	if err := e.workspace.RequireCommitted(ctx, "devkit.toml"); err != nil {
-		return Result{}, err
-	}
 	settings, err := e.settings(ctx, head)
 	if err != nil {
-		return Result{}, err
+		return Result{}, fmt.Errorf("read committed devkit.toml; commit the devkit init changes first: %w", err)
 	}
 	if settings.KitVersion != e.version {
 		return Result{}, errors.New("configuration and binary kit versions do not match")
 	}
-	if err := e.workspace.RequireCommitted(ctx, settings.RepositoryPaths().Plans); err != nil {
+	p := settings.RepositoryPaths()
+	paths := []string{"devkit.toml"}
+	roots := []string{p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md"}
+	committed, err := e.workspace.NormativeIDs(ctx, head, roots...)
+	if err != nil {
 		return Result{}, err
+	}
+	for _, path := range roots {
+		_, err := os.Lstat(filepath.Join(e.Root(), filepath.FromSlash(path)))
+		if err == nil || committed[path] != "" {
+			paths = append(paths, path)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return Result{}, err
+		}
+	}
+	if err := e.workspace.RequireCommitted(ctx, paths...); err != nil {
+		return Result{}, err
+	}
+	if _, err := e.workspace.ReadFile(ctx, head, p.Rules); err != nil {
+		return Result{}, fmt.Errorf("required rules file %s: %w", p.Rules, err)
 	}
 	if err := e.initialize(); err != nil {
 		return Result{}, err
@@ -781,7 +796,7 @@ func (e *Engine) template(ctx context.Context, ref, name string) (plan.PlanTempl
 }
 func (e *Engine) reference(ctx context.Context, state *ledger.State) (string, error) {
 	if r, ok := state.OpenRound(); ok {
-		return r.StartTarget.Tree, nil
+		return roundReference(r), nil
 	}
 	return e.workspace.Head(ctx)
 }
@@ -794,15 +809,6 @@ func (e *Engine) norms(ctx context.Context, ref string) ([]form.NormReference, e
 
 // NormativeReferences returns sorted norm identities, distinguishing trees from blobs.
 func NormativeReferences(ctx context.Context, w *workspace.Workspace, ref string) ([]form.NormReference, error) {
-	ids, err := w.NormativeIDs(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	paths := make([]string, 0, len(ids))
-	for path := range ids {
-		paths = append(paths, path)
-	}
-	slices.Sort(paths)
 	source, err := w.ReadFile(ctx, ref, "devkit.toml")
 	if err != nil {
 		return nil, err
@@ -812,6 +818,15 @@ func NormativeReferences(ctx context.Context, w *workspace.Workspace, ref string
 		return nil, err
 	}
 	p := settings.RepositoryPaths()
+	ids, err := w.NormativeIDs(ctx, ref, p.Principles, p.Stages, p.Checks, p.Plans, p.Templates, p.Rules, "devkit.toml", ".claude/agents", ".codex/agents", "AGENTS.md", "CLAUDE.md")
+	if err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(ids))
+	for path := range ids {
+		paths = append(paths, path)
+	}
+	slices.Sort(paths)
 	norms := []form.NormReference{}
 	for _, path := range paths {
 		norm := form.NormReference{Path: path}
@@ -823,4 +838,21 @@ func NormativeReferences(ctx context.Context, w *workspace.Workspace, ref string
 		norms = append(norms, norm)
 	}
 	return norms, nil
+}
+
+func roundReference(round *ledger.Round) string {
+	if round.NormReference != "" {
+		return round.NormReference
+	}
+	return round.StartTarget.Tree
+}
+
+func (e *Engine) bundledSchema(source []byte) ([]byte, error) {
+	resources := map[string][]byte{}
+	for name, body := range e.schemas {
+		resources["urn:devkit:form:"+name] = body
+		resources["https://devkit.invalid/schemas/v1/"+name+".json"] = body
+		resources[name+".json"] = body
+	}
+	return form.BundleSchema(source, resources)
 }

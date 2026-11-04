@@ -28,7 +28,7 @@ const usage = `Usage: devkit <command> [arguments]
   next
   submit <file>
   plan <file> | plan --withdraw
-  answer [--interpretation approved|rejected|deferred|text] [--text <text>]
+  answer [--interpretation approved|rejected|deferred|text|back] [--text <text>]
          [--observation <basename>] [--supersedes <answer_record_id>] <question_id>
   external --target <target> [--instruction <id>] <kind> <input_file>
   external --recover <operation_id>

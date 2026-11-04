@@ -14,6 +14,7 @@ import (
 	"github.com/BurntSushi/toml"
 	"github.com/ildjenty/dev-kit/internal/brief"
 	"github.com/ildjenty/dev-kit/internal/check"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/kit"
 	"github.com/ildjenty/dev-kit/internal/ledger"
@@ -23,13 +24,14 @@ import (
 
 // instructionData is a regenerable request artifact, never a ledger record.
 type instructionData struct {
-	Instruction  form.Instruction    `json:"instruction"`
-	Reference    string              `json:"reference"`
-	Request      *check.Request      `json:"request,omitempty"`
-	Origin       plan.ProposalOrigin `json:"origin,omitempty"`
-	TemplateName string              `json:"template_name,omitempty"`
-	Detection    *detectionInput     `json:"detection,omitempty"`
-	BriefText    string              `json:"brief_text,omitempty"`
+	Instruction  form.Instruction           `json:"instruction"`
+	Reference    string                     `json:"reference"`
+	Request      *check.Request             `json:"request,omitempty"`
+	Origin       plan.ProposalOrigin        `json:"origin,omitempty"`
+	TemplateName string                     `json:"template_name,omitempty"`
+	Detection    *detectionInput            `json:"detection,omitempty"`
+	BriefText    string                     `json:"brief_text,omitempty"`
+	Context      *ledger.InstructionContext `json:"context,omitempty"`
 }
 
 func (e *Engine) assetPath(ctx context.Context, ref, name string) (string, error) {
@@ -53,7 +55,11 @@ func (e *Engine) assetPath(ctx context.Context, ref, name string) (string, error
 }
 func (e *Engine) asset(ctx context.Context, ref, name string) ([]byte, error) {
 	if strings.HasPrefix(name, "schemas/") {
-		return kit.Schema(strings.TrimSuffix(strings.TrimPrefix(name, "schemas/"), ".json"))
+		source, err := kit.Schema(strings.TrimSuffix(strings.TrimPrefix(name, "schemas/"), ".json"))
+		if err != nil {
+			return nil, err
+		}
+		return e.bundledSchema(source)
 	}
 	path, err := e.assetPath(ctx, ref, name)
 	if err != nil {
@@ -180,7 +186,7 @@ func (e *Engine) aspectDocuments(ctx context.Context, ref string, items []plan.C
 	return docs, nil
 }
 
-func (e *Engine) repository(ctx context.Context, ref string) (brief.RepositoryFacts, error) {
+func (e *Engine) repository(ctx context.Context, ref string, productRef ...string) (brief.RepositoryFacts, error) {
 	settings, err := e.settings(ctx, ref)
 	if err != nil {
 		return brief.RepositoryFacts{}, err
@@ -191,24 +197,35 @@ func (e *Engine) repository(ctx context.Context, ref string) (brief.RepositoryFa
 	}
 	p := settings.RepositoryPaths()
 	facts := brief.RepositoryFacts{LayoutGuides: []brief.Document{}, AvailableChecks: []plan.Check{}}
+	data, err := os.ReadFile(filepath.Join(expanded, filepath.FromSlash(p.Rules)))
+	if err != nil {
+		return facts, fmt.Errorf("required rules file %s: %w", p.Rules, err)
+	}
+	facts.Rules = brief.Document{Path: p.Rules, Content: string(data), Exists: true}
+	if len(productRef) > 0 {
+		expanded, err = e.expanded(ctx, productRef[0])
+		if err != nil {
+			return facts, err
+		}
+	}
 	for _, item := range []struct {
 		path   string
 		target *brief.Document
-	}{{p.Rules, &facts.Rules}, {p.Requirements, &facts.Requirements}} {
+	}{{p.Requirements, &facts.Requirements}, {p.Structure, &facts.Structure}} {
 		data, err := os.ReadFile(filepath.Join(expanded, filepath.FromSlash(item.path)))
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return facts, err
 		}
-		*item.target = brief.Document{Path: item.path, Content: string(data)}
+		*item.target = brief.Document{Path: item.path, Content: string(data), Exists: err == nil}
+		if err != nil {
+			item.target.Content = "not created yet; create it at " + item.path
+		}
 	}
-	data, err := os.ReadFile(filepath.Join(expanded, filepath.FromSlash(p.Structure)))
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return facts, err
+	if facts.Structure.Exists {
+		facts.LayoutGuides = append(facts.LayoutGuides, facts.Structure)
 	}
-	if err == nil {
-		facts.LayoutGuides = append(facts.LayoutGuides, brief.Document{Path: p.Structure, Content: string(data)})
-	}
-	facts.IrreversibleDecisions = []string{facts.Rules.Content}
+	// Shared decisions are already included in the rules body.
+	facts.IrreversibleDecisions = []string{"See the Shared difficult-to-change decisions section in " + p.Rules + "."}
 	return facts, nil
 }
 func (e *Engine) outputs(state *ledger.State) ([]brief.StageOutput, error) {
@@ -330,6 +347,9 @@ func (e *Engine) publishInstruction(meta ledger.Instruction, fresh bool, data in
 		}
 	}
 	data.Instruction = i
+	if data.Context != nil {
+		meta.Context = data.Context
+	}
 	body, err := json.Marshal(data)
 	if err != nil {
 		return Result{}, err
@@ -416,7 +436,7 @@ func (e *Engine) readInstructionFacts(id string) (instructionData, error) {
 				}
 			}
 		}
-		return instructionData{Instruction: i, Reference: meta.Reference, Origin: meta.Origin, TemplateName: meta.TemplateName, Request: meta.Request, Detection: meta.Detection}, nil
+		return instructionData{Instruction: i, Reference: meta.Reference, Origin: meta.Origin, TemplateName: meta.TemplateName, Request: meta.Request, Detection: meta.Detection, Context: meta.Context}, nil
 	}
 	return instructionData{}, fmt.Errorf("instruction not found: %s", id)
 }
@@ -571,39 +591,11 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 	if p, ok := latestPlan(state); ok {
 		input.CurrentPlan = &p.Plan
 		if origin == plan.BackProposal {
-			remaining := p.Plan
-			remaining.Stages = nil
-			start := p.Plan.StartStage
-			if run, ok := state.LatestStageRun(); ok && run.State == ledger.StageCompleted {
-				start = ""
-				for i, stage := range p.Plan.Stages {
-					if stage.ID == run.StageID && i+1 < len(p.Plan.Stages) {
-						start = p.Plan.Stages[i+1].ID
-						break
-					}
-				}
-			} else if run, ok := state.LatestStageRun(); ok {
-				if target, err := p.Plan.Next(run.StageID, plan.Back); err == nil && target != nil {
-					start = *target
-				}
+			remaining, err := e.remainingPlan(state)
+			if err != nil {
+				return brief.Brief{}, err
 			}
-			remaining.StartStage = start
-			retained := map[string]bool{}
-			id := start
-			for !retained[id] {
-				retained[id] = true
-				stage, ok := p.Plan.Stage(id)
-				if !ok || stage.Transitions.Done == nil {
-					break
-				}
-				id = *stage.Transitions.Done
-			}
-			for _, stage := range p.Plan.Stages {
-				if retained[stage.ID] {
-					remaining.Stages = append(remaining.Stages, stage)
-				}
-			}
-			input.RemainingPlan = &remaining
+			input.RemainingPlan = remaining
 		}
 	}
 	records, err := e.records()
@@ -669,11 +661,11 @@ func (e *Engine) workInstruction(ctx context.Context, state *ledger.State, p pla
 			return Result{}, err
 		}
 	}
-	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Text: "Perform the work described in the brief, then run devkit submit."}, Reference: round.StartTarget.Tree}, b.Text)
+	return e.publishInstruction(meta, fresh, instructionData{Instruction: form.Instruction{Text: "Perform the work described in the brief, then run devkit submit."}, Reference: roundReference(round)}, b.Text)
 }
 
 func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan, stage plan.Stage, round *ledger.Round, meta *ledger.Instruction) (brief.Brief, error) {
-	ref := round.StartTarget.Tree
+	ref := roundReference(round)
 	template, err := e.asset(ctx, ref, "templates/brief/work.md.tmpl")
 	if err != nil {
 		return brief.Brief{}, err
@@ -686,7 +678,7 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	facts, err := e.repository(ctx, ref)
+	facts, err := e.repository(ctx, ref, round.StartTarget.Tree)
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -730,24 +722,7 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 		}
 	}
 	if meta.Context == nil {
-		if stage.ID == "retrospective" {
-			var context strings.Builder
-			for _, record := range records {
-				switch record.Payload.(type) {
-				case *ledger.Judgment, *ledger.Answer, *ledger.Approval, *ledger.Lesson:
-					data, err := json.MarshalIndent(record.Payload, "", "  ")
-					if err != nil {
-						return brief.Brief{}, err
-					}
-					fmt.Fprintf(&context, "%s %s\n%s\n\n", record.ID, record.Kind(), data)
-				}
-			}
-			for _, run := range state.StageRuns() {
-				fmt.Fprintf(&context, "Stage %s: %d rounds\n", run.StageID, len(state.Rounds(run.ID)))
-			}
-			input.RetrospectiveContext = context.String()
-		}
-		meta.Context = &ledger.InstructionContext{RetrospectiveContext: input.RetrospectiveContext, Findings: input.PreviousFindings, Commands: commands, PreCommitOutput: input.PreCommitOutput}
+		meta.Context = &ledger.InstructionContext{Findings: input.PreviousFindings, Commands: commands, PreCommitOutput: input.PreCommitOutput}
 		for _, output := range input.PreviousOutputs {
 			meta.Context.Outputs = append(meta.Context.Outputs, ledger.InstructionOutput{StageID: output.StageID, Content: output.Content})
 		}
@@ -755,11 +730,26 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 		input.PreviousOutputs = instructionOutputs(meta.Context)
 		input.PreviousFindings = meta.Context.Findings
 		input.PreCommitOutput = meta.Context.PreCommitOutput
-		input.RetrospectiveContext = meta.Context.RetrospectiveContext
 		input.CommandOutputs = nil
 		for _, command := range meta.Context.Commands {
 			input.CommandOutputs = append(input.CommandOutputs, brief.CommandOutput{Check: plan.Check{Aspect: command.Aspect, Runner: plan.Runner(command.Runner)}, ExitCode: command.Command.ExitCode, Output: command.Command.Output})
 		}
+	}
+	history, err := e.workHistory(state, meta)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	input.WorkHistoryPath = history
+	for _, name := range []string{"decision", "evidence", "lesson", "structure"} {
+		source := e.schemas[name]
+		if name == "lesson" {
+			source = []byte(`{"type":"object","properties":{"content":{"type":"string","minLength":1},"evidence":{"type":"array","items":{"$ref":"urn:devkit:form:reference"}}},"required":["content","evidence"],"additionalProperties":false}`)
+		}
+		bundled, err := e.bundledSchema(source)
+		if err != nil {
+			return brief.Brief{}, err
+		}
+		input.SupportingSchemas = append(input.SupportingSchemas, brief.Document{Path: name, Content: string(bundled)})
 	}
 	return brief.BuildWork(input)
 }
@@ -785,7 +775,17 @@ func (e *Engine) table(ctx context.Context, ref string) (router.Table, error) {
 	if err != nil {
 		return table, err
 	}
-	return table.WithConfig(settings), nil
+	destinations := []router.LessonDestination{}
+	for _, destination := range settings.LessonDestinations() {
+		destinations = append(destinations, router.LessonDestination(destination))
+	}
+	table = router.MergeTables(table, router.Table{HumanConfirmation: settings.HumanConfirmation(), Lessons: router.Lessons{Destinations: destinations}})
+	mode := router.ConfirmNow
+	if settings.MetaLoopEditApproval() == "allow" {
+		mode = router.NoConfirm
+	}
+	table.ConfirmationRules[config.MetaLoopEdit] = mode
+	return table, nil
 }
 func (e *Engine) question(target form.ApprovalTarget, category, text, stage string) form.Question {
 	return form.Question{ID: ulidString(), Text: text, ApprovalTarget: target, Options: []string{"approve", "reject", "defer"}, Recommendation: "defer", StopCategory: category, NextStage: stage, StoppedStage: stage, StopReason: text, Evidence: []form.Reference{}}

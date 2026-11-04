@@ -211,7 +211,7 @@ func Deviations(template PlanTemplate, p Plan) []Deviation {
 // RequiresApproval compares the plan with the last human-approved requirements.
 // The caller supplies a validated approval policy.
 func (p Plan) RequiresApproval(template PlanTemplate, policy string, lastApproved *Plan) bool {
-	if policy == "always" || len(p.ExternalOperations) > 0 || len(Deviations(template, p)) > 0 {
+	if len(p.OpenQuestions) > 0 || policy == "always" || len(p.ExternalOperations) > 0 || len(Deviations(template, p)) > 0 {
 		return true
 	}
 	if policy == "deviation" {

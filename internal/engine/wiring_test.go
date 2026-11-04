@@ -75,7 +75,11 @@ func newTestEngine(ctx context.Context, root, session string) (*Engine, error) {
 			return config.Parse(data)
 		},
 		LoadSchemas: func() (map[string][]byte, error) {
-			source, err := os.ReadFile(filepath.Join(w.Root(), "devkit.toml"))
+			head, err := w.Head(ctx)
+			if err != nil {
+				return nil, err
+			}
+			source, err := w.ReadFile(ctx, head, "devkit.toml")
 			if err != nil {
 				return nil, err
 			}

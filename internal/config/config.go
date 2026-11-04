@@ -21,6 +21,7 @@ type Config struct {
 	External       map[string]ExternalOperation `toml:"external"`
 	Deny           Deny                         `toml:"deny"`
 	Router         Router                       `toml:"router"`
+	PlanCheck      PlanCheck                    `toml:"plan_check"`
 	DefaultPlan    string                       `toml:"default_plan"`
 	Paths          Paths                        `toml:"paths"`
 	Approval       Approval                     `toml:"approval"`
@@ -48,6 +49,24 @@ type Paths struct {
 type Approval struct {
 	Plan         string `toml:"plan"`
 	MetaLoopEdit string `toml:"meta_loop_edit"`
+}
+
+// PlanCheck selects the aspect and runner for plan judgments.
+type PlanCheck struct {
+	Aspect string `toml:"aspect"`
+	Runner string `toml:"runner"`
+}
+
+// PlanCheckSettings returns the effective plan judgment settings.
+func (c Config) PlanCheckSettings() PlanCheck {
+	settings := c.PlanCheck
+	if settings.Aspect == "" {
+		settings.Aspect = "plan"
+	}
+	if settings.Runner == "" {
+		settings.Runner = "devkit-judge"
+	}
+	return settings
 }
 
 // Git holds work branch and stage commit settings.
@@ -82,7 +101,7 @@ func (c Config) DetectionRequired() bool {
 	return c.Detection.Required == nil || *c.Detection.Required
 }
 
-// Default human confirmation categories are also the complete set of known names.
+// Classification names identify changes that may require human confirmation.
 const (
 	DependencyChanged  = "dependency_changed"
 	MetaLoopEdit       = "meta_loop_edit"
@@ -196,7 +215,7 @@ func (c Config) HumanConfirmation() []string {
 	if c.Router.HumanConfirmation != nil {
 		return slices.Clone(c.Router.HumanConfirmation)
 	}
-	return []string{DependencyChanged, MetaLoopEdit, TargetChangedAgain}
+	return []string{DependencyChanged, TargetChangedAgain}
 }
 
 // StopContinuation returns the effective Stop continuation limit.
@@ -262,6 +281,7 @@ func Parse(data []byte) (Config, error) {
 	c.Git = Git{Branch: c.branchPattern(), CommitMessage: c.commitMessagePattern(), AllowEmptyCommit: &allowEmpty}
 	c.Classification.DependencyFiles = c.DependencyFiles()
 	c.Router.HumanConfirmation = c.HumanConfirmation()
+	c.PlanCheck = c.PlanCheckSettings()
 	c.Limits.StopContinuation = c.StopContinuation()
 	c.Lessons.Destinations = c.LessonDestinations()
 	metadata, err := toml.NewDecoder(bytes.NewReader(data)).Decode(&c)
@@ -320,15 +340,21 @@ func (c Config) Validate() error {
 	}
 	for _, item := range c.Router.HumanConfirmation {
 		switch item {
-		case DependencyChanged, MetaLoopEdit, TargetChangedAgain:
+		case DependencyChanged, TargetChangedAgain:
 		default:
 			return fmt.Errorf("unknown router.human_confirmation category: %q", item)
 		}
 	}
+	if strings.TrimSpace(c.PlanCheck.Aspect) == "" {
+		return fmt.Errorf("plan_check.aspect must not be empty")
+	}
+	if strings.TrimSpace(c.PlanCheck.Runner) == "" {
+		return fmt.Errorf("plan_check.runner must not be empty")
+	}
 	if strings.TrimSpace(c.DefaultPlan) == "" {
 		return fmt.Errorf("default_plan must not be empty")
 	}
-	for _, field := range []struct {
+	paths := []struct {
 		name  string
 		value string
 	}{
@@ -341,9 +367,22 @@ func (c Config) Validate() error {
 		{"requirements", c.Paths.Requirements},
 		{"structure", c.Paths.Structure},
 		{"detect", c.Paths.Detect},
-	} {
+	}
+	for _, field := range paths {
 		if !validRepositoryPath(field.value) {
 			return fmt.Errorf("paths.%s must be a clean repository-relative slash path outside .devkit/run: %q", field.name, field.value)
+		}
+	}
+	for i, norm := range paths[:6] {
+		for _, other := range paths[i+1 : 6] {
+			if norm.value == other.value || strings.HasPrefix(norm.value, other.value+"/") || strings.HasPrefix(other.value, norm.value+"/") {
+				return fmt.Errorf("paths.%s and paths.%s must not overlap", norm.name, other.name)
+			}
+		}
+		for _, product := range paths[6:] {
+			if product.value == norm.value || strings.HasPrefix(product.value, norm.value+"/") {
+				return fmt.Errorf("paths.%s must not be inside or equal to paths.%s", product.name, norm.name)
+			}
 		}
 	}
 	switch c.Approval.Plan {

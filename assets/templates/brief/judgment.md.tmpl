@@ -4,21 +4,25 @@ Instruction ID: {{.InstructionID}}
 
 {{.Content}}
 
+For a round judgment, inspect the supplied expanded round-start comparison base and the changed-file list and patch to the returned target. Use the work-history file referenced by this request as required by the aspect; the file is fixed at instruction issue time.
+
 ## Repository requirements
 
-Reference: requirements.md
+Reference: requirements.md -> {{.Repository.Requirements.Path}} ({{if .Repository.Requirements.Exists}}exists{{else}}not created yet{{end}})
 
 {{.Repository.Requirements.Content}}
 
 ## Relevant structure records
+
+Working-tree product: structure.json -> {{.Repository.Structure.Path}} ({{if .Repository.Structure.Exists}}exists{{else}}not created yet{{end}})
 {{range .Repository.LayoutGuides}}
-Reference: {{.Path}}
+Reference: structure.json -> {{.Path}}
 
 {{.Content}}
 {{end}}
 ## Rules and enforcement
 
-Reference: rules.md
+Reference: rules.md -> {{.Repository.Rules.Path}}
 
 {{.Repository.Rules.Content}}
 
@@ -30,7 +34,7 @@ Reference: {{.Path}}
 {{end}}
 ## Other fixed norms
 
-Read additional norms only when needed, using these paths into the fixed snapshot expansion. The snapshot is fixed at round start, or when an instruction outside a round is issued. Do not substitute norms from the working tree.
+Read additional norms only when needed, using these paths into the fixed snapshot expansion. Round norms are fixed at round start. Plan checks and detection tests use committed norms from the work branch HEAD fixed at instruction issue time. Do not substitute norms from the working tree.
 {{range .NormPaths}}
 - Reference: {{.Path}}; fixed snapshot path: {{.SnapshotPath}}
 {{end}}

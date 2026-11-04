@@ -240,6 +240,8 @@ func TestPauseAndStatusWithoutForwardAssets(t *testing.T) {
 			e, ctx := fixture(t)
 			working(t, e, ctx)
 			write(t, e.Root(), broken, "Invalid configuration or schema")
+			git(t, e.Root(), "add", broken)
+			git(t, e.Root(), "commit", "-qm", "Commit invalid forward configuration")
 			reopened, err := newTestEngine(ctx, e.Root(), e.sessionID)
 			if err != nil {
 				t.Fatal(err)
@@ -392,7 +394,7 @@ func TestEndedWorkAcceptsAnswerCorrections(t *testing.T) {
 	}
 }
 
-func TestDetectionUsesFrozenIndexAndCurrentOpeningTarget(t *testing.T) {
+func TestDetectionUsesCurrentIndexAndFrozenIdentity(t *testing.T) {
 	e, ctx := fixture(t)
 	configureStage(t, e, func(stage *plan.Stage) {
 		stage.Checks = []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}
@@ -411,8 +413,8 @@ func TestDetectionUsesFrozenIndexAndCurrentOpeningTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	requirements, tests, err := e.detectionContext(ctx, []plan.Check{{Aspect: "plan", Runner: "devkit-judge", Required: true}}, round.StartTarget.Tree)
-	if err != nil || len(check.MissingDetection(requirements, tests)) != 0 {
-		t.Fatalf("working index changed the open round: %v", err)
+	if err != nil || len(check.MissingDetection(requirements, tests)) != 1 {
+		t.Fatalf("current index was not consulted: %v", err)
 	}
 	write(t, e.Root(), ".devkit/detect.json", string(index))
 	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
@@ -442,7 +444,8 @@ func TestDetectionCommandRetriesAfterHumanAnswer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, e.Root(), "devkit.toml", string(settings)+"\n[judges.devkit-judge]\nexecutable = '/bin/sh'\nargs = ['-c', \"printf 'attempt\\\\n' >> .devkit/run/attempts; if test ! -f .devkit/run/retry; then touch .devkit/run/retry; exit 7; fi; cat .devkit/run/detection-result.json\"]\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n")
+	write(t, e.Root(), "judge.sh", "#!/bin/sh\ninput=$(cat)\ncase \"$input\" in\n*'\"Kind\":\"plan\"'*) cat .devkit/run/plan-result.json ;;\n*) printf 'attempt\\n' >> .devkit/run/attempts; if test ! -f .devkit/run/retry; then touch .devkit/run/retry; exit 7; fi; cat .devkit/run/detection-result.json ;;\nesac\n")
+	write(t, e.Root(), "devkit.toml", string(settings)+"\n[judges.devkit-judge]\nexecutable = '/bin/sh'\nargs = ['judge.sh']\ntimeout_seconds = 5\noutput_schema = 'judge-schema.json'\n")
 	git(t, e.Root(), "add", ".")
 	write(t, e.Root(), "judge-schema.json", string(e.schemas["judgment"]))
 	git(t, e.Root(), "add", ".")
@@ -480,12 +483,25 @@ func TestDetectionCommandRetriesAfterHumanAnswer(t *testing.T) {
 		output.Observations = append(output.Observations, form.DetectionObservation{File: example.ID, Judgment: judgment, Reason: "The observation distinguishes the example"})
 	}
 	write(t, e.Root(), ".devkit/run/detection-result.json", string(marshal(t, output)))
+	head, err := e.workspace.Head(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	norms, err := e.norms(ctx, head)
+	if err != nil {
+		t.Fatal(err)
+	}
+	planRequest := check.Request{RequestInput: check.RequestInput{InstructionID: instructionID(e.workID, form.InstructionPlanCheck, "1:plan:devkit-judge", 0), Aspect: check.Aspect{ID: "plan"}, TargetVersion: form.TargetVersion{Kind: form.TargetPlan, Plan: 1}, Norms: []check.Norm{}, CompletionConditionIDs: []string{}}}
+	for _, norm := range norms {
+		planRequest.Norms = append(planRequest.Norms, check.Norm{Reference: norm})
+	}
+	write(t, e.Root(), ".devkit/run/plan-result.json", string(marshal(t, pass(planRequest))))
 	observeAnswer(t, e, "Retry the registered detection command.")
 	if _, err := e.Answer(ctx, AnswerRequest{QuestionID: asked.Instruction.Question.ID, Interpretation: ledger.AnswerText, Text: "Retry detection"}); err != nil {
 		t.Fatal(err)
 	}
 	result, err := e.Next(ctx)
-	if err != nil || result.Instruction == nil || result.Instruction.Kind != form.InstructionPlanCheck {
+	if err != nil || result.Instruction == nil || result.Instruction.Kind != form.InstructionWork {
 		t.Fatalf("registered command was not retried: %+v, %v", result, err)
 	}
 	attempts, err := os.ReadFile(filepath.Join(e.Root(), ".devkit/run/attempts"))
@@ -701,6 +717,11 @@ func TestRoundOpeningTestsUncommittedAspect(t *testing.T) {
 	tree, err := e.workspace.SnapshotTree(ctx)
 	if err != nil || data.Reference != tree || data.Request.TargetVersion.Tree != tree {
 		t.Fatalf("detection used a different opening target: %v", err)
+	}
+	acceptDetectionResult(t, e, result.Instruction)
+	opened, err := e.Next(ctx)
+	if err != nil || opened.Instruction == nil || opened.Instruction.Kind != form.InstructionWork {
+		t.Fatalf("approved opening norms did not accept detection: %+v, %v", opened, err)
 	}
 }
 

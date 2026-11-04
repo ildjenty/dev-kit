@@ -1,0 +1,215 @@
+package engine
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"path/filepath"
+	"slices"
+	"strings"
+
+	"github.com/ildjenty/dev-kit/internal/config"
+	"github.com/ildjenty/dev-kit/internal/form"
+	"github.com/ildjenty/dev-kit/internal/ledger"
+	"github.com/ildjenty/dev-kit/internal/plan"
+)
+
+func (e *Engine) workHistory(state *ledger.State, meta *ledger.Instruction) (string, error) {
+	if meta.Context == nil {
+		meta.Context = &ledger.InstructionContext{}
+	}
+	if meta.Context.WorkHistory == "" {
+		records, err := e.records()
+		if err != nil {
+			return "", err
+		}
+		var text strings.Builder
+		text.WriteString("# Work history\n\n")
+		for _, record := range records {
+			switch record.Payload.(type) {
+			case *ledger.Judgment, *ledger.Question, *ledger.Answer, *ledger.Approval, *ledger.Lesson:
+				data, err := json.MarshalIndent(record.Payload, "", "  ")
+				if err != nil {
+					return "", err
+				}
+				fmt.Fprintf(&text, "%s %s\n%s\n\n", record.ID, record.Kind(), data)
+			}
+		}
+		for _, run := range state.StageRuns() {
+			fmt.Fprintf(&text, "Stage %s (%s): %d rounds\n", run.StageID, run.ID, len(state.Rounds(run.ID)))
+		}
+		meta.Context.WorkHistory = text.String()
+	}
+	name := "brief/" + meta.ID + "-history.md"
+	if err := e.store().Publish(name, []byte(meta.Context.WorkHistory)); err != nil {
+		return "", err
+	}
+	return filepath.Join(e.workRoot(), name), nil
+}
+
+func (e *Engine) comparison(ctx context.Context, before, after string) (string, error) {
+	base, err := e.expanded(ctx, before)
+	if err != nil {
+		return "", err
+	}
+	paths, err := e.workspace.ChangedFiles(ctx, before, after)
+	if err != nil {
+		return "", err
+	}
+	patch, err := e.workspace.Diff(ctx, before, after)
+	if err != nil {
+		return "", err
+	}
+	name := "brief/" + before + "-" + after + ".diff"
+	if err := e.store().Publish(name, patch); err != nil {
+		return "", err
+	}
+	var text strings.Builder
+	fmt.Fprintf(&text, "Round-start comparison base: %s\nChanged files:\n", base)
+	for _, path := range paths {
+		fmt.Fprintf(&text, "- %s\n", path)
+	}
+	fmt.Fprintf(&text, "Diff file: %s\n", filepath.Join(e.workRoot(), name))
+	if len(patch) <= 3000 {
+		fmt.Fprintf(&text, "\n```diff\n%s\n```\n", patch)
+	}
+	return text.String(), nil
+}
+
+func (e *Engine) judgmentEvidence(ctx context.Context, meta *ledger.Instruction, state *ledger.State, round *ledger.Round) (string, error) {
+	history, err := e.workHistory(state, meta)
+	if err != nil {
+		return "", err
+	}
+	text := "Work-history file (fixed at instruction issue time): " + history + "\n"
+	if round != nil && round.ReturnedTarget != nil {
+		comparison, err := e.comparison(ctx, round.StartTarget.Tree, round.ReturnedTarget.Tree)
+		if err != nil {
+			return "", err
+		}
+		text += comparison
+	}
+	return text, nil
+}
+
+func (e *Engine) loopEditText(ctx context.Context, before, after, reason string) (string, error) {
+	paths, err := e.workspace.ChangedFiles(ctx, before, after)
+	if err != nil {
+		return "", err
+	}
+	hook, err := e.workspace.PreCommitPath(ctx)
+	if err != nil {
+		return "", err
+	}
+	selected := map[string]bool{}
+	for _, ref := range []string{before, after} {
+		settings, err := e.settings(ctx, ref)
+		if err != nil {
+			return "", err
+		}
+		for _, path := range paths {
+			if path == hook || slices.Contains(differenceCategories([]string{path}, settings), config.MetaLoopEdit) {
+				selected[path] = true
+			}
+		}
+	}
+	var text strings.Builder
+	text.WriteString(reason + "\n\nChanged loop files:\n")
+	for _, path := range paths {
+		if selected[path] {
+			fmt.Fprintf(&text, "- %s\n", path)
+		}
+	}
+	comparison, err := e.comparison(ctx, before, after)
+	if err != nil {
+		return "", err
+	}
+	text.WriteString("\n" + comparison)
+	return text.String(), nil
+}
+
+func (e *Engine) stageQuestionText(ctx context.Context, stage plan.Stage, round *ledger.Round, reason string) (string, error) {
+	var progress form.Progress
+	records, err := e.records()
+	if err != nil {
+		return "", err
+	}
+	for _, record := range records {
+		if value, ok := record.Payload.(*ledger.Progress); ok && value.RoundID == round.ID {
+			progress = value.Progress
+		}
+	}
+	var text strings.Builder
+	fmt.Fprintf(&text, "%s\n\nGate reason: %s\n\nWork performed:\n", reason, stage.Gate.Reason)
+	for _, item := range progress.WorkPerformed {
+		fmt.Fprintf(&text, "- %s\n", item)
+	}
+	text.WriteString("\nConfirmed matters:\n")
+	for _, item := range progress.Confirmed {
+		fmt.Fprintf(&text, "- %s\n", item)
+	}
+	text.WriteString("\nUnconfirmed matters:\n")
+	for _, item := range progress.Unconfirmed {
+		fmt.Fprintf(&text, "- %s\n", item)
+	}
+	comparison, err := e.comparison(ctx, round.StartTarget.Tree, round.ReturnedTarget.Tree)
+	if err != nil {
+		return "", err
+	}
+	text.WriteString("\n" + comparison)
+	return text.String(), nil
+}
+
+func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.State, q *form.Question) error {
+	work, _ := state.Work()
+	before := work.BaseCommit
+	if q.StopCategory == config.MetaLoopEdit {
+		latest := ""
+		answers := state.AnsweredQuestions()
+		for _, previous := range state.Questions() {
+			if previous.StopCategory != config.MetaLoopEdit {
+				continue
+			}
+			answer, ok := answers[previous.ID]
+			effective, valid := state.ResolveAnswer(previous.ApprovalTarget)
+			if ok && valid && effective.RecordID == answer.RecordID && answer.Answer.Interpretation == ledger.AnswerApproved && answer.RecordID > latest {
+				before, latest = previous.ApprovalTarget.Tree, answer.RecordID
+			}
+		}
+	}
+	var stageText string
+	for _, run := range state.StageRuns() {
+		for _, round := range state.Rounds(run.ID) {
+			if !slices.Contains(q.Evidence, form.Reference{RecordID: round.ID}) {
+				continue
+			}
+			bound, ok, err := e.boundPlan(run.PlanVersion)
+			if err != nil {
+				return err
+			}
+			if !ok {
+				return fmt.Errorf("bound plan is missing")
+			}
+			stage, _ := bound.Stage(run.StageID)
+			copy := *round
+			target := form.TargetVersion{Kind: form.TargetTree, Tree: q.ApprovalTarget.Tree}
+			copy.ReturnedTarget = &target
+			stageText, err = e.stageQuestionText(ctx, stage, &copy, "Confirm the updated stage target.")
+			if err != nil {
+				return err
+			}
+			before = roundReference(round)
+		}
+	}
+	if q.StopCategory == config.MetaLoopEdit {
+		text, err := e.loopEditText(ctx, before, q.ApprovalTarget.Tree, "Approve the updated development loop edits? If rejected, the worker must undo the edits.\n\n"+stageText)
+		if err != nil {
+			return err
+		}
+		q.Text = text
+	} else if q.StopCategory == "stage_confirmation" && stageText != "" {
+		q.Text = stageText
+	}
+	q.StopReason = q.Text
+	return nil
+}

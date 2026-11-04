@@ -68,7 +68,7 @@
 
 ## テスト
 
-観点 ID は `test` であり、`default` と `fix` の実装で、必須の `command:test` と併せて使う。
+観点 ID は `test` であり、`default` と `fix` の実装と振り返りで、必須の `command:test` と併せて使う。
 
 - **確認事項**: 原則 `principles/testing.md`(既定の内容は [`assets/principles/testing.md`](../assets/principles/testing.md))に照らし、完了条件ごとに、具体的なテストがあるか、登録済みの検証コマンドから実行されるかを確かめる。利用者から見える入口(CLI なら引数・標準出力・終了コード)で契約を確かめているか、テストが実装をなぞっていないかも判定する。
 - **blocking**: 照合した原則の blocking 条件に該当する。
@@ -102,7 +102,7 @@
 
 ## harness
 
-毎回の振り返りで、必須の `command:test` と併せてループ自身を評価するメタ観点である。
+毎回の振り返りでループ自身を評価するメタ観点である。`default` と `fix` は必須の `command:test`・`test` と併せて使い、`docs` は `harness` だけを必須とする。
 
 - **確認事項**:
   - 原則と契約: [`assets/principles/harness.md`](../assets/principles/harness.md) の各原則と[モジュールごとの契約](architecture/modules.md#モジュールごとの契約)に従う。
@@ -110,7 +110,7 @@
   - skill: [`description`](https://agentskills.io/specification#description-field)(skill の説明項目)の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`assets/principles/working.md` の原則5](../assets/principles/working.md#5-定型処理はコマンドにし手順はそれを呼ぶ)に従う。
   - 判定: [check の結果](architecture/data.md#check-の結果-judgment)に従い、`NOT ASSESSED`(未評価)を返せるか。
   - 原則の内容: 適用条件・要求・例外・blocking の意味を判断できるか。
-  - 問題の捕捉: 作業全体の判定・指摘(blocking でないものも含む)、`FAIL`・`NOT ASSESSED` の経緯、ラウンド数、人の却下・訂正・作り直しの指示、`note` で伝えられた見逃しを確かめ、各問題をどこで捕まえるべきだったかを判断しているか。
+  - 問題の捕捉: brief が参照する作業履歴ファイルから、作業全体の判定・指摘(blocking でないものも含む)、`FAIL`・`NOT ASSESSED` の経緯、ラウンド数、人の却下・訂正・作り直しの指示、`note` で伝えられた見逃しを確かめ、各問題をどこで捕まえるべきだったかを判断しているか。
   - 再発防止: 機械の検査、雛形、観点、原則、skill の順(設定 `[lessons] destinations` で変更可能)で反映先を選び、リポジトリの規範へ反映しているか。反映しない理由があるか。観点を変えたら検出試験の例も更新しているか。規則の「手段: 未実装」と繰り返す違反を、テスト・lint・型・pre-commit・検証コマンドへ移す候補にしているか。
   - 規範の働き: どの原則がどの観点・雛形で使われるか、使われない仕組みや負担に見合わない仕組みがないか。その作業で見えた問題・不足・負担を扱い、規範全体の棚卸しは必要が見えたときだけ行っているか。
   - 単純さ: 部品・原則・記録・観点の数と形式に、より単純な対案があるか。比較と blocking の条件は [`assets/principles/harness.md` の原則5](../assets/principles/harness.md#5-防ぐ失敗と運用負担から仕組みを選ぶ)に従う。

@@ -20,10 +20,10 @@ Placement choices identified as difficult to change.
 
 ## Artifacts
 
-Updated `structure.json` recording modules, responsibilities, placement, and dependency direction, existing locations whose style to follow, rejected alternatives and reasons, and unverified premises. Include recovery methods if effects cannot be reverted with git or require a special recovery order. Preserve decisions needed by future tasks following `stages/README.md#decisions-for-later-work`.
+Updated `structure.json` following the bundled `schemas/structure.json` at the working-tree path shown in the brief. Record modules with `id`, `name`, `responsibility`, and `path`, and dependencies with `from` and `to` module IDs. Module IDs must be unique and both ends of each dependency must name recorded modules. Include existing locations whose style to follow, rejected alternatives and reasons, and unverified premises in the stage output. Include recovery methods if effects cannot be reverted with git or require a special recovery order. Preserve decisions needed by future tasks following `stages/README.md#decisions-for-later-work`.
 
 ## Completion conditions
 
-Reflect modules, responsibilities, placement, and dependency direction in the structure record. Show existing locations to follow, rejected alternatives and reasons, and unverified premises. Provide recovery methods when needed. Finalize difficult-to-change placement only after resolving unverified matters affecting the choice.
+Reflect modules, responsibilities, placement, and dependency direction in the structure record using `schemas/structure.json`. Show existing locations to follow, rejected alternatives and reasons, and unverified premises. Provide recovery methods when needed. Finalize difficult-to-change placement only after resolving unverified matters affecting the choice.
 
-All required checks valid for the returned target and norms are `PASS`, detection tests have passed for required aspects handled by judges and their assigned runners, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.
+All required checks valid for the returned target and norms are `PASS`, the detection requirements in `checks/README.md#detection-tests` are satisfied, and devkit has successfully finalized completion at a matching committed target. Follow the plan for selecting and requiring verification; do not add checks from this definition. Follow `stages/README.md#completion-finalization` for finalization responsibilities.

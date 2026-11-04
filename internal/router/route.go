@@ -17,7 +17,6 @@ type Input struct {
 	PreviousNoProgressRounds int
 	ProgressMade             bool
 	TerminationKind          form.TerminationKind
-	PremiseBroken            bool
 	Confirmation             ConfirmationInput
 	// FindingCategories maps IDs of findings requiring human decisions to category names.
 	FindingCategories map[string]string
@@ -54,11 +53,6 @@ func (t Table) Decide(input Input) (Decision, error) {
 	decision := Decision{Confirmation: confirmation}
 	if input.TerminationKind == form.TerminationQuestion || input.TerminationKind == form.TerminationStopped || confirmation.Required {
 		decision.Action, decision.Reason = plan.Ask, "human confirmation is required"
-		decision.Confirmation.Provisional = false
-		return decision, nil
-	}
-	if input.PremiseBroken {
-		decision.Action, decision.Reason = plan.Back, "the stage that established the premise must be reconsidered"
 		decision.Confirmation.Provisional = false
 		return decision, nil
 	}

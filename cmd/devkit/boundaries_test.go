@@ -40,6 +40,8 @@ func TestPausedCommandsWithoutForwardAssets(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(root, broken), []byte("Invalid configuration or schema"), 0o644); err != nil {
 				t.Fatal(err)
 			}
+			gitCommand(t, root, "add", broken)
+			gitCommand(t, root, "commit", "-qm", "Commit invalid forward configuration")
 			command(t, "", "status")
 			command(t, "", "pause")
 			if got := command(t, "", "next"); !strings.Contains(got, `"paused": true`) {

@@ -12,7 +12,7 @@
 // InstructionRunner supplies the runner resolver used by hook collection.
 // NormativeReferences shares sorted tree/blob identities with CLI display.
 //
-// Plan checks use the plan aspect and devkit-judge. Detection instructions ask
+// Plan checks use the configured aspect and runner (plan and devkit-judge by default). Detection instructions ask
 // the same runner as the required check for form.DetectionResult.
 // Options defers forward-asset loading so pause, resume, and status can use the
 // embedded schemas while configuration is being edited.

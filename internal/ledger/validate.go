@@ -191,7 +191,7 @@ func (v *Validator) answer(a Answer) error {
 		return fmt.Errorf("answer observation time is required")
 	}
 	switch a.Interpretation {
-	case AnswerApproved, AnswerRejected, AnswerDeferred:
+	case AnswerApproved, AnswerRejected, AnswerDeferred, AnswerBack:
 	case AnswerText:
 		if a.Text == "" {
 			return fmt.Errorf("text answer requires text")

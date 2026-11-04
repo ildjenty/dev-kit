@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -16,7 +18,7 @@ import (
 func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	e, ctx := fixture(t)
 	// The fixture initializes and commits a fresh repository. Use the shipped default policy.
-	settings := "kit_version = 'v1'\n"
+	settings := "kit_version = 'v2'\n"
 	write(t, e.Root(), "devkit.toml", settings)
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Use default settings")
@@ -175,7 +177,7 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	if !found {
 		t.Fatal("unregistered command did not produce its fixable finding")
 	}
-	write(t, e.Root(), "test.sh", "#!/bin/sh\nset -eu\ntest \"$(sh greet.sh)\" = Hello\n")
+	write(t, e.Root(), "test.sh", "#!/bin/sh\nset -u\noutput=$(sh greet.sh)\nstatus=$?\ntest \"$status\" -eq 0 || exit 1\ntest \"$output\" = Hello\n")
 	write(t, e.Root(), "devkit.toml", settings+"\n[commands.test]\nexecutable = '/bin/sh'\nargs = ['test.sh']\ntimeout_seconds = 5\n")
 	approve(next(), "meta_loop_edit")
 	implement = next()
@@ -187,14 +189,47 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	if len(state.Rounds(run.ID)) != 2 {
 		t.Fatal("registration did not take effect in round two")
 	}
+	write(t, e.Root(), "greet.sh", "#!/bin/sh\nprintf 'Hello\\n'\nexit 7\n")
 	submit(implement, "implement")
+	correction := next()
+	if correction.Instruction.Kind != form.InstructionWork {
+		t.Fatalf("failed registered test did not produce a fix round: %+v", correction)
+	}
+	state, err = e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, _ = state.LatestStageRun()
+	if len(state.Rounds(run.ID)) != 3 {
+		t.Fatal("failed registered test did not open round three")
+	}
+	records, err = e.records()
+	if err != nil {
+		t.Fatal(err)
+	}
+	registeredFailure := false
+	for _, record := range records {
+		if j, ok := record.Payload.(*ledger.Judgment); ok && j.Aspect == "command:test" && j.Command != nil && j.Judgment.Judgment == check.Fail && j.Command.ExitCode != 0 {
+			registeredFailure = true
+		}
+	}
+	if !registeredFailure {
+		t.Fatal("the test did not reject a greeting with correct stdout and a failing exit status")
+	}
+	write(t, e.Root(), "greet.sh", "#!/bin/sh\nprintf 'Hello\\n'\nexit 0\n")
+	submit(correction, "implement")
 	retrospective := next()
 	body, err := e.instructionBrief(retrospective.Instruction.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(body), "Verification command `test` is not registered") || !strings.Contains(string(body), "2 rounds") || !strings.Contains(string(body), "Original human input") {
-		t.Fatal("retrospective omitted work history")
+	historyPath := filepath.Join(e.workRoot(), "brief", retrospective.Instruction.ID+"-history.md")
+	history, err := os.ReadFile(historyPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), historyPath) || !strings.Contains(string(history), "Verification command `test` is not registered") || !strings.Contains(string(history), "3 rounds") || !strings.Contains(string(history), "original") {
+		t.Fatal("work history omitted command failures, rounds, or human input")
 	}
 	submit(retrospective, "retrospective")
 	completed := next()
@@ -205,7 +240,7 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 
 func TestDetectionCanBeDisabled(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v1'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n")
+	write(t, e.Root(), "devkit.toml", "kit_version = 'v2'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Disable detection tests")
 	started, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
@@ -236,7 +271,7 @@ func TestGitSettingsAndEmptyStage(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			e, ctx := fixture(t)
-			write(t, e.Root(), "devkit.toml", "kit_version = 'v1'\ndefault_plan = 'test'\n[approval]\nplan = 'deviation'\n[git]\nbranch = 'topic/{work_id}/work'\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n[detection]\nrequired = false\n")
+			write(t, e.Root(), "devkit.toml", "kit_version = 'v2'\ndefault_plan = 'test'\n[approval]\nplan = 'deviation'\n[git]\nbranch = 'topic/{work_id}/work'\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n[detection]\nrequired = false\n")
 			git(t, e.Root(), "add", ".")
 			git(t, e.Root(), "commit", "-qm", "Configure git behavior")
 			head := git(t, e.Root(), "rev-parse", "HEAD")
@@ -332,10 +367,43 @@ func TestRejectedMetaLoopEditUsesConfirmedNorms(t *testing.T) {
 	if correction.Instruction.ID == work.Instruction.ID {
 		t.Fatal("rejection reused the old work instruction")
 	}
+	state, err = e.load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixed, _ := state.OpenRound()
+	actual, err := e.workspace.SnapshotTree(ctx)
+	if err != nil || fixed.StartTarget.Tree != actual || roundReference(fixed) == actual {
+		t.Fatalf("rejection replaced the actual work target: %+v, %v", fixed, err)
+	}
+	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: correction.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
+		t.Fatal(err)
+	}
+	again, err := e.Next(ctx)
+	if err != nil || again.Instruction == nil || again.Instruction.Kind != form.InstructionWork {
+		t.Fatalf("unchanged rejected norms were asked again: %+v, %v", again, err)
+	}
+	original, err := e.workspace.ReadFile(ctx, roundReference(fixed), ".devkit/rules.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, e.Root(), ".devkit/rules.md", string(original))
+	write(t, e.Root(), "README.md", "# Preserved work product\n")
+	if _, err := e.Submit(ctx, marshal(t, form.Progress{InstructionID: again.Instruction.ID, TerminationKind: form.TerminationCompleted})); err != nil {
+		t.Fatal(err)
+	}
+	done, err := e.Next(ctx)
+	if err != nil || done.Status != ledger.WorkCompleted {
+		t.Fatalf("undo did not complete: %+v, %v", done, err)
+	}
+	if git(t, e.Root(), "show", "HEAD:README.md") != "# Preserved work product" {
+		t.Fatal("undo discarded the work product")
+	}
+
 }
 
 func TestStartRequiresCommittedInitialization(t *testing.T) {
-	for _, pending := range []string{"HEAD", "devkit.toml", ".devkit/plans/test.json", ".devkit/plans/untracked.json"} {
+	for _, pending := range []string{"HEAD", "devkit.toml", ".devkit/plans/test.json", ".devkit/plans/untracked.json", ".devkit/rules.md", ".devkit/checks/plan.md", ".devkit/templates/brief/work.md.tmpl", ".devkit/principles/harness.md", ".devkit/stages/implement.md", ".claude/agents/devkit-judge.md", ".codex/agents/devkit-judge.toml", "AGENTS.md", "CLAUDE.md"} {
 		t.Run(pending, func(t *testing.T) {
 			e, ctx := fixture(t)
 			if pending == "HEAD" {
@@ -343,8 +411,16 @@ func TestStartRequiresCommittedInitialization(t *testing.T) {
 			} else {
 				write(t, e.Root(), pending, "Uncommitted initialization change\n")
 			}
+			branch := git(t, e.Root(), "branch", "--show-current")
 			if _, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"}); err == nil || !strings.Contains(err.Error(), "commit the devkit init changes first") {
 				t.Fatalf("start did not explain initialization requirement: %v", err)
+			}
+			if e.workID != "" || git(t, e.Root(), "branch", "--show-current") != branch {
+				t.Fatal("failed start created work or switched branches")
+			}
+			works, err := os.ReadDir(filepath.Join(e.runRoot(), "work"))
+			if err != nil || len(works) != 0 {
+				t.Fatalf("failed start wrote work records: %v, %v", works, err)
 			}
 		})
 	}
