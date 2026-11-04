@@ -26,6 +26,13 @@ type Progress struct {
 	ResumeConditions []string         `json:"resume_conditions,omitempty"`
 	OutOfScope       []string         `json:"out_of_scope,omitempty"`
 	ChangeReason     string           `json:"change_reason,omitempty"`
+	Notes            []Note           `json:"notes,omitempty"`
+}
+
+// Note carries a ledger note using its existing kind-specific payload.
+type Note struct {
+	Kind    string          `json:"kind"`
+	Payload json.RawMessage `json:"payload"`
 }
 
 // Confirmation carries a worker's question verbatim, separately from its stage report.

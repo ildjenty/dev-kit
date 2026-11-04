@@ -14,7 +14,7 @@ Scope: {{.Unit.Scope}}
 
 Absolute worktree path: {{.WorktreePath}}
 
-Edit only this detached worktree and the assigned scope. Do not edit the work checkout, other unit worktrees, or runtime records directly. Run `devkit note <kind> <file>` from this worktree to record intermediate decisions, evidence, and lessons on the parent work; devkit resolves its parent checkout and unfinished work. Read and record commands such as status and view use that same parent work. Do not commit, merge, or run devkit submit. Return only the progress JSON as your final message; SubagentStop stores it and devkit merges the units before the stage judgment.
+Edit only this detached worktree and the assigned scope. Do not edit the work checkout, other unit worktrees, or runtime records directly. Put decisions, evidence, and lessons in the termination block's optional `notes` array as `{"kind":"decision|evidence|lesson","payload":{...}}`, using the existing schema for each payload. Do not run `devkit note` from this worktree; the parent ledger is outside the worker sandbox. Devkit validates and records the notes when accepting your result, without duplicates on reacceptance or reissue. Do not commit, merge, or run devkit submit. Return only the progress JSON as your final message; SubagentStop stores it and devkit merges the units before the stage judgment.
 
 ## Plan instructions
 {{range .Stage.Instructions}}
@@ -128,7 +128,7 @@ Devkit accepts all unit results, fixes their trees as SHAs, merges them, judges 
 {{.OutputSchema}}
 {{end}}
 
-Supporting schemas describe recorded decisions, evidence, and lessons for reference. Return only progress JSON. The `structure` schema describes the structure product at the working-tree path above.
+Supporting schemas describe the payloads for `notes` of kinds `decision`, `evidence`, and `lesson`. Return them inside the progress JSON. The `structure` schema describes the structure product at the working-tree path above.
 {{range .SupportingSchemas}}
 ### {{.Path}} JSON Schema
 

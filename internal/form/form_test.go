@@ -16,7 +16,7 @@ func schemaFor(t *testing.T, name string) *Schema {
 		t.Fatal(err)
 	}
 	resources := make(map[string][]byte)
-	for _, dependency := range []string{"finding", "question", "reference", "plan", "plan-template"} {
+	for _, dependency := range []string{"finding", "question", "reference", "decision", "evidence", "plan", "plan-template"} {
 		if dependency == name {
 			continue
 		}

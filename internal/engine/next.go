@@ -261,6 +261,13 @@ func (e *Engine) recordSubmission(ctx context.Context, state *ledger.State, run 
 		}
 	}
 	if !accepted {
+		notes, err := e.workerNotes(round.ID, progress.Notes)
+		if err != nil {
+			return err
+		}
+		if err := e.publishNotes(notes); err != nil {
+			return err
+		}
 		if _, err = e.append(&ledger.Progress{Progress: progress, RoundID: round.ID}); err != nil {
 			return err
 		}

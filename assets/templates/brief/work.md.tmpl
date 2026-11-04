@@ -110,7 +110,7 @@ devkit confirms completion and runs git commit.
 {{.OutputSchema}}
 {{end}}
 
-Supported `devkit note` kinds: `decision`, `evidence`, `lesson`. The `structure` schema describes the structure product at the working-tree path above.
+Supported `devkit note` kinds: `decision`, `evidence`, `lesson`. This command is for the session agent itself. Agent workers put notes in their termination block's `notes` array as `{"kind":"decision|evidence|lesson","payload":{...}}` instead of running `devkit note`. The `structure` schema describes the structure product at the working-tree path above.
 {{range .SupportingSchemas}}
 ### {{.Path}} JSON Schema
 

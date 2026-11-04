@@ -525,18 +525,8 @@ func (e *Engine) Note(ctx context.Context, kind ledger.Kind, data []byte) (Resul
 		return Result{}, err
 	}
 	defer lock.Close()
-	var payload ledger.Payload
-	switch kind {
-	case ledger.KindDecision:
-		payload = &ledger.Decision{}
-	case ledger.KindEvidence:
-		payload = &ledger.Evidence{}
-	case ledger.KindLesson:
-		payload = &ledger.Lesson{}
-	default:
-		return Result{}, fmt.Errorf("unsupported note kind: %q", kind)
-	}
-	if err = fsstore.DecodePayload(data, payload); err != nil {
+	payload, err := decodeNote(kind, data)
+	if err != nil {
 		return Result{}, err
 	}
 	if _, err = e.append(payload); err != nil {

@@ -24,6 +24,7 @@ type Store struct {
 // Record is the storage envelope. Ledger interprets Kind and Payload.
 type Record struct {
 	ID      string          `json:"id"`
+	NoteKey string          `json:"note_key,omitempty"`
 	Kind    string          `json:"kind"`
 	Payload json.RawMessage `json:"payload"`
 }

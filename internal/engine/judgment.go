@@ -1097,7 +1097,7 @@ func (e *Engine) rejectReadOnlyEdits(ctx context.Context, state *ledger.State, p
 	if len(blocked) == 0 {
 		return Result{}, false, nil
 	}
-	reason := "Read-only sources were edited: " + strings.Join(blocked, ", ") + ". Undo these edits and record each improvement as a lesson with devkit note lesson so that the source maintainers can apply it."
+	reason := "Read-only sources were edited: " + strings.Join(blocked, ", ") + ". Undo these edits and record each improvement as a lesson in the termination block notes array (or with devkit note lesson when the session agent itself is working) so that the source maintainers can apply it."
 	r, err := e.preserveFixRound(ctx, state, p, stage, run, round, reason)
 	return r, true, err
 }

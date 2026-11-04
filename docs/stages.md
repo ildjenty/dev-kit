@@ -12,7 +12,7 @@ kit は、利用者が[ループのパターン](architecture/data.md#ループ�
 
 元に戻せないもの(変更困難な決定)の判断は、[`assets/principles/designing.md` の原則1](../assets/principles/designing.md#1-identify-decisions-that-are-hard-to-change-early-and-finalize-them-after-obtaining-the-evidence-needed)に従う。
 
-既定の各ステージは定義が求める成果の `report` の形を持つ。完了を主張するときだけ必須とし、確認要求と停止では途中の報告を認める。形への適合は証拠にしない。報告の内容と `confirmation` の契約は[進捗](architecture/data.md#進捗-progress)に従う。既定の作業者 `worker` は `devkit-worker` のサブエージェントであり、devkit が作る worktree で作業する。セッションはまとめ役を担う。
+既定の各ステージは定義が求める成果の `report` の形を持つ。完了を主張するときだけ必須とし、確認要求と停止では途中の報告を認める。形への適合は証拠にしない。報告の内容と `confirmation` の契約は[進捗](architecture/data.md#進捗-progress)に従う。既定の作業者 `worker` は `devkit-worker` のサブエージェントであり、devkit が作る worktree で作業する。セッションはまとめ役を担う。ワーカーの決定・証拠・教訓は終了ブロックの任意の `notes` 配列に `kind` と種別ごとの `payload` として含める。`devkit note` はセッション自身が記録するときに使う。
 
 ## 0 目的
 
@@ -87,7 +87,7 @@ kit は、利用者が[ループのパターン](architecture/data.md#ループ�
 - **決めること**: 未確認の前提の真偽。
 - **決めずに次のステージへ渡すこと**: 本番のコード。
 - **元に戻せないもの**: なし。
-- **成果物**: 実験の結果と決定。決定は [`devkit note`](architecture/data.md#決定と証拠-decision--evidence) で記録する。試作は本番のコードから分離し、[`devkit submit`](architecture/flow.md#作業結果の提出)(作業結果を提出するコマンド)の実行前に削除するか、追跡対象外で ignore された場所に置いて[完了時のコミット](architecture/guarantees.md#完了条件)に含めない。
+- **成果物**: 実験の結果と決定。決定はワーカーなら終了ブロックの `notes`、セッション自身なら [`devkit note`](architecture/data.md#決定と証拠-decision--evidence) で記録する。試作は本番のコードから分離し、[`devkit submit`](architecture/flow.md#作業結果の提出)(作業結果を提出するコマンド)の実行前に削除するか、追跡対象外で ignore された場所に置いて[完了時のコミット](architecture/guarantees.md#完了条件)に含めない。
 
 ## 引き継ぎ
 
@@ -102,6 +102,6 @@ kit は、利用者が[ループのパターン](architecture/data.md#ループ�
 - **決めること**: 各問題をどこで捕まえるべきだったかと、再発防止の反映先。判定者が `PASS` とした後に後続のステージや人が見つけた見逃しを記録から確認し、用途別の判定基準を見直す。既定の優先順は機械の検査(hook・lint・型・検証コマンド)、パターン、用途別の判定基準、原則、skill であり、`[lessons] destinations` で変更できる。リポジトリ内の書き込めるソースの規範へ反映し、リポジトリ外のソースと読み取り専用のソースへの改善は教訓として記録して管理者へ引き継ぐ。反映しない場合は理由を残す。規範全体が目的を果たしているか、原則がどの観点・パターンで使われるか、使われない仕組みや負担に見合わない仕組みがないかを確かめる。扱う対象はその作業の問題・見逃し・規範の不足や負担であり、全体の棚卸しは必要が見えたときだけ行う。
 - **決めずに次のステージへ渡すこと**: なし。
 - **元に戻せないもの**: なし。
-- **成果物**: 再発防止の反映と、反映しない項目の理由。目的のステージがない場合や目的で未反映の場合は、承認された完了条件のうち要件に当たるものを `.devkit/requirements.md` に反映する。
+- **成果物**: 再発防止の反映と、反映しない項目の理由。ワーカーは教訓を終了ブロックの `notes` に `kind: "lesson"` と `content`・`evidence` を持つ `payload` で返す。目的のステージがない場合や目的で未反映の場合は、承認された完了条件のうち要件に当たるものを `.devkit/requirements.md` に反映する。
 - **check**: `default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけを置く。`default` と `fix` では検証の手段や対象を変えた場合も、最終のツリーで検査する。
 - **人の確認**: 規範を変えた場合はループ自身の変更として、既定では効力を持つ最初のラウンドの前、最後のラウンドなら完了時のコミット前に人が確認する。規範を変えなければ、この確認は不要である。

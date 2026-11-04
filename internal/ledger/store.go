@@ -1,6 +1,7 @@
 package ledger
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -22,6 +23,22 @@ func NewRecord(store *fsstore.Store, payload Payload) (Record, error) {
 
 // Append validates and publishes a record. The caller owns the work lock lifetime.
 func Append(store *fsstore.Store, record Record, validator *Validator) error {
+	if err := Validate(store, record, validator); err != nil {
+		return err
+	}
+	payload, err := json.Marshal(record.Payload)
+	if err != nil {
+		return fmt.Errorf("record %s.json: %w", record.ID, err)
+	}
+	data, err := json.Marshal(fsstore.Record{ID: record.ID, NoteKey: record.NoteKey, Kind: string(record.Kind()), Payload: payload})
+	if err != nil {
+		return fmt.Errorf("record %s.json: %w", record.ID, err)
+	}
+	return store.Append(record.ID, data)
+}
+
+// Validate checks a record and its references without publishing it.
+func Validate(store *fsstore.Store, record Record, validator *Validator) error {
 	if err := validator.validate(record); err != nil {
 		return fmt.Errorf("record %s.json: %w", record.ID, err)
 	}
@@ -41,7 +58,7 @@ func Append(store *fsstore.Store, record Record, validator *Validator) error {
 			return fmt.Errorf("record %s.json: reference cannot identify both a record and an external source", record.ID)
 		}
 	}
-	return store.AppendRecord(record.ID, string(record.Kind()), record.Payload)
+	return nil
 }
 
 // Get reads a typed record. Corrupt and incompatible records are left in place.
@@ -163,7 +180,7 @@ func readRecord(raw fsstore.Record, validator *Validator) (Record, error) {
 	if err := fsstore.DecodePayload(raw.Payload, payload); err != nil {
 		return Record{}, fmt.Errorf("record %s.json: %w", raw.ID, err)
 	}
-	record := Record{ID: raw.ID, Payload: payload}
+	record := Record{ID: raw.ID, NoteKey: raw.NoteKey, Payload: payload}
 	if err := validator.validateRaw(payload, raw.Payload); err != nil {
 		return Record{}, fmt.Errorf("record %s.json: %w", raw.ID, err)
 	}

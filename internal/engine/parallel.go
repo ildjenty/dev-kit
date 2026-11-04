@@ -73,10 +73,22 @@ func (e *Engine) acceptUnitResult(state *ledger.State, instruction ledger.Instru
 	if progress.InstructionID != instruction.ID || instruction.Unit == nil {
 		return e.rejectResult(instruction, obs, errors.New("worker instruction ID or unit does not match"))
 	}
+	for _, result := range state.UnitResults(instruction.RoundID) {
+		if result.UnitID == instruction.Unit.ID {
+			return false, nil
+		}
+	}
 	if err := e.validateUnitReport(state, instruction, progress); err != nil {
 		return e.rejectResult(instruction, obs, err)
 	}
-	_, err := e.append(&ledger.UnitResult{Progress: progress, RoundID: instruction.RoundID, UnitID: instruction.Unit.ID, AgentID: obs.result.AgentID, ResultPath: obs.path})
+	notes, err := e.workerNotes(instruction.TargetKey, progress.Notes)
+	if err != nil {
+		return e.rejectResult(instruction, obs, err)
+	}
+	if err := e.publishNotes(notes); err != nil {
+		return false, err
+	}
+	_, err = e.append(&ledger.UnitResult{Progress: progress, RoundID: instruction.RoundID, UnitID: instruction.Unit.ID, AgentID: obs.result.AgentID, ResultPath: obs.path})
 	return true, err
 }
 

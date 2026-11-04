@@ -62,6 +62,7 @@ type Payload interface {
 // Record belongs to the work identified by the supplied store root.
 type Record struct {
 	ID      string
+	NoteKey string
 	Payload Payload
 }
 

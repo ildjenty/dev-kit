@@ -55,7 +55,7 @@ skill は `.agents/skills/devkit/`、サブエージェント定義は `.claude/
 
 規範にあるコード書式の `principles/…`・`stages/…`・`templates/…`・`rules.md` は、リポジトリ側の資産の論理名である。brief が設定で解決した実際のパスとの対応を示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
 
-skill の手順では、再現手順の保存先とバージョンを修正開始前に、仮説の結果を次の仮説を始める前に [devkit note](architecture/data.md#決定と証拠-decision--evidence)で記録する。
+セッションのエージェント自身は、再現手順の保存先とバージョンを修正開始前に、仮説の結果を次の仮説を始める前に [devkit note](architecture/data.md#決定と証拠-decision--evidence)で記録する。ワーカーは作業中に材料を保持し、終了ブロックの `notes` に `kind` と種別ごとの `payload` を入れて返す。親の記録先は worktree の sandbox の外にあるため、`devkit note` を実行しない。
 
 人への問いと回答はセッションのチャットで扱い、CLI が受理して進行を再開する([人の回答と再開](architecture/flow.md#人の回答と再開))。計画の作り直しと切り替えは[計画のバージョン](architecture/data.md#計画のバージョン)に従う。
 
