@@ -26,7 +26,7 @@ func briefText(t *testing.T, instruction *form.Instruction) string {
 
 func configure(t *testing.T, e *Engine, settings string) {
 	t.Helper()
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v2'\n[approval]\nplan = 'deviation'\n"+settings)
+	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = 'deviation'\n"+settings)
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Configure sources")
 }
@@ -122,7 +122,7 @@ func TestDetectionRequestWithholdsExpectations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	withheld := []string{string(spec), `"expected"`, "violation", "conforming", "-history.md", "Work-history file", "spec.json", ".devkit/examples", "Repository requirements", "Other fixed norms"}
+	withheld := []string{string(spec), `"expected"`, "violation", "conforming", "-history.md", "Work-history file", ".devkit/examples", "Repository requirements", "Other fixed norms"}
 	for _, example := range parsed.Cases {
 		withheld = append(withheld, example.File)
 	}

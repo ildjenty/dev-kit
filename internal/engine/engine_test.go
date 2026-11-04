@@ -120,7 +120,7 @@ func planResult(t *testing.T, e *Engine, start Result) plan.Plan {
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err := e.workspace.ReadFile(context.Background(), data.Reference, ".devkit/plans/test.json")
+	source, err := e.asset(context.Background(), data.Reference, "plans/test.json")
 	if err != nil {
 		t.Fatal(err)
 	}

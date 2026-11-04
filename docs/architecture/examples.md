@@ -43,15 +43,18 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
 ```json
 {
   "name": "fix",
+  "planner_inputs": [{"source": "requirements", "select": ""}, {"source": "rules", "select": ""}, {"source": "structure", "select": ""}],
+  "judge_inputs": [{"source": "requirements", "select": ""}, {"source": "rules", "select": ""}, {"source": "structure", "select": ""}],
   "start_stage": "implement",
   "stages": [
     {
       "id": "implement",
       "assignee": "worker",
+      "inputs": [{"source": "requirements", "select": ""}, {"source": "rules", "select": ""}, {"source": "structure", "select": ""}],
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true },
         { "aspect": "test", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"} },
-        { "aspect": "diff", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}], "examples": {"source": "examples", "select": "diff/spec.json"} }
+        { "aspect": "diff", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}, {"source": "templates", "select": "pr.md.tmpl"}, {"source": "rules", "select": ""}], "examples": {"source": "examples", "select": "diff/spec.json"} }
       ],
       "gate": { "required": false, "reason": "公開契約を保つ修正" },
       "limits": { "max_rounds": 3, "max_no_progress": 2 },
@@ -60,10 +63,11 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
     {
       "id": "retrospective",
       "assignee": "worker",
+      "inputs": [{"source": "requirements", "select": ""}, {"source": "rules", "select": ""}, {"source": "structure", "select": ""}],
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true },
         { "aspect": "test", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"} },
-        { "aspect": "harness", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/harness.md"}, {"source": "principles", "select": "harness.md"}, {"source": "principles", "select": "working.md"}], "examples": {"source": "examples", "select": "harness/spec.json"} }
+        { "aspect": "harness", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/harness.md"}, {"source": "principles", "select": "harness.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "review/README.md"}, {"source": "stages", "select": "README.md"}, {"source": "stages", "select": "retrospective.md"}, {"source": "plans", "select": "README.md"}, {"source": "examples", "select": "README.md"}, {"source": "templates", "select": "brief/judgment.md.tmpl"}], "examples": {"source": "examples", "select": "harness/spec.json"} }
       ],
       "gate": { "required": false, "reason": "作業の問題と再発防止を確認する" },
       "limits": { "max_rounds": 3, "max_no_progress": 2 },
@@ -74,6 +78,7 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
     {
       "id": "research",
       "assignee": "worker",
+      "inputs": [{"source": "requirements", "select": ""}, {"source": "rules", "select": ""}, {"source": "structure", "select": ""}],
       "checks": [],
       "gate": { "required": false, "reason": "調査結果を実装に渡す" },
       "limits": { "max_rounds": 1, "max_no_progress": 1 },
@@ -82,6 +87,7 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
     {
       "id": "prototype",
       "assignee": "worker",
+      "inputs": [{"source": "requirements", "select": ""}, {"source": "rules", "select": ""}, {"source": "structure", "select": ""}],
       "checks": [
         { "aspect": "contract", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/contract.md"}, {"source": "principles", "select": "data.md"}, {"source": "principles", "select": "engineering.md"}], "examples": {"source": "examples", "select": "contract/spec.json"} }
       ],
@@ -99,7 +105,7 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
 ```json
 {
   "version": 1,
-  "template": { "name": "fix", "content_hash": "5b27c4145427857b54001b77938d5654c9775829b70f747f7abdba9f324e41d0" },
+  "template": { "name": "fix", "content_hash": "a1d9df43c23c60e53c8f9d0cfc8064edcfec00b180d2179617f7ba1b4051a8e8" },
   "task": "保存ボタンの文言を「登録」から「保存」に変える",
   "completion_conditions": [
     { "id": "C1", "description": "保存ボタンに「保存」と表示され、その表示を確かめるテストが登録済みのコマンドから実行されて通る" }
@@ -112,7 +118,7 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "返却後のツリー" },
         { "aspect": "test", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"}, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示と、その表示を確かめるテスト" },
-        { "aspect": "diff", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}], "examples": {"source": "examples", "select": "diff/spec.json"}, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示と、その表示を確かめるテスト" }
+        { "aspect": "diff", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}, {"source": "templates", "select": "pr.md.tmpl"}, {"source": "rules", "select": ""}], "examples": {"source": "examples", "select": "diff/spec.json"}, "completion_condition_ids": ["C1"], "target": "保存ボタンの表示と、その表示を確かめるテスト" }
       ],
       "gate": { "required": false, "reason": "公開契約を保つ修正" },
       "limits": { "max_rounds": 3, "max_no_progress": 2 },
@@ -124,7 +130,7 @@ retrospective は作業者が担当する。必須 check は `default` と `fix`
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "返却後のツリー" },
         { "aspect": "test", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"}, "completion_condition_ids": ["C1"], "target": "最終のツリーのテストと登録済みコマンド" },
-        { "aspect": "harness", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/harness.md"}, {"source": "principles", "select": "harness.md"}, {"source": "principles", "select": "working.md"}], "examples": {"source": "examples", "select": "harness/spec.json"}, "completion_condition_ids": ["C1"], "target": "その作業の判定と指摘、要件への反映、規範の不足と再発防止" }
+        { "aspect": "harness", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/harness.md"}, {"source": "principles", "select": "harness.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "review/README.md"}, {"source": "stages", "select": "README.md"}, {"source": "stages", "select": "retrospective.md"}, {"source": "plans", "select": "README.md"}, {"source": "examples", "select": "README.md"}, {"source": "templates", "select": "brief/judgment.md.tmpl"}], "examples": {"source": "examples", "select": "harness/spec.json"}, "completion_condition_ids": ["C1"], "target": "その作業の判定と指摘、要件への反映、規範の不足と再発防止" }
       ],
       "gate": { "required": false, "reason": "作業の問題と再発防止を確認する" },
       "limits": { "max_rounds": 3, "max_no_progress": 2 },
@@ -186,7 +192,7 @@ retrospective は、その作業の判定と指摘、人の回答や教訓を確
     "checks": [
       { "aspect": "command:test", "runner": "command:test", "required": true },
       { "aspect": "test", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"} },
-      { "aspect": "diff", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}], "examples": {"source": "examples", "select": "diff/spec.json"} }
+      { "aspect": "diff", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}, {"source": "templates", "select": "pr.md.tmpl"}, {"source": "rules", "select": ""}], "examples": {"source": "examples", "select": "diff/spec.json"} }
     ],
     "gate": { "required": false, "reason": "合流した成果をステージ全体で判定する" },
     "limits": { "max_rounds": 3, "max_no_progress": 2 },
@@ -220,7 +226,7 @@ steps で「保存処理とそのテスト」「利用手順」の2つの手順�
       "checks": [
         { "aspect": "command:test", "runner": "command:test", "required": true, "completion_condition_ids": ["C1"], "target": "合流後のツリー" },
         { "aspect": "test", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}], "examples": {"source": "examples", "select": "test/spec.json"}, "completion_condition_ids": ["C1"], "target": "保存処理のテストと登録済みコマンド" },
-        { "aspect": "diff", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}], "examples": {"source": "examples", "select": "diff/spec.json"}, "completion_condition_ids": ["C1"], "target": "単位の変更とマージ結果を含む累積差分" }
+        { "aspect": "diff", "runner": "devkit-judge", "required": true, "criteria": [{"source": "principles", "select": "review/diff.md"}, {"source": "principles", "select": "engineering.md"}, {"source": "principles", "select": "working.md"}, {"source": "principles", "select": "designing.md"}, {"source": "principles", "select": "writing.md"}, {"source": "principles", "select": "verification.md"}, {"source": "templates", "select": "pr.md.tmpl"}, {"source": "rules", "select": ""}], "examples": {"source": "examples", "select": "diff/spec.json"}, "completion_condition_ids": ["C1"], "target": "単位の変更とマージ結果を含む累積差分" }
       ],
       "gate": { "required": false, "reason": "合流した成果をステージ全体で判定する" },
       "limits": { "max_rounds": 3, "max_no_progress": 2 },

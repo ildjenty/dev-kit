@@ -52,11 +52,11 @@ func (e *Engine) comparison(ctx context.Context, before, after string) (string, 
 	if err != nil {
 		return "", err
 	}
-	paths, err := e.workspace.ChangedFiles(ctx, before, after)
+	paths, err := e.workspace.ChangedFiles(ctx, gitReference(before), gitReference(after))
 	if err != nil {
 		return "", err
 	}
-	patch, err := e.workspace.Diff(ctx, before, after)
+	patch, err := e.workspace.Diff(ctx, gitReference(before), gitReference(after))
 	if err != nil {
 		return "", err
 	}
@@ -93,7 +93,7 @@ func (e *Engine) judgmentEvidence(ctx context.Context, meta *ledger.Instruction,
 }
 
 func (e *Engine) loopEditText(ctx context.Context, before, after, reason string) (string, error) {
-	paths, err := e.workspace.ChangedFiles(ctx, before, after)
+	paths, err := e.workspace.ChangedFiles(ctx, gitReference(before), gitReference(after))
 	if err != nil {
 		return "", err
 	}
@@ -178,7 +178,7 @@ func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.Stat
 			answer, ok := answers[previous.ID]
 			effective, valid := state.ResolveAnswer(previous.ApprovalTarget)
 			if ok && valid && effective.RecordID == answer.RecordID && answer.Answer.Interpretation == ledger.AnswerApproved && answer.RecordID > latest {
-				before, latest = previous.ApprovalTarget.Tree, answer.RecordID
+				before, latest = approvalReference(previous.ApprovalTarget), answer.RecordID
 			}
 		}
 	}
@@ -207,7 +207,7 @@ func (e *Engine) refreshQuestionEvidence(ctx context.Context, state *ledger.Stat
 		}
 	}
 	if q.StopCategory == config.MetaLoopEdit {
-		text, err := e.loopEditText(ctx, before, q.ApprovalTarget.Tree, "Approve the updated development loop edits? If rejected, the worker must undo the edits.\n\n"+stageText)
+		text, err := e.loopEditText(ctx, before, approvalReference(q.ApprovalTarget), "Approve the updated development loop edits? If rejected, the worker must undo the edits.\n\n"+stageText)
 		if err != nil {
 			return err
 		}

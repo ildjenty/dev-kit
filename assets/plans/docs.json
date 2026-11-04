@@ -39,7 +39,21 @@
         "ask": "implement",
         "back": "implement",
         "done": "retrospective"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     },
     {
       "id": "retrospective",
@@ -106,7 +120,21 @@
         "ask": "retrospective",
         "back": "implement",
         "done": null
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     }
   ],
   "optional_stages": [
@@ -127,7 +155,21 @@
         "ask": "research",
         "back": "research",
         "done": "implement"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     },
     {
       "id": "prototype",
@@ -170,7 +212,49 @@
         "ask": "prototype",
         "back": "prototype",
         "done": "implement"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
+    }
+  ],
+  "planner_inputs": [
+    {
+      "source": "requirements",
+      "select": ""
+    },
+    {
+      "source": "rules",
+      "select": ""
+    },
+    {
+      "source": "structure",
+      "select": ""
+    }
+  ],
+  "judge_inputs": [
+    {
+      "source": "requirements",
+      "select": ""
+    },
+    {
+      "source": "rules",
+      "select": ""
+    },
+    {
+      "source": "structure",
+      "select": ""
     }
   ]
 }

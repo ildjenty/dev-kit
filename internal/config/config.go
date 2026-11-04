@@ -71,7 +71,7 @@ func (c Config) PlanCheckSettings() PlanCheck {
 		settings.Runner = "devkit-judge"
 	}
 	if settings.Criteria == nil {
-		settings.Criteria = []Selection{{Source: "principles", Select: "review/plan.md"}}
+		settings.Criteria = []Selection{{Source: "principles", Select: "review/plan.md"}, {Source: "plans", Select: "README.md"}}
 	} else {
 		settings.Criteria = slices.Clone(settings.Criteria)
 	}

@@ -43,8 +43,8 @@ func TestNormsLayoutAndContents(t *testing.T) {
 }
 
 func TestBinaryAssets(t *testing.T) {
-	if kit.Version != "v2" {
-		t.Fatalf("kit version = %q; want v2", kit.Version)
+	if kit.Version != "v3" {
+		t.Fatalf("kit version = %q; want v3", kit.Version)
 	}
 	for _, pair := range []struct {
 		path string

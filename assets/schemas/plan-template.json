@@ -34,6 +34,24 @@
         "max_rounds"
       ],
       "additionalProperties": false
+    },
+    "planner_inputs": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/selection"
+      }
+    },
+    "judge_inputs": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "$ref": "#/$defs/selection"
+      }
     }
   },
   "required": [
@@ -199,7 +217,10 @@
           }
         },
         "inputs": {
-          "type": "array",
+          "type": [
+            "array",
+            "null"
+          ],
           "items": {
             "$ref": "#/$defs/selection"
           }

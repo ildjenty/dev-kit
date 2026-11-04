@@ -23,7 +23,8 @@ func TestJudgmentCriteriaAndDetectionInputs(t *testing.T) {
 		input := map[string]any{
 			"InstructionID": "instruction-1", "InstructionIDJSON": `"instruction-1"`,
 			"Content": "Anonymous target", "OutputSchema": "Output contract", "Detection": detection,
-			"Criteria": []map[string]string{{"Path": "principles/review/test.md", "Content": "Selected frozen criteria"}},
+			"SupportingSchemas": []map[string]string{},
+			"Criteria":          []map[string]string{{"Path": "principles/review/test.md", "Content": "Selected frozen criteria"}},
 			"Repository": map[string]any{
 				"Requirements": map[string]any{"Path": "requirements.md", "Exists": true, "Content": "Repository product body"},
 				"Structure":    map[string]any{"Path": "structure.json", "Exists": false},

@@ -18,7 +18,7 @@ import (
 func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	e, ctx := fixture(t)
 	// The fixture initializes and commits a fresh repository. Use the shipped default policy.
-	settings := "kit_version = 'v2'\n"
+	settings := "kit_version = 'v3'\n"
 	write(t, e.Root(), "devkit.toml", settings)
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Use default settings")
@@ -244,7 +244,7 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 
 func TestDetectionCanBeDisabled(t *testing.T) {
 	e, ctx := fixture(t)
-	write(t, e.Root(), "devkit.toml", "kit_version = 'v2'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n")
+	write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = 'deviation'\n[detection]\nrequired = false\n")
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Disable detection tests")
 	started, err := e.Start(ctx, StartRequest{Template: "test", Task: "Update documentation"})
@@ -275,7 +275,7 @@ func TestGitSettingsAndEmptyStage(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			e, ctx := fixture(t)
-			write(t, e.Root(), "devkit.toml", "kit_version = 'v2'\ndefault_plan = 'test'\n[approval]\nplan = 'deviation'\n[git]\nbranch = 'topic/{work_id}/work'\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n[detection]\nrequired = false\n")
+			write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\ndefault_plan = 'test'\n[approval]\nplan = 'deviation'\n[git]\nbranch = 'topic/{work_id}/work'\ncommit_message = '{task}: {stage} ({work_id})'\nallow_empty_commit = false\n[detection]\nrequired = false\n")
 			git(t, e.Root(), "add", ".")
 			git(t, e.Root(), "commit", "-qm", "Configure git behavior")
 			head := git(t, e.Root(), "rev-parse", "HEAD")

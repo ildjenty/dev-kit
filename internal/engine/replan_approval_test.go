@@ -14,7 +14,7 @@ func TestCompletedStagesAreNotReplanDeviations(t *testing.T) {
 		for _, policy := range []string{"requirements", "deviation"} {
 			t.Run(mode+"/"+policy, func(t *testing.T) {
 				e, ctx := fixture(t)
-				write(t, e.Root(), "devkit.toml", "kit_version = 'v2'\n[approval]\nplan = '"+policy+"'\n[detection]\nrequired = false\n")
+				write(t, e.Root(), "devkit.toml", "kit_version = 'v3'\n[approval]\nplan = '"+policy+"'\n[detection]\nrequired = false\n")
 				template := plan.PlanTemplate{Name: "test", StartStage: "purpose", OptionalStages: []plan.Stage{}}
 				ids := []string{"purpose", "implement", "retrospective"}
 				for index, id := range ids {

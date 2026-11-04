@@ -13,13 +13,14 @@ import (
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/config"
+	"github.com/ildjenty/dev-kit/internal/form"
 	"github.com/ildjenty/dev-kit/internal/source"
 )
 
 // sourceManifest maps document IDs of one source to their content hashes.
 type sourceManifest map[string]string
 
-// sourcePin holds the manifests of sources outside the repository fixed for one reference.
+// sourcePin holds the manifests of one immutable outside-source snapshot.
 type sourcePin map[string]sourceManifest
 
 var fullObjectID = regexp.MustCompile(`^[0-9a-f]{40}([0-9a-f]{24})?$`)
@@ -42,7 +43,7 @@ func (e *Engine) treeFS(ctx context.Context, ref, location string) (fs.FS, error
 	if tree, ok := e.trees[key]; ok {
 		return tree, nil
 	}
-	tree, err := e.workspace.TreeFS(ctx, ref, location)
+	tree, err := e.workspace.TreeFS(ctx, gitReference(ref), location)
 	if err != nil {
 		return nil, err
 	}
@@ -192,24 +193,42 @@ func (e *Engine) externalSources(ctx context.Context, ref string) (map[string]co
 	return external, nil
 }
 
-// pin returns the copies of sources outside the repository fixed for ref. refresh reads the
-// current documents again; otherwise the first fixed copy for ref is reused.
+// gitReference removes the immutable outside-source pin from a snapshot reference.
+func gitReference(ref string) string {
+	git, _, _ := strings.Cut(ref, "@")
+	return git
+}
+
+func pinReference(ref string, pin sourcePin) string {
+	if len(pin) == 0 {
+		return gitReference(ref)
+	}
+	data, _ := json.Marshal(pin)
+	return gitReference(ref) + "@" + hash(data)
+}
+
+// pin reads immutable content-addressed copies. A plain git reference retains its first
+// copy; refreshing publishes a new pin without replacing that original association.
 func (e *Engine) pin(ctx context.Context, ref string, refresh bool) (sourcePin, error) {
 	if e.workRoot() == "" || !localName(ref) {
 		return nil, fmt.Errorf("sources outside the repository cannot be fixed for %q", ref)
 	}
-	name := filepath.Join(e.workRoot(), "sources", "pins", ref+".json")
-	if !refresh {
-		data, err := os.ReadFile(name)
+	git, id, fixed := strings.Cut(ref, "@")
+	name := filepath.Join("sources", "refs", git+".json")
+	if fixed {
+		name = filepath.Join("sources", "pins", id+".json")
+	}
+	if !refresh || fixed {
+		data, err := os.ReadFile(filepath.Join(e.workRoot(), name))
 		if err == nil {
 			pin := sourcePin{}
 			return pin, json.Unmarshal(data, &pin)
 		}
-		if !errors.Is(err, os.ErrNotExist) {
+		if fixed || !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
 	}
-	external, err := e.externalSources(ctx, ref)
+	external, err := e.externalSources(ctx, git)
 	if err != nil {
 		return nil, err
 	}
@@ -223,17 +242,27 @@ func (e *Engine) pin(ctx context.Context, ref string, refresh bool) (sourcePin, 
 	if err != nil {
 		return nil, err
 	}
-	return pin, e.store().Publish(filepath.Join("sources", "pins", ref+".json"), data)
+	if err := e.store().Publish(filepath.Join("sources", "pins", hash(data)+".json"), data); err != nil {
+		return nil, err
+	}
+	if _, err := os.Stat(filepath.Join(e.workRoot(), name)); errors.Is(err, os.ErrNotExist) {
+		if err := e.store().Publish(name, data); err != nil {
+			return nil, err
+		}
+	} else if err != nil {
+		return nil, err
+	}
+	return pin, nil
 }
 
-// refreshSources fixes the current documents of sources outside the repository for ref.
-func (e *Engine) refreshSources(ctx context.Context, ref string) error {
+// refreshSources returns a reference to the current outside documents and the given git tree.
+func (e *Engine) refreshSources(ctx context.Context, ref string) (string, error) {
 	external, err := e.externalSources(ctx, ref)
 	if err != nil || len(external) == 0 {
-		return err
+		return ref, err
 	}
-	_, err = e.pin(ctx, ref, true)
-	return err
+	pin, err := e.pin(ctx, gitReference(ref), true)
+	return pinReference(ref, pin), err
 }
 
 func (e *Engine) fixExternal(name string, item config.Source) (sourceManifest, error) {
@@ -307,4 +336,31 @@ func (e *Engine) writeManifest(directory string, manifest sourceManifest, mode f
 		}
 	}
 	return nil
+}
+
+func normApproval(ref string) form.ApprovalTarget {
+	git, pin, _ := strings.Cut(ref, "@")
+	return form.ApprovalTarget{Kind: form.ApprovalTree, Tree: git, SourcePin: pin}
+}
+
+func approvalReference(target form.ApprovalTarget) string {
+	if target.SourcePin == "" {
+		return target.Tree
+	}
+	return target.Tree + "@" + target.SourcePin
+}
+
+func (e *Engine) currentApprovalTarget(ctx context.Context, target form.ApprovalTarget, tree string) (form.ApprovalTarget, error) {
+	if target.SourcePin != "" {
+		ref, err := e.refreshSources(ctx, tree)
+		return normApproval(ref), err
+	}
+	current := target
+	current.Tree = tree
+	if target.Sources != "" {
+		sources, err := e.sourceIdentity()
+		current.Sources = sources
+		return current, err
+	}
+	return current, nil
 }

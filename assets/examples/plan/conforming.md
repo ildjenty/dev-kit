@@ -1,3 +1,7 @@
+## Approval policy
+
+The fixed policy for this example is `[approval] plan = "requirements"` and `meta_loop_edit = "confirm"`.
+
 ## Request
 
 The template is purpose → implement. C1 requires the save button text to be "Save"; C2 requires preserving existing storage behavior. Only UI text changes; data, communication, and structure do not change.

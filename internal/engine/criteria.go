@@ -80,3 +80,14 @@ func planSelections(selections []config.Selection) []plan.Selection {
 	}
 	return result
 }
+
+// judgmentSchemas supplies binary-owned contracts without asking a knowledge adapter to read them.
+func (e *Engine) judgmentSchemas(ctx context.Context, ref string) ([]brief.Document, error) {
+ documents := []brief.Document{}
+ for _, name := range SchemaNames() {
+  body, err := e.asset(ctx, ref, "schemas/"+name+".json")
+  if err != nil { return nil, err }
+  documents = append(documents, brief.Document{Path: "schemas/"+name+".json", Content:string(body), Exists:true})
+ }
+ return documents, nil
+}

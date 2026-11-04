@@ -1,3 +1,7 @@
+## Approval policy
+
+The fixed policy for this example is `[approval] plan = "requirements"` and `meta_loop_edit = "confirm"`.
+
 ## Fixed inputs
 
 Original user request: Rename the save button to "Save", preserve existing storage behavior, and make the save status clearer.

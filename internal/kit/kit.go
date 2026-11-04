@@ -9,7 +9,7 @@ import (
 )
 
 // Version identifies the record format and binary compatibility version.
-const Version = "v2"
+const Version = "v3"
 
 // FS returns the assets embedded in the binary.
 func FS() fs.FS {

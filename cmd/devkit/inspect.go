@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -144,8 +143,16 @@ func inspect(ctx context.Context, e *engine.Engine, name string, f *flag.FlagSet
 
 // parseStructure returns a drawable structure, or nil when the body does not follow the structure JSON.
 func parseStructure(data []byte, version string) *view.Structure {
+	schema, err := kit.Schema("structure")
+	if err != nil {
+		return nil
+	}
+	validator, err := form.CompileSchema(schema)
+	if err != nil {
+		return nil
+	}
 	var structure view.Structure
-	if err := json.Unmarshal(data, &structure); err != nil {
+	if err := validator.Decode(data, &structure); err != nil {
 		return nil
 	}
 	structure.Version = version
@@ -191,9 +198,7 @@ func viewStructures(ctx context.Context, w *workspace.Workspace, root, tree stri
 	for _, entry := range history {
 		revision := view.StructureRevision{Commit: entry.Commit}
 		if !entry.Deleted {
-			if revision.Structure = parseStructure(entry.Content, fmt.Sprintf("%x", sha256.Sum256(entry.Content))); revision.Structure == nil {
-				continue
-			}
+			revision.Structure, revision.Text = currentStructure([]source.Document{{Body: string(entry.Content)}})
 		}
 		revisions = append(revisions, revision)
 	}

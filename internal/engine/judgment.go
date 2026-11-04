@@ -39,7 +39,7 @@ func (e *Engine) judgmentSchema(ctx context.Context, ref, runner string) ([]byte
 		return nil, err
 	}
 	if command, ok := settings.Judges[runner]; ok {
-		source, err = e.workspace.ReadFile(ctx, ref, command.OutputSchema)
+		source, err = e.workspace.ReadFile(ctx, gitReference(ref), command.OutputSchema)
 		if err != nil {
 			return nil, err
 		}
@@ -81,15 +81,8 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 		}
 		fresh = meta.ID != previousID
 	}
-	norms, _, err := e.normDocuments(ctx, ref)
+	norms, inputs, err := e.judgmentNormDocuments(ctx, ref, target, round, version)
 	if err != nil {
-		return meta, instructionData{}, false, err
-	}
-	productRef := ref
-	if round != nil {
-		productRef = target.Tree
-	}
-	if err := e.requestNorms(ctx, ref, norms, productRef); err != nil {
 		return meta, instructionData{}, false, err
 	}
 	aspect := check.Aspect{ID: item.Aspect}
@@ -141,7 +134,7 @@ func (e *Engine) judgmentInstruction(ctx context.Context, state *ledger.State, i
 	if err != nil {
 		return meta, instructionData{}, false, err
 	}
-	data := instructionData{Reference: ref, Request: &request, Context: meta.Context, Instruction: form.Instruction{ID: meta.ID, Kind: kind, TargetPath: path, Runner: string(item.Runner), Text: "Launch the assigned judge with: devkit-instruction " + meta.ID}}
+	data := instructionData{Reference: ref, Inputs: inputs, Request: &request, Context: meta.Context, Instruction: form.Instruction{ID: meta.ID, Kind: kind, TargetPath: path, Runner: string(item.Runner), Text: "Launch the assigned judge with: devkit-instruction " + meta.ID}}
 	return meta, data, fresh, nil
 }
 func (e *Engine) roundNorms(ctx context.Context, state *ledger.State, roundID string, version int, norms []check.Norm) error {
@@ -176,14 +169,26 @@ func (e *Engine) roundNorms(ctx context.Context, state *ledger.State, roundID st
 	return nil
 }
 
-func (e *Engine) requestNorms(ctx context.Context, ref string, norms []check.Norm, productRef ...string) error {
-	facts, err := e.repository(ctx, ref, productRef...)
+func (e *Engine) requestNorms(ctx context.Context, ref string, norms []check.Norm, inputs []plan.Selection, productRef ...string) error {
+	facts, err := e.repository(ctx, ref, inputs, productRef...)
 	if err != nil {
 		return err
 	}
 	docs := append([]brief.Document{facts.Rules, facts.Requirements}, facts.LayoutGuides...)
+	products := ref
+	if len(productRef) > 0 {
+		products = productRef[0]
+	}
+	additional, err := e.additionalInputs(ctx, ref, products, inputs)
+	if err != nil {
+		return err
+	}
+	docs = append(docs, additional...)
 	if len(norms) > 0 {
 		for _, doc := range docs {
+			if doc.Path == "" {
+				continue
+			}
 			norms[0].Content += "\nReference: " + doc.Path + "\n\n" + doc.Content + "\n"
 		}
 	}
@@ -202,7 +207,7 @@ func (e *Engine) hydrateRequest(ctx context.Context, data instructionData) error
 	if data.Request.Kind == check.RoundRequest {
 		productRef = data.Request.TargetVersion.Tree
 	}
-	if err := e.requestNorms(ctx, data.Reference, norms, productRef); err != nil {
+	if err := e.requestNorms(ctx, data.Reference, norms, data.Inputs, productRef); err != nil {
 		return err
 	}
 	if data.Request.Kind == check.RoundRequest {
@@ -262,7 +267,7 @@ func (e *Engine) judgmentBrief(ctx context.Context, data instructionData) (brief
 	if data.Request.Kind == check.RoundRequest {
 		productRef = data.Request.TargetVersion.Tree
 	}
-	facts, err := e.repository(ctx, data.Reference, productRef)
+	facts, err := e.repository(ctx, data.Reference, data.Inputs, productRef)
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -282,7 +287,15 @@ func (e *Engine) judgmentBrief(ctx context.Context, data instructionData) (brief
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: "```json\n" + string(content) + "\n```", Criteria: criteria, Repository: facts, Norms: []brief.Document{}, NormPaths: paths, OutputSchema: string(schema)})
+	docs, err := e.additionalInputs(ctx, data.Reference, productRef, data.Inputs)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	supporting, err := e.judgmentSchemas(ctx, data.Reference)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: "```json\n" + string(content) + "\n```", SupportingSchemas: supporting, Criteria: criteria, Repository: facts, Norms: docs, NormPaths: paths, OutputSchema: string(schema)})
 }
 
 func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan) (Result, error) {
@@ -299,7 +312,7 @@ func (e *Engine) planCheck(ctx context.Context, state *ledger.State, p plan.Plan
 	if selected.Examples != nil {
 		item.Examples = &plan.Selection{Source: selected.Examples.Source, Select: selected.Examples.Select}
 	}
-	if err := e.refreshSources(ctx, ref); err != nil {
+	if ref, err = e.refreshSources(ctx, ref); err != nil {
 		return Result{}, err
 	}
 	if r, pending, err := e.ensureDetection(ctx, state, []plan.Check{item}, ref); pending || err != nil {
@@ -386,7 +399,7 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 			return Result{}, err
 		}
 	}
-	if roundReference(round) != round.StartTarget.Tree {
+	if gitReference(roundReference(round)) != round.StartTarget.Tree {
 		ref, question, err := e.confirmRoundNorms(ctx, state, run, round.ReturnedTarget.Tree)
 		if err != nil {
 			return Result{}, err
@@ -394,7 +407,7 @@ func (e *Engine) judgeRound(ctx context.Context, state *ledger.State, p plan.Pla
 		if question != nil {
 			return e.issueQuestion(state, *question)
 		}
-		if ref != round.ReturnedTarget.Tree {
+		if gitReference(ref) != round.ReturnedTarget.Tree {
 			return e.fixRound(ctx, state, p, stage, run, round, "Undo the rejected development loop edits listed in the previous human question.")
 		}
 	}
@@ -538,7 +551,7 @@ func (e *Engine) runJudge(ctx context.Context, data instructionData, command con
 	if !match {
 		return changedCommand(request, "The target differed before command execution.", nil), nil
 	}
-	input, err := json.Marshal(request)
+	input, err := e.judgmentCommandInput(ctx, data, request)
 	if err != nil {
 		return check.Judgment{}, err
 	}
@@ -848,6 +861,10 @@ func (e *Engine) pendingRequestCurrent(ctx context.Context, state *ledger.State,
 			return false, true, nil
 		}
 		ref = confirmed
+	}
+	ref, err = e.refreshSources(ctx, ref)
+	if err != nil {
+		return false, false, err
 	}
 	if request.Detection != nil {
 		current, _, err := e.detectionInput(ctx, ref, request.Detection.Check)
@@ -1219,4 +1236,56 @@ func (e *Engine) rejectReadOnlyEdits(ctx context.Context, state *ledger.State, p
 	reason := "Read-only sources were edited: " + strings.Join(blocked, ", ") + ". Undo these edits and record each improvement as a lesson with devkit note lesson so that the source maintainers can apply it."
 	r, err := e.fixRound(ctx, state, p, stage, run, round, reason)
 	return r, true, err
+}
+
+func (e *Engine) judgeInputs(ctx context.Context, ref string, version int) ([]plan.Selection, error) {
+	p, ok, err := e.boundPlan(version)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, errors.New("bound plan is missing")
+	}
+	template, _, err := e.template(ctx, ref, p.Template.Name)
+	return template.JudgeSelections(), err
+}
+
+// judgmentCommandInput keeps recorded document identities separate from runtime bodies.
+// The rendered brief carries the same fixed judgment rules and output contract as a subagent.
+func (e *Engine) judgmentCommandInput(ctx context.Context, data instructionData, request check.Request) ([]byte, error) {
+	var body brief.Brief
+	var err error
+	if request.Kind == check.DetectionRequest {
+		body, err = e.detectionBrief(ctx, data)
+	} else {
+		body, err = e.judgmentBrief(ctx, data)
+	}
+	if err != nil {
+		return nil, err
+	}
+	criteria, err := e.criteriaDocuments(ctx, data.Reference, request.Criteria)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(struct {
+		check.Request
+		CriteriaBodies []brief.Document `json:"criteria_bodies"`
+		Brief          string           `json:"brief"`
+	}{request, criteria, body.Text})
+}
+
+func (e *Engine) judgmentNormDocuments(ctx context.Context, ref string, target form.TargetVersion, round *ledger.Round, version int) ([]check.Norm, []plan.Selection, error) {
+	norms, _, err := e.normDocuments(ctx, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	inputs, err := e.judgeInputs(ctx, ref, version)
+	if err != nil {
+		return nil, nil, err
+	}
+	product := ref
+	if round != nil {
+		product = target.Tree
+	}
+	return norms, inputs, e.requestNorms(ctx, ref, norms, inputs, product)
 }

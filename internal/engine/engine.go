@@ -751,10 +751,10 @@ func (e *Engine) reference(ctx context.Context, state *ledger.State) (string, er
 	return e.workspace.Head(ctx)
 }
 func (e *Engine) settings(ctx context.Context, ref string) (config.Config, error) {
-	return e.readConfig(ctx, ref)
+	return e.readConfig(ctx, gitReference(ref))
 }
 func (e *Engine) norms(ctx context.Context, ref string) ([]form.NormReference, error) {
-	norms, err := NormativeReferences(ctx, e.workspace, ref)
+	norms, err := NormativeReferences(ctx, e.workspace, gitReference(ref))
 	if err != nil {
 		return nil, err
 	}

@@ -35,7 +35,21 @@
         "ask": "purpose",
         "back": "purpose",
         "done": "replan"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     },
     {
       "id": "scope",
@@ -74,7 +88,21 @@
         "ask": "scope",
         "back": "purpose",
         "done": "structure"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     },
     {
       "id": "structure",
@@ -121,7 +149,21 @@
         "ask": "structure",
         "back": "scope",
         "done": "contract"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     },
     {
       "id": "contract",
@@ -164,7 +206,21 @@
         "ask": "contract",
         "back": "structure",
         "done": "steps"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     },
     {
       "id": "steps",
@@ -199,7 +255,21 @@
         "ask": "steps",
         "back": "contract",
         "done": "implement"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     },
     {
       "id": "implement",
@@ -286,7 +356,21 @@
         "ask": "implement",
         "back": "steps",
         "done": "retrospective"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     },
     {
       "id": "retrospective",
@@ -377,7 +461,21 @@
         "ask": "retrospective",
         "back": "implement",
         "done": null
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     }
   ],
   "optional_stages": [
@@ -398,7 +496,21 @@
         "ask": "research",
         "back": "research",
         "done": "purpose"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
     },
     {
       "id": "prototype",
@@ -441,7 +553,49 @@
         "ask": "prototype",
         "back": "prototype",
         "done": "purpose"
-      }
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        }
+      ]
+    }
+  ],
+  "planner_inputs": [
+    {
+      "source": "requirements",
+      "select": ""
+    },
+    {
+      "source": "rules",
+      "select": ""
+    },
+    {
+      "source": "structure",
+      "select": ""
+    }
+  ],
+  "judge_inputs": [
+    {
+      "source": "requirements",
+      "select": ""
+    },
+    {
+      "source": "rules",
+      "select": ""
+    },
+    {
+      "source": "structure",
+      "select": ""
     }
   ]
 }

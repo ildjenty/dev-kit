@@ -33,6 +33,7 @@ type instructionData struct {
 	Detection    *detectionInput            `json:"detection,omitempty"`
 	BriefText    string                     `json:"brief_text,omitempty"`
 	Context      *ledger.InstructionContext `json:"context,omitempty"`
+	Inputs       []plan.Selection           `json:"inputs,omitempty"`
 }
 
 func (e *Engine) asset(ctx context.Context, ref, name string) ([]byte, error) {
@@ -46,9 +47,9 @@ func (e *Engine) asset(ctx context.Context, ref, name string) ([]byte, error) {
 	return e.logicalAsset(ctx, ref, name)
 }
 func (e *Engine) expanded(ctx context.Context, ref string) (string, error) {
-	tree, err := e.workspace.CommitTree(ctx, ref)
+	tree, err := e.workspace.CommitTree(ctx, gitReference(ref))
 	if err != nil {
-		tree = ref
+		tree = gitReference(ref)
 	}
 	path := filepath.Join(e.workRoot(), "snap", tree)
 	marker := path + ".complete"
@@ -105,7 +106,15 @@ func (e *Engine) normDocuments(ctx context.Context, ref string) ([]check.Norm, [
 	}
 	norms := []check.Norm{}
 	for _, norm := range refs {
-		norms = append(norms, check.Norm{Reference: norm})
+		item := check.Norm{Reference: norm}
+		if norm.Path == "devkit.toml" {
+			body, err := e.workspace.ReadFile(ctx, gitReference(ref), norm.Path)
+			if err != nil {
+				return nil, nil, err
+			}
+			item.Content = string(body)
+		}
+		norms = append(norms, item)
 	}
 	return norms, nil, nil
 }
@@ -191,32 +200,26 @@ func (e *Engine) productDocuments(ctx context.Context, ref, productRef string, s
 		}
 		return adapter.Select(selection.Select)
 	}
+	if _, inside := e.repositoryLocation(item); !inside {
+		productRef = ref
+	}
 	return e.selectFrom(ctx, ref, productRef, selection.Source, selection.Select)
 }
 
-// workerInputs resolves the stage inputs other than the requirements and rules, which the
-// repository facts already supply.
-func (e *Engine) workerInputs(ctx context.Context, ref, productRef string, stage plan.Stage) ([]brief.Document, error) {
-	selections := slices.DeleteFunc(stage.WorkerInputs(), func(selection plan.Selection) bool {
+// additionalInputs resolves selections not rendered by the repository fields.
+func (e *Engine) additionalInputs(ctx context.Context, ref, productRef string, inputs []plan.Selection) ([]brief.Document, error) {
+	selections := slices.DeleteFunc(slices.Clone(inputs), func(selection plan.Selection) bool {
 		return slices.Contains(plan.DefaultInputs(), selection)
 	})
 	return e.selectionDocuments(ctx, ref, productRef, selections)
 }
 
-func (e *Engine) repository(ctx context.Context, ref string, productRef ...string) (brief.RepositoryFacts, error) {
+func (e *Engine) repository(ctx context.Context, ref string, inputs []plan.Selection, productRef ...string) (brief.RepositoryFacts, error) {
 	sources, err := e.knowledgeSources(ctx, ref)
 	if err != nil {
 		return brief.RepositoryFacts{}, err
 	}
 	facts := brief.RepositoryFacts{LayoutGuides: []brief.Document{}, AvailableChecks: []plan.Check{}}
-	rules, exists, err := e.sourceText(ctx, ref, "rules")
-	if err == nil && !exists {
-		err = fs.ErrNotExist
-	}
-	if err != nil {
-		return facts, fmt.Errorf("required rules source %s: %w", sources["rules"].Path, err)
-	}
-	facts.Rules = brief.Document{Path: sources["rules"].Path, Content: rules, Exists: true}
 	products := ref
 	if len(productRef) > 0 {
 		products = productRef[0]
@@ -224,7 +227,12 @@ func (e *Engine) repository(ctx context.Context, ref string, productRef ...strin
 	for _, item := range []struct {
 		name   string
 		target *brief.Document
-	}{{"requirements", &facts.Requirements}, {"structure", &facts.Structure}} {
+	}{
+		{"rules", &facts.Rules}, {"requirements", &facts.Requirements}, {"structure", &facts.Structure},
+	} {
+		if !slices.Contains(inputs, plan.Selection{Source: item.name}) {
+			continue
+		}
 		if *item.target, err = e.productFact(ctx, ref, products, item.name, sources[item.name]); err != nil {
 			return facts, err
 		}
@@ -232,8 +240,6 @@ func (e *Engine) repository(ctx context.Context, ref string, productRef ...strin
 	if facts.Structure.Exists {
 		facts.LayoutGuides = append(facts.LayoutGuides, facts.Structure)
 	}
-	// Shared decisions are already included in the rules body.
-	facts.IrreversibleDecisions = []string{"See the Shared difficult-to-change decisions section in " + facts.Rules.Path + "."}
 	return facts, nil
 }
 
@@ -427,7 +433,7 @@ func (e *Engine) readInstructionFacts(id string) (instructionData, error) {
 				}
 			}
 		}
-		return instructionData{Instruction: i, Reference: meta.Reference, Origin: meta.Origin, TemplateName: meta.TemplateName, Request: meta.Request, Detection: meta.Detection, Context: meta.Context}, nil
+		return instructionData{Instruction: i, Reference: meta.Reference, Origin: meta.Origin, TemplateName: meta.TemplateName, Request: meta.Request, Detection: meta.Detection, Context: meta.Context, Inputs: meta.Inputs}, nil
 	}
 	return instructionData{}, fmt.Errorf("instruction not found: %s", id)
 }
@@ -536,8 +542,15 @@ func (e *Engine) planner(ctx context.Context, t plan.PlanTemplate, source []byte
 		}
 		return e.publishInstruction(meta, false, old, "")
 	}
-	if err := e.refreshSources(ctx, ref); err != nil {
+	if ref, err = e.refreshSources(ctx, ref); err != nil {
 		return Result{}, err
+	}
+	name := t.Name
+	if t, source, err = e.template(ctx, ref, name); err != nil {
+		return Result{}, err
+	}
+	if t.Name != name {
+		return Result{}, errors.New("template name does not match its file name")
 	}
 	b, err := e.plannerBrief(ctx, state, t, source, version, origin, ref, &meta)
 	if err != nil {
@@ -555,7 +568,7 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	facts, err := e.repository(ctx, ref)
+	facts, err := e.repository(ctx, ref, t.PlannerSelections())
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -581,7 +594,11 @@ func (e *Engine) plannerBrief(ctx context.Context, state *ledger.State, t plan.P
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	input := brief.PlannerInput{RequestTemplate: string(template), InstructionID: meta.ID, Version: version, Template: t, TemplateHash: plan.ContentHash(source), Task: string(task), OriginalRequest: originalRequest(work), StageDefinitions: definitions, Repository: facts, NormPaths: paths, PreviousOutputs: outputs, OutputSchema: string(outputSchema)}
+	docs, err := e.additionalInputs(ctx, ref, ref, t.PlannerSelections())
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	input := brief.PlannerInput{RequestTemplate: string(template), InstructionID: meta.ID, Version: version, Template: t, TemplateHash: plan.ContentHash(source), Task: string(task), OriginalRequest: originalRequest(work), StageDefinitions: definitions, Repository: facts, Norms: docs, NormPaths: paths, PreviousOutputs: outputs, OutputSchema: string(outputSchema)}
 	if p, ok := latestPlan(state); ok {
 		input.CurrentPlan = &p.Plan
 		if origin == plan.BackProposal {
@@ -653,12 +670,12 @@ func (e *Engine) workBrief(ctx context.Context, state *ledger.State, p plan.Plan
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	facts, err := e.repository(ctx, ref, round.StartTarget.Tree)
+	facts, err := e.repository(ctx, ref, stage.WorkerInputs(), round.StartTarget.Tree)
 	if err != nil {
 		return brief.Brief{}, err
 	}
 	facts.AvailableChecks = stage.Checks
-	docs, err := e.workerInputs(ctx, ref, round.StartTarget.Tree, stage)
+	docs, err := e.additionalInputs(ctx, ref, round.StartTarget.Tree, stage.WorkerInputs())
 	if err != nil {
 		return brief.Brief{}, err
 	}
@@ -832,6 +849,7 @@ func completedStageOutputs(state *ledger.State, records []ledger.Record) []brief
 func (e *Engine) recordInstruction(meta ledger.Instruction, data instructionData) error {
 	meta.Reference, meta.Runner, meta.TargetPath = data.Reference, data.Instruction.Runner, data.Instruction.TargetPath
 	meta.TemplateName, meta.Origin = data.TemplateName, data.Origin
+	meta.Inputs = slices.Clone(data.Inputs)
 	meta.Request, meta.Detection = data.Request, data.Detection
 	if data.Request != nil {
 		request := *data.Request

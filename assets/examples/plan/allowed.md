@@ -1,3 +1,7 @@
+## Approval policy
+
+The fixed policy for this example is `[approval] plan = "requirements"` and `meta_loop_edit = "confirm"`.
+
 ## Request
 
 The template is purpose → implement. C1 requires the save button text to be "Save"; C2 requires preserving existing storage behavior. Only UI text changes; data, communication, and structure do not change. A previous plan with both stages and these exact condition IDs and wording has already received human approval. A retry requires replanning without changing those conditions.

@@ -81,9 +81,9 @@ type Selection struct {
 	Select string `json:"select"`
 }
 
-// DefaultInputs returns the knowledge always supplied to planners, workers, and judges.
+// DefaultInputs returns the default knowledge selections for each role.
 func DefaultInputs() []Selection {
-	return []Selection{{Source: "requirements", Select: ""}, {Source: "rules", Select: ""}}
+	return []Selection{{Source: "requirements", Select: ""}, {Source: "rules", Select: ""}, {Source: "structure", Select: ""}}
 }
 
 // The caller resolves judge subagent names and judgment command names.
@@ -98,7 +98,7 @@ type Check struct {
 }
 
 type Stage struct {
-	Inputs      []Selection `json:"inputs,omitempty"`
+	Inputs      []Selection `json:"inputs"`
 	ID          string      `json:"id"`
 	Split       bool        `json:"split,omitempty"`
 	Units       []Unit      `json:"units,omitempty"`
@@ -139,6 +139,8 @@ func (s Stage) CompletionRule() CompletionRule {
 }
 
 type PlanTemplate struct {
+	PlannerInputs  []Selection `json:"planner_inputs"`
+	JudgeInputs    []Selection `json:"judge_inputs"`
 	Name           string      `json:"name"`
 	StartStage     string      `json:"start_stage"`
 	Stages         []Stage     `json:"stages"`
@@ -208,15 +210,20 @@ func (p Plan) Declares(operation ExternalOperation) bool {
 	return slices.Contains(p.ExternalOperations, operation)
 }
 
-// WorkerInputs returns the always-supplied inputs followed by stage-specific inputs.
-func (s Stage) WorkerInputs() []Selection {
-	inputs := DefaultInputs()
-	for _, input := range s.Inputs {
-		if !slices.Contains(inputs, input) {
-			inputs = append(inputs, input)
-		}
+// WorkerInputs returns the stage selections, or the defaults when omitted.
+func (s Stage) WorkerInputs() []Selection { return roleInputs(s.Inputs) }
+
+// PlannerSelections returns the planner selections, or the defaults when omitted.
+func (t PlanTemplate) PlannerSelections() []Selection { return roleInputs(t.PlannerInputs) }
+
+// JudgeSelections returns the judge selections, or the defaults when omitted.
+func (t PlanTemplate) JudgeSelections() []Selection { return roleInputs(t.JudgeInputs) }
+
+func roleInputs(inputs []Selection) []Selection {
+	if inputs == nil {
+		return DefaultInputs()
 	}
-	return inputs
+	return slices.Clone(inputs)
 }
 
 func cloneCheck(c Check) Check {

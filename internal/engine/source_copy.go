@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -141,14 +140,34 @@ func (e *Engine) editDocuments(name string) (map[string]string, error) {
 	return documents, err
 }
 
-// sourceIdentity hashes the set of source names, document IDs, and content hashes of the
-// editable copies. It is empty when no source outside the repository has a copy.
+// sourceIdentity preserves editable-copy identities and includes fixed outside products
+// independently of write capability.
 func (e *Engine) sourceIdentity() (string, error) {
-	names, err := e.editCopies()
-	if err != nil || len(names) == 0 {
+	state, err := e.load()
+	if err != nil {
 		return "", err
 	}
-	var text strings.Builder
+	ref, err := e.reference(context.Background(), state)
+	if err != nil {
+		return "", err
+	}
+	return e.sourceIdentityAt(context.Background(), ref)
+}
+
+func (e *Engine) sourceIdentityAt(ctx context.Context, ref string) (string, error) {
+	names, err := e.editCopies()
+	if err != nil {
+		return "", err
+	}
+	external, err := e.externalSources(ctx, ref)
+	if err != nil || len(external) == 0 && len(names) == 0 {
+		return "", err
+	}
+	pin, err := e.pin(ctx, ref, false)
+	if err != nil {
+		return "", err
+	}
+	manifests := sourcePin{}
 	for _, name := range names {
 		documents, err := e.editDocuments(name)
 		if err != nil {
@@ -158,12 +177,21 @@ func (e *Engine) sourceIdentity() (string, error) {
 		for id, body := range documents {
 			manifest[id] = source.ContentHash(body)
 		}
-		fmt.Fprintf(&text, "%s\x00%s\n", name, manifestHash(manifest))
+		manifests[name] = manifest
 	}
-	return source.ContentHash(text.String()), nil
+	for name, item := range external {
+		if _, copied := manifests[name]; !item.Norm && !copied && len(pin[name]) > 0 {
+			manifests[name] = pin[name]
+		}
+	}
+	if len(manifests) == 0 {
+		return "", nil
+	}
+	data, err := json.Marshal(manifests)
+	return hash(data), err
 }
 
-// treeTarget identifies a git tree together with the editable copies of outside sources.
+// treeTarget identifies a git tree together with outside copies and fixed product documents.
 func (e *Engine) treeTarget(tree string) (form.TargetVersion, error) {
 	sources, err := e.sourceIdentity()
 	return form.TargetVersion{Kind: form.TargetTree, Tree: tree, Sources: sources}, err
@@ -234,12 +262,17 @@ func (e *Engine) editLocation(name, configured string) string {
 }
 
 // CurrentIdentity returns the target version of a working-tree snapshot with the editable
-// copies of outside sources, and the norms fixed for it, for display by the CLI.
+// product documents of outside sources, and the norms fixed for it, for display by the CLI.
 func (e *Engine) CurrentIdentity(ctx context.Context, tree string) (form.TargetVersion, []form.NormReference, error) {
-	target, err := e.treeTarget(tree)
+	ref, err := e.refreshSources(ctx, tree)
 	if err != nil {
 		return form.TargetVersion{}, nil, err
 	}
-	norms, err := e.norms(ctx, tree)
+	sources, err := e.sourceIdentityAt(ctx, ref)
+	target := form.TargetVersion{Kind: form.TargetTree, Tree: tree, Sources: sources}
+	if err != nil {
+		return form.TargetVersion{}, nil, err
+	}
+	norms, err := e.norms(ctx, ref)
 	return target, norms, err
 }

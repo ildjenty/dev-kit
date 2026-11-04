@@ -26,12 +26,14 @@ Judge the target against the criteria documents supplied in this request. Each c
 - **Aggregation**: Aggregate results in the order `FAIL`, `NOT ASSESSED`, then `PASS`.
 
 {{if not .Detection}}
+{{if .Repository.Requirements.Path}}
 ## Repository requirements
 
 Reference: requirements.md -> {{.Repository.Requirements.Path}} ({{if .Repository.Requirements.Exists}}exists{{else}}not created yet{{end}})
 
 {{.Repository.Requirements.Content}}
 
+{{end}}{{if or .Repository.Structure.Path .Repository.LayoutGuides}}
 ## Relevant structure records
 
 Working-tree product: structure.json -> {{.Repository.Structure.Path}} ({{if .Repository.Structure.Exists}}exists{{else}}not created yet{{end}})
@@ -40,12 +42,14 @@ Reference: structure.json -> {{.Path}}
 
 {{.Content}}
 {{end}}
+{{end}}{{if .Repository.Rules.Path}}
 ## Rules and enforcement
 
 Reference: rules.md -> {{.Repository.Rules.Path}}
 
 {{.Repository.Rules.Content}}
 
+{{end}}
 ## Norms supplied in full
 {{range .Norms}}
 Reference: {{.Path}}
@@ -71,4 +75,13 @@ Set `instruction_id` to {{.InstructionIDJSON}}.
 ### Result JSON Schema
 
 {{.OutputSchema}}
+{{end}}
+
+## Supporting contracts supplied by devkit
+{{range .SupportingSchemas}}
+### {{.Path}}
+
+```json
+{{.Content}}
+```
 {{end}}

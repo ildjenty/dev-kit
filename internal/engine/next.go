@@ -451,7 +451,7 @@ func differenceCategories(root string, paths []string, settings config.Config) [
 }
 
 func (e *Engine) metaLoopChanged(ctx context.Context, before, after string) (bool, error) {
-	paths, err := e.workspace.ChangedFiles(ctx, before, after)
+	paths, err := e.workspace.ChangedFiles(ctx, gitReference(before), gitReference(after))
 	if err != nil {
 		return false, err
 	}
@@ -500,7 +500,7 @@ func confirmedLoopEdits(state *ledger.State) (string, *form.Question) {
 		}
 		if answer.Answer.Interpretation == ledger.AnswerApproved {
 			if answer.RecordID > lastApproval {
-				base, lastApproval = q.ApprovalTarget.Tree, answer.RecordID
+				base, lastApproval = approvalReference(q.ApprovalTarget), answer.RecordID
 			}
 		} else if answer.RecordID > lastRejection {
 			copy := q
@@ -519,7 +519,7 @@ func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run
 	if err != nil {
 		return "", nil, err
 	}
-	if err := e.refreshSources(ctx, tree); err != nil {
+	if tree, err = e.refreshSources(ctx, tree); err != nil {
 		return "", nil, err
 	}
 	if settings.MetaLoopEditApproval() == "allow" {
@@ -530,7 +530,7 @@ func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run
 		return tree, nil, err
 	}
 	if rejected != nil {
-		changed, err := e.startNormsChanged(ctx, rejected.ApprovalTarget.Tree, tree)
+		changed, err := e.startNormsChanged(ctx, approvalReference(rejected.ApprovalTarget), tree)
 		if err != nil {
 			return "", nil, err
 		}
@@ -542,7 +542,7 @@ func (e *Engine) confirmRoundNorms(ctx context.Context, state *ledger.State, run
 	if err != nil {
 		return "", nil, err
 	}
-	q := e.question(form.ApprovalTarget{Kind: form.ApprovalTree, Tree: tree}, config.MetaLoopEdit, text, run.StageID)
+	q := e.question(normApproval(tree), config.MetaLoopEdit, text, run.StageID)
 	q.Evidence = []form.Reference{{RecordID: run.ID}}
 	q, err = e.saveQuestion(state, q, "")
 	return tree, &q, err
@@ -906,10 +906,14 @@ func (e *Engine) advanceQuestion(ctx context.Context, state *ledger.State, q for
 		if err != nil {
 			return Result{}, false, err
 		}
-		if tree != q.ApprovalTarget.Tree {
+		current, err := e.currentApprovalTarget(ctx, q.ApprovalTarget, tree)
+		if err != nil {
+			return Result{}, false, err
+		}
+		if current != q.ApprovalTarget {
 			replacement := q
 			replacement.ID = ulidString()
-			replacement.ApprovalTarget.Tree = tree
+			replacement.ApprovalTarget = current
 			if err := e.refreshQuestionEvidence(ctx, state, &replacement); err != nil {
 				return Result{}, false, err
 			}
@@ -995,6 +999,10 @@ func (e *Engine) reviseFailedPlan(ctx context.Context, state *ledger.State, late
 
 func (e *Engine) advancePlan(ctx context.Context, state *ledger.State) (Result, bool, error) {
 	head, err := e.workspace.Head(ctx)
+	if err != nil {
+		return Result{}, false, err
+	}
+	head, err = e.refreshSources(ctx, head)
 	if err != nil {
 		return Result{}, false, err
 	}
@@ -1254,7 +1262,8 @@ func (e *Engine) openStageRound(ctx context.Context, state *ledger.State, stage 
 	if err != nil {
 		return Result{}, false, err
 	}
-	start, err := e.treeTarget(snapshot.Tree)
+	sources, err := e.sourceIdentityAt(ctx, startRef)
+	start := form.TargetVersion{Kind: form.TargetTree, Tree: snapshot.Tree, Sources: sources}
 	if err != nil {
 		return Result{}, false, err
 	}

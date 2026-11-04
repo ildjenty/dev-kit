@@ -102,7 +102,7 @@ func (e *Engine) runnerDefinition(ctx context.Context, ref string, runner plan.R
 	if obs.Host == "codex" {
 		name = ".codex/agents/" + string(runner) + ".toml"
 	}
-	return e.workspace.ReadFile(ctx, ref, name)
+	return e.workspace.ReadFile(ctx, gitReference(ref), name)
 }
 
 func (e *Engine) detectionRecords(ctx context.Context, ref string) ([]check.DetectionTest, error) {
@@ -188,9 +188,9 @@ func (e *Engine) issueDetection(ctx context.Context, state *ledger.State, input 
 		return e.resumeDetection(ctx, state, meta)
 	}
 	path := filepath.Join(e.workRoot(), "brief", meta.ID+".md")
-	tree, err := e.workspace.CommitTree(ctx, ref)
+	tree, err := e.workspace.CommitTree(ctx, gitReference(ref))
 	if err != nil {
-		tree = ref
+		tree = gitReference(ref)
 	}
 	output, err := e.bundledSchema(e.schemas["detection-result"])
 	if err != nil {
@@ -236,7 +236,11 @@ func (e *Engine) detectionBrief(ctx context.Context, data instructionData) (brie
 	if err != nil {
 		return brief.Brief{}, err
 	}
-	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, Criteria: criteria, Detection: true, OutputSchema: string(schema), Repository: brief.RepositoryFacts{LayoutGuides: []brief.Document{}}, Norms: []brief.Document{}, NormPaths: []brief.NormPath{}})
+	supporting, err := e.judgmentSchemas(ctx, data.Reference)
+	if err != nil {
+		return brief.Brief{}, err
+	}
+	return brief.BuildJudgment(brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: text, SupportingSchemas: supporting, Criteria: criteria, Detection: true, OutputSchema: string(schema), Repository: brief.RepositoryFacts{LayoutGuides: []brief.Document{}}, Norms: []brief.Document{}, NormPaths: []brief.NormPath{}})
 }
 
 func detectionRequest(data instructionData) (check.Request, error) {
@@ -259,7 +263,7 @@ func (e *Engine) executeDetection(ctx context.Context, state *ledger.State, meta
 		if err != nil {
 			return Result{}, false, err
 		}
-		encoded, err := json.Marshal(request)
+		encoded, err := e.judgmentCommandInput(ctx, data, request)
 		if err != nil {
 			return Result{}, false, err
 		}

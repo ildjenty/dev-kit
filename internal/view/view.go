@@ -373,7 +373,11 @@ func anchor(kind, id string) string { return kind + "-" + hex.EncodeToString([]b
 func targetLabel(target form.TargetVersion) string {
 	switch target.Kind {
 	case form.TargetTree:
-		return "Tree " + target.Tree
+		label := "Tree " + target.Tree
+		if target.Sources != "" {
+			label += "; sources " + target.Sources
+		}
+		return label
 	case form.TargetPlan:
 		return fmt.Sprintf("Plan %d", target.Plan)
 	case form.TargetStructure:
@@ -386,7 +390,7 @@ func targetLabel(target form.TargetVersion) string {
 func approvalTarget(target form.TargetVersion) form.ApprovalTarget {
 	switch target.Kind {
 	case form.TargetTree:
-		return form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree}
+		return form.ApprovalTarget{Kind: form.ApprovalTree, Tree: target.Tree, Sources: target.Sources}
 	case form.TargetPlan:
 		return form.ApprovalTarget{Kind: form.ApprovalPlan, Plan: target.Plan}
 	default:
@@ -395,9 +399,16 @@ func approvalTarget(target form.TargetVersion) form.ApprovalTarget {
 }
 
 func approvalLabel(target form.ApprovalTarget) string {
+	if target.SourcePin != "" {
+		return "Tree " + target.Tree + "; source pin " + target.SourcePin
+	}
 	switch target.Kind {
 	case form.ApprovalTree:
-		return "Tree " + target.Tree
+		label := "Tree " + target.Tree
+		if target.Sources != "" {
+			label += "; sources " + target.Sources
+		}
+		return label
 	case form.ApprovalPlan:
 		return fmt.Sprintf("Plan %d", target.Plan)
 	case form.ApprovalDecision:
@@ -428,11 +439,21 @@ func structureDiagrams(input Input) ([]diagram, []diagram) {
 		}
 		diagrams = append(diagrams, current)
 	} else if input.StructureText != nil {
-		diagrams = append(diagrams, diagram{ID: anchor("structure", input.StructureText.Version), Title: "Current structure record", Version: input.StructureText.Version, Text: input.StructureText.Body})
+		current := diagram{ID: anchor("structure", input.StructureText.Version), Title: "Current structure record", Version: input.StructureText.Version, Text: input.StructureText.Body}
+		seen[input.StructureText.Version] = current.ID
+		diagrams = append(diagrams, current)
 	}
 	for _, revision := range input.StructureHistory {
 		entry := diagram{Title: "Structure at commit " + revision.Commit}
-		if revision.Structure == nil {
+		if revision.Text != nil {
+			entry.Version = revision.Text.Version
+			if id, exists := seen[entry.Version]; exists {
+				entry.Reference = link{Label: "Structure record for this version", Href: "#" + id}
+			} else {
+				entry.ID, entry.Text = anchor("structure", entry.Version), revision.Text.Body
+				seen[entry.Version] = entry.ID
+			}
+		} else if revision.Structure == nil {
 			entry.Changes = []string{"Structure deleted"}
 		} else {
 			entry.Version = revision.Structure.Version

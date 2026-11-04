@@ -79,15 +79,16 @@ type WorkInput struct {
 // sets Detection and receives only criteria, anonymous examples in Content, and the output contract.
 type JudgmentInput struct {
 	// RequestTemplate is the request text resolved by the caller from the fixed repository snapshot.
-	RequestTemplate string
-	InstructionID   string
-	Content         string
-	Criteria        []Document
-	Detection       bool
-	Repository      RepositoryFacts
-	Norms           []Document
-	NormPaths       []NormPath
-	OutputSchema    string
+	RequestTemplate   string
+	InstructionID     string
+	Content           string
+	Criteria          []Document
+	SupportingSchemas []Document
+	Detection         bool
+	Repository        RepositoryFacts
+	Norms             []Document
+	NormPaths         []NormPath
+	OutputSchema      string
 }
 
 // PlannerInput contains information for initial planning, revised proposals, and rebuilding the remaining plan.

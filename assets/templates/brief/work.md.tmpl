@@ -98,6 +98,7 @@ Supported `devkit note` kinds: `decision`, `evidence`, `lesson`. The `structure`
 ```
 {{end}}
 {{define "repository"}}
+{{if or .Structure.Path .LayoutGuides}}
 ## Relevant structure records
 
 Working-tree product: structure.json -> {{.Structure.Path}} ({{if .Structure.Exists}}exists{{else}}not created yet{{end}})
@@ -106,25 +107,31 @@ Reference: structure.json -> {{.Path}}
 
 {{.Content}}
 {{end}}
+{{end}}{{if .Rules.Path}}
 ## Rules and enforcement
 
 Reference: {{.Rules.Path}}
 
 {{.Rules.Content}}
 
+{{end}}{{if .Requirements.Path}}
 ## Repository requirements
 
 Reference: requirements.md -> {{.Requirements.Path}} ({{if .Requirements.Exists}}exists{{else}}not created yet{{end}})
 
 {{.Requirements.Content}}
 
+{{end}}
+{{if .Rules.Path}}
 ## Irreversible decisions
+
+See the Shared difficult-to-change decisions section in `rules.md` supplied above.
 
 Shared difficult-to-change decisions from `rules.md`:
 {{range .IrreversibleDecisions}}
 - {{.}}
 {{end}}
-{{end}}{{define "norms"}}
+{{end}}{{end}}{{define "norms"}}
 ## Norms supplied in full
 {{range .}}
 Reference: {{.Path}}

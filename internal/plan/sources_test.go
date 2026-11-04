@@ -18,7 +18,7 @@ func TestKnowledgeSelectionRoundTrip(t *testing.T) {
 	if err := v.ValidatePlan(p); err != nil {
 		t.Fatal(err)
 	}
-	want := []Selection{{Source: "requirements", Select: ""}, {Source: "rules", Select: ""}, {Source: "principles", Select: "writing.md"}}
+	want := []Selection{{Source: "principles", Select: "writing.md"}}
 	if got := p.Stages[0].WorkerInputs(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("worker inputs = %+v; want %+v", got, want)
 	}

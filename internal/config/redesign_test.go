@@ -16,20 +16,20 @@ func TestPlanCheckSettings(t *testing.T) {
 		{"[plan_check]\naspect = 'custom-plan'\nrunner = 'custom-agent'", PlanCheck{Aspect: "custom-plan", Runner: "custom-agent"}},
 	} {
 		t.Run(tc.body, func(t *testing.T) {
-			settings, err := Parse([]byte("kit_version = 'v2'\n" + tc.body))
+			settings, err := Parse([]byte("kit_version = 'v3'\n" + tc.body))
 			if err != nil || settings.PlanCheck.Aspect != tc.want.Aspect || settings.PlanCheck.Runner != tc.want.Runner {
 				t.Fatalf("plan check settings = %+v, error = %v; want %+v", settings.PlanCheck, err, tc.want)
 			}
 		})
 	}
-	if got := (Config{}).PlanCheckSettings(); !reflect.DeepEqual(got, PlanCheck{Aspect: "plan", Runner: "devkit-judge", Criteria: []Selection{{Source: "principles", Select: "review/plan.md"}}, Examples: &Selection{Source: "examples", Select: "plan/spec.json"}}) {
+	if got := (Config{}).PlanCheckSettings(); !reflect.DeepEqual(got, PlanCheck{Aspect: "plan", Runner: "devkit-judge", Criteria: []Selection{{Source: "principles", Select: "review/plan.md"}, {Source: "plans", Select: "README.md"}}, Examples: &Selection{Source: "examples", Select: "plan/spec.json"}}) {
 		t.Fatalf("effective plan check defaults = %+v", got)
 	}
 }
 
 func TestRouterConfirmationDoesNotControlLoopEdits(t *testing.T) {
 	for _, policy := range []string{"confirm", "allow"} {
-		settings, err := Parse([]byte("kit_version = 'v2'\n[router]\nhuman_confirmation = []\n[approval]\nmeta_loop_edit = '" + policy + "'"))
+		settings, err := Parse([]byte("kit_version = 'v3'\n[router]\nhuman_confirmation = []\n[approval]\nmeta_loop_edit = '" + policy + "'"))
 		if err != nil || len(settings.HumanConfirmation()) != 0 || settings.MetaLoopEditApproval() != policy {
 			t.Fatalf("loop edit policy = %q, error = %v; want %q", settings.MetaLoopEditApproval(), err, policy)
 		}

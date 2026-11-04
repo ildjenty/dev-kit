@@ -27,10 +27,11 @@ type Dependency struct {
 }
 
 // StructureRevision is parsed git history supplied by cmd/devkit, newest first.
-// A nil Structure represents a deletion.
+// Nil Structure and Text represent a deletion.
 type StructureRevision struct {
 	Commit    string
 	Structure *Structure
+	Text      *StructureText
 }
 
 // StructureMermaid returns dependency diagram text without executing Mermaid.

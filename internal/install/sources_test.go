@@ -12,7 +12,7 @@ func TestExternalAndReadOnlySourcesRemainUntouched(t *testing.T) {
 	vault := t.TempDir()
 	writeFile(t, vault, "local.json", "External plan contents.\n")
 	writeFile(t, root, "read-only/rules.md", "Read-only rules.\n")
-	configuration := fmt.Sprintf("kit_version = 'v2'\n[sources.plans]\npath = %q\n[sources.rules]\npath = 'read-only/rules.md'\nwritable = false\n[sources.extra]\npath = 'missing-extra'\nnorm = true\n", vault)
+	configuration := fmt.Sprintf("kit_version = 'v3'\n[sources.plans]\npath = %q\n[sources.rules]\npath = 'read-only/rules.md'\nwritable = false\n[sources.extra]\npath = 'missing-extra'\nnorm = true\n", vault)
 	writeFile(t, root, "devkit.toml", configuration)
 	if _, err := Init(context.Background(), root, nil); err != nil {
 		t.Fatal(err)

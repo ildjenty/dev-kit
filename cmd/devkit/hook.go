@@ -118,7 +118,8 @@ func processHook(ctx context.Context, e event.Event) (event.Result, error) {
 	}
 	normativeRef := func(ref string) string {
 		if round, ok := state.OpenRound(); ok && round.StartTarget.Tree == ref && round.NormReference != "" {
-			return round.NormReference
+			git, _, _ := strings.Cut(round.NormReference, "@")
+			return git
 		}
 		return ref
 	}

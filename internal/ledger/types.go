@@ -11,7 +11,7 @@ import (
 )
 
 // ReadableKitVersion identifies the record format understood by this binary.
-const ReadableKitVersion = "v2"
+const ReadableKitVersion = "v3"
 
 type Kind string
 
@@ -275,6 +275,7 @@ type Instruction struct {
 	PlanVersion  int                   `json:"plan_version,omitempty"`
 	QuestionID   string                `json:"question_id,omitempty"`
 	Reference    string                `json:"reference,omitempty"`
+	Inputs       []plan.Selection      `json:"inputs,omitempty"`
 	Runner       string                `json:"runner,omitempty"`
 	TargetPath   string                `json:"target_path,omitempty"`
 	TemplateName string                `json:"template_name,omitempty"`
