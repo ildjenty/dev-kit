@@ -13,7 +13,7 @@ func TestSourceDefaultsAndOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.Sources) != 9 || c.Sources["principles"].Path != "/vault/principles" || c.Sources["principles"].CanWrite() || !c.Sources["principles"].Norm || !c.Sources["requirements"].Norm {
+	if len(c.Sources) != 10 || c.Sources["principles"].Path != "/vault/principles" || c.Sources["principles"].CanWrite() || !c.Sources["principles"].Norm || !c.Sources["requirements"].Norm {
 		t.Fatalf("source defaults or overrides differ: %+v", c)
 	}
 	if !c.Sources["extra"].CanWrite() || c.Sources["extra"].Norm || c.Sources["extra"].Adapter != "files" {
@@ -22,7 +22,7 @@ func TestSourceDefaultsAndOverrides(t *testing.T) {
 	copy := c.KnowledgeSources()
 	*copy["principles"].Writable = true
 	delete(copy, "rules")
-	if c.Sources["principles"].CanWrite() || len(c.KnowledgeSources()) != 9 {
+	if c.Sources["principles"].CanWrite() || len(c.KnowledgeSources()) != 10 {
 		t.Fatal("source accessor modified stored settings")
 	}
 	if err := c.ValidateImprovementDestination("principles"); err == nil {
@@ -96,6 +96,7 @@ func TestDefaultSources(t *testing.T) {
 		{"templates", ".devkit/templates", true},
 		{"rules", ".devkit/rules.md", true},
 		{"git", ".devkit/git.md", true},
+		{"authority", ".devkit/authority.md", true},
 		{"requirements", ".devkit/requirements.md", false},
 		{"structure", ".devkit/structure.json", false},
 	} {
@@ -104,7 +105,7 @@ func TestDefaultSources(t *testing.T) {
 			t.Fatalf("default source %s = %+v", tc.name, got)
 		}
 	}
-	if len(c.Sources) != 8 {
+	if len(c.Sources) != 9 {
 		t.Fatalf("unexpected sources: %+v", c)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"path/filepath"
+	"slices"
 
 	"github.com/ildjenty/dev-kit/internal/brief"
 	"github.com/ildjenty/dev-kit/internal/check"
@@ -159,6 +160,10 @@ func (e *Engine) judgmentInput(ctx context.Context, data instructionData) (brief
 	if err != nil {
 		return brief.JudgmentInput{}, err
 	}
+	// A document already supplied as a criterion is not repeated among the norms.
+	docs = slices.DeleteFunc(docs, func(doc brief.Document) bool {
+		return slices.ContainsFunc(criteria, func(criterion brief.Document) bool { return criterion.Path == doc.Path })
+	})
 	input := brief.JudgmentInput{RequestTemplate: string(template), InstructionID: data.Instruction.ID, Content: "```json\n" + string(content) + "\n```", Criteria: criteria, Repository: facts, Norms: docs, NormPaths: paths, OutputSchema: string(schema)}
 	return input, e.judgmentInputContext(ctx, data, &input)
 }

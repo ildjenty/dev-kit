@@ -34,16 +34,13 @@ func Norms() (map[string][]byte, error) {
 			return nil, err
 		}
 	}
-	rules, err := fs.ReadFile(FS(), "rules/rules.md")
-	if err != nil {
-		return nil, err
+	for _, name := range []string{"rules.md", "git.md", "authority.md"} {
+		data, err := fs.ReadFile(FS(), "rules/"+name)
+		if err != nil {
+			return nil, err
+		}
+		files[name] = data
 	}
-	files["rules.md"] = rules
-	git, err := fs.ReadFile(FS(), "rules/git.md")
-	if err != nil {
-		return nil, err
-	}
-	files["git.md"] = git
 	return files, nil
 }
 

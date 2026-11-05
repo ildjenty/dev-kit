@@ -53,14 +53,14 @@ func TestDefaults(t *testing.T) {
 	wantDependencies := []string{"go.mod", "go.sum", "package.json", "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "Cargo.toml", "Cargo.lock", "Gemfile", "Gemfile.lock", "requirements.txt", "pyproject.toml", "poetry.lock", "uv.lock", "composer.json", "composer.lock"}
 	wantConfirmation := []string{DependencyChanged, TargetChangedAgain}
 	wantDestinations := []string{"hook_lint_type", "plan_template", "aspect", "principle", "skill"}
-	if c.DefaultPlan != "default" || !reflect.DeepEqual(c.Sources, wantSources) || c.Approval != (Approval{Plan: "requirements", MetaLoopEdit: "confirm"}) || c.Git.CommitMessage != "devkit: {stage} ({work_id})" || c.Git.AllowEmptyCommit == nil || !*c.Git.AllowEmptyCommit || c.Limits.StopContinuation != 3 {
+	if c.DefaultPlan != "default" || !reflect.DeepEqual(c.Sources, wantSources) || c.Approval != (Approval{Plan: "deviation", MetaLoopEdit: "confirm"}) || c.Git.CommitMessage != "devkit: {stage} ({work_id})" || c.Git.AllowEmptyCommit == nil || !*c.Git.AllowEmptyCommit || c.Limits.StopContinuation != 3 {
 		t.Fatalf("parsed defaults do not match: %+v", c)
 	}
 	if !slices.Equal(c.Classification.DependencyFiles, wantDependencies) || !slices.Equal(c.Router.HumanConfirmation, wantConfirmation) || !slices.Equal(c.Lessons.Destinations, wantDestinations) {
 		t.Fatalf("parsed list defaults do not match: %+v", c)
 	}
 	for _, settings := range []Config{{}, c} {
-		if settings.DefaultPlanName() != "default" || !reflect.DeepEqual(settings.KnowledgeSources(), wantSources) || settings.PlanApproval() != "requirements" || settings.MetaLoopEditApproval() != "confirm" || !settings.AllowEmptyCommit() || settings.StopContinuation() != 3 {
+		if settings.DefaultPlanName() != "default" || !reflect.DeepEqual(settings.KnowledgeSources(), wantSources) || settings.PlanApproval() != "deviation" || settings.MetaLoopEditApproval() != "confirm" || !settings.AllowEmptyCommit() || settings.StopContinuation() != 3 {
 			t.Fatalf("effective defaults do not match: %+v", settings)
 		}
 		if !slices.Equal(settings.DependencyFiles(), wantDependencies) || !slices.Equal(settings.HumanConfirmation(), wantConfirmation) || !slices.Equal(settings.LessonDestinations(), wantDestinations) {

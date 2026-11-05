@@ -15,6 +15,8 @@
 - **確認事項**: 目的と完了条件の対応を短く説明でき、完了を判定できるか。
 - **blocking**: 完了を判定できない。
 
+`irreversible`・`structure`・`contract`・`diff` の権限に関する基準と人の回答の照合は[権限の文書](architecture/data.md#権限の文書-authority)に従う。
+
 ## 元に戻せないもの
 
 - **確認事項**: 元に戻せないもの(変更困難な決定)の一覧に漏れがないか。判断と確定の時期は [`assets/principles/designing.md` の原則1](../assets/principles/designing.md#1-identify-decisions-that-are-hard-to-change-early-and-finalize-them-after-obtaining-the-evidence-needed)に従う。
@@ -49,10 +51,9 @@
 - **確認事項**: 状態と値の受け入れは [`assets/principles/data.md` の原則3](../assets/principles/data.md#3-prevent-invalid-states-and-values-with-types-and-validation)、失敗の分類と公開応答は [`assets/principles/engineering.md` の原則1](../assets/principles/engineering.md#1-do-not-hide-failures)に従う。
 - **blocking**: 照合した原則の blocking 条件に該当する。
 
-## 手順
+## 増分
 
-- **確認事項**: 各ステップを単独で検証できるか。人が一度で読める大きさか。
-- **blocking**: 検証できないステップがある。
+観点 ID は `increments` である。リリースの分割を [`assets/principles/review/increments.md`](../assets/principles/review/increments.md) に照らして判定する。確認事項と blocking は同基準、増分の組み方は[既定の開発フロー](architecture/flow.md#既定の開発フロー)に従う。
 
 ## 差分
 
@@ -77,7 +78,7 @@
 
 ## 動作検証
 
-既定の `default` と `fix` は verification で必須の `command:e2e` と判定者の check を使う。判定者は `principles/review/behavior.md` などに照らし、完了条件ごとの利用場面を利用者の入口から通しで確かめているかを見る。`e2e` の未登録は `test` と同じ修正の経路でスクリプトと登録を用意する。
+既定の `default` と `fix` は verification で必須の `command:e2e` と判定者の check を使う。判定者は `principles/review/behavior.md` などに照らし、実体の check に割り当てた完了条件 ID ごとの利用場面を利用者の入口から通しで確かめているかを見る。`e2e` の未登録は `test` と同じ修正の経路でスクリプトと登録を用意する。
 
 - **確認事項**:
   - 共通: 起動、操作、コンソールエラー、証拠の取得、後片付けを確認する。
@@ -98,12 +99,12 @@
   - ゲート: [ループのパターン](architecture/data.md#ループの雛形-plantemplate)の理由の書き方に従い、理由を示しているか。人への確認の判定は[人への確認対象](architecture/guarantees.md#人への確認対象)に従っているか。
   - 構造: 前に承認した計画の残り、最初なら参考パターンとの差分を確認する。差分だけを人の承認理由にせず、定義ごとの決まり、作業の経路の決まり、上限の天井を満たしているか。
   - 分割: units の担当範囲が重なっていないか。範囲の重なりは機械では検査しない。成果に依存する仕事は別のステージに分けているか。
-  - 規模: ステージを減らせないか。
+  - 増分と受け入れ: [既定の開発フロー](architecture/flow.md#既定の開発フロー)の対応と順序、デモごとの条件 ID、acceptance の全条件の網羅を満たすか。
 
   - 指示: 計画者がステージ・check・単位に書いた `instructions` が課題に対して十分か。
   - 完了条件: [計画](architecture/data.md#計画-plan)に従い、ID 付きの文章と、条件ごとの確認手段の妥当性・網羅性を確かめているか。
   - 網羅性: 変更の種類(画面・データ・外部との通信・構造)に必要な検査が含まれるか。
-- **blocking**: 要求の抜けや追加がある、または完了条件に check または人のゲートによる確認手段がない。
+- **blocking**: [`assets/principles/review/plan.md`](../assets/principles/review/plan.md) に従う。
 
 ## harness
 
@@ -115,6 +116,7 @@
   - skill: [`description`](https://agentskills.io/specification#description-field)(skill の説明項目)の有無、[配置](architecture/layout.md#指示ファイルとホスト設定)、参照先を確認する。実装との処理の分担は [`assets/principles/working.md` の原則5](../assets/principles/working.md#5-turn-routine-processing-into-commands-and-call-them-from-procedures)に従う。
   - 判定: [check の結果](architecture/data.md#check-の結果-judgment)に従い、`NOT ASSESSED`(未評価)を返せるか。
   - 原則の内容: 適用条件・要求・例外・blocking の意味を判断できるか。用途別文書に判定の範囲、報告しない事項、適用除外も含まれるか。
+  - 判断の線引き: [線引きの更新](architecture/guarantees.md#線引きの更新)に従い、人の入力を漏れなく扱ったか。
   - 問題の捕捉: brief が参照する作業履歴ファイルから、作業全体の判定・指摘(blocking でないものも含む)、`FAIL`・`NOT ASSESSED` の経緯、ラウンド数、人の却下・訂正・作り直しの指示、`note` で伝えられた見逃しを確かめ、各問題をどこで捕まえるべきだったかを判断しているか。
   - 再発防止: 機械の検査、パターン、用途別の判定基準、原則、skill の順(設定 `[lessons] destinations` で変更可能)で反映先を選び、リポジトリ内の書き込めるソースの規範へ反映しているか。リポジトリ外のソースと読み取り専用のソースへの改善は教訓に記録して管理者へ引き継いでいるか。反映しない理由があるか。規則の「手段: 未実装」と繰り返す違反を、テスト・lint・型・pre-commit・検証コマンドへ移す候補にしているか。
   - 規範の働き: どの原則がどの観点・パターンで使われるか、使われない仕組みや負担に見合わない仕組みがないか。その作業で見えた問題・不足・負担を扱い、規範全体の棚卸しは必要が見えたときだけ行っているか。

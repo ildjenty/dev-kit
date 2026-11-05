@@ -2,4 +2,6 @@
 
 The rules are Markdown. Apply them to target code and documents; "Enforcement: Not implemented" identifies rules without an enforcing implementation. Refer to principles as `principles/<name>.md` and output schemas as `schemas/<name>.json`. During retrospective, consider unenforced rules and recurring violations for machine enforcement. Changes to `rules.md` modify the loop itself and, by default, require human confirmation before they first take effect.
 
+`authority.md` is installed as `.devkit/authority.md`, the `authority` norm source. Apply its human-decision categories and recorded delegations when planning and working. Changes follow the loop-edit approval policy.
+
 `git.md` supplies the default git operation rules: work branches, one work per checkout, commit message prefixes, and integration after completion. `devkit init` installs it as `.devkit/git.md`, the `git` knowledge source, which plan templates select through stage inputs. The session agent follows it for branches and integration, and workers follow it when writing `commit_message`. The repository may rewrite it to match its own git workflow; changes modify the loop like changes to `rules.md`.

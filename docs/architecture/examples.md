@@ -1,12 +1,12 @@
 # 最小の例
 
-パターンは計画を組む参考であり、計画者が課題ごとに並び・担当・check・ゲート・上限・指示を決める。機械で守らせる決まりは `devkit.toml` に置く。利用側の資産は既定 `.devkit/plans/`・`.devkit/stages/`・`.devkit/principles/`・`.devkit/templates/`・`.devkit/rules.md`・`.devkit/requirements.md`・`.devkit/structure.json` に置き、配置は設定で変更できる。
+パターンは計画を組む参考であり、計画者が課題ごとに並び・担当・check・ゲート・上限・指示を決める。機械で守らせる決まりは `devkit.toml` に置く。利用側の資産は既定 `.devkit/plans/`・`.devkit/stages/`・`.devkit/principles/`・`.devkit/templates/`・`.devkit/rules.md`・`.devkit/authority.md`・`.devkit/requirements.md`・`.devkit/structure.json` に置き、配置は設定で変更できる。
 
 <a id="雛形と計画"></a>
 
 ## パターンと計画
 
-既定の参考の並びは default が purpose・scope・structure・contract・steps・implement・verification・retrospective、fix が implement・verification・retrospective、docs が edit・retrospective である。default の purpose の `done` は `"replan"` であり、要件と完了条件を合意してから残りを組む。計画の開始から `done` で到達できないステージは含めない。
+パターンの構成と再計画は[作業の開始](flow.md#作業の開始)と[既定の開発フロー](flow.md#既定の開発フロー)、計画の到達可能な経路は[計画](data.md#計画-plan)に従う。
 
 `start --plan fix` は fix を優先する指定である。省略時は `default_plan`(既定 default)を優先し、計画者はほかのパターンも参考にできる。計画の `pattern` に名前と内容ハッシュを記録し、指示の参照コミットで存在とハッシュを確かめる。
 
@@ -64,6 +64,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -85,8 +89,8 @@
         }
       ],
       "gate": {
-        "required": false,
-        "reason": "Review the results of work required for the task"
+        "required": true,
+        "reason": "Review the increment demo and its assigned completion conditions"
       },
       "limits": {
         "max_rounds": 3,
@@ -113,6 +117,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],
@@ -168,6 +176,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -211,6 +223,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],
@@ -258,6 +274,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -304,6 +324,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -322,7 +346,7 @@
   "version": 1,
   "pattern": {
     "name": "fix",
-    "content_hash": "a50b9109c1181f0d92d494c0db9de0d49021d2569e5ab38be2f51efbdabdda2c"
+    "content_hash": "a70a45e16e3b0a27f84379c946f69632b8de31fae0cc247364fb8138e8f3f15f"
   },
   "task": "保存ボタンの文言を「登録」から「保存」に変える",
   "completion_conditions": [
@@ -392,6 +416,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -425,8 +453,8 @@
         }
       ],
       "gate": {
-        "required": false,
-        "reason": "Review the results of work required for the task"
+        "required": true,
+        "reason": "Review the increment demo and its assigned completion conditions"
       },
       "limits": {
         "max_rounds": 3,
@@ -453,6 +481,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],
@@ -524,6 +556,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -542,9 +578,9 @@
 }
 ```
 
-`definition` を省くと `id` と同じ定義を使う。同じ定義を何度も使う増分は、`implement-2`・`verification-2` のように新しい ID で組む。走った実体 ID の再利用は同じ仕事の再実行だけを意味する。戻り後の計画には戻り先 ID を含める。
+`definition` を省くと `id` と同じ定義を使う。同じ定義を何度も使う増分は、`design-2`・`implement-2`・`verification-2` のように新しい ID で組む。走った実体 ID の再利用は同じ仕事の再実行だけを意味する。戻り後の計画には戻り先 ID を含める。
 
-最初の計画、完了条件の変更、外部操作、未決事項を既定では人が確認する。パターンとの違いは承認理由にはせず、前に承認した計画の残り、最初なら参考パターンとの構造の差分として表示する。未決事項への回答は再提案の指示として計画者へ渡す。
+承認と未決事項への回答は[計画のバージョン](data.md#計画のバージョン)に従う。
 
 implement の終了ブロックである。`instruction_id` は受け取った作業指示 ID に置き換える。`report` の形への適合は証拠や完了の根拠にはしない。
 
@@ -569,6 +605,40 @@ implement の終了ブロックである。`instruction_id` は受け取った�
     "changes": ["保存ボタンの文言を保存に揃える"]
   },
   "commit_message": "fix: 保存ボタンの文言を修正"
+}
+```
+
+### 増分のデモと受け入れ
+
+備品貸し出しアプリで、C1 を「起動して備品一覧をデータストアから表示でき、テストを実行できる」、C2 を「利用者が備品を借り、返却すると一覧の状態が変わる」と合意した例である。increments の成果は、C1 の骨組みを増分1、C2 の貸し出し・返却を増分2とする。配布する [`default` パターン](../../assets/plans/default.json)を参考に、increments の完了後の再計画で次の実体を組む。
+
+```text
+design-1 → implement-1 → verification-1 → design-2 → implement-2 → verification-2 → acceptance → retrospective
+```
+
+verification-1 の check には C1、verification-2 には C2 を割り当てる。acceptance は次の実体とする。ゲート、デモでの指摘、最後のデモと受け入れを兼ねる場合の扱いは[既定の開発フロー](flow.md#既定の開発フロー)に従う。
+
+```json
+{
+  "id": "acceptance",
+  "assignee": "worker",
+  "checks": [
+    {"aspect": "command:e2e", "required": true, "completion_condition_ids": ["C1", "C2"], "target": "備品一覧の骨組みと貸し出し・返却の利用場面"},
+    {"aspect": "behavior", "required": true, "completion_condition_ids": ["C1", "C2"], "target": "備品一覧の骨組みと貸し出し・返却の利用場面"}
+  ],
+  "gate": {"required": true, "reason": "Accept end-to-end evidence for all completion conditions"},
+  "limits": {"max_rounds": 3, "max_no_progress": 2},
+  "transitions": {"fix": "acceptance", "ask": "acceptance", "back": "implement-2", "done": "retrospective"},
+  "inputs": [
+    {"source": "requirements", "select": ""},
+    {"source": "rules", "select": ""},
+    {"source": "structure", "select": ""},
+    {"source": "git", "select": ""},
+    {"source": "authority", "select": ""}
+  ],
+  "report": {"source": "templates", "select": "reports/verification.json"},
+  "definition": "verification",
+  "instructions": ["C1 と C2 の操作と観測を条件ごとに報告する"]
 }
 ```
 
@@ -658,6 +728,10 @@ agent = "devkit-senior-worker"
     {
       "source": "git",
       "select": ""
+    },
+    {
+      "source": "authority",
+      "select": ""
     }
   ],
   "report": {
@@ -739,6 +813,10 @@ FAIL のラウンドが2回以上で diff が FAIL または NOT ASSESSED なら
     {
       "source": "git",
       "select": ""
+    },
+    {
+      "source": "authority",
+      "select": ""
     }
   ],
   "report": {
@@ -800,12 +878,12 @@ kind = "human"
 [planning]
 role = "planner"
 max_rounds = 3
-inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }]
+inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }, { source = "authority", select = "" }]
 
 [plan_check]
 runner = "judge"
-schemas = ["plan", "plan-template"]
-inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }]
+schemas = ["plan", "plan-template", "finding"]
+inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }, { source = "authority", select = "" }]
 
 [limits]
 max_rounds_ceiling = 3
@@ -813,51 +891,71 @@ max_no_progress_ceiling = 2
 max_total_rounds = 40
 
 [checks."purpose"]
+description = "Checks that the purpose and completion conditions preserve the human request."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/purpose.md" }]
 
 [checks."irreversible"]
+description = "Checks difficult-to-change decisions, alternatives, and approval grounds."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/irreversible.md" }, { source = "principles", select = "designing.md" }]
+criteria = [{ source = "principles", select = "review/irreversible.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "review/authority.md" }, { source = "authority", select = "" }]
+history = "all"
 
 [checks."structure"]
+description = "Checks responsibility boundaries, dependencies, and structure records."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/structure.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "structure.md" }, { source = "principles", select = "data.md" }]
+criteria = [{ source = "principles", select = "review/structure.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "structure.md" }, { source = "principles", select = "data.md" }, { source = "principles", select = "review/authority.md" }, { source = "authority", select = "" }]
+history = "all"
 
 [checks."contract"]
+description = "Checks public contracts, input validation, data ownership, and failures."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/contract.md" }, { source = "principles", select = "data.md" }, { source = "principles", select = "engineering.md" }]
+criteria = [{ source = "principles", select = "review/contract.md" }, { source = "principles", select = "data.md" }, { source = "principles", select = "engineering.md" }, { source = "principles", select = "review/authority.md" }, { source = "authority", select = "" }]
+history = "all"
 
-[checks."steps"]
+[checks."increments"]
+description = "Checks release increments, completion condition coverage, and demonstrable size."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/steps.md" }]
+criteria = [{ source = "principles", select = "review/increments.md" }]
 
 [checks."command:test"]
+description = "Runs the registered test command."
 runner = "command:test"
 
 [checks."test"]
+description = "Checks test coverage and meaningful assertions through user entry points."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/test.md" }, { source = "principles", select = "testing.md" }]
 
 [checks."diff"]
+description = "Checks the cumulative diff against scope, quality principles, and rules."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/diff.md" }, { source = "principles", select = "engineering.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "writing.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "security.md" }, { source = "templates", select = "pr.md.tmpl" }, { source = "rules", select = "" }]
+criteria = [{ source = "principles", select = "review/diff.md" }, { source = "principles", select = "engineering.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "writing.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "security.md" }, { source = "templates", select = "pr.md.tmpl" }, { source = "rules", select = "" }, { source = "principles", select = "review/authority.md" }, { source = "authority", select = "" }]
+history = "all"
 
 [checks."command:e2e"]
+description = "Runs the registered end-to-end verification command."
 runner = "command:e2e"
 
 [checks."behavior"]
+description = "Checks completion scenarios against end-to-end execution evidence."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/behavior.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "testing.md" }, { source = "principles", select = "ui.md" }, { source = "rules", select = "" }]
 
 [checks."harness"]
+description = "Checks lessons, recurrence prevention, requirements, and loop quality."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/harness.md" }, { source = "principles", select = "harness.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "review/README.md" }, { source = "stages", select = "README.md" }, { source = "stages", select = "retrospective.md" }, { source = "plans", select = "README.md" }, { source = "templates", select = "brief/judgment.md.tmpl" }]
 history = "all"
 
 [checks."wording"]
+description = "Checks clarity, accuracy, and consistency of wording."
 runner = "judge"
 criteria = [{ source = "principles", select = "review/wording.md" }, { source = "principles", select = "writing.md" }, { source = "templates", select = "pr.md.tmpl" }]
+
+[[loop.stage]]
+definition = ["scope", "architecture"]
+gate = true
 
 [[loop.stage]]
 definition = "implement"
@@ -866,10 +964,12 @@ checks = ["command:test", "test", "diff"]
 [[loop.stage]]
 definition = "verification"
 checks = ["command:e2e", "behavior"]
+gate = true
 
 [[loop.stage]]
 definition = "retrospective"
 checks = ["harness"]
+history = "all"
 
 [[loop.path]]
 definition = "implement"

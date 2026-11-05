@@ -1,9 +1,76 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Structure report",
+  "title": "Architecture report",
   "description": "Worker-reported material, not independent evidence of completion.",
   "type": "object",
   "properties": {
+    "decisions": {
+      "type": "array",
+      "description": "List human decisions first, followed by delegated decisions. Empty question and answer IDs mean no human answer is recorded; a human decision proposed for this stage's own gate leaves them empty and is decided by the gate approval. A decision approved at an earlier gate cites that gate's question ID.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "recommendation": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "classification": {
+            "type": "string",
+            "enum": [
+              "human",
+              "delegated"
+            ]
+          },
+          "decider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "question_id": {
+            "type": "string"
+          },
+          "answer_id": {
+            "type": "string"
+          },
+          "cost_and_operational_effects": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "decision",
+          "options",
+          "recommendation",
+          "reason",
+          "classification",
+          "decider",
+          "question_id",
+          "answer_id",
+          "cost_and_operational_effects"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "technology_choices": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "structure_reference": {
       "type": "string",
       "minLength": 1
@@ -99,6 +166,8 @@
     }
   },
   "required": [
+    "decisions",
+    "technology_choices",
     "structure_reference",
     "modules",
     "dependencies",

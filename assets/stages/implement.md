@@ -2,13 +2,13 @@
 
 ## Inputs
 
-The plan's completion conditions with IDs; scope, structure, contracts, and steps from adopted preceding stages; code to change; and available verification methods.
+The plan's completion conditions with IDs; approved architecture, the increment list, and detailed design from adopted preceding stages; code to change; and available verification methods.
 
-Common inputs are `requirements.md`, the frozen norms, plan limits, relevant records from `structure.json`, placement guides for the change targets, difficult-to-change decisions in `rules.md` and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required `command:` check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
+Common inputs are `requirements.md`, the authority rules (`authority` source), the frozen norms, plan limits, relevant records from `structure.json`, placement guides for the change targets, difficult-to-change decisions in `rules.md` and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required `command:` check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
 ## Decisions
 
-Code.
+Code and tests within the committed approved design and decisions. If the design must change, use `confirmation-required` to recommend back and ask the human before changing it.
 
 ## Deferred to later stages
 
@@ -26,7 +26,7 @@ The diff and verification results corresponding to completion condition IDs. Pre
 
 When claiming completion, fill `report` according to this stage's selected report JSON Schema supplied in the brief. When asking the human, use `termination_kind: "confirmation-required"` and fill `confirmation` with the verbatim question (`text`), `options`, `recommendation`, `recommendation_reason`, and material references (`evidence`). Leave the recommendation and reason empty when no recommendation is supported. A question or stop may include a partial report conforming to the supplied fields; only a completion claim requires the full report. Schema conformance is not evidence of completion.
 
-Submit a diff that follows the agreed scope and contracts, with verification results corresponding to the completion conditions of this stage in the plan. Leave no unnecessary investigative behavior or interference with subsequent verification.
+Submit a diff that follows the committed approved design, decisions, scope, and contracts, with verification results corresponding to the completion conditions of this stage in the plan. Leave no unnecessary investigative behavior or interference with subsequent verification.
 
 When a required `command:<name>` is unregistered in the round's frozen `devkit.toml`, its check returns an auto-fixable `FAIL`. Create the verification method and register it in `[commands.<name>]`, including its required deadline. Registration is a loop edit and is used from the next round's snapshot. Devkit asks the human to confirm loop edits itself, so register the command and claim completion; do not stop to request a separate confirmation for it. For `command:test`, create tests following `principles/testing.md`; the `test` check assesses coverage of completion conditions, execution through the registered command, public entry-point contracts, and independence from implementation details. If a command changes the tree, ignore its generated output before rerunning verification.
 

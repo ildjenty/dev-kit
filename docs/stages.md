@@ -1,64 +1,32 @@
 # ステージ
 
-kit は、利用者が[ループのパターン](architecture/data.md#ループの雛形-plantemplate)(ループを組むための参考)に並べるステージ(作業を区切る単位)と[観点](checks.md)(check の確認の切り口)を定義する。[計画者](architecture/flow.md#作業の開始)(パターンを参考に計画を組むサブエージェント)による取捨の範囲は[作業の開始](architecture/flow.md#作業の開始)に従う。
+計画のステージは実体 ID と定義 ID を持ち、同じ定義を増分ごとに使える。[計画](architecture/data.md#計画-plan)に従って入力・報告・check・遷移を組み、[ループの決まり](architecture/data.md#ループの決まり)を満たす。定義は `stages` ソースから選ぶ。
 
-0〜5 は段階的な具体化の順序である。`default` と `fix` は実装後に通しの検証を行い、最後に振り返りを行う。既定の `default`・`fix`・`docs` の構成と、調査・試作の候補としての扱いは[既定のパターン](loop-plan.md#既定の雛形)に従う。テストの仕組みがない場合は、実装の必須 `command:test` の指摘を受け、作業の中で検証の手段とコマンドの登録を用意する。
-
-計画の `split` と `units` で、1ステージの作業を複数の作業者に分けられる。単位ごとの判定はせず、合流後の成果をステージのラウンドとして判定する。既定のパターンは複数単位への分割を使わない。再計画では採用済みの完了した実体を経路に保持する。
-
-計画の実体は `id` と `definition` を持ち、同じ定義を増分ごとに何度も使える。新しい仕事には新しい実体 ID を使う。遷移と戻り先は実体 ID、決まりは定義 ID である。
-
-ステージの `inputs` は作業者へ渡す知識の選び方を持つ。計画者と計画の判定者は `[planning] inputs` と `[plan_check] inputs`、作業者は計画のステージの `inputs` に選び方を書け、要件と規則を渡す既定値を用意する。ステージ定義そのものも `stages` ソースから選ぶ。ステージ定義はリポジトリが所有する `.devkit/stages/` に置く。要件の正本は `.devkit/requirements.md`、構造の記録は `.devkit/structure.json`、規則は `.devkit/rules.md` であり、これらの配置は `devkit.toml` の `[sources.<名前>]` で変更できる。各ステージで決めたことのうち、後の作業に効かせたい要件は要件の正本へ、構造は構造の記録へ、複数の作業で守る変更困難な決定は規則へ残す。固定の `.devkit/run/` の記録は git 管理しない。
-
-元に戻せないもの(変更困難な決定)の判断は、[`assets/principles/designing.md` の原則1](../assets/principles/designing.md#1-identify-decisions-that-are-hard-to-change-early-and-finalize-them-after-obtaining-the-evidence-needed)に従う。
-
-既定の各ステージは定義が求める成果の `report` の形を持つ。完了を主張するときだけ必須とし、確認要求と停止では途中の報告を認める。形への適合は証拠にしない。報告の内容と `confirmation` の契約は[進捗](architecture/data.md#進捗-progress)に従う。既定の作業者 `worker` は `devkit-worker` のサブエージェントであり、devkit が作る worktree で作業する。セッションはまとめ役を担う。ワーカーの決定・証拠・教訓は終了ブロックの任意の `notes` 配列に `kind` と種別ごとの `payload` として含める。`devkit note` はセッション自身が記録するときに使う。
+報告と確認要求の形式は[進捗](architecture/data.md#進捗-progress)、入力・経緯・採用された成果は[依頼の入力](architecture/data.md#依頼の入力)、後の作業へ残す決定は[資産の更新と共有](architecture/data.md#資産の更新と共有)に従う。
 
 ## 0 目的
 
-既定の `default` は、最初の計画に要件と完了条件の合意に関する完了条件を持たせ、`purpose` の遷移 `done` を `"replan"` にする。目的の完了後、計画者が合意した完了条件で残りを作り直し、既定では人が承認する。`fix` と `docs` はこの形を使わない。要件定義を先に行って再計画するかは計画の組み方で決まり、kit は目的を特別扱いしない。
-
-- **決めること**: 変更の利用者と目的、計画の完了条件の根拠。人が承認した完了条件と既存の要件を照らし、人に確かめながら要件を詰め、リポジトリが満たすべき要件を更新する。完了条件の案は利用者の言葉で文章にし、[計画の作り直し](architecture/data.md#計画のバージョン)で完了条件を変える場合は、既定では再び人の承認を得る。
-- **決めずに次のステージへ渡すこと**: 手段全般。
-- **元に戻せないもの**: なし。
-- **成果物**: [目的と完了条件の対応の説明](checks.md#目的)、更新した `.devkit/requirements.md`、完了条件の案。再計画は計画の遷移と承認の条件に従う。
+`purpose` のヒアリングと要件の合意は[既定の開発フロー](architecture/flow.md#既定の開発フロー)に従う。定義は [`assets/stages/purpose.md`](../assets/stages/purpose.md) に置く。
 
 ## 1 スコープ
 
-- **決めること**: 含めるものと含めないもの。外部から見えるもの。
-- **決めずに次のステージへ渡すこと**: 内部構造。
-- **元に戻せないもの**: スキーマ、識別子、契約の型、外部への公開、データの保持のうち、該当すると判断したもの。
-- **成果物**: スコープの明示と、元に戻せないものの一覧。保存先は[規則と強制手段](architecture/data.md#規則と強制手段-rules)と[計画](architecture/data.md#計画-plan)に従う。後続ステージの [brief](architecture/modules.md#brief)(入力から組み立てる依頼文)に渡す範囲は[規則と強制手段](architecture/data.md#規則と強制手段-rules)に従う。
+`scope` の外部設計と範囲の合意は[既定の開発フロー](architecture/flow.md#既定の開発フロー)に従う。定義は [`assets/stages/scope.md`](../assets/stages/scope.md) に置く。
 
-## 2 構造
+## 2 アーキテクチャ
 
-- **決めること**: モジュール、責務、配置、依存の向き。
-- **決めずに次のステージへ渡すこと**: 関数の内部。
-- **元に戻せないもの**: 配置のうち、該当すると判断したもの。
-- **成果物**: 形式が自由な知識として更新した [`.devkit/structure.json`](architecture/data.md#構造の記録-structure)(`schemas/structure.json` に従う JSON のときだけ図を [view](architecture/modules.md#view)(作業の表示を生成する部品)が生成し、それ以外は本文を表示する)、流儀を揃える既存の箇所、不採用とした案と理由、未確認の前提。git で戻せない作用や特別な復元順序がある場合は、その復元手段。
+`architecture` の方式と技術選定は[既定の開発フロー](architecture/flow.md#既定の開発フロー)に従う。定義は [`assets/stages/architecture.md`](../assets/stages/architecture.md) に置く。
 
-## 3 契約
+## 3 増分
 
-- **決めること**: インターフェース、データ形式、失敗の種類。
-- **決めずに次のステージへ渡すこと**: 実装方式。
-- **元に戻せないもの**: 公開・内部の契約のうち、該当すると判断したもの。
-- **成果物**: 型のシグネチャ。
+`increments` のリリースの分割と再計画は[既定の開発フロー](architecture/flow.md#既定の開発フロー)に従う。定義は [`assets/stages/increments.md`](../assets/stages/increments.md) に置く。増分を組むことと、[1ステージ内の単位への分割](architecture/examples.md#分割の雛形と計画)は別の指定である。
 
-## 4 手順
+## 4 詳細設計
 
-- **決めること**: ステップの分け方と、各ステップの検証方法。
-- **決めずに次のステージへ渡すこと**: コード。
-- **元に戻せないもの**: なし。
-- **成果物**: 各ステップの目的・完了条件・根拠・スコープを記した一覧。後続ステージの brief への取り込みは[作業の指示](architecture/flow.md#作業の指示)に従う。
-
-計画で steps の `done` を `"replan"`、implement を `split: true` にすれば、完了した手順に従って計画者が implement の `units` を記入する。[分割のパターンと計画](architecture/examples.md#分割の雛形と計画)に例を示す。
+`design` の増分の詳細化と判断の確認は[既定の開発フロー](architecture/flow.md#既定の開発フロー)に従う。定義は [`assets/stages/design.md`](../assets/stages/design.md) に置く。
 
 ## 5 実装
 
-- **決めること**: コードと、その完了条件を確かめるテスト。`default` と `fix` では必須の `command:test` と観点 `test`・`diff`、文書編集は別の定義 `edit` に観点 `wording` の check を置く。検証コマンドが未登録なら、テストの仕組みを作り `devkit.toml` の `[commands.test]` に登録する。登録はループ自身の変更として人が確認し、次のラウンドから使う。
-- **決めずに次のステージへ渡すこと**: なし。
-- **元に戻せないもの**: なし。
-- **成果物**: 差分。
+`implement` の設計に沿った実装は[既定の開発フロー](architecture/flow.md#既定の開発フロー)、検証コマンドの用意と登録は[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。定義は [`assets/stages/implement.md`](../assets/stages/implement.md) に置く。
 
 ## 文書の編集
 
@@ -66,14 +34,7 @@ kit は、利用者が[ループのパターン](architecture/data.md#ループ�
 
 ## 検証
 
-ステージ定義 ID は `verification` である。
-
-- **担当**: 既定の `worker`(`devkit-worker`)である。
-- **決めること**: 完了条件ごとの利用場面を、利用者の入口から通しで確かめる方法である。
-- **成果物**: 通しの確認のスクリプトと、その実行結果を完了条件ごとに記した報告である。
-- **check**: 必須の `command:e2e` と、`principles/review/behavior.md` などを基準にする判定者の check である。未登録なら作業者がスクリプトを作り `[commands.e2e]` に登録し、`command:test` と同じ経路で次のラウンドから使う。
-
-定義は既定 `.devkit/stages/verification.md` に置き、設定で変更できる。`default` と `fix` では implement と retrospective の間に置き、`docs` には置かない。
+`verification` の増分のデモと acceptance は[既定の開発フロー](architecture/flow.md#既定の開発フロー)に従う。定義は [`assets/stages/verification.md`](../assets/stages/verification.md) に置く。
 
 ## 調査
 
@@ -95,13 +56,4 @@ kit は、利用者が[ループのパターン](architecture/data.md#ループ�
 
 ## 振り返り
 
-ステージ定義 ID は `retrospective` である。
-
-- **担当**: 作業者。
-- **入力**: brief が参照する、指示発行時点で固定した作業履歴の索引と規範の一覧である。既定の振り返りと harness の check は `history = "all"` を明示する。作業履歴には、作業全体の判定と指摘(blocking でないものも含む)、`FAIL` と `NOT ASSESSED` の経緯、ラウンド数、人の却下・訂正・作り直しの指示、`note` の教訓で伝えた見逃しを含む。
-- **決めること**: 各問題をどこで捕まえるべきだったかと、再発防止の反映先。判定者が `PASS` とした後に後続のステージや人が見つけた見逃しを記録から確認し、用途別の判定基準を見直す。既定の優先順は機械の検査(hook・lint・型・検証コマンド)、パターン、用途別の判定基準、原則、skill であり、`[lessons] destinations` で変更できる。リポジトリ内の書き込めるソースの規範へ反映し、リポジトリ外のソースと読み取り専用のソースへの改善は教訓として記録して管理者へ引き継ぐ。反映しない場合は理由を残す。規範全体が目的を果たしているか、原則がどの観点・パターンで使われるか、使われない仕組みや負担に見合わない仕組みがないかを確かめる。扱う対象はその作業の問題・見逃し・規範の不足や負担であり、全体の棚卸しは必要が見えたときだけ行う。
-- **決めずに次のステージへ渡すこと**: なし。
-- **元に戻せないもの**: なし。
-- **成果物**: 再発防止の反映と、反映しない項目の理由。ワーカーは教訓を終了ブロックの `notes` に `kind: "lesson"` と `content`・`evidence` を持つ `payload` で返す。目的のステージがない場合や目的で未反映の場合は、承認された完了条件のうち要件に当たるものを `.devkit/requirements.md` に反映する。
-- **check**: `default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけを置く。`default` と `fix` では検証の手段や対象を変えた場合も、最終のツリーで検査する。
-- **人の確認**: 規範を変えた場合はループ自身の変更として、既定では効力を持つ最初のラウンドの前、最後のラウンドなら完了時のコミット前に人が確認する。規範を変えなければ、この確認は不要である。
+`retrospective` で問題・見逃しと規範の働きを見直す。[教訓の反映先](architecture/guarantees.md#教訓の反映先)と[線引きの更新](architecture/guarantees.md#線引きの更新)に従う。履歴の固定と必須 check は[ループの決まり](architecture/data.md#ループの決まり)、定義は [`assets/stages/retrospective.md`](../assets/stages/retrospective.md) に置く。

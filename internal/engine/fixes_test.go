@@ -141,7 +141,7 @@ func TestGateQuestionContainsRecordedEvidence(t *testing.T) {
 	})
 	work := working(t, e, ctx)
 	write(t, e.Root(), "README.md", "# Evidence target\n")
-	progress := form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{"Recorded work performed"}, Confirmed: []string{"Recorded confirmed matter"}, Unconfirmed: []string{"Recorded unconfirmed matter"}}
+	progress := form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{"Recorded work performed"}, Confirmed: []string{"Recorded confirmed matter"}, Unconfirmed: []string{"Recorded unconfirmed matter"}, Report: json.RawMessage(`{"completion_conditions":[{"id":"C1","observed_result":"gate-report-marker"}]}`)}
 	if _, err := e.Submit(ctx, marshal(t, progress)); err != nil {
 		t.Fatal(err)
 	}
@@ -173,10 +173,13 @@ func TestGateQuestionContainsRecordedEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{progress.WorkPerformed[0], progress.Confirmed[0], progress.Unconfirmed[0], "Confirm the published documentation scope", "Diff file:"} {
+	for _, want := range []string{progress.WorkPerformed[0], progress.Confirmed[0], progress.Unconfirmed[0], "Confirm the published documentation scope", "Diff file:", "Stage report (worker-reported):", `"observed_result": "gate-report-marker"`} {
 		if asked.Instruction.Question == nil || !strings.Contains(asked.Instruction.Question.Text, want) {
 			t.Fatalf("gate omitted %q: %+v", want, asked)
 		}
+	}
+	if text := asked.Instruction.Question.Text; strings.Index(text, "gate-report-marker") > strings.Index(text, "Work performed:") {
+		t.Fatalf("gate shows the stage report after the work performed: %s", text)
 	}
 }
 
@@ -494,6 +497,8 @@ func TestWorkHistoryIsGenericAndFixedAtIssuance(t *testing.T) {
 	git(t, e.Root(), "add", ".")
 	git(t, e.Root(), "commit", "-qm", "Select all history")
 	working(t, e, ctx)
+	observeAnswer(t, e, "First human input marker")
+	observeAnswer(t, e, "Second human input marker\nwith a second line")
 	if _, err := e.Note(ctx, ledger.KindLesson, marshal(t, ledger.Lesson{Content: "First recorded lesson", Evidence: []form.Reference{}})); err != nil {
 		t.Fatal(err)
 	}
@@ -518,9 +523,15 @@ func TestWorkHistoryIsGenericAndFixedAtIssuance(t *testing.T) {
 	if !strings.Contains(string(original), "First recorded lesson") || !strings.Contains(string(original), "Tests failed before the implementation") {
 		t.Fatal("work history lacked a lesson or recorded evidence")
 	}
+	history := string(original)
+	first, second := strings.Index(history, "First human input marker"), strings.Index(history, "Second human input marker\nwith a second line")
+	if heading := strings.Index(history, "# Human inputs"); heading < 0 || first < heading || second < first {
+		t.Fatalf("work history lacked the human inputs in chronological order:\n%s", history)
+	}
 	if _, err := e.Note(ctx, ledger.KindLesson, marshal(t, ledger.Lesson{Content: "Later lesson must stay out", Evidence: []form.Reference{}})); err != nil {
 		t.Fatal(err)
 	}
+	observeAnswer(t, e, "Later human input must stay out")
 	if err := os.RemoveAll(filepath.Join(e.workRoot(), "brief")); err != nil {
 		t.Fatal(err)
 	}

@@ -59,7 +59,7 @@ func TestBundledCriteriaSelectTheirRequiredDocuments(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, stage := range append(template.Stages, template.OptionalStages...) {
-			if !slices.Equal(stage.Inputs, append(plan.DefaultInputs(), plan.Selection{Source: "git"})) {
+			if !slices.Equal(stage.Inputs, append(plan.RepositoryInputs(), plan.Selection{Source: "git"}, plan.Selection{Source: "authority"})) {
 				t.Fatalf("%s/%s does not express worker inputs as data", name, stage.ID)
 			}
 			for _, item := range stage.Checks {

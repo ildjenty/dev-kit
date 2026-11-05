@@ -49,6 +49,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -70,8 +74,8 @@
         }
       ],
       "gate": {
-        "required": false,
-        "reason": "Review the results of work required for the task"
+        "required": true,
+        "reason": "Review the increment demo and its assigned completion conditions"
       },
       "limits": {
         "max_rounds": 3,
@@ -98,6 +102,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],
@@ -153,6 +161,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -196,6 +208,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],
@@ -243,6 +259,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -288,6 +308,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],

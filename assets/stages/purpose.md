@@ -4,11 +4,11 @@
 
 The task, users of the change and its known purpose, existing `requirements.md`, and the plan's human-approved completion conditions with IDs and their grounds.
 
-Common inputs are `requirements.md`, the frozen norms, plan limits, relevant records from `structure.json`, placement guides for the change targets, difficult-to-change decisions in `rules.md` and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required `command:` check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
+Common inputs are `requirements.md`, the authority rules (`authority` source), the frozen norms, plan limits, relevant records from `structure.json`, placement guides for the change targets, difficult-to-change decisions in `rules.md` and the plan, available checks, and outputs from previous stages. Fix rounds also include previous findings and their IDs, required `command:` check output, and pre-commit output. Use outputs only from stages adopted by the plan; do not require absent stages.
 
 ## Decisions
 
-Clarify the users, purpose, and requirements of the change with the human instead of guessing. Reconcile them with existing requirements and agree on a proposal for completion conditions written in users' words, with IDs and grounds.
+Ask about matters the request leaves undecided: purpose, users, main usage scenarios, data, runtime environment, authentication and permissions, scale, performance, security, existing integrations, exclusions, deadlines, and priorities. List provisional assumptions and confirm them with the human. Reconcile the answers with existing requirements and agree on completion conditions written as concrete usage examples, with IDs and grounds.
 
 ## Deferred to later stages
 
@@ -20,7 +20,7 @@ None.
 
 ## Artifacts
 
-An explanation of how the purpose corresponds to the proposed completion conditions (`principles/review/purpose.md`), the agreed proposal with IDs and grounds, and `requirements.md` updated with requirements clarified with the human. Preserve decisions needed by future tasks following `stages/README.md#decisions-for-later-work`.
+An explanation of how the purpose corresponds to the proposed completion conditions (`principles/review/purpose.md`), the agreed proposal with IDs and grounds, the confirmed assumptions, and `requirements.md` updated with requirements clarified with the human. Preserve decisions needed by future tasks following `stages/README.md#decisions-for-later-work`.
 
 ## Completion conditions
 

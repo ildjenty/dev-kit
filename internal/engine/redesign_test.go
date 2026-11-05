@@ -132,22 +132,35 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 	if run.State != ledger.StageCompleted || run.Commit == "" {
 		t.Fatal("replanning preceded stage commit")
 	}
-	remaining := chainStages(proposal, "scope", "structure", "contract", "steps", "implement", "retrospective")
+	remaining := chainStages(proposal, "scope", "architecture", "increments")
 	remaining.Version = 2
 	remaining.CompletionConditions = []plan.CompletionCondition{{ID: "C1", Description: "The greeting command prints Hello and exits successfully"}}
 	propose(replanning.Instruction, remaining)
 	approve(next(), "plan_approval")
-	for _, stage := range []string{"scope", "structure", "contract", "steps"} {
+	for _, stage := range []string{"scope", "architecture", "increments"} {
 		work := next()
 		write(t, e.Root(), stage+".txt", "Agreed "+stage+" output\n")
 		submit(work, stage)
-		if stage == "scope" {
+		if stage != "increments" {
 			approve(next(), "stage_confirmation")
 		}
 	}
+	replanning = next()
+	if replanning.Instruction.Kind != form.InstructionPlan {
+		t.Fatalf("increments did not trigger replanning: %+v", replanning)
+	}
+	increment := chainStages(proposal, "design-1", "implement-1", "retrospective")
+	increment.Version = 3
+	increment.CompletionConditions = remaining.CompletionConditions
+	propose(replanning.Instruction, increment)
+	// The default deviation policy asks again because the increment plan changes the structure.
+	approve(next(), "plan_approval")
+	design := next()
+	write(t, e.Root(), "design.txt", "Agreed design output\n")
+	submit(design, "design-1")
 	implement := next()
 	write(t, e.Root(), "greet.sh", "#!/bin/sh\nprintf 'Hello\\n'\n")
-	submit(implement, "implement")
+	submit(implement, "implement-1")
 	failed, err := e.Next(ctx)
 	if err != nil || !strings.Contains(failed.Message, "[commands.test]") {
 		t.Fatalf("missing registration correction: %+v, %v", failed, err)
@@ -188,7 +201,7 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 		t.Fatal("registration did not take effect in round two")
 	}
 	write(t, e.Root(), "greet.sh", "#!/bin/sh\nprintf 'Hello\\n'\nexit 7\n")
-	submit(implement, "implement")
+	submit(implement, "implement-1")
 	correction := next()
 	if correction.Instruction.Kind != form.InstructionWork {
 		t.Fatalf("failed registered test did not produce a fix round: %+v", correction)
@@ -215,7 +228,7 @@ func TestRequirementOnlyDefaultLifecycle(t *testing.T) {
 		t.Fatal("the test did not reject a greeting with correct stdout and a failing exit status")
 	}
 	write(t, e.Root(), "greet.sh", "#!/bin/sh\nprintf 'Hello\\n'\nexit 0\n")
-	submit(correction, "implement")
+	submit(correction, "implement-1")
 	// The registration was approved before round two, so the completion commit does not ask again.
 	retrospective := next()
 	if retrospective.Instruction == nil || retrospective.Instruction.Question != nil {

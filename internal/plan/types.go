@@ -87,9 +87,14 @@ const (
 	HistoryAll      History = "all"
 )
 
+// RepositoryInputs returns the selections rendered by dedicated repository fields.
+func RepositoryInputs() []Selection {
+	return []Selection{{Source: "requirements", Select: ""}, {Source: "rules", Select: ""}, {Source: "structure", Select: ""}}
+}
+
 // DefaultInputs returns the default knowledge selections for each role.
 func DefaultInputs() []Selection {
-	return []Selection{{Source: "requirements", Select: ""}, {Source: "rules", Select: ""}, {Source: "structure", Select: ""}}
+	return append(RepositoryInputs(), Selection{Source: "authority", Select: ""})
 }
 
 // Check selects a configured check and binds it to this task.

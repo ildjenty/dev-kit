@@ -41,6 +41,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -87,6 +91,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -130,6 +138,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],
@@ -176,6 +188,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],

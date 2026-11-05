@@ -201,7 +201,7 @@ func (e *Engine) productDocuments(ctx context.Context, ref, productRef string, s
 // additionalInputs resolves selections not rendered by the repository fields.
 func (e *Engine) additionalInputs(ctx context.Context, ref, productRef string, inputs []plan.Selection) ([]brief.Document, error) {
 	selections := slices.DeleteFunc(slices.Clone(inputs), func(selection plan.Selection) bool {
-		return slices.Contains(plan.DefaultInputs(), selection)
+		return slices.Contains(plan.RepositoryInputs(), selection)
 	})
 	return e.selectionDocuments(ctx, ref, productRef, selections)
 }

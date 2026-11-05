@@ -35,7 +35,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 ### brief
 
-- **責務**: `stages` ソースから選んだステージ定義、計画(ID 付きの完了条件と上限)、前のステージの出力、計画のステージの `inputs` で選んだ知識、リポジトリの事実から依頼文を組み立てる。計画者と計画の判定者は `[planning] inputs` と `[plan_check] inputs`、作業者はステージの `inputs` に入力の選び方を持ち、既定で要件と規則を渡す。判定依頼には 一覧の check の `criteria` で明示した基準の文書を含める。修正ラウンドには前回の指摘と ID、検証コマンドと pre-commit の出力を取り込む。規範は全体を固定するが、本文で渡す知識は選び方で絞る。その他の規範は固定した写しのソース名・ID・パスの一覧で渡し、編集中の原本を読ませない。成果も固定した本文と作成・編集先を示し、要件が未作成なら作成先を案内する。共通の JSON Schema はバイナリから受け取り、ステージ固有の報告の形はソースから受け取る。参照先は同梱する。補助のスキーマは出力の参照先と check の `schemas` の和集合だけを渡す。配置の既定値は[所有と生存期間](data.md#所有と生存期間)に従う。
+- **責務**: `stages` ソースから選んだステージ定義、計画(ID 付きの完了条件と上限)、前のステージの出力、計画のステージの `inputs` で選んだ知識、リポジトリの事実から依頼文を組み立てる。計画者と計画の判定者は `[planning] inputs` と `[plan_check] inputs`、作業者はステージの `inputs` に入力の選び方を持ち、既定の入力は[依頼の入力](data.md#依頼の入力)に従う。判定依頼には 一覧の check の `criteria` で明示した基準の文書を含める。修正ラウンドには前回の指摘と ID、検証コマンドと pre-commit の出力を取り込む。規範は全体を固定するが、本文で渡す知識は選び方で絞る。その他の規範は固定した写しのソース名・ID・パスの一覧で渡し、編集中の原本を読ませない。成果も固定した本文と作成・編集先を示し、要件が未作成なら作成先を案内する。共通の JSON Schema はバイナリから受け取り、ステージ固有の報告の形はソースから受け取る。参照先は同梱する。補助のスキーマは出力の参照先と check の `schemas` の和集合だけを渡す。配置の既定値は[所有と生存期間](data.md#所有と生存期間)に従う。
 - **持つデータ**: brief の型を持つ。
 - **公開する契約**: brief の型と、brief を組み立てる関数を公開する。
 - **依存**: ステージの型を持つ plan と、テンプレートを持つ form に依存する。
@@ -47,7 +47,7 @@ plan・brief・check・router・form がドメインの核を担い、engine が
 
 単位の作業者への brief には、単位の説明・担当する範囲と作業場所の絶対パスを載せ、そこでだけ編集させる。合流がぶつかった場合の修正ラウンドには、ぶつかったファイルと単位を載せる。合流後の判定依頼には、単位 ID を付けて欠けなく保持した各単位の終了ブロックと、単位の変更・マージ結果を含むステージ開始時点からの累積差分を使う。
 
-brief の入力は[依頼の入力](data.md#依頼の入力)に従い、採用された成果・今の材料・経緯を分ける。経緯は `history` に従って記録から決定的に絞り、固定した索引で渡す。本文の採用された成果はステージ・単位の `outputs` で選ぶ。判定対象のコマンド結果・有効な承認・引用された証拠と参照先は常に判定者へ渡す。規則・要件・構造・基準・スキーマの本文は1回だけ載せ、JSON の部分は ID とハッシュだけにする。上限 `[briefs] max_bytes` を超える分はファイルへ出して一覧と超過の記録を残す。
+brief の入力は[依頼の入力](data.md#依頼の入力)に従い、採用された成果・今の材料・経緯を分ける。経緯は `history` に従って記録から決定的に絞り、固定した索引で渡す。本文の採用された成果はステージ・単位の `outputs` で選ぶ。判定対象のコマンド結果・有効な承認・引用された証拠と参照先は常に判定者へ渡す。規則・要件・構造・権限の文書・基準・スキーマの本文は1回だけ載せ、JSON の部分は ID とハッシュだけにする。上限 `[briefs] max_bytes` を超える分はファイルへ出して一覧と超過の記録を残す。
 
 ### check
 
@@ -119,7 +119,7 @@ start は HEAD の存在と規範・devkit.toml・agent 定義のコミット済
 
 中断中は新しい単位の指示と合流を開始せず、起動済みの作業者の結果は受理条件を満たせば記録してよい。単位の結果待ちでは Stop が停止を許す。不正な最終メッセージに指示 ID がなく、同じ runner の複数の未受理の指示のどれにも結び付けられない場合は、観測を残して人に問う。中止・作業完了時は変更のない単位の worktree を削除し、変更の残るものは保持して場所を知らせる。破棄は人が git で行う。
 
-計画の承認はパターンとの違いによらず、`[approval] plan` で定める。既定の `"requirements"` は最初の計画、直前に人が承認した完了条件の ID または文面が変わる計画、外部操作を宣言した計画を人に確認する。`"always"` はすべてのバージョンを確認する。`"deviation"` は最初の計画に加え、前に承認した計画の残りと構造が違う計画、外部操作を宣言した計画を確認する。`open_questions` が空でない計画は承認方針によらず人に確認し、未決事項を残したままの承認を拒否する。同じ完了条件で外部操作も未決事項もない再計画は、既定では再確認しない。
+計画の承認と未決事項の解消は[計画のバージョン](data.md#計画のバージョン)に従う。
 
 未決事項への回答は、人が推奨案に同意した場合も、セッションのエージェントが `devkit answer --interpretation rejected` と回答本文で記録する。計画者が回答を完了条件へ反映し、未決事項を解消した計画を再提案する。
 
@@ -133,7 +133,7 @@ start は HEAD の存在と規範・devkit.toml・agent 定義のコミット済
 
 未登録の `command:` は check の `FAIL` として作業者に返し、検証の手段と登録を作らせる。`devkit.toml` の登録はループ自身の変更として `[approval] meta_loop_edit` に従い確認し、次のラウンド開始時のスナップショットから使う。
 
-作業の brief と判定依頼は、`history` に従う範囲の経緯を指示発行時点で固定した索引から参照する。全判定と指摘、FAIL と NOT ASSESSED の経緯、ラウンド数、人の却下・訂正・作り直しの指示、note の教訓で伝えた見逃しを devkit が履歴にまとめ、規範の一覧とともに参照できるようにする。振り返りのステージ定義と観点 `harness` がこの履歴を使う。再発防止の反映先は `[lessons] destinations` の優先順に従い、反映しない理由も残す。`rules` の強制手段が未実装の項目と繰り返す違反は、機械の検査に移す候補とする。規範全体の棚卸しは必要が見えた場合に行う。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。
+作業の brief と判定依頼は[依頼の入力](data.md#依頼の入力)に従って経緯を固定し、振り返りのステージ定義と観点 harness に渡す。振り返りの再発防止は[教訓の反映先](guarantees.md#教訓の反映先)、人の反応による改善は[線引きの更新](guarantees.md#線引きの更新)に従う。
 
 engine は全体と役割ごとの `max_concurrent` を両方照合し、発行済みで未受理のサブエージェント指示を数える。単位の作業、検証コマンド後の判定者の check、check ごとの判定直前の指示のうち独立したものをまとめて返し、空いた分だけ次の `next` で発行する。単位の成果に依存する仕事は別のステージにする。単位の報告は単位 ID ごとに欠けなく保持して合流後の判定へ渡し、ステージの報告へまとめ直さない。ステージの完了時は終了ブロックの `commit_message` を使い、省略時だけ `[git] commit_message` のテンプレートで補う。
 
@@ -198,13 +198,13 @@ PreToolUse と SubagentStop は、agent の名前から `devkit.toml` の[役割
 - `[roles] read_only_tools = ["Read", "Glob", "Grep"]` は、Claude Code の `judge`・`plan` の役割の agent の定義に許す `tools` の集合である。
 - `[checks.<観点>]` は任意の description と runner・criteria・schemas・history・brief_by_planner の一覧である。description は計画者の check 一覧に使い、未指定または空なら従来の基準文書やコマンドからの説明を使う。計画とパターンは観点名を参照する。
 - `[[loop.stage]]` と `[[loop.path]]` は[ループの決まり](data.md#ループの決まり)を定める。定義の決まりと作業の経路の決まりを、固定した規範で検査する。
-- `[planning] max_rounds = 3` は計画の判定のやり直しの上限である。`[planning] inputs` と `[plan_check] inputs` は既定で要件・規則・構造を選ぶ。パターンには置かない。
+- `[planning] max_rounds = 3` は計画の判定のやり直しの上限である。`[planning] inputs` と `[plan_check] inputs` の既定は[依頼の入力](data.md#依頼の入力)に従う。パターンには置かない。
 - `[limits] max_rounds_ceiling = 3` と `max_no_progress_ceiling = 2` はステージ上限の天井である。超える計画を拒否する。
 - `[planning] role = "planner"` は計画を作る役割であり、`plan` の種類でなければならない。
 - `[plan_check] aspect = "plan"`・`runner = "judge"` は計画の check の名前と実行主体である。runner は `judge` の種類の役割の ID か、登録済みの判定コマンドの名前である。runner の agent は計画者の役割の agent と違うものにする。`criteria` に基準の選び方も持ち、`schemas` の既定は `["plan", "plan-template", "finding"]` である。判定コマンドなら devkit が実行し、役割ならその agent への指示を出す。
 - `[router] human_confirmation` は `dependency_changed` と `target_changed_again` の分類だけを変更できる。check の結果から次の行動への対応は固定である。ループ自身の変更の確認は `[approval] meta_loop_edit` だけで決まる。
-- `[sources.<名前>]` は名前付きの知識の接続先を定める。`adapter = "files"`、`path`、`norm`、書き込み能力 `writable` を持つ。既定は[所有と生存期間](data.md#所有と生存期間)に従い、principles・stages・plans・rules・git・templates を規範、requirements・structure を成果とする。規範は空の選び方で全体を列挙できなければならない。リポジトリ外のソースは読み取り専用であり、`writable = true` を書くと設定エラーになる。
-- `[approval] plan = "requirements"` は最初の計画、完了条件の変更、外部操作を確認する。`"always"` はすべてのバージョン、`"deviation"` は最初の計画と、前に承認した計画の残りとの構造の違い、外部操作を確認する。未決事項はいずれの方針でも確認する。パターンとの違いは承認理由にしない。
+- `[sources.<名前>]` は名前付きの知識の接続先を定める。`adapter = "files"`、`path`、`norm`、書き込み能力 `writable` を持つ。既定は[所有と生存期間](data.md#所有と生存期間)に従い、principles・stages・plans・rules・git・authority・templates を規範、requirements・structure を成果とする。規範は空の選び方で全体を列挙できなければならない。リポジトリ外のソースは読み取り専用であり、`writable = true` を書くと設定エラーになる。
+- `[approval] plan` の既定値と承認の条件は[計画のバージョン](data.md#計画のバージョン)に従う。
 - `[approval] meta_loop_edit = "confirm"` はどのステージでもループ自身の変更を確認する。`"allow"` も指定できる。
 - `[git] commit_message = "devkit: {stage} ({work_id})"` は `{stage}`・`{work_id}`・`{task}` を使える。`allow_empty_commit = true` は変更のないステージも空のコミットを作る。false ならコミットせず、その時点の HEAD で完了を記録する。
 - `[classification] dependency_files` は依存の宣言として扱うファイルの glob の一覧である。既定は各ディレクトリの `go.mod`・`go.sum`・`package.json`・`package-lock.json`・`yarn.lock`・`pnpm-lock.yaml`・`Cargo.toml`・`Cargo.lock`・`Gemfile`・`Gemfile.lock`・`requirements.txt`・`pyproject.toml`・`poetry.lock`・`uv.lock`・`composer.json`・`composer.lock` を対象とする。
@@ -220,13 +220,13 @@ PreToolUse と SubagentStop は、agent の名前から `devkit.toml` の[役割
 
 当面はこのリポジトリをクローンして `install.sh` を実行し、利用者の環境に Go を必要とする。`install.sh` は Go で `devkit` をビルドし、PATH の通った場所に配置する。正式な配布方法は後で決める。
 
-- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、ソース設定の既定のリポジトリ内の場所に置く原則と用途別の判定基準・ステージ定義・パターン・テンプレート・規則・git の運用の文書の初期内容、ignore、ホスト設定、既定の役割の agent である `devkit-worker`・`devkit-judge`・`devkit-planner` のサブエージェント定義、skill とリンクを用意する。単位の作業場所 `.devkit/worktrees/` も ignore する。文章の規範は assets からコピーし、リポジトリが所有する。`init` は変更を人に確認したあと、導入したファイルをコミットする。`--no-commit` でコミットを省略できる。`uninstall` は `init` の逆を行う。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
+- **責務**: `init` で[利用側の配置](layout.md#利用側のリポジトリ)を用意し、[権限の境界](guarantees.md#権限の境界)に従って設定を追記する。`devkit.toml`、ソース設定の既定のリポジトリ内の場所に置く原則と用途別の判定基準・ステージ定義・パターン・テンプレート・規則・git の運用の文書・権限の文書の初期内容、ignore、ホスト設定、既定の役割の agent である `devkit-worker`・`devkit-judge`・`devkit-planner` のサブエージェント定義、skill とリンクを用意する。単位の作業場所 `.devkit/worktrees/` も ignore する。文章の規範は assets からコピーし、リポジトリが所有する。`init` は変更を人に確認したあと、導入したファイルをコミットする。`--no-commit` でコミットを省略できる。`uninstall` は `init` の逆を行う。指示ファイルとの境界は[指示ファイルとホスト設定](layout.md#指示ファイルとホスト設定)に従う。既存の git hook の扱いは[完了条件](guarantees.md#完了条件)に従う。既存の設定・skill は上書きせず、処理は冪等にする。
 - **持つデータ**: 導入する固定物と設定の断片、導入先との差分、doctor の照合結果を扱う。
 - **公開する契約**: `init`・`uninstall`・`doctor` に対応する導入・削除・照合の操作を公開する。`devkit uninstall [--yes]` は変更の一覧を示して人の確認を待ち、`--yes` で確認を省略する。doctor の項目は[doctor の確認項目](#doctor-の確認項目)に従う。
 - **依存**: config、kit、ledger、ledger/fsstore、workspace に依存する。
 - **置くもの・置かないもの**: 導入先の構成と登録・削除・照合を置く。
 
-`uninstall` はスナップショット展開先のディレクトリに書き込み権限を戻してから、実行の記録 `.devkit/run/` と skill のリンクを削除する。`init` が既定のソースのリポジトリ内の場所に置いた原則と用途別の判定基準・ステージ定義・パターン・テンプレート・規則、および skill・サブエージェント定義は、配布した初期内容と一致するものを削除する。ホスト設定(`.claude/settings.json`・`.codex/hooks.json`・`.codex/config.toml`・`.codex/rules/devkit.rules`)、`devkit.toml`、`.gitignore` から kit の断片を取り除き、空になったファイルとディレクトリを削除する。利用者が書き換えたファイルと、利用者の設定が残る `devkit.toml` は削除せず、一覧で知らせる。処理は冪等であり、git hook とバイナリは扱わない。
+`uninstall` はスナップショット展開先のディレクトリに書き込み権限を戻してから、実行の記録 `.devkit/run/` と skill のリンクを削除する。`init` が既定のソースのリポジトリ内の場所に置いた原則と用途別の判定基準・ステージ定義・パターン・テンプレート・規則・git の運用の文書・権限の文書、および skill・サブエージェント定義は、配布した初期内容と一致するものを削除する。ホスト設定(`.claude/settings.json`・`.codex/hooks.json`・`.codex/config.toml`・`.codex/rules/devkit.rules`)、`devkit.toml`、`.gitignore` から kit の断片を取り除き、空になったファイルとディレクトリを削除する。利用者が書き換えたファイルと、利用者の設定が残る `devkit.toml` は削除せず、一覧で知らせる。処理は冪等であり、git hook とバイナリは扱わない。
 
 導入時の案内は、`default` と `fix` が `command:test` を必須とし、未登録なら最初の作業がテストと検証コマンドを作って登録し、人が登録を確認することを伝える。
 
@@ -234,15 +234,15 @@ PreToolUse と SubagentStop は、agent の名前から `devkit.toml` の[役割
 
 kit は [assets パッケージ](#assets-パッケージ)がバイナリに埋め込む配布物を供給する。JSON Schema、分類表と役割の既定値、ホスト設定の断片はバイナリから供給する。JSON Schema は記録とバイナリの約束であり、リポジトリで育てる対象にはしない。人への確認の分類は `devkit.toml` の `[router] human_confirmation` で上書き・追加・削除できる。check の結果から次の行動への対応は固定である。役割は `devkit.toml` の `[roles.<id>]` で上書き・追加できる。
 
-原則と用途別の判定基準・ステージ定義・パターン・テンプレート・規則・git の運用の文書の初期内容は `init` に渡す。コピーは install が既定のソースのリポジトリ内の置き場所へ行い、以後はリポジトリが所有する規範として育てる。skill とサブエージェント定義もリポジトリに置く。規則の既定は、どのリポジトリにも当てはまるものだけとする。`docs/` とリポジトリ直下の `README.md` は配布しない。
+原則と用途別の判定基準・ステージ定義・パターン・テンプレート・規則・git の運用の文書・権限の文書の初期内容は `init` に渡す。コピーは install が既定のソースのリポジトリ内の置き場所へ行い、以後はリポジトリが所有する規範として育てる。skill とサブエージェント定義もリポジトリに置く。規則の既定は、どのリポジトリにも当てはまるものだけとする。`docs/` とリポジトリ直下の `README.md` は配布しない。
 
-規範内の `principles/…`・`stages/…`・`templates/…`・`rules.md` はリポジトリ側の置き場所の論理名である。brief には論理名とスナップショット内の実際のパスの対応を渡し、`schemas/…` はバイナリから出力スキーマの本文として渡す。設計文書や部品の契約を読むことは前提にしない。
+規範内の `principles/…`・`stages/…`・`templates/…`・`rules.md`・`authority.md` はリポジトリ側の置き場所の論理名である。brief には論理名とスナップショット内の実際のパスの対応を渡し、`schemas/…` はバイナリから出力スキーマの本文として渡す。設計文書や部品の契約を読むことは前提にしない。
 
 配布物とバイナリが持つ定義の供給を公開する。他の処理モジュールには依存せず、埋め込みの供給源を assets パッケージから読む。リポジトリの規範と埋め込みの一致は照合しない。`kit_version` は記録形式とバイナリの互換性の識別であり、[Work](data.md#作業-work) に記録する。状態機械の進行やドメインの判断は持たない。
 
 ### view
 
-- **責務**: 1作業(1課題)を表示するため、ledger と、構造ステージを使う場合の構造の記録(既定 `.devkit/structure.json`、`[sources.structure]` で変更可能)から静的 HTML を生成する。[表示の構成](#view-の表示構成)に従い、冒頭、主表示、判断対象ごとの表示、確認範囲の地図(完了条件ごとの対象のバージョン・方法・確認した範囲・未確認の範囲の一覧)、構造の図を描く。網羅性は「`submit` が成果物を記録した範囲」とする。図は Mermaid のテキストとする。構造の本文と取得できる元のバージョンの識別子は、cmd/devkit がソースから取得して渡す。`schemas/structure.json` に従う JSON のときだけ構造図を描き、それ以外は本文を表示する。問いの表示と停止は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
+- **責務**: 1作業(1課題)を表示するため、ledger と、architecture と design が育てる構造の記録(既定 `.devkit/structure.json`、`[sources.structure]` で変更可能)から静的 HTML を生成する。[表示の構成](#view-の表示構成)に従い、冒頭、主表示、判断対象ごとの表示、確認範囲の地図(完了条件ごとの対象のバージョン・方法・確認した範囲・未確認の範囲の一覧)、構造の図を描く。網羅性は「`submit` が成果物を記録した範囲」とする。図は Mermaid のテキストとする。構造の本文と取得できる元のバージョンの識別子は、cmd/devkit がソースから取得して渡す。`schemas/structure.json` に従う JSON のときだけ構造図を描き、それ以外は本文を表示する。問いの表示と停止は[状態遷移と受理条件](data.md#状態遷移と受理条件)に従う。
 - **持つデータ**: 記録と構造の本文、描画できる場合の解析済みの値、表示用の派生値、生成する HTML を扱う。新着は人が最後に回答・承認した時点より後に追加された記録とする。
 - **公開する契約**: `devkit view` で静的 HTML を生成する。
 - **依存**: ledger、問いを描画する form、ステージ名を持つ plan に依存する。

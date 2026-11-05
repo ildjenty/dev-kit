@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"slices"
@@ -102,7 +103,7 @@ func (e *Engine) stageQuestionText(ctx context.Context, stage plan.Stage, round 
 		}
 	}
 	var text strings.Builder
-	fmt.Fprintf(&text, "%s\n\nGate reason: %s\n\nWork performed:\n", reason, stage.Gate.Reason)
+	fmt.Fprintf(&text, "%s\n\nGate reason: %s\n\n%sWork performed:\n", reason, stage.Gate.Reason, gateReportText(progress.Report))
 	for _, item := range progress.WorkPerformed {
 		fmt.Fprintf(&text, "- %s\n", item)
 	}
@@ -125,6 +126,14 @@ func (e *Engine) stageQuestionText(ctx context.Context, stage plan.Stage, round 
 	}
 	text.WriteString("\n" + comparison)
 	return text.String(), nil
+}
+
+// gateReportText shows the worker's stage report so the human sees its decisions and observations first.
+func gateReportText(report json.RawMessage) string {
+	if len(report) == 0 {
+		return ""
+	}
+	return "Stage report (worker-reported):\n" + reportText(report, nil) + "\n\n"
 }
 
 // decisionFindings renders the findings of the judged round that need a human decision.

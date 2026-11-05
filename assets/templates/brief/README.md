@@ -14,7 +14,7 @@ Read the full generated request and its references, and retain its `instruction_
 
 `templates/brief/unit.md.tmpl` uses the work inputs plus `Unit` (`ID`, `Description`, `Scope`) and the absolute `WorktreePath`. It directs a `devkit-worker` to edit only that worktree and scope and return `schemas/progress.json` as its final message instead of submitting. The parent accepts hook observations and merges fixed unit SHAs for one stage judgment.
 
-Template `planner_inputs` and `judge_inputs` select knowledge for planners and judges. Stage `inputs` selects worker knowledge. An omitted or null selection list defaults to requirements, rules, and structure; an explicit array replaces those defaults, and an empty array selects no knowledge. The bundled templates express the default selections as data. Rules section names and guidance belong in these distributed request templates.
+`[planning] inputs` and `[plan_check] inputs` select knowledge for planners and plan judges. Stage `inputs` selects worker knowledge. An omitted or null selection list defaults to requirements, rules, structure, and authority; an explicit array replaces those defaults, and an empty array selects no knowledge. The bundled patterns express the worker selections as data. Rules section names and guidance belong in these distributed request templates.
 
 ## Flow context
 

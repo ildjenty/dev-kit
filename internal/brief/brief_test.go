@@ -74,7 +74,7 @@ func TestBuildWork(t *testing.T) {
 			LayoutGuides:          []Document{{Path: "internal/save/README.md", Content: "Storage layout guide"}},
 			Rules:                 Document{Path: ".devkit/rules.md", Content: "Existing rules"},
 			IrreversibleDecisions: []string{"Irreversible rule decision"},
-			AvailableChecks:       []plan.Check{{Aspect: "command:test"}},
+			AvailableChecks:       []plan.Check{{Aspect: "command:test"}, {Aspect: "behavior", Required: true, CompletionConditionIDs: []string{"C7"}}},
 		},
 		Norms:            []Document{{Path: "AGENTS.md", Content: "Fixed instructions"}},
 		PreviousFindings: []form.Finding{{ID: "F1", Blocking: true, Kind: form.AutoFixable, Scenario: "Saving fails"}},
@@ -103,7 +103,7 @@ func TestBuildWork(t *testing.T) {
 		"3 rounds", "2 consecutive rounds without progress", "internal/save/README.md", "Storage layout guide",
 		".devkit/rules.md", "Existing rules", "Irreversible plan decision",
 		"AGENTS.md", "Fixed instructions", "F1", "Saving fails", "command:test", "Exit code: 1",
-		input.PreCommitOutput, `"instruction_id": "work-round-1"`, string(form.TerminationQuestion), string(form.TerminationStopped),
+		input.PreCommitOutput, `"instruction_id": "work-round-1"`, `"completion_condition_ids": [`, `"C7"`, string(form.TerminationQuestion), string(form.TerminationStopped),
 	} {
 		if !strings.Contains(got.Text, want) {
 			t.Errorf("request does not contain %q", want)

@@ -143,7 +143,7 @@ func (c Config) DefaultPlanName() string {
 // PlanApproval returns the effective plan approval policy.
 func (c Config) PlanApproval() string {
 	if c.Approval.Plan == "" {
-		return "requirements"
+		return "deviation"
 	}
 	return c.Approval.Plan
 }

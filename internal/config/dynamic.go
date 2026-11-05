@@ -8,7 +8,7 @@ import (
 
 func effectiveInputs(inputs []Selection) []Selection {
 	if inputs == nil {
-		return []Selection{{Source: "requirements"}, {Source: "rules"}, {Source: "structure"}}
+		return []Selection{{Source: "requirements"}, {Source: "rules"}, {Source: "structure"}, {Source: "authority"}}
 	}
 	return slices.Clone(inputs)
 }

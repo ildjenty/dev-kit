@@ -37,7 +37,11 @@ func TestPlanApprovalPolicies(t *testing.T) {
 		{"always first", "always", nil, func(*Plan) {}, true},
 		{"always repeated", "always", &approved, func(*Plan) {}, true},
 		{"deviation first", "deviation", nil, func(*Plan) {}, true},
-		{"deviation changed requirements", "deviation", &approved, func(p *Plan) { p.CompletionConditions[0].Description = "Changed condition" }, false},
+		{"deviation changed text", "deviation", &approved, func(p *Plan) { p.CompletionConditions[0].Description = "Changed condition" }, true},
+		{"deviation changed ID", "deviation", &approved, func(p *Plan) { p.CompletionConditions[0].ID = "C3" }, true},
+		{"deviation same plan", "deviation", &approved, func(*Plan) {}, false},
+		{"deviation reordered conditions", "deviation", &approved, func(p *Plan) { slices.Reverse(p.CompletionConditions) }, false},
+		{"deviation approved gate", "deviation", &approved, func(p *Plan) { p.Stages[0].Gate.Required = true }, true},
 		{"deviation external", "deviation", nil, func(p *Plan) { p.ExternalOperations = []ExternalOperation{{Kind: "publish"}} }, true},
 		{"deviation gate", "deviation", nil, func(p *Plan) { p.Stages[0].Gate.Required = true }, true},
 	} {

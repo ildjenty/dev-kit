@@ -4,9 +4,9 @@ A stage definition is Markdown named `<stage_id>.md`, with an initial `# <name>`
 
 - `stages/purpose.md`: 0 Purpose.
 - `stages/scope.md`: 1 Scope.
-- `stages/structure.md`: 2 Structure.
-- `stages/contract.md`: 3 Contract.
-- `stages/steps.md`: 4 Steps.
+- `stages/architecture.md`: 2 Architecture.
+- `stages/increments.md`: 3 Increments.
+- `stages/design.md`: 4 Design.
 - `stages/implement.md`: 5 Implementation.
 - `stages/edit.md`: Document editing.
 - `stages/verification.md`: Verification.
@@ -19,7 +19,7 @@ The `transitions.done` value is a stage ID to continue, `null` to finish, or `"r
 
 ## Work inputs and submission
 
-Use the task, human-approved completion conditions with IDs, `requirements.md`, frozen norms, plan limits, relevant records from `structure.json`, difficult-to-change decisions in `rules.md` and the plan, available checks, and outputs from adopted previous stages. Every work brief references a work-history file fixed at instruction issue time; stage definitions determine how to use it. Fix rounds also use previous findings and their IDs, required `command:` check output, and pre-commit output. Do not require outputs from stages absent from the plan. Pass previous outputs and the conditions and sources attached to decisions and temporary state unchanged; agents and humans assess whether those conditions hold.
+Use the task, human-approved completion conditions with IDs, `requirements.md`, authority rules (`authority` source), frozen norms, plan limits, relevant records from `structure.json`, difficult-to-change decisions in `rules.md` and the plan, available checks, and outputs from adopted previous stages. Every work brief references a work-history file fixed at instruction issue time; stage definitions determine how to use it. Fix rounds also use previous findings and their IDs, required `command:` check output, and pre-commit output. Do not require outputs from stages absent from the plan. Pass previous outputs and the conditions and sources attached to decisions and temporary state unchanged; agents and humans assess whether those conditions hold.
 
 Write completion conditions in prose. For each condition, select a check run by a verification command, a judge, or a judgment command, or a human gate; checks need not be mechanical. Verify conditions during requirements definition through judges and human gates. The plan judge assesses the suitability and coverage of verification, and the human reviews it during plan approval; devkit does not enforce a formal assignment of verification to every condition.
 
@@ -33,7 +33,7 @@ Workers of split-stage units follow the optional `unit_report` schema for their 
 
 ## Decisions for later work
 
-Runtime records stay under the fixed, untracked `.devkit/run/` directory. Preserve decisions needed by future tasks in `requirements.md` for repository requirements, `structure.json` for modules, responsibilities, placement, and dependencies, or `rules.md` for shared difficult-to-change decisions with enforcement and grounds. Runtime notes and previous-stage outputs alone do not preserve those decisions for later tasks. Changes to `rules.md` and other norms require confirmation as loop edits under the configured approval policy; requirements and structure updates are work outputs assessed by stage checks.
+Runtime records stay under the fixed, untracked `.devkit/run/` directory. Preserve decisions needed by future tasks in `requirements.md` for repository requirements, `structure.json` for modules, responsibilities, placement, and dependencies, or `rules.md` for shared difficult-to-change decisions with enforcement and grounds. Use the authority rules to identify human decisions and delegated decisions. Put decisions in termination-block notes using `schemas/decision.json`. A decided `decider: "human"` decision cites in `evidence` the question and answer record IDs, or the gate question ID, that decided it. A stage with a fixed human gate may instead propose human decisions for that gate: give options, a recommendation, and a reason, mark them `provisional: true`, and leave the answer references empty; the gate approval decides them. Later stages cite that gate's question ID as the ground for decisions approved there. Preserve those references in design documents or `rules.md` alongside the decisions, and keep `structure.json` consistent with them. Runtime notes and previous-stage outputs alone do not preserve those decisions for later tasks. Changes to `rules.md` and other norms require confirmation as loop edits under the configured approval policy; requirements and structure updates are work outputs assessed by stage checks.
 
 ## Completion finalization
 

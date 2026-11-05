@@ -1,6 +1,6 @@
 # Review documents
 
-A judge-run check names its review criteria in the plan template as selections from knowledge sources, for example `"criteria": [{"source": "principles", "select": "review/test.md"}, {"source": "principles", "select": "testing.md"}]`. The documents in `principles/review/` state, for one kind of review, what to check, which other documents are part of the criteria, what blocks, what not to report, and which exemptions apply. The check name (`aspect`) only names the judgment; devkit does not read a review document's structure.
+A judge-run check names its review criteria in `[checks.<aspect>] criteria` in `devkit.toml` as selections from norm sources, for example `criteria = [{ source = "principles", select = "review/test.md" }, { source = "principles", select = "testing.md" }]`. Review criteria specify what to check, which other documents are part of the criteria, what blocks, what not to report, and which exemptions apply. The check name (`aspect`) only names the judgment; devkit does not read a review document's structure.
 
 Devkit does not follow references inside a document. A check that selects a review document also selects every document that the review names as part of its criteria, from the source that holds it. Only norm sources can supply criteria. Schemas named as `schemas/…` are owned by the binary and supplied in the request; they are not selected.
 
@@ -10,11 +10,12 @@ The repository owns and maintains these documents. A change to a review document
 
 - `principles/review/purpose.md`: Purpose.
 - `principles/review/irreversible.md`: Irreversible items.
-- `principles/review/structure.md`: Structure.
+- `principles/review/structure.md`: Module structure in architecture and design.
 - `principles/review/consistency.md`: Consistency.
 - `principles/review/wording.md`: Wording.
-- `principles/review/contract.md`: Contracts.
-- `principles/review/steps.md`: Steps.
+- `principles/review/contract.md`: Interfaces, types, and failures in design.
+- `principles/review/increments.md`: Release increments.
+- `principles/review/authority.md`: Human decisions and delegated authority.
 - `principles/review/diff.md`: Diff.
 - `principles/review/test.md`: Tests of completion conditions and public contracts.
 - `principles/review/behavior.md`: Behavior verification.

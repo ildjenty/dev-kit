@@ -97,7 +97,9 @@ Put undecidable requirements in `open_questions` for the human. Answers remain f
 
 ## Plan contents
 
-Use the original user request, task, repository requirements, and available patterns to propose the smallest sufficient loop. The prioritized pattern is a reference, not a constraint. You may reference any listed pattern; read its exact content at the fixed path and copy its name and the supplied content hash into `pattern`. Do not compute hashes yourself.
+Use the original user request, task, repository requirements, authority rules, and available patterns to propose the plan. Follow the flow in plans/README.md.
+
+When dividing work into increments, assign completion condition IDs and keep each within one implement instance's limits. Make the first a thin skeleton from the user interface through to data, including startup and testing with explicit verification conditions. One increment is enough for a small task. The prioritized pattern is a reference, not a constraint. You may reference any listed pattern; read its exact content at the fixed path and copy its name and the supplied content hash into `pattern`. Do not compute hashes yourself.
 List undecidable requirements in `open_questions`; incorporate human clarification in the next proposal. Human-approved completion conditions define completion. Give every completion condition an appropriate verification check or human gate; the plan judge and human assess coverage.
 
 Assign each stage a unique instance `id` and a catalog `definition` (omitting definition uses id). Reuse definitions freely with distinct instance IDs. Reuse an ID that ran in this work only when rerunning that work. A back-triggered plan must contain its return instance. Back targets are current instances or instances that ran in this work. All planned instances must be reachable from start_stage by done transitions. Ask and scalar fix target the same instance. Done may name the next instance, replan, or null.
@@ -106,7 +108,7 @@ Use only listed definitions, configured roles, configured check names, and selec
 
 Choose stage reports, unit reports, human prompts, inputs, output selections, history, gates, limits, correction roles, and instructions as needed within the rules. Output selections may name an instance or all instances of a definition. Split units have unique plan-wide IDs, descriptions, and nonoverlapping scopes. Units have no after dependencies; put dependent work in later stages. Checks, gates, questions, and replanning stay at stage level.
 
-Pattern differences are displayed for the human and do not determine default approval. The first plan, changed completion conditions, external operations, and open questions require approval under the default policy. Under deviation, structure is compared with the last approved remaining plan. Fill external operation hashes only from verified supplied inputs. For revised proposals, incorporate human instructions and findings; for replanning, rebuild the supplied remaining work.
+Assign each verification instance's checks their completion condition IDs. Follow the approval policy in plans/README.md and the fixed devkit.toml; the default is deviation. Fill external operation hashes only from verified supplied inputs. For revised proposals, incorporate human instructions and findings; for replanning, rebuild the supplied remaining work.
 
 ## Returning the result
 

@@ -116,6 +116,9 @@ func (e *Engine) Answer(ctx context.Context, request AnswerRequest) (Result, err
 	return e.applyStageAnswer(state, question, request)
 }
 
+// promptTimestamp is the UTC timestamp layout of hook-saved prompts/<session>-<timestamp>.txt.
+const promptTimestamp = "20060102T150405.000000000Z"
+
 func (e *Engine) prompt(name string) (string, time.Time, error) {
 	if name != "" && !localName(name) {
 		return "", time.Time{}, errors.New("prompt observation must be a basename")
@@ -132,7 +135,7 @@ func (e *Engine) prompt(name string) (string, time.Time, error) {
 			continue
 		}
 		timestamp := strings.TrimSuffix(strings.TrimPrefix(entry.Name(), prefix), ".txt")
-		observed, err := time.Parse("20060102T150405.000000000Z", timestamp)
+		observed, err := time.Parse(promptTimestamp, timestamp)
 		if err != nil {
 			return "", at, fmt.Errorf("prompt observation %s: %w", entry.Name(), err)
 		}

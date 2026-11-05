@@ -48,12 +48,18 @@ func implementInstance(id string, done *string) plan.Stage {
 	return instance(id, "implement", done, "command:test", "test", "diff")
 }
 
+// verificationInstance keeps the human gate the bundled loop rules fix on verification.
 func verificationInstance(id string, done *string) plan.Stage {
-	return instance(id, "verification", done, "command:e2e", "behavior")
+	stage := instance(id, "verification", done, "command:e2e", "behavior")
+	stage.Gate.Required = true
+	return stage
 }
 
+// retrospectiveInstance keeps the full history the bundled loop rules fix on retrospective.
 func retrospectiveInstance(id string) plan.Stage {
-	return instance(id, "retrospective", nil, "harness")
+	stage := instance(id, "retrospective", nil, "harness")
+	stage.History = plan.HistoryAll
+	return stage
 }
 
 // composedPlan cites the default pattern and composes the given instances from start.
@@ -298,8 +304,8 @@ func TestRulesAreRecheckedAtStageStartAfterConfirmedLoopEdit(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	write(t, e.Root(), "devkit.toml", string(settings)+"\n[[loop.stage]]\ndefinition = \"verification\"\ngate = true\n")
-	if _, err := e.Submit(t.Context(), marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{"Required a gate for verification"}})); err != nil {
+	write(t, e.Root(), "devkit.toml", string(settings)+"\n[[loop.stage]]\ndefinition = \"verification\"\nmax_rounds = 1\n")
+	if _, err := e.Submit(t.Context(), marshal(t, form.Progress{InstructionID: work.Instruction.ID, TerminationKind: form.TerminationCompleted, WorkPerformed: []string{"Lowered the verification round ceiling"}})); err != nil {
 		t.Fatal(err)
 	}
 	asked := false
@@ -332,7 +338,7 @@ func TestRulesAreRecheckedAtStageStartAfterConfirmedLoopEdit(t *testing.T) {
 func assertStageStartRejection(t *testing.T, e *Engine, instruction *form.Instruction, asked bool) {
 	t.Helper()
 	body := briefText(t, instruction)
-	if !asked || !strings.Contains(body, "Current plan rejected at stage start") || !strings.Contains(body, "a human gate is required") {
+	if !asked || !strings.Contains(body, "Current plan rejected at stage start") || !strings.Contains(body, "max_rounds exceeds the stage ceiling") {
 		t.Fatalf("the stage start did not reject the plan under the confirmed rule: %v %s", asked, body)
 	}
 	state, err := e.load()
@@ -363,8 +369,15 @@ func TestShippedDefaultPatternRunsWithDefaultRoles(t *testing.T) {
 	if replanning.Instruction == nil || replanning.Instruction.Kind != form.InstructionPlan {
 		t.Fatalf("purpose did not replan: %+v", replanning)
 	}
-	rest := chainStages(full, "scope", "structure", "contract", "steps", "implement", "verification", "retrospective")
-	rest.Version = 2
+	design := chainStages(full, "scope", "architecture", "increments")
+	design.Version = 2
+	collect(t, e, replanning.Instruction, form.PlannerResult{InstructionID: replanning.Instruction.ID, Plan: marshal(t, design)})
+	replanning = drive(t, e)
+	if replanning.Instruction == nil || replanning.Instruction.Kind != form.InstructionPlan {
+		t.Fatalf("increments did not replan: %+v", replanning)
+	}
+	rest := chainStages(full, "design-1", "implement-1", "verification-1", "acceptance", "retrospective")
+	rest.Version = 3
 	collect(t, e, replanning.Instruction, form.PlannerResult{InstructionID: replanning.Instruction.ID, Plan: marshal(t, rest)})
 	done := drive(t, e)
 	if done.Status != ledger.WorkCompleted {

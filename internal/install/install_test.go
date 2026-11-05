@@ -122,6 +122,8 @@ func TestInitAndDoctor(t *testing.T) {
 		{"plans/default.json", ".devkit/plans/default.json"},
 		{"principles/review/contract.md", ".devkit/principles/review/contract.md"},
 		{"rules/rules.md", ".devkit/rules.md"},
+		{"rules/git.md", ".devkit/git.md"},
+		{"rules/authority.md", ".devkit/authority.md"},
 		{"skills/devkit/SKILL.md", ".agents/skills/devkit/SKILL.md"},
 	} {
 		want, err := fs.ReadFile(assets.FS(), pair[0])
@@ -565,7 +567,7 @@ func TestUninstallReversesInit(t *testing.T) {
 	if got := string(readFile(t, root, ".gitignore")); got != "node_modules/\n" {
 		t.Fatalf(".gitignore = %q", got)
 	}
-	for _, name := range []string{"devkit.toml", ".devkit/kit", ".devkit/run", ".devkit/plans", ".devkit/principles", ".devkit/stages", ".devkit/templates", ".agents", ".codex", ".claude/skills", ".claude/agents"} {
+	for _, name := range []string{"devkit.toml", ".devkit/kit", ".devkit/run", ".devkit/plans", ".devkit/principles", ".devkit/stages", ".devkit/templates", ".devkit/git.md", ".devkit/authority.md", ".agents", ".codex", ".claude/skills", ".claude/agents"} {
 		if _, err := os.Lstat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Fatalf("%s remains after uninstall: %v", name, err)
 		}
@@ -706,6 +708,8 @@ path = "norms/plans"
 path = "norms/templates"
 [sources.rules]
 path = "norms/rules.md"
+[sources.authority]
+path = "norms/authority.md"
 [sources.requirements]
 path = "records/requirements.md"
 [sources.structure]
@@ -722,13 +726,14 @@ path = "records/structure.json"
 		{"plans/default.json", "norms/plans/default.json"},
 		{"templates/brief/work.md.tmpl", "norms/templates/brief/work.md.tmpl"},
 		{"rules/rules.md", "norms/rules.md"},
+		{"rules/authority.md", "norms/authority.md"},
 	} {
 		want, err := fs.ReadFile(assets.FS(), pair[0])
 		if err != nil || !bytes.Equal(want, readFile(t, root, pair[1])) {
 			t.Fatalf("configured norm differs: %s: %v", pair[1], err)
 		}
 	}
-	for _, name := range []string{".devkit/principles", ".devkit/stages", ".devkit/checks", ".devkit/plans", ".devkit/templates", ".devkit/rules.md", "records"} {
+	for _, name := range []string{".devkit/principles", ".devkit/stages", ".devkit/checks", ".devkit/plans", ".devkit/templates", ".devkit/rules.md", ".devkit/authority.md", "records"} {
 		if _, err := os.Stat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("init created an unconfigured or stage-owned path: %s: %v", name, err)
 		}
@@ -761,7 +766,7 @@ path = "records/structure.json"
 	if !slices.Contains(result.Preserved, "norms/principles/harness.md") || !slices.Contains(result.Preserved, "devkit.toml") {
 		t.Fatalf("repository-owned norms or config were not preserved: %v", result.Preserved)
 	}
-	for _, name := range []string{"norms/stages", "norms/templates", "norms/rules.md"} {
+	for _, name := range []string{"norms/stages", "norms/templates", "norms/rules.md", "norms/authority.md"} {
 		if _, err := os.Stat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
 			t.Errorf("unmodified norm remains: %s: %v", name, err)
 		}

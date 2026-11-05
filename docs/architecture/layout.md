@@ -47,7 +47,7 @@ dev-kit/
 
 ## 利用側のリポジトリ
 
-規範と成果のソースの既定の置き場所である。接続先と配置は `[sources.<名前>]` で変更できる。既定の規範のソースは principles・stages・plans・rules・git・templates、成果は requirements・structure である。
+規範と成果のソースの既定の置き場所である。接続先と配置は `[sources.<名前>]` で変更できる。既定の規範のソースは principles・stages・plans・rules・git・authority・templates、成果は requirements・structure である。
 
 ```text
 <repo>/
@@ -66,6 +66,7 @@ dev-kit/
     plans/<name>.json        ループのパターン。init が既定の default・fix・docs をコピー
     templates/               brief と form のテンプレート
     rules.md                 規則と強制手段
+    authority.md             人に上げる判断と任された判断の規範
     git.md                   ブランチ・worktree・PR・統合の散文の規則。git ソース
     requirements.md          リポジトリが満たすべき要件の正本
     structure.json           構造の知識。形式は自由であり、所定の JSON のときだけ図を描く

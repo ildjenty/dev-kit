@@ -208,7 +208,7 @@ func normPath(sources map[string]config.Source, name string) string {
 
 // normSource maps single-document norms to their source names.
 func normSource(root string) string {
-	if name, ok := strings.CutSuffix(root, ".md"); ok && (name == "rules" || name == "git") {
+	if name, ok := strings.CutSuffix(root, ".md"); ok && (name == "rules" || name == "git" || name == "authority") {
 		return name
 	}
 	return root

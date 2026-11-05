@@ -19,12 +19,12 @@ kind = "human"
 [planning]
 role = "planner"
 max_rounds = 3
-inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }]
+inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }, { source = "authority", select = "" }]
 
 [plan_check]
 runner = "judge"
 schemas = ["plan", "plan-template", "finding"]
-inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }]
+inputs = [{ source = "requirements", select = "" }, { source = "rules", select = "" }, { source = "structure", select = "" }, { source = "authority", select = "" }]
 
 [limits]
 max_rounds_ceiling = 3
@@ -39,22 +39,25 @@ criteria = [{ source = "principles", select = "review/purpose.md" }]
 [checks."irreversible"]
 description = "Checks difficult-to-change decisions, alternatives, and approval grounds."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/irreversible.md" }, { source = "principles", select = "designing.md" }]
+criteria = [{ source = "principles", select = "review/irreversible.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "review/authority.md" }, { source = "authority", select = "" }]
+history = "all"
 
 [checks."structure"]
 description = "Checks responsibility boundaries, dependencies, and structure records."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/structure.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "structure.md" }, { source = "principles", select = "data.md" }]
+criteria = [{ source = "principles", select = "review/structure.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "structure.md" }, { source = "principles", select = "data.md" }, { source = "principles", select = "review/authority.md" }, { source = "authority", select = "" }]
+history = "all"
 
 [checks."contract"]
 description = "Checks public contracts, input validation, data ownership, and failures."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/contract.md" }, { source = "principles", select = "data.md" }, { source = "principles", select = "engineering.md" }]
+criteria = [{ source = "principles", select = "review/contract.md" }, { source = "principles", select = "data.md" }, { source = "principles", select = "engineering.md" }, { source = "principles", select = "review/authority.md" }, { source = "authority", select = "" }]
+history = "all"
 
-[checks."steps"]
-description = "Checks implementation order and verifiable completion steps."
+[checks."increments"]
+description = "Checks release increments, completion condition coverage, and demonstrable size."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/steps.md" }]
+criteria = [{ source = "principles", select = "review/increments.md" }]
 
 [checks."command:test"]
 description = "Runs the registered test command."
@@ -68,7 +71,8 @@ criteria = [{ source = "principles", select = "review/test.md" }, { source = "pr
 [checks."diff"]
 description = "Checks the cumulative diff against scope, quality principles, and rules."
 runner = "judge"
-criteria = [{ source = "principles", select = "review/diff.md" }, { source = "principles", select = "engineering.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "writing.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "security.md" }, { source = "templates", select = "pr.md.tmpl" }, { source = "rules", select = "" }]
+criteria = [{ source = "principles", select = "review/diff.md" }, { source = "principles", select = "engineering.md" }, { source = "principles", select = "working.md" }, { source = "principles", select = "designing.md" }, { source = "principles", select = "writing.md" }, { source = "principles", select = "verification.md" }, { source = "principles", select = "security.md" }, { source = "templates", select = "pr.md.tmpl" }, { source = "rules", select = "" }, { source = "principles", select = "review/authority.md" }, { source = "authority", select = "" }]
+history = "all"
 
 [checks."command:e2e"]
 description = "Runs the registered end-to-end verification command."
@@ -91,16 +95,22 @@ runner = "judge"
 criteria = [{ source = "principles", select = "review/wording.md" }, { source = "principles", select = "writing.md" }, { source = "templates", select = "pr.md.tmpl" }]
 
 [[loop.stage]]
+definition = ["scope", "architecture"]
+gate = true
+
+[[loop.stage]]
 definition = "implement"
 checks = ["command:test", "test", "diff"]
 
 [[loop.stage]]
 definition = "verification"
 checks = ["command:e2e", "behavior"]
+gate = true
 
 [[loop.stage]]
 definition = "retrospective"
 checks = ["harness"]
+history = "all"
 
 [[loop.path]]
 definition = "implement"

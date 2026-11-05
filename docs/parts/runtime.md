@@ -39,7 +39,7 @@ runtime は単一バイナリの `devkit` として、セッション内でル�
 
 ラウンド開始時に未登録の検証コマンドは、`auto-fixable` の指摘を伴う check の `FAIL` とする。作業者が検証の手段を作って登録し、既定では人の確認を経た次のラウンドから使う。
 
-既定のパターンは `default`・`fix`・`docs` であり、最後に作業者の retrospective を置く。作業の brief と判定依頼は `history` に従う経緯の固定した索引を参照し、振り返りはそこからすべての判定と指摘、人の回答や note の見逃しを確認する。振り返りの必須 check は `default` と `fix` では `command:test`・`test`・`harness`、`docs` では `harness` だけである。規範を変えた場合はループ自身の変更として確認する。
+既定のパターンと振り返りの扱いは[作業の開始](../architecture/flow.md#作業の開始)、[ループの決まり](../architecture/data.md#ループの決まり)、[線引きの更新](../architecture/guarantees.md#線引きの更新)に従う。
 
 ソースへの書き込みはリポジトリ内の `writable = true` のソースに限り、直接編集して完了時のコミットで反映する。リポジトリ外のソースは読み取り専用であり、devkit は書き込まず、`writable = true` を書くと設定エラーになる。判定・承認・完了は git のツリーとリポジトリ外の成果の文書を合わせた同じ識別を指す。
 

@@ -41,6 +41,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -59,7 +63,7 @@
       ],
       "gate": {
         "required": true,
-        "reason": "Review the scope, including hard-to-change decisions"
+        "reason": "Review screens, user flows, data model, and scope"
       },
       "limits": {
         "max_rounds": 3,
@@ -69,7 +73,7 @@
         "fix": "scope",
         "ask": "scope",
         "back": "purpose",
-        "done": "structure"
+        "done": "architecture"
       },
       "inputs": [
         {
@@ -86,6 +90,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],
@@ -95,9 +103,117 @@
       }
     },
     {
-      "id": "structure",
+      "id": "architecture",
       "assignee": "worker",
       "checks": [
+        {
+          "aspect": "structure",
+          "required": true
+        },
+        {
+          "aspect": "irreversible",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": true,
+        "reason": "Choose technologies and approve the overall architecture"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "architecture",
+        "ask": "architecture",
+        "back": "scope",
+        "done": "increments"
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
+        }
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/architecture.json"
+      }
+    },
+    {
+      "id": "increments",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "increments",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": false,
+        "reason": "Review increment division and order through replanning"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "increments",
+        "ask": "increments",
+        "back": "architecture",
+        "done": "replan"
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
+        }
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/increments.json"
+      }
+    },
+    {
+      "id": "design-1",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "contract",
+          "required": true
+        },
         {
           "aspect": "structure",
           "required": true
@@ -105,17 +221,17 @@
       ],
       "gate": {
         "required": false,
-        "reason": "Review the results of work required for the task"
+        "reason": "Work within the approved design and completion conditions"
       },
       "limits": {
         "max_rounds": 3,
         "max_no_progress": 2
       },
       "transitions": {
-        "fix": "structure",
-        "ask": "structure",
-        "back": "scope",
-        "done": "contract"
+        "fix": "design-1",
+        "ask": "design-1",
+        "back": "increments",
+        "done": "implement-1"
       },
       "inputs": [
         {
@@ -133,107 +249,20 @@
         {
           "source": "git",
           "select": ""
-        }
-      ],
-      "report": {
-        "source": "templates",
-        "select": "reports/structure.json"
-      }
-    },
-    {
-      "id": "contract",
-      "assignee": "worker",
-      "checks": [
-        {
-          "aspect": "contract",
-          "required": true
-        }
-      ],
-      "gate": {
-        "required": false,
-        "reason": "Review the results of work required for the task"
-      },
-      "limits": {
-        "max_rounds": 3,
-        "max_no_progress": 2
-      },
-      "transitions": {
-        "fix": "contract",
-        "ask": "contract",
-        "back": "structure",
-        "done": "steps"
-      },
-      "inputs": [
-        {
-          "source": "requirements",
-          "select": ""
         },
         {
-          "source": "rules",
-          "select": ""
-        },
-        {
-          "source": "structure",
-          "select": ""
-        },
-        {
-          "source": "git",
+          "source": "authority",
           "select": ""
         }
       ],
       "report": {
         "source": "templates",
-        "select": "reports/contract.json"
-      }
+        "select": "reports/design.json"
+      },
+      "definition": "design"
     },
     {
-      "id": "steps",
-      "assignee": "worker",
-      "checks": [
-        {
-          "aspect": "steps",
-          "required": true
-        }
-      ],
-      "gate": {
-        "required": false,
-        "reason": "Review the results of work required for the task"
-      },
-      "limits": {
-        "max_rounds": 3,
-        "max_no_progress": 2
-      },
-      "transitions": {
-        "fix": "steps",
-        "ask": "steps",
-        "back": "contract",
-        "done": "implement"
-      },
-      "inputs": [
-        {
-          "source": "requirements",
-          "select": ""
-        },
-        {
-          "source": "rules",
-          "select": ""
-        },
-        {
-          "source": "structure",
-          "select": ""
-        },
-        {
-          "source": "git",
-          "select": ""
-        }
-      ],
-      "report": {
-        "source": "templates",
-        "select": "reports/steps.json"
-      }
-    },
-    {
-      "id": "implement",
+      "id": "implement-1",
       "assignee": "worker",
       "checks": [
         {
@@ -251,17 +280,17 @@
       ],
       "gate": {
         "required": false,
-        "reason": "Review the results of work required for the task"
+        "reason": "Work within the approved design and completion conditions"
       },
       "limits": {
         "max_rounds": 3,
         "max_no_progress": 2
       },
       "transitions": {
-        "fix": "implement",
-        "ask": "implement",
-        "back": "steps",
-        "done": "verification"
+        "fix": "implement-1",
+        "ask": "implement-1",
+        "back": "design-1",
+        "done": "verification-1"
       },
       "inputs": [
         {
@@ -279,15 +308,20 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
         "source": "templates",
         "select": "reports/implement.json"
-      }
+      },
+      "definition": "implement"
     },
     {
-      "id": "verification",
+      "id": "verification-1",
       "assignee": "worker",
       "checks": [
         {
@@ -300,17 +334,72 @@
         }
       ],
       "gate": {
-        "required": false,
-        "reason": "Review the results of work required for the task"
+        "required": true,
+        "reason": "Review the increment demo and its assigned completion conditions"
       },
       "limits": {
         "max_rounds": 3,
         "max_no_progress": 2
       },
       "transitions": {
-        "fix": "verification",
-        "ask": "verification",
-        "back": "implement",
+        "fix": "verification-1",
+        "ask": "verification-1",
+        "back": "implement-1",
+        "done": "acceptance"
+      },
+      "inputs": [
+        {
+          "source": "requirements",
+          "select": ""
+        },
+        {
+          "source": "rules",
+          "select": ""
+        },
+        {
+          "source": "structure",
+          "select": ""
+        },
+        {
+          "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
+        }
+      ],
+      "report": {
+        "source": "templates",
+        "select": "reports/verification.json"
+      },
+      "definition": "verification"
+    },
+    {
+      "id": "acceptance",
+      "assignee": "worker",
+      "checks": [
+        {
+          "aspect": "command:e2e",
+          "required": true
+        },
+        {
+          "aspect": "behavior",
+          "required": true
+        }
+      ],
+      "gate": {
+        "required": true,
+        "reason": "Accept end-to-end evidence for all completion conditions"
+      },
+      "limits": {
+        "max_rounds": 3,
+        "max_no_progress": 2
+      },
+      "transitions": {
+        "fix": "acceptance",
+        "ask": "acceptance",
+        "back": "implement-1",
         "done": "retrospective"
       },
       "inputs": [
@@ -329,12 +418,17 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
         "source": "templates",
         "select": "reports/verification.json"
-      }
+      },
+      "definition": "verification"
     },
     {
       "id": "retrospective",
@@ -364,7 +458,7 @@
       "transitions": {
         "fix": "retrospective",
         "ask": "retrospective",
-        "back": "implement",
+        "back": "implement-1",
         "done": null
       },
       "inputs": [
@@ -382,6 +476,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],
@@ -426,6 +524,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],
@@ -473,6 +575,10 @@
         {
           "source": "git",
           "select": ""
+        },
+        {
+          "source": "authority",
+          "select": ""
         }
       ],
       "report": {
@@ -500,7 +606,7 @@
       "transitions": {
         "fix": "handoff",
         "ask": "handoff",
-        "back": "implement",
+        "back": "implement-1",
         "done": "retrospective"
       },
       "inputs": [
@@ -518,6 +624,10 @@
         },
         {
           "source": "git",
+          "select": ""
+        },
+        {
+          "source": "authority",
           "select": ""
         }
       ],

@@ -8,13 +8,13 @@
 
 パターンと計画の項目は[パターン](architecture/data.md#ループの雛形-plantemplate)と[計画](architecture/data.md#計画-plan)、検証の責務は [plan](architecture/modules.md#plan) に従う。記録形式の `kit_version` は `v3` である。
 
-計画のステージは実体の `id` と使う定義の `definition` を持つ。`definition` の省略時は `id` と同じ定義を使う。同じ定義を何度も使え、例えば `implement-1 → verification-1 → implement-2 → verification-2` と増分を組める。実体 ID は計画内で一意とし、新しい仕事には新しい ID を使う。この作業で走った実体の ID を後の計画に書くのは、その仕事を走らせ直す場合だけである。
+計画のステージは実体の `id` と使う定義の `definition` を持つ。`definition` の省略時は `id` と同じ定義を使う。同じ定義を何度も使え、例えば `design-1 → implement-1 → verification-1 → design-2 → implement-2 → verification-2` と増分を組める。実体 ID は計画内で一意とし、新しい仕事には新しい ID を使う。この作業で走った実体の ID を後の計画に書くのは、その仕事を走らせ直す場合だけである。
 
 遷移、`start_stage`、戻り先、`StoppedStage`、修正の担当の規則、単位の所属は実体 ID を使う。`outputs` は実体 ID を選び、定義 ID を書いた場合はその定義の実体をすべて選ぶ。決まりは定義 ID を使う。経緯と集計は実体ごとであり、振り返りには定義ごとの集計も渡す。コミットメッセージの `{stage}` は実体 ID である。
 
 check の一覧は `devkit.toml` の `[checks.<観点>]` に置き、`runner`・`criteria`・`schemas`・`history`・`brief_by_planner` を定める。計画とパターンの check に書くのは、観点の名前、必須か、対象、完了条件 ID、計画者の指示だけである。パターンは課題固有の `instructions` を持たない。判定者の基準は規範のソースから選ぶ。
 
-計画者と計画の判定者の入力の選び方は `[planning] inputs` と `[plan_check] inputs` に置く。既定は要件・規則・構造である。作業者への入力はステージの `inputs` に置く。`report`・`unit_report`・`human_prompt`・`delegations`・`history`・`outputs` は[依頼の入力](architecture/data.md#依頼の入力)に従う。本文の参照を解析して必要な文書を補わない。
+計画者と計画の判定者の入力の選び方は `[planning] inputs` と `[plan_check] inputs` に置く。既定の入力は[依頼の入力](architecture/data.md#依頼の入力)に従う。作業者への入力はステージの `inputs` に置く。`report`・`unit_report`・`human_prompt`・`delegations`・`history`・`outputs` は[依頼の入力](architecture/data.md#依頼の入力)に従う。本文の参照を解析して必要な文書を補わない。
 
 ステージの担当 `assignee` は `work` または `human` の役割 ID である。check の runner は一覧に定める `judge` の役割、登録済み判定コマンド、`command:<name>` のいずれかである。`fix` には同じ実体の次のラウンドの担当を変える[規則](architecture/data.md#修正の担当の規則)を書ける。`fix` と `ask` の行き先は自分の実体だけである。
 
@@ -38,17 +38,7 @@ check の一覧は `devkit.toml` の `[checks.<観点>]` に置き、`runner`・
 
 ## 既定のパターン
 
-- `default`: `purpose → scope → structure → contract → steps → implement → verification → retrospective` が参考の並びである。purpose の `done` は `"replan"` とし、要件と完了条件を合意してから残りを計画する。scope にゲートを置く。
-- `fix`: `implement → verification → retrospective` である。
-- `docs`: 文書編集の定義 `edit` を使う `edit → retrospective` である。edit の check は wording であり、verification を置かない。
-
-research・prototype と、PR 本文を書く handoff は候補の例である。`optional_stages` は候補の例を示す参考であり、計画者が使える定義を限定しない。handoff は `templates/pr.md.tmpl` に沿って本文を書き、wording などで判定する。git 操作は含めない。
-
-既定の決まりは implement に `command:test`・test・diff、verification に `command:e2e`・behavior、retrospective に harness を必須とする。implement の後に同じ区切りの verification を置き、最後の定義を retrospective とする。purpose・scope のゲートはパターンと人の承認で決める。
-
-default と fix のパターンは retrospective に `command:test`・test・harness を置く。docs は harness だけである。作業者は worker、判定者は一覧の judge が既定である。retrospective と一覧の harness は `history = "all"`、`brief_by_planner` は既定では使わない。diff の基準には `principles/security.md` を含める。
-
-`command:test` または `command:e2e` が未登録なら check は修正可能な `FAIL` になる。作業者が検証手段を作って `[commands.<name>]` に登録し、ループ自身の変更の確認を経て次のラウンドから使う。期限は登録ごとに必須である。
+[作業の開始](architecture/flow.md#作業の開始)でパターンを選び、要求から受け入れまでの組み方は[既定の開発フロー](architecture/flow.md#既定の開発フロー)に従う。必須 check・固定ゲート・振り返りの履歴は[ループの決まり](architecture/data.md#ループの決まり)、未登録の検証コマンドは[作業結果の判定](architecture/flow.md#作業結果の判定)で扱う。
 
 ## 例
 
@@ -60,7 +50,7 @@ default と fix のパターンは retrospective に `command:test`・test・har
 
 ### パターンを組む規則
 
-パターンは機能追加・修正・文書編集などの参考として組む。何を変えるかに応じて、目的・スコープ・構造・契約・手順・実装の候補を選ぶ。元に戻せないものの判断は [`assets/principles/designing.md`](../assets/principles/designing.md) に従う。
+パターンは機能追加・修正・文書編集などの参考として組む。何を変えるかに応じて、purpose・scope・architecture・increments・design・implement・verification などの定義を選ぶ。元に戻せないものの判断は [`assets/principles/designing.md`](../assets/principles/designing.md) に従う。
 
 どのステージにも、変えうるものを確かめる check を置く。画面・データ・外部通信を変える場合は動作の確認を置く。ゲートには人が判断する理由を記す。機械で必ず守らせる項目は、参考パターンとは別に `[[loop.stage]]`・`[[loop.path]]` で定める。
 
@@ -72,13 +62,13 @@ default と fix のパターンは retrospective に `command:test`・test・har
 
 メインのエージェントは、壁打ちで決まったことを `start` の課題にまとめる。長い課題は `devkit start --task-file <ファイル>` で本文を渡す。課題引数と `--task-file` は併用しない。途中の指示は `devkit instruct <ファイル>` で記録し、次の計画者・作業者へ渡す。判定者には渡さない。会話の写しは取らない。指示は計画や承認済みの完了条件を直接変えず、変更が必要なら再計画と承認を通す。
 
-完了条件は ID 付きの文章で記す。条件ごとに check または人のゲートを置き、妥当性と漏れは計画の判定者と人が判断する。曖昧な要求は推測せず `open_questions` に記す。変えるものだけを扱う最小の計画に保つ。
+完了条件は ID 付きの文章で記す。条件ごとに check または人のゲートを置き、妥当性と漏れは計画の判定者と人が判断する。曖昧な要求は推測せず `open_questions` に記す。増分の大きさと順序は[既定の開発フロー](architecture/flow.md#既定の開発フロー)に従う。
 
 ## 計画の check と人によるレビュー
 
 計画の check は `[plan_check]` に定め、既定の観点は plan、runner は judge である。計画者と計画の判定者の agent は分ける。
 
-既定の `[approval] plan = "requirements"` は最初の計画、直前に人が承認した完了条件の ID または文面の変更、外部操作、未決事項を確認する。同じ完了条件で外部操作も未決事項もない再計画には再確認を求めない。`"always"` はすべてのバージョン、`"deviation"` は前に承認した計画の残りとの構造の違いも確認する。最初の計画・外部操作・未決事項はいずれの方針でも確認する。
+計画の承認は[計画のバージョン](architecture/data.md#計画のバージョン)の方針に従う。
 
 承認の問いには課題、ID 付き完了条件、各実体の定義・担当・ゲート・必須 check・指示を順に示し、前に承認した計画の残りとの差分を表示する。最初の計画は参考パターンと比較する。パターンとの違いは表示する判断材料であり、承認の理由にしない。元に戻せないもの、外部操作、未決事項も示す。人が承認した完了条件を完了基準とする。
 

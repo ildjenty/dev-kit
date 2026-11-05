@@ -6,18 +6,18 @@
 
 `init` が既定のソースの初期内容をリポジトリへコピーし、以後はリポジトリが所有する知識として育てる。接続先と配置は `devkit.toml` の `[sources.<名前>]` で変更できる。アダプタは必須の「選ぶ」と元のバージョンの識別子を扱い、「書く」は比較と更新を一体で行えることを保証できるアダプタのための口として定める。[知識のソース](architecture/data.md#知識のソース)の契約に従う。
 
-- 規範(`norm = true`): principles は `.devkit/principles`、stages は `.devkit/stages`、plans は `.devkit/plans`、rules は `.devkit/rules.md`、git は `.devkit/git.md` をそれぞれ1文書として、templates は `.devkit/templates` を既定とする。
-- 成果(`norm = false`): requirements は `.devkit/requirements.md`、structure は `.devkit/structure.json` を既定とする。
+規範と成果の既定のソースと配置は[所有と生存期間](architecture/data.md#所有と生存期間)に従う。
 
 規範のソースは空の選び方で全体を列挙し、固定と変化の確認を全体に対して行う。成果のソースは選んだ範囲を固定する。リポジトリ内の `files` は git のスナップショットから読み、外部はその時点の本文を写す。リポジトリ外のソースは読み取り専用であり、`writable = true` を書くと設定エラーになる。書き込みはリポジトリ内の `writable = true` のソースに限る。
 
 各リポジトリは資産と実行の記録を分けて管理する。
 
 - **指示ファイル(AGENTS.md と CLAUDE.md)**: 管理・更新方針と判定の規範としての扱いは[指示ファイルとホスト設定](architecture/layout.md#指示ファイルとホスト設定)に従う。
-- **配置ガイド**: 構造の記録に、置くもの・置かないもの・配置先の案内を残す。構造のステージが更新し、brief には関係する構造の記録を入れる。
+- **配置ガイド**: 構造の記録に、置くもの・置かないもの・配置先の案内を残す。architecture と各増分の design が更新し、brief には関係する構造の記録を入れる。
 - **元に戻せないものと外部操作**: 元に戻せないものの共有項目は規則、課題固有の項目は[計画](architecture/data.md#計画-plan)(パターンを参考に課題ごとに組む実行内容)で扱う。外部操作(外部への書き込みの行為)の登録は [config](architecture/modules.md#config)、宣言と承認は[外部操作の承認](architecture/guarantees.md#外部操作の承認)に従う。
 - **育てるもの**: 原則と用途別の判定基準・ステージ・パターン・テンプレート・規則をリポジトリの規範として育てる。リポジトリ内のファイルは git で共有する。kit の埋め込みとの一致は要求しない。
 - **要件**: 目的のステージが、人が承認した完了条件と既存の要件を照らして更新する。目的がないパターンや目的を外した計画では、振り返りが要件に当たる完了条件を反映する。目的で反映済みなら重ねて更新する必要はない。後の作業の計画者・作業者・判定者へ渡す入力の選び方の既定値に含める。
+- **判断の権限**: 人に上げる判断と任された判断は[権限の文書](architecture/data.md#権限の文書-authority)に従う。
 - **規則と強制手段**: 複数の作業で守る変更困難な決定を残す。更新はループ自身の変更として人が確認する。「手段: 未実装」と振り返りで繰り返し見つかる違反は、機械の検査へ移す候補にする。
 - **設定ファイル**: `devkit.toml` の項目は [config](architecture/modules.md#config)、配置は[利用側のリポジトリ](architecture/layout.md#利用側のリポジトリ)に従う。[判定コマンド](architecture/modules.md#config)(`[judges]`)は別エンジンによる判定に使う。[検証コマンド](architecture/modules.md#config)(`[commands]`)はテスト・型検査などに使い、`command:<name>` の [check](parts/check.md)(評価と判定の部品)から呼ぶ。実行の扱いは[作業結果の判定](architecture/flow.md#作業結果の判定)に従う。
 - **実行の記録と生成物**: `.devkit/run/` に固定し、git 管理しない。サブエージェント定義・hook・保護の設定・ignore がこの場所を前提にし、途中で変えると記録を見失うためである。後の作業に効かせたい決定は要件・構造・規則へ残す。記録から組み立てる [checkpoint](architecture/data.md#checkpoint)(再開用の派生状態)は保存する記録と区別する。
@@ -49,11 +49,11 @@ skill は `.agents/skills/devkit/`、サブエージェント定義は `.claude/
 
 ループ自体を並行して回す場合は、別の worktree で新しいセッションを開く。各チェックアウトは自分の `.devkit/run/` を持ち、作業中のチェックアウトでの2つ目の `start` は拒否する。
 
-本文で渡す知識は、`[planning] inputs`・`[plan_check] inputs`・計画のステージの `inputs` と、`[checks.<観点>] criteria` で選ぶ。要件と規則を渡す既定値を用意する。ステージの実体の `definition` でステージ定義を解決する。規範はソース全体を固定し、成果は選んだ本文を固定する。その他の規範はソース名・文書 ID・固定した写しのパスの一覧で渡し、編集中の原本を読ませない。文中の参照を解析して入力を補わず、必要な文書は選び方に明示する。変更の範囲は scope の出力と rules で渡す。
+本文で渡す知識は、`[planning] inputs`・`[plan_check] inputs`・計画のステージの `inputs` と、`[checks.<観点>] criteria` で選ぶ。既定の入力は[依頼の入力](architecture/data.md#依頼の入力)に従う。ステージの実体の `definition` でステージ定義を解決する。規範はソース全体を固定し、成果は選んだ本文を固定する。その他の規範はソース名・文書 ID・固定した写しのパスの一覧で渡し、編集中の原本を読ませない。文中の参照を解析して入力を補わず、必要な文書は選び方に明示する。変更の範囲は scope の出力と rules で渡す。
 
 成果の requirements と structure は、固定した本文とソース名・文書 ID・編集先・存在の有無を示す。要件が未作成なら作成先を案内する。出力スキーマの参照先と check の `schemas` に列挙した入力契約のスキーマを同梱する。補助のスキーマはその和集合だけを渡す。依頼の経緯は `history` で決定的に絞った固定した索引から参照する。
 
-規範にあるコード書式の `principles/…`・`stages/…`・`templates/…`・`rules.md` は、リポジトリ側の資産の論理名である。brief が設定で解決した実際のパスとの対応を示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
+規範にあるコード書式の `principles/…`・`stages/…`・`templates/…`・`rules.md`・`authority.md` は、リポジトリ側の資産の論理名である。brief が設定で解決した実際のパスとの対応を示す。`schemas/…` はバイナリが出力スキーマの本文として渡す。
 
 セッションのエージェント自身は、再現手順の保存先とバージョンを修正開始前に、仮説の結果を次の仮説を始める前に [devkit note](architecture/data.md#決定と証拠-decision--evidence)で記録する。ワーカーは作業中に材料を保持し、終了ブロックの `notes` に `kind` と種別ごとの `payload` を入れて返す。親の記録先は worktree の sandbox の外にあるため、`devkit note` を実行しない。
 

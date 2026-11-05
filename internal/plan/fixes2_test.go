@@ -38,17 +38,28 @@ func doneTarget(id string) *string { return &id }
 func TestReplannedPlanMayGoBackToARemovedStage(t *testing.T) {
 	v := validator(t)
 	template, hash := loadTemplate(t, v, "default")
-	p := newTestPlan(template, hash, "Build a CLI", []CompletionCondition{{"C1", "The CLI works"}})
-	bindChecks(&p)
-	// After purpose completes, the replanned plan starts at scope and keeps scope's back edge to purpose.
-	p.Stages = clonePlan(Plan{Stages: template.Stages[1:]}).Stages
-	bindChecks(&p)
-	p.StartStage = p.Stages[0].ID
-	if back, _ := p.Stages[0].Transitions.Next(Back); back == nil || *back != "purpose" {
-		t.Fatalf("test premise: scope must go back to purpose, got %v", back)
-	}
-	if err := v.ValidatePlan(p); err != nil {
-		t.Fatalf("replanned plan rejected: %v", err)
+	for _, tc := range []struct {
+		name       string
+		start, end int
+		back       string
+	}{
+		// After purpose completes, the replanned plan runs scope through increments and keeps scope's back edge to purpose.
+		{"after purpose", 1, 4, "purpose"},
+		// After increments completes, the replanned plan starts at the first design and keeps its back edge to increments.
+		{"after increments", 4, len(template.Stages), "increments"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := newTestPlan(template, hash, "Build a CLI", []CompletionCondition{{"C1", "The CLI works"}})
+			p.Stages = clonePlan(Plan{Stages: template.Stages[tc.start:tc.end]}).Stages
+			bindChecks(&p)
+			p.StartStage = p.Stages[0].ID
+			if back, _ := p.Stages[0].Transitions.Next(Back); back == nil || *back != tc.back {
+				t.Fatalf("test premise: %s must go back to %s, got %v", p.StartStage, tc.back, back)
+			}
+			if err := v.ValidatePlan(p); err != nil {
+				t.Fatalf("replanned plan rejected: %v", err)
+			}
+		})
 	}
 	broken := template
 	broken.Stages = append([]Stage(nil), template.Stages[1:]...)

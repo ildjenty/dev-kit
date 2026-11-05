@@ -35,17 +35,17 @@ graph LR
 git の運用は計画のステージの入力で選ぶ `git` ソースの散文の規則に従う。既定は `.devkit/git.md` であり、配置は設定で変更できる。セッションのまとめ役が `start` の前に種類の接頭辞と短い説明を持つ作業ブランチを用意し、完了後に起点のブランチへ統合する。push と PR の作成は外部操作の経路を通す。devkit はステージの完了時に判定した対象を現在のブランチへコミットし、終了ブロックの `commit_message`、省略時は設定のテンプレートを使う。
 
 1. `devkit init` が導入したファイルをコミットしたリポジトリで、`devkit start --plan <name> <課題>` または `devkit start --plan <name> --task-file <ファイル>` により[作業を開始](architecture/flow.md#作業の開始)する。`--plan` は優先するパターンであり、省略時は `default_plan`(既定 default)を優先する。計画者はほかのパターンも参考にできる。メインのエージェントは壁打ちで合意した内容を課題にまとめ、会話の写しは取らない。
-2. 計画の check を通す。完了条件ごとの確認手段と、その妥当性・網羅性の判断は[計画](architecture/data.md#計画-plan)に従う。既定では最初の計画、承認済みの完了条件の ID または文面が変わる計画、外部操作を宣言する計画を人が承認する。人が承認した完了条件を作業の完了基準とする。`open_questions` が空でない計画はいずれの承認方針でも人に確認し、そのままの承認は devkit が拒否する。人が推奨案に同意した場合も、セッションのエージェントは `devkit answer --interpretation rejected` と回答本文で記録し、計画者が回答を反映して再提案する。未決事項と再計画の扱いは[計画の check と人によるレビュー](loop-plan.md#計画の-check-と人によるレビュー)に従う。
+2. 計画の check を通し、[計画の承認方針](architecture/data.md#計画のバージョン)に従って人が承認する。人が承認した完了条件を作業の完了基準とする。未決事項とその解消は[計画の check と承認ゲート](architecture/flow.md#計画の-check-と承認ゲート)に従う。
 3. `devkit next` が[作業の指示](architecture/flow.md#作業の指示)としてステージ(作業を区切る単位)の brief を返す。規範はソース全体をラウンド開始時に固定し、成果は選んだ本文を固定する。判定対象には git のツリーと外部の成果の文書のソース名・ID・内容ハッシュの集合を含める。既定の `[approval] meta_loop_edit = "confirm"` では、未確認のループ自身の変更があれば、効力を持つラウンドを開く前に人へ問いを出して止まる。
-4. 既定の作業者 `devkit-worker` が devkit の作る worktree で作業し、終了ブロックを SubagentStop 経由で返す。agent のない `work` の役割を定義した場合はセッション自身が作業し、`devkit submit` で[提出する](architecture/flow.md#作業結果の提出)。目的のステージでは要件、構造のステージでは構造の記録を更新する。
+4. 既定の作業者 `devkit-worker` が devkit の作る worktree で作業し、終了ブロックを SubagentStop 経由で返す。agent のない `work` の役割を定義した場合はセッション自身が作業し、`devkit submit` で[提出する](architecture/flow.md#作業結果の提出)。purpose では要件、architecture と各増分の design では構造の記録を更新する。
 5. 判定待ちでは `devkit` が判定者に先立って `command:` の check を実行する。未登録のコマンドは修正可能な `FAIL` とし、作業者が検証の手段と登録を用意する。判定者サブエージェントの結果は[作業結果の判定](architecture/flow.md#作業結果の判定)に従って受理する。
 6. 判定後は [router](architecture/modules.md#router)(check の結果から次の行動を分類する部品)が判断し、[判断後の処理](architecture/flow.md#router-の判断)へ進む。ステージの遷移が `done: "replan"` なら、完了後に既存の再計画の経路で計画者が残りを作り直し、計画の check と承認の条件を適用する。問いへの回答は[人の回答](architecture/flow.md#人の回答と再開)、ステージの完了の確定は[完了条件](architecture/guarantees.md#完了条件)に従う。
-7. 最後の[振り返り](stages.md#振り返り)で、すべての判定・指摘と人の回答を見直し、再発防止をリポジトリの検査とリポジトリ内の書き込めるソースの規範に反映する。リポジトリ外のソースと読み取り専用のソースへの改善は教訓として管理者へ引き継ぐ。`default` と `fix` は必須の `command:test`・`test`・`harness`、`docs` は必須の `harness` だけで確認する。規範を変えた場合は、既定では効力を持つ前、最後のラウンドなら完了時のコミット前に人が確認する。変えなければループ自身の変更に対する確認は不要である。
+7. 最後の振り返りで問題と見逃しを見直し、[教訓の反映先](architecture/guarantees.md#教訓の反映先)に従って再発防止を反映する。人への確認の過不足は[線引きの更新](architecture/guarantees.md#線引きの更新)で扱う。
 8. セッションをまたぐ再開は、[人の回答と再開](architecture/flow.md#人の回答と再開)に従う。
 
-既定の `default` は `purpose` の遷移 `done` を `"replan"` とし、最初の計画に要件と完了条件の合意に関する完了条件を持たせる。`purpose` で人に確かめながら要件を詰め、既定の `.devkit/requirements.md`(`[sources.requirements]` で変更可能)に書き、完了条件の案を作る。`purpose` の完了後、合意した完了条件で残りを再計画し、人が承認する。`fix` と `docs` はこの形を使わない。kit は要件定義を特別扱いせず、計画の遷移に従う。
+要求から受け入れまでの具体化は[既定の開発フロー](architecture/flow.md#既定の開発フロー)、判断を人に上げる範囲は[権限の文書](architecture/data.md#権限の文書-authority)に従う。人は質問への回答、設計の承認、デモの確認を担う。
 
-`default` と `fix` は implement と retrospective の間に worker が担当する verification を置き、必須の `command:e2e` と、完了条件ごとの利用場面を通しで確かめる判定者の check を通す。`docs` には置かない。既定の diff の基準には英語の `principles/security.md` を含める。PR 本文を書く handoff は既定のパターンの候補だけに置き、git 操作は含めない。
+既定のパターンと必須 check・ゲートは[作業の開始](architecture/flow.md#作業の開始)と[ループの決まり](architecture/data.md#ループの決まり)に従う。PR 本文を書く handoff は候補として使う。
 
 [ラウンド](architecture/data.md#ラウンド-round)(作業の指示から次の行動の確定までの往復)の判定待ちでは、[Judgment](architecture/data.md#check-の結果-judgment)(`command:` の check を含む判定結果)を受理して次の行動を決める。
 
@@ -63,11 +63,11 @@ git の運用は計画のステージの入力で選ぶ `git` ソースの散文
 2. **判定の基準**: `[checks.<観点>]` に runner と基準・スキーマ・経緯の選び方を定める。`.devkit/principles/` の原則と用途別文書を育てる。check は `criteria` で基準の文書を明示して選ぶ。
 3. **検証コマンド(`[commands.<name>]`)**: パターンの `command:<name>` の check(終了コードによる検証)から使う。テストのないリポジトリでも、必須の `command:test` の指摘を受けて作業の中で仕組みと登録を作る。期限は登録ごとに必須である。
 4. **pre-commit**: リポジトリで有効な pre-commit にテストと lint を書く。既存の hook の扱いと実行は[完了条件](architecture/guarantees.md#完了条件)に従う([例](architecture/examples.md#pre-commit))。
-5. **ステージ・テンプレート・規則**: `.devkit/stages/`、`.devkit/templates/`、`.devkit/rules.md` を育てる。作業をまたぐ要件は `.devkit/requirements.md`、構造は `.devkit/structure.json` に残す。規範と成果の区別は[リポジトリ側の構成](repository.md#リポジトリ側の構成)に従う。
+5. **ステージ・テンプレート・規則**: `.devkit/stages/`、`.devkit/templates/`、`.devkit/rules.md` と[権限の文書](architecture/data.md#権限の文書-authority)を育てる。作業をまたぐ要件は `.devkit/requirements.md`、構造は `.devkit/structure.json` に残す。規範と成果の区別は[所有と生存期間](architecture/data.md#所有と生存期間)に従う。
 
 ## 保証の範囲
 
-[保証と対策](architecture/guarantees.md)で保証の対象を定める。保証が成り立つ条件は[信頼の前提](architecture/guarantees.md#信頼の前提)、git とホストに任せる範囲は[実装対象外の機能](architecture/guarantees.md#実装対象外の機能)を参照する。
+判定の独立性と完了の確定などの本体の保証と、リポジトリが育てる既定の方針の境界は[保証と対策](architecture/guarantees.md)に従う。保証が成り立つ条件は[信頼の前提](architecture/guarantees.md#信頼の前提)、git とホストに任せる範囲は[実装対象外の機能](architecture/guarantees.md#実装対象外の機能)を参照する。
 
 ## 構成要素
 

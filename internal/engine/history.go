@@ -2,10 +2,14 @@ package engine
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/ildjenty/dev-kit/internal/brief"
 	"github.com/ildjenty/dev-kit/internal/form"
@@ -62,6 +66,13 @@ func (e *Engine) historyText(state *ledger.State, scope historyScope, adopted []
 			text.WriteString("# Main agent instruction records\n" + instructions + "\n")
 		}
 	}
+	if scope.Kind == plan.HistoryAll {
+		inputs, err := humanInputsText(e.workRoot(), "Human inputs", "")
+		if err != nil {
+			return "", err
+		}
+		text.WriteString(inputs)
+	}
 	fmt.Fprintf(&text, "# History (scope: %s)\n\n", scope.Kind)
 	if scope.Kind == plan.HistoryNone {
 		return text.String(), nil
@@ -81,6 +92,51 @@ func (e *Engine) historyText(state *ledger.State, scope historyScope, adopted []
 		if scope.Kind == plan.HistoryAll || run.ID == scope.RunID {
 			fmt.Fprintf(&text, "Stage %s (%s): %d rounds, state: %s, plan version: %d\n", run.StageID, run.ID, len(state.Rounds(run.ID)), run.State, run.PlanVersion)
 		}
+	}
+	return text.String(), nil
+}
+
+// humanInputsText lists inputs after the latest one included in the fixed history, oldest first.
+func humanInputsText(root, heading, history string) (string, error) {
+	entries, err := os.ReadDir(filepath.Join(root, "prompts"))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", err
+	}
+	type input struct {
+		name string
+		at   time.Time
+	}
+	var inputs []input
+	var through time.Time
+	for _, entry := range entries {
+		base, ok := strings.CutSuffix(entry.Name(), ".txt")
+		if entry.IsDir() || !ok {
+			continue
+		}
+		observed, err := time.Parse(promptTimestamp, base[strings.LastIndex(base, "-")+1:])
+		if err != nil {
+			return "", fmt.Errorf("prompt observation %s: %w", entry.Name(), err)
+		}
+		inputs = append(inputs, input{entry.Name(), observed})
+		if strings.Contains(history, fmt.Sprintf("## %s (%s)\n\n", observed.Format(time.RFC3339Nano), entry.Name())) && observed.After(through) {
+			through = observed
+		}
+	}
+	slices.SortStableFunc(inputs, func(a, b input) int { return a.at.Compare(b.at) })
+	var text strings.Builder
+	fmt.Fprintf(&text, "# %s\n\n", heading)
+	if len(inputs) == 0 || !inputs[len(inputs)-1].at.After(through) {
+		text.WriteString("None recorded.\n\n")
+	}
+	for _, item := range inputs {
+		if !item.at.After(through) {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(root, "prompts", item.name))
+		if err != nil {
+			return "", err
+		}
+		fmt.Fprintf(&text, "## %s (%s)\n\n%s\n\n", item.at.Format(time.RFC3339Nano), item.name, data)
 	}
 	return text.String(), nil
 }

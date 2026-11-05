@@ -52,7 +52,7 @@ func TestBundledCheckRegistryAndRules(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(c.Loop.Stage) != 3 || len(c.Loop.Path) != 2 {
+	if len(c.Loop.Stage) != 4 || len(c.Loop.Path) != 2 {
 		t.Fatalf("missing bundled rules: %+v", c.Loop)
 	}
 	templateSchema, err := fs.ReadFile(assets.FS(), plan.TemplateSchemaPath)
@@ -85,6 +85,12 @@ func TestBundledCheckRegistryAndRules(t *testing.T) {
 							t.Fatalf("%s: missing required check %s", name, aspect)
 						}
 					}
+					if rule.Gate && !stage.Gate.Required {
+						t.Fatalf("%s/%s: missing the fixed human gate", name, stage.ID)
+					}
+					if rule.History != "" && string(stage.WorkerHistory()) != rule.History {
+						t.Fatalf("%s/%s: history %q differs from the fixed %q", name, stage.ID, stage.WorkerHistory(), rule.History)
+					}
 				}
 			}
 		}
@@ -94,8 +100,8 @@ func TestBundledCheckRegistryAndRules(t *testing.T) {
 				if !ok || definition.Runner == "" {
 					t.Fatalf("missing configured check: %s", check.Aspect)
 				}
-				if check.Aspect == "harness" && definition.History != "all" {
-					t.Fatal("harness lacks full history")
+				if slices.Contains([]string{"harness", "irreversible", "structure", "contract", "diff"}, check.Aspect) && definition.History != "all" {
+					t.Fatalf("%s lacks full history", check.Aspect)
 				}
 			}
 		}
