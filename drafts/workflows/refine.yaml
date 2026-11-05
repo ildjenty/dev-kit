@@ -1,0 +1,139 @@
+name: refine
+description: "要求を詰める1手を進める。トピックは前提にするトピックの合意を受けて動的に立てる。1回の実行で1手だけ進め、人の判断が要る手だけ人に聞き、答えはその場で反映する。続きがあるかを返すので、起動役(セッションなど)はそれを見て次を起動する。状態はすべて文書のグラフに持つ。最初の起動で要求をトピックとして登録する"
+returns: result
+nodes:
+  - id: init
+    description: "グラフがなければ用意し、要求を最初のトピックとして登録する(2回目以降は何もしない)"
+    script: refine-init
+    runtime: bun
+  - id: pick-topic
+    description: "次のトピックを機械で選ぶ。前提のトピックとの食い違いの印があるもの、要再検討の印のあるもの、未合意のものの順。前提にするトピックがすべて合意済みのものだけを候補にする。選ぶものがなければ done"
+    depends_on: [init]
+    script: pick-topic
+    runtime: bun
+    output_format:
+      type: object
+      properties:
+        topic: { type: string }
+        reason: { type: string }
+        done: { type: boolean }
+      required: [done]
+  - id: choose-action
+    description: "選ばれたトピックで、質問・下書き・修正のどれをするかだけを決める"
+    depends_on: [pick-topic]
+    when: "$pick-topic.output.done == false"
+    command: refine-choose-action
+    output_format:
+      type: object
+      properties:
+        action: { type: string, enum: [ask, draft, revise] }
+        reason: { type: string }
+      required: [action, reason]
+  - id: question
+    description: "トピックについて人への質問を書く。質問の仕方は skill に従う"
+    depends_on: [choose-action]
+    when: "$choose-action.output.action == 'ask'"
+    command: refine-question
+    output_format:
+      type: object
+      properties: { question: { type: string } }
+      required: [question]
+  - id: draft
+    description: "合意済みの前提のトピックをもとに、トピックの文書の変更案を構造化した出力で返す(グラフには書かない)。元にしたノードを必ず指す。新たに詰めるべきトピックがあれば、前提の関係つきで提案する。推測で置いた前提と未確定の点には印を付ける"
+    depends_on: [choose-action]
+    when: "$choose-action.output.action == 'draft'"
+    command: refine-draft
+  - id: revise
+    description: "グラフに記録された指摘・矛盾・人の答え・要再検討の理由を受けて直した変更案を構造化した出力で返す(グラフには書かない)。既存のノードは ID を指す"
+    depends_on: [choose-action]
+    when: "$choose-action.output.action == 'revise'"
+    command: refine-revise
+  - id: check
+    description: "変更案と、関係するノード(前提のトピックの合意済みのものを含む)との矛盾を調べる。候補は機械で絞る"
+    depends_on: [draft, revise]
+    trigger_rule: none_failed_min_one_success
+    command: refine-check-consistency
+    output_format:
+      type: object
+      properties:
+        contradictions: { type: array }
+        premise_conflict: { type: boolean }
+      required: [contradictions, premise_conflict]
+  - id: review
+    description: "変更案を、矛盾の調査結果と合わせて独立にレビューする。重大な指摘があるか、人が合意した内容の意味が変わるかも判定する"
+    depends_on: [check]
+    command: refine-review
+    provider: codex
+    output_format:
+      type: object
+      properties:
+        blocking: { type: boolean }
+        meaning_changed: { type: boolean }
+        findings: { type: array }
+      required: [blocking, meaning_changed, findings]
+  - id: record-findings
+    description: "レビューの指摘と矛盾をグラフに記録する(次の手の revise と振り返りが読む)。前提のトピックとの食い違いは、そのトピックに印を付ける"
+    depends_on: [review]
+    script: record-findings
+    runtime: bun
+  - id: route
+    description: "振り分ける。矛盾や重大な指摘があれば revise(次の実行で直す)。人が合意した内容の意味が変わる・トピックを増やす・権限の規則で人の判断になる・同じトピックの修正が上限回数を超えた・質問なら human。それ以外は auto"
+    depends_on: [question, record-findings]
+    trigger_rule: none_failed_min_one_success
+    script: route-approval
+    runtime: bun
+    output_format:
+      type: object
+      properties:
+        outcome: { type: string, enum: [revise, auto, human] }
+        message: { type: string }
+        options: { type: array }
+      required: [outcome]
+  - id: commit-auto
+    description: "auto-approve の変更案をグラフに書き込み、決定記録に auto-approve として残す"
+    depends_on: [route]
+    when: "$route.output.outcome == 'auto'"
+    script: commit-proposal
+    runtime: bun
+  - id: mark-stale-auto
+    description: "書き込んだノードにぶら下がるノードに、グラフをたどって要再検討の印を付ける"
+    depends_on: [commit-auto]
+    script: mark-stale
+    runtime: bun
+  - id: ask
+    description: "質問、または変更案の確認を人に返す。選択肢は route が出す(質問なら answer、確認なら approve / revise)。本文に答えや指摘を書ける"
+    depends_on: [route]
+    when: "$route.output.outcome == 'human'"
+    labels: { to: human }
+    wait:
+      form: select
+      attention: "$route.output.message"
+      options: "$route.output.options"
+  - id: record-answer
+    description: "人の答え(選んだ選択肢と本文)を決定記録とグラフに残す。指摘なら次の revise が読む"
+    depends_on: [ask]
+    script: record-answer
+    runtime: bun
+  - id: commit-approved
+    description: "人が承認した変更案($draft / $revise の出力)をグラフに書き込む"
+    depends_on: [record-answer]
+    when: "$ask.output.decision == 'approve'"
+    script: commit-proposal
+    runtime: bun
+  - id: mark-stale-approved
+    description: "書き込んだノードにぶら下がるノードに、グラフをたどって要再検討の印を付ける"
+    depends_on: [commit-approved]
+    script: mark-stale
+    runtime: bun
+  - id: result
+    description: "グラフを読み、未合意・要再検討・食い違いの印が残っているか(続きがあるか)を返す"
+    depends_on: [pick-topic, route, mark-stale-auto, record-answer, mark-stale-approved]
+    trigger_rule: all_done
+    script: refine-result
+    runtime: bun
+    output_format:
+      type: object
+      properties:
+        more: { type: boolean }
+        summary: { type: string }
+      required: [more]
