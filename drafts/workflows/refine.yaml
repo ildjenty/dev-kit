@@ -1,13 +1,14 @@
 name: refine
-description: "要求を詰める1手を進める。トピックは前提にするトピックの合意を受けて動的に立てる。1回の実行で1手だけ進め、人の判断が要る手だけ人に聞き、答えはその場で反映する。続きがあるかを返すので、起動役(セッションなど)はそれを見て次を起動する。状態はすべて文書のグラフに持つ。最初の起動で要求をトピックとして登録する"
+description: "要求を詰める1手を進める。トピックは前提にするトピックの合意を受けて動的に立てる。1回の実行で1手だけ進め、人の判断が要る手だけ人に聞き、答えはその場で反映する。続き・完了・先に進めないのどれかを返すので、起動役(セッションなど)はそれを見て次を起動するか人へ返す。文書はグラフ(1ノード=1ファイル、frontmatter に種類・状態・関係)を正本とし、作業の状態(指摘、修正回数)はグラフとは別に持つ。最初の起動で要求をトピックとして登録する"
+worktree: { enabled: false }
 returns: result
 nodes:
   - id: init
-    description: "グラフがなければ用意し、要求を最初のトピックとして登録する(2回目以降は何もしない)"
+    description: "グラフと作業の状態がなければ用意し、要求を最初のトピックとして登録する(2回目以降は何もしない)"
     script: refine-init
     runtime: bun
   - id: pick-topic
-    description: "次のトピックを機械で選ぶ。前提のトピックとの食い違いの印があるもの、要再検討の印のあるもの、未合意のものの順。前提にするトピックがすべて合意済みのものだけを候補にする。選ぶものがなければ done"
+    description: "次のトピックを機械で選ぶ。今の作業範囲の中で、矛盾(conflicts_with)が記録されたもの、要再検討のもの、未合意のものの順。要再検討かどうかは、合意したときの上流ノードのバージョンと今の上流を比べて計算する。前提にするトピックがすべて合意済みのものだけを候補にする。選ぶものがなければ done"
     depends_on: [init]
     script: pick-topic
     runtime: bun
@@ -29,27 +30,118 @@ nodes:
         action: { type: string, enum: [ask, draft, revise] }
         reason: { type: string }
       required: [action, reason]
-  - id: question
-    description: "トピックについて人への質問を書く。質問の仕方は skill に従う"
+
+  # 質問: 区切りのよいところまで、まとめて聞く往復を繰り返す
+  - id: interview
+    description: "トピックについて、材料が十分になるまで質問の往復を繰り返す。1回にまとめるのは互いの答えに依存しない質問だけ。答えに依存する質問は次の回に聞く"
     depends_on: [choose-action]
     when: "$choose-action.output.action == 'ask'"
-    command: refine-question
-    output_format:
-      type: object
-      properties: { question: { type: string } }
-      required: [question]
+    loop_group:
+      max_iterations: 1
+      until_bash: 'test "$question.output.done" = "true"'
+      nodes:
+        - id: record-round
+          description: "前の回の質問と人の答えを決定記録に残す(1回目は何もしない)"
+          script: record-interview-round
+          runtime: bun
+        - id: question
+          description: "これまでの答えを踏まえ、材料が十分か判断する。足りなければ、互いに独立した質問を、それぞれ理由と推奨の答えつきでまとめて書く。質問の仕方とまとめる粒度は skill に従う。人が終わりにしたい意図を示したら終える"
+          depends_on: [record-round]
+          command: refine-question
+          output_format:
+            type: object
+            properties:
+              done: { type: boolean }
+              questions: { type: array }
+            required: [done]
+        - id: render-questions
+          description: "質問を番号つきで、理由と推奨の答えを添えて決まった形に整形する"
+          depends_on: [question]
+          when: "$question.output.done == false"
+          script: render-questions
+          runtime: bun
+        - id: ask-question
+          description: "まとめた質問を人に返す。人は番号ごとに本文で答える(推奨どおりでよければそう書くだけでよい)"
+          depends_on: [render-questions]
+          wait:
+            labels: { to: human }
+            form: message
+            attention: "$render-questions.output"
+
+  # 下書き・修正: 変更案を作り、検査とレビューを通す
   - id: draft
-    description: "合意済みの前提のトピックをもとに、トピックの文書の変更案を構造化した出力で返す(グラフには書かない)。元にしたノードを必ず指す。新たに詰めるべきトピックがあれば、前提の関係つきで提案する。推測で置いた前提と未確定の点には印を付ける"
+    description: "合意済みの前提のトピックをもとに、トピックの完了条件に向けた文書の変更案を構造化した出力で返す(グラフには書かない)。各変更は、合意済みの内容から導いたもの(derived、元のノードを指す)か新しい判断(new)かを区分する。判断のノードには、検討した案(最も単純な案を含む)・選んだ理由・退けた理由・根拠・残る不確かさを書く。推測で置いた前提と未確定の点は別に挙げる"
     depends_on: [choose-action]
     when: "$choose-action.output.action == 'draft'"
     command: refine-draft
+    output_format:
+      type: object
+      properties:
+        changes:
+          type: array
+          items:
+            type: object
+            properties:
+              op: { type: string, enum: [add, update, remove] }
+              id: { type: string }
+              kind: { type: string }
+              relations: { type: object }
+              body: { type: string }
+              reason: { type: string }
+              origin: { type: string, enum: [derived, new] }
+              derived_from: { type: array }
+            required: [op, kind, reason, origin]
+        assumptions: { type: array }
+        open_points: { type: array }
+      required: [changes, assumptions, open_points]
   - id: revise
-    description: "グラフに記録された指摘・矛盾・人の答え・要再検討の理由を受けて直した変更案を構造化した出力で返す(グラフには書かない)。既存のノードは ID を指す"
+    description: "作業の状態に記録された指摘・矛盾・人の答えと、要再検討の理由を受けて直した変更案を構造化した出力で返す(グラフには書かない)。既存のノードは ID を指す"
     depends_on: [choose-action]
     when: "$choose-action.output.action == 'revise'"
     command: refine-revise
+    output_format:
+      type: object
+      properties:
+        changes:
+          type: array
+          items:
+            type: object
+            properties:
+              op: { type: string, enum: [add, update, remove] }
+              id: { type: string }
+              kind: { type: string }
+              relations: { type: object }
+              body: { type: string }
+              reason: { type: string }
+              origin: { type: string, enum: [derived, new] }
+              derived_from: { type: array }
+            required: [op, kind, reason, origin]
+        assumptions: { type: array }
+        open_points: { type: array }
+      required: [changes, assumptions, open_points]
+  - id: discover-topics
+    description: "変更案の内容から、次に詰めるべきトピックを洗い出し、それぞれ答えるべき問い・完了条件・前提にするトピックの関係つきで提案する"
+    depends_on: [draft, revise]
+    trigger_rule: none_failed_min_one_success
+    command: refine-discover-topics
+    output_format:
+      type: object
+      properties:
+        topics: { type: array }
+      required: [topics]
+  - id: review-topics
+    description: "洗い出したトピックに抜けや余計なものがないか、前提の関係が正しいかを独立にレビューする"
+    depends_on: [discover-topics]
+    command: review-topics
+    provider: codex
+    output_format:
+      type: object
+      properties:
+        blocking: { type: boolean }
+        findings: { type: array }
+      required: [blocking, findings]
   - id: check
-    description: "変更案と、関係するノード(前提のトピックの合意済みのものを含む)との矛盾を調べる。候補は機械で絞る"
+    description: "変更案の追加・更新されるノードごとに、既存の全ノードとの組の関連性を Jev で判定して候補を絞り、Codex か Claude が候補との矛盾を判定する。同じ候補から depends_on の書き漏らしも拾う。既存の合意済みノード同士の矛盾が見つかれば conflicts_with として記録の対象にする"
     depends_on: [draft, revise]
     trigger_rule: none_failed_min_one_success
     command: refine-check-consistency
@@ -60,7 +152,7 @@ nodes:
         premise_conflict: { type: boolean }
       required: [contradictions, premise_conflict]
   - id: review
-    description: "変更案を、矛盾の調査結果と合わせて独立にレビューする。重大な指摘があるか、人が合意した内容の意味が変わるかも判定する"
+    description: "変更案を、矛盾の調査結果と合わせて独立にレビューする。重大な指摘があるか、人が合意した内容の意味が変わるか、derived とされた変更が本当に合意済みの内容から導いたものだけかも判定する"
     depends_on: [check]
     command: refine-review
     provider: codex
@@ -69,25 +161,66 @@ nodes:
       properties:
         blocking: { type: boolean }
         meaning_changed: { type: boolean }
+        only_derived: { type: boolean }
         findings: { type: array }
-      required: [blocking, meaning_changed, findings]
+      required: [blocking, meaning_changed, only_derived, findings]
+  - id: critic
+    description: "全体を見る批評役。トピックの完了条件に照らして検討が足りているか、もっと単純な案はないか、置き場所はおかしくないかの3点だけを独立に判定する"
+    depends_on: [draft, revise]
+    trigger_rule: none_failed_min_one_success
+    command: refine-critic
+    provider: codex
+    output_format:
+      type: object
+      properties:
+        blocking: { type: boolean }
+        findings: { type: array }
+      required: [blocking, findings]
+  - id: validate-graph
+    description: "変更案を当てたあとのグラフの形を機械で検証する。ID の重複、関係(depends_on、supersedes、conflicts_with)の参照先の実在、depends_on の循環、frontmatter の必須欄(種類、状態、topic)、derived の変更が合意済みのノードだけを指しているか。本文は散文なので検査しない"
+    depends_on: [draft, revise, discover-topics]
+    trigger_rule: none_failed_min_one_success
+    script: validate-graph
+    runtime: bun
+    output_format:
+      type: object
+      properties:
+        ok: { type: boolean }
+        violations: { type: array }
+        all_derived: { type: boolean }
+      required: [ok, violations, all_derived]
+  - id: lint-wording
+    description: "変更案の文章を、機械で判定できる書き方の規則(使わない言葉、表の禁止、メタ記述など)で検査する"
+    depends_on: [draft, revise]
+    trigger_rule: none_failed_min_one_success
+    script: lint-wording
+    runtime: bun
+  - id: review-wording
+    description: "変更案の文章を、書き方の規範に照らして独立にレビューする(内容のレビューとは別の担当)"
+    depends_on: [lint-wording]
+    command: review-wording
+    provider: codex
+    output_format:
+      type: object
+      properties:
+        blocking: { type: boolean }
+        findings: { type: array }
+      required: [blocking, findings]
   - id: record-findings
-    description: "レビューの指摘と矛盾をグラフに記録する(次の手の revise と振り返りが読む)。前提のトピックとの食い違いは、そのトピックに印を付ける"
-    depends_on: [review]
+    description: "内容・書き方・トピック・批評役のレビューの指摘、矛盾、グラフの検証の違反を作業の状態に記録する。各指摘に種類と、どの規範の観点に当たるかを付ける(次の手の revise と振り返りが読む)。前提のトピックとの食い違いは、そのトピックについて記録する"
+    depends_on: [review, review-wording, review-topics, critic, validate-graph]
     script: record-findings
     runtime: bun
   - id: route
-    description: "振り分ける。矛盾や重大な指摘があれば revise(次の実行で直す)。人が合意した内容の意味が変わる・トピックを増やす・権限の規則で人の判断になる・同じトピックの修正が上限回数を超えた・質問なら human。それ以外は auto"
-    depends_on: [question, record-findings]
-    trigger_rule: none_failed_min_one_success
+    description: "振り分ける。グラフの検証の違反、矛盾、重大な指摘があれば revise(次の実行で直す)。同じトピックの修正が上限回数を超えたら human。auto にするのは、全変更が derived で指す先がすべて合意済み(機械の検証)、かつレビューが導いたものだけと判定し、合意した内容の意味も変わらない場合だけ。判断のノードの追加・変更、トピックの追加、権限の規則で人の判断になるものを含め、それ以外はすべて human"
+    depends_on: [record-findings]
     script: route-approval
     runtime: bun
     output_format:
       type: object
       properties:
         outcome: { type: string, enum: [revise, auto, human] }
-        message: { type: string }
-        options: { type: array }
+        reasons: { type: array }
       required: [outcome]
   - id: commit-auto
     description: "auto-approve の変更案をグラフに書き込み、決定記録に auto-approve として残す"
@@ -95,45 +228,53 @@ nodes:
     when: "$route.output.outcome == 'auto'"
     script: commit-proposal
     runtime: bun
-  - id: mark-stale-auto
-    description: "書き込んだノードにぶら下がるノードに、グラフをたどって要再検討の印を付ける"
-    depends_on: [commit-auto]
-    script: mark-stale
-    runtime: bun
-  - id: ask
-    description: "質問、または変更案の確認を人に返す。選択肢は route が出す(質問なら answer、確認なら approve / revise)。本文に答えや指摘を書ける"
+  - id: render-proposal
+    description: "人に見せる変更案を決まった形に整形する。どのノードをどう変えるかの差分、提案するトピック、人に返す理由、レビューの結果を並べる(LLM を通さない)"
     depends_on: [route]
     when: "$route.output.outcome == 'human'"
-    labels: { to: human }
+    script: render-proposal
+    runtime: bun
+  - id: ask
+    description: "変更案の確認を人に返す。承認するか、本文に指摘を書いて直させる"
+    depends_on: [render-proposal]
     wait:
+      labels: { to: human }
       form: select
-      attention: "$route.output.message"
-      options: "$route.output.options"
+      attention: "$render-proposal.output"
+      options:
+        - { id: approve, label: "承認する" }
+        - { id: revise, label: "直させる(本文に指摘を書く)" }
   - id: record-answer
-    description: "人の答え(選んだ選択肢と本文)を決定記録とグラフに残す。指摘なら次の revise が読む"
+    description: "人の答え(選んだ選択肢と本文)を決定記録に残す。指摘なら作業の状態にも記録し、次の revise が読む"
     depends_on: [ask]
     script: record-answer
     runtime: bun
   - id: commit-approved
-    description: "人が承認した変更案($draft / $revise の出力)をグラフに書き込む"
+    description: "人が承認した変更案($draft / $revise の出力)をグラフに書き込む。合意したときの上流ノードのバージョンも記録する"
     depends_on: [record-answer]
     when: "$ask.output.decision == 'approve'"
     script: commit-proposal
     runtime: bun
-  - id: mark-stale-approved
-    description: "書き込んだノードにぶら下がるノードに、グラフをたどって要再検討の印を付ける"
-    depends_on: [commit-approved]
-    script: mark-stale
+
+  # 締め: git にコミットし、続きがあるかを返す
+  - id: update-summary
+    description: "人が理解を取り戻す入口として、今の前提・決まったこと・残っていること・人が次にすべきことの短い要約を更新する"
+    depends_on: [pick-topic, interview, route, commit-auto, record-answer, commit-approved]
+    trigger_rule: all_done
+    command: refine-update-summary
+  - id: git-commit
+    description: "この1手でのグラフ・決定記録・作業の状態・要約の変更を1つのコミットにする(変更がなければ何もしない)"
+    depends_on: [update-summary]
+    script: git-commit-step
     runtime: bun
   - id: result
-    description: "グラフを読み、未合意・要再検討・食い違いの印が残っているか(続きがあるか)を返す"
-    depends_on: [pick-topic, route, mark-stale-auto, record-answer, mark-stale-approved]
-    trigger_rule: all_done
+    description: "グラフと作業の状態を読み、続きがある(more)・完了(done: 作業範囲の中に未合意も矛盾も残っていない。範囲の外の矛盾は要約で知らせるだけ)・先に進めない(blocked: 未合意が残るのに選べるトピックがない)のどれかを返す。blocked なら起動役は起動し直さずに人へ返す"
+    depends_on: [git-commit]
     script: refine-result
     runtime: bun
     output_format:
       type: object
       properties:
-        more: { type: boolean }
+        status: { type: string, enum: [more, done, blocked] }
         summary: { type: string }
-      required: [more]
+      required: [status]

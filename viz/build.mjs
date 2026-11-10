@@ -23,7 +23,7 @@ const trunc = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 
 function kindOf(n) { return KINDS.find(k => n[k] !== undefined) ?? 'prompt'; }
 function group(n, k) {
-  if (k === 'wait' || k === 'approval' || n.labels?.to === 'human') return 'human';
+  if (k === 'wait' || k === 'approval' || (n.labels?.to === 'human' || n.wait?.labels?.to === 'human')) return 'human';
   if (k === 'prompt' || k === 'command' || k === 'loop') return 'ai';
   if (k === 'bash' || k === 'script') return 'mech';
   if (k === 'workflow' || k === 'include') return 'child';
