@@ -86,7 +86,8 @@
           "needs_decision",
           "failure_scenario",
           "evidence",
-          "fix"
+          "fix",
+          "mechanical"
         ]
       }
     }

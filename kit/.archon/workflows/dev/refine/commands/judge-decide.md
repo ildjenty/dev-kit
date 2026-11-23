@@ -18,3 +18,5 @@ Return `{ "criteria": [{"aspect":"...","verdict":"pass|fail|not_assessed","check
 "not_checked":"..."}], "findings": [{"aspect":"...","item":"...","blocking":true,
 "needs_decision":false,"failure_scenario":"...","evidence":"...","fix":"...","mechanical":false}] }`.
 Write no files.
+
+Return every property in the output schema. Use `false` for `mechanical` when no mechanical check is proposed. Use empty strings or empty arrays for inapplicable text or lists.

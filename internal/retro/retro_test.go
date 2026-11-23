@@ -293,7 +293,7 @@ func TestJudgmentDecisionPointsAndRoundLimit(t *testing.T) {
 			case "duplicate":
 				j["criteria"] = append(items(j["criteria"]), items(j["criteria"])[0])
 			case "blocking", "needs_decision":
-				j["findings"] = []doc{{"aspect": "mechanism", "item": "repair", "blocking": verdict == "blocking", "needs_decision": verdict == "needs_decision", "failure_scenario": "Failure", "evidence": "Evidence", "fix": "Fix"}}
+				j["findings"] = []doc{{"aspect": "mechanism", "item": "repair", "mechanical": false, "blocking": verdict == "blocking", "needs_decision": verdict == "needs_decision", "failure_scenario": "Failure", "evidence": "Evidence", "fix": "Fix"}}
 			case "schema":
 				j = doc{}
 			default:

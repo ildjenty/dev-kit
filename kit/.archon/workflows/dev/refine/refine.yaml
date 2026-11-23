@@ -103,6 +103,7 @@ nodes:
           command: decide
           output_format:
             type: object
+            additionalProperties: false
             properties:
               draft: { type: string }
             required: [draft]
@@ -120,7 +121,7 @@ nodes:
           context: fresh
           mutates_checkout: false
           allowed_tools: [Read, Grep, Glob]
-          output_format: {"type": "object", "additionalProperties": false, "properties": {"criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["coverage", "additions", "open_points", "consistency", "sufficiency"]}, "verdict": {"type": "string", "enum": ["pass", "fail", "not_assessed"]}, "checked": {"type": "string"}, "not_checked": {"type": "string"}}, "required": ["aspect", "verdict", "checked", "not_checked"]}}, "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["coverage", "additions", "open_points", "consistency", "sufficiency"]}, "item": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "needs_decision": {"type": "boolean"}, "mechanical": {"type": "boolean"}, "failure_scenario": {"type": "string", "minLength": 1}, "evidence": {"type": "string", "minLength": 1}, "fix": {"type": "string", "minLength": 1}}, "required": ["aspect", "item", "blocking", "needs_decision", "failure_scenario", "evidence", "fix"]}}}, "required": ["criteria", "findings"]}
+          output_format: {"type": "object", "additionalProperties": false, "properties": {"criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["coverage", "additions", "open_points", "consistency", "sufficiency"]}, "verdict": {"type": "string", "enum": ["pass", "fail", "not_assessed"]}, "checked": {"type": "string"}, "not_checked": {"type": "string"}}, "required": ["aspect", "verdict", "checked", "not_checked"]}}, "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["coverage", "additions", "open_points", "consistency", "sufficiency"]}, "item": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "needs_decision": {"type": "boolean"}, "mechanical": {"type": "boolean"}, "failure_scenario": {"type": "string", "minLength": 1}, "evidence": {"type": "string", "minLength": 1}, "fix": {"type": "string", "minLength": 1}}, "required": ["aspect", "item", "blocking", "needs_decision", "failure_scenario", "evidence", "fix", "mechanical"]}}}, "required": ["criteria", "findings"]}
 
         - id: round-decide
           depends_on: [judge-decide]
@@ -151,6 +152,7 @@ nodes:
           command: document
           output_format:
             type: object
+            additionalProperties: false
             properties:
               draft: { type: string }
             required: [draft]
@@ -168,7 +170,7 @@ nodes:
           output_format:
             type: object
             properties:
-              source: { type: string, enum: [jev, codex] }
+              source: { type: string, enum: [jev, claude, codex] }
               model: { type: string }
               not_reflected:
                 type: array
@@ -192,7 +194,7 @@ nodes:
           context: fresh
           mutates_checkout: false
           allowed_tools: [Read, Grep, Glob]
-          output_format: {"type": "object", "additionalProperties": false, "properties": {"criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["wording"]}, "verdict": {"type": "string", "enum": ["pass", "fail", "not_assessed"]}, "checked": {"type": "string"}, "not_checked": {"type": "string"}}, "required": ["aspect", "verdict", "checked", "not_checked"]}}, "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["wording"]}, "item": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "needs_decision": {"type": "boolean"}, "mechanical": {"type": "boolean"}, "failure_scenario": {"type": "string", "minLength": 1}, "evidence": {"type": "string", "minLength": 1}, "fix": {"type": "string", "minLength": 1}}, "required": ["aspect", "item", "blocking", "needs_decision", "failure_scenario", "evidence", "fix"]}}}, "required": ["criteria", "findings"]}
+          output_format: {"type": "object", "additionalProperties": false, "properties": {"criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["wording"]}, "verdict": {"type": "string", "enum": ["pass", "fail", "not_assessed"]}, "checked": {"type": "string"}, "not_checked": {"type": "string"}}, "required": ["aspect", "verdict", "checked", "not_checked"]}}, "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["wording"]}, "item": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "needs_decision": {"type": "boolean"}, "mechanical": {"type": "boolean"}, "failure_scenario": {"type": "string", "minLength": 1}, "evidence": {"type": "string", "minLength": 1}, "fix": {"type": "string", "minLength": 1}}, "required": ["aspect", "item", "blocking", "needs_decision", "failure_scenario", "evidence", "fix", "mechanical"]}}}, "required": ["criteria", "findings"]}
 
         - id: round-document
           depends_on: [judge-document, reflect]

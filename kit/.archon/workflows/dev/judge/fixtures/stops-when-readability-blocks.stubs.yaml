@@ -50,6 +50,7 @@ judge-readability:
           verdict: pass
     findings:
         - aspect: readability
+          deferred: false
           blocking: true
           evidence: The changed name contradicts its operation
           failure_scenario: A caller misreads the changed name and invokes the wrong operation

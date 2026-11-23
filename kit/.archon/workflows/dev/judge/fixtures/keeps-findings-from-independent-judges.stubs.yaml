@@ -49,6 +49,7 @@ judge-contract:
           verdict: pass
     findings:
         - aspect: contract
+          deferred: false
           blocking: true
           evidence: data.md criterion3
           failure_scenario: a negative amount is stored
@@ -76,6 +77,7 @@ judge-structure:
           verdict: fail
     findings:
         - aspect: structure
+          deferred: false
           blocking: true
           evidence: 'smells.md: criterion'
           failure_scenario: orders and payments import each other

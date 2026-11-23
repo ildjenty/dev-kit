@@ -57,6 +57,7 @@ judge-scope:
           verdict: fail
     findings:
         - aspect: decisions
+          deferred: false
           blocking: true
           evidence: diff.md
           failure_scenario: a retry limit no row records

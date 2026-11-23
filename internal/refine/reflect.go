@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ildjenty/dev-kit/internal/claudecli"
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/codexcli"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/jev"
 )
 
@@ -27,10 +29,20 @@ func runReflectTimeout(env cli.Env, timeout time.Duration) error {
 		result["source"] = "jev"
 		return env.JSON(result)
 	}
-	answer, err := codexcli.Run(env, "refine", "refine/commands/reflect.md", reflectionSchema, timeout)
+	settings, err := config.Load(env.Cwd)
 	if err != nil {
-		return fmt.Errorf("Jev unavailable: %s; Codex unavailable: %s", str(result["reason"]), err)
+		return err
 	}
-	answer["source"] = "codex"
+	runCLI := claudecli.Run
+	label := "Claude"
+	if settings.Provider == "codex" {
+		runCLI = codexcli.Run
+		label = "Codex"
+	}
+	answer, err := runCLI(env, "refine", "refine/commands/reflect.md", reflectionSchema, timeout)
+	if err != nil {
+		return fmt.Errorf("Jev unavailable: %s; %s unavailable: %s", str(result["reason"]), label, err)
+	}
+	answer["source"] = settings.Provider
 	return env.JSON(answer)
 }

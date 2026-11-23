@@ -30,7 +30,7 @@ func criterion(verdict string) doc {
 	return doc{"aspect": "security", "verdict": verdict, "checked": "source", "not_checked": ""}
 }
 func finding(extra doc) doc {
-	f := doc{"id": "security-1", "blocking": true, "needs_decision": false, "failure_scenario": "A caller reads another user's data", "evidence": "security.md", "file": "a.js", "line": "1", "fix": "Check access"}
+	f := doc{"id": "security-1", "blocking": true, "needs_decision": false, "deferred": false, "mechanical": false, "failure_scenario": "A caller reads another user's data", "evidence": "security.md", "file": "a.js", "line": "1", "fix": "Check access"}
 	for k, v := range extra {
 		f[k] = v
 	}

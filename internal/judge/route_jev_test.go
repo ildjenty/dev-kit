@@ -301,6 +301,8 @@ func TestJevMalformedAnswersAndPartialFailure(t *testing.T) {
 }
 func TestJevCommandNoKeyAndSecretRedaction(t *testing.T) {
 	a := jevInput(t)
+	testutil.Git(t, a, "init", "-q")
+	testutil.Put(t, a, ".devkit/config.json", `{"provider":"codex"}`)
 	testutil.Put(t, a, "typesafe-apikey.txt", "secret")
 	var calls atomic.Int32
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

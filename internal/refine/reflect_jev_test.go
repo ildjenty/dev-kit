@@ -269,6 +269,8 @@ func TestReflectJevHTTPFailuresAndTimeout(t *testing.T) {
 }
 func TestReflectJevCommandNoKeyAndSecretRedaction(t *testing.T) {
 	root, artifacts := reflectionArtifacts(t, map[string]string{"docs/secret.md": "N1"})
+	testutil.Git(t, root, "init", "-q")
+	testutil.Put(t, root, ".devkit/config.json", `{"provider":"codex"}`)
 	testutil.Put(t, root, "typesafe-apikey.txt", "secret")
 	d := clone(items(draft()["decisions"])[0])
 	d["title"] = "secret title"

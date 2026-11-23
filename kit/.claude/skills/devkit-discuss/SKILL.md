@@ -1,9 +1,12 @@
 ---
-name: dev-discuss
+name: devkit-discuss
 description: Discuss an unsettled product or development topic with its owner, compare existing decisions, and prepare a confirmed memo for refine without editing documents or decision records.
 ---
 
 # Discuss with the owner
+
+Read the companion `.claude/skills/devkit-runs/SKILL.md` for starting runs. The installer places
+these skills under the session tool selected by `sessions`, independently of the workflow `provider`.
 
 Let the owner lead the conversation. Start with open questions about their situation, difficulty and
 intention. Ask one useful question at a time; do not begin by forcing a list of solutions. Restate what
@@ -29,7 +32,7 @@ session. When the owner is ready to finish, write a memo in the conversation, in
 with three parts: decided, overturned (include existing decision IDs), and still open. Distinguish the
 owner's choices from your suggestions. Ask the owner to confirm or correct the memo.
 
-After confirmation, use `dev-runs` to start `refine` on a `refine/<name>` branch with the confirmed memo
+After confirmation, use `devkit-runs` to start `refine` on a `refine/<name>` branch with the confirmed memo
 verbatim as `memo`. A run settles one topic: use the selected pickable topic ID as `topic`, or leave it
 empty for the first request topic. `devkit decisions topics` lists open topics whose decision
 dependencies are agreed. Refine decides, documents, and asks approval of an exact proposal version.
@@ -37,6 +40,6 @@ The discussion memo does not approve that proposal.
 
 After approval, publish and merge the refine pull request through the repository's PR process before
 starting any unit it created. Continue topic by topic, discussing unresolved choices when needed.
-For each settled unit, `dev-runs` passes `unit=<id>` to requirements and follows plan → implement →
+For each settled unit, `devkit-runs` passes `unit=<id>` to requirements and follows plan → implement →
 judge ⇄ fix → pr, with sync when needed and retro for the merged backlog. Relay recorded questions
 and `back` results through that skill; do not supply approval, answers or `continue` for the owner.

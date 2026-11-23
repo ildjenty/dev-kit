@@ -49,6 +49,7 @@ judge-cost:
           verdict: pass
     findings:
         - aspect: cost
+          deferred: false
           blocking: true
           evidence: authority.md cost item; MAX_ATTEMPTS = 10
           failure_scenario: a failing paid call is retried up to 10 times instead of 3

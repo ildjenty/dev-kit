@@ -40,3 +40,5 @@ the machine stops with "this change needs requirements and a plan: start `requir
 ## Output
 
 Return one `criteria` entry for every document in materials `criteria`; its `aspect` is the document's filename without `.md` (for example `scope`). An empty or missing required entry invalidates the assessment. Entries have `aspect`, `verdict` (`pass`, `fail`, `not_assessed`), `checked`, and `not_checked`. Include the quality's criteria and the decisions relevant to it. Return `findings` with `aspect`, `file`, `line`, `blocking`, `needs_decision`, `deferred`, `mechanical`, `failure_scenario`, `evidence`, `fix`. Empty location strings are allowed. `mechanical` means a written mechanical rule can decide it. Cite the criterion and observed evidence. Pass and state why when nothing of your quality changed.
+
+Return every property in the output schema. Use `false` for `mechanical` when no mechanical check is proposed and for `deferred` when the finding is on the change’s path. Use empty strings or empty arrays for inapplicable text or lists.

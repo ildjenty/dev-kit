@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/testutil"
 )
 
@@ -66,4 +67,16 @@ func TestRetroFixtureSetupUsesRetroBranch(t *testing.T) {
 	testutil.OK(t, setup("retro", env))
 	testutil.Equal(t, testutil.Git(t, repo, "branch", "--show-current"), "retro/"+filepath.Base(repo))
 	testutil.Equal(t, testutil.Git(t, repo, "status", "--porcelain"), "")
+}
+
+func TestFixtureSetupPreservesProvider(t *testing.T) {
+	for _, provider := range []string{"claude", "codex"} {
+		t.Run(provider, func(t *testing.T) {
+			repo := testutil.Repo(t)
+			testutil.Put(t, repo, ".devkit/config.json", `{"provider":"`+provider+`"}`)
+			env := cli.Env{Cwd: repo, LookupEnv: func(k string) (string, bool) { return "fixture-base", k == "BASE_BRANCH" }}
+			testutil.OK(t, setup("requirements", env))
+			testutil.Equal(t, testutil.Must(config.Load(repo)).Provider, provider)
+		})
+	}
 }

@@ -44,6 +44,8 @@ judge-data:
     checked: D1
     findings:
         - blocking: true
+          deferred: false
+          mechanical: false
           evidence: src/entry.ext
           failure_scenario: The entry point cannot reach the result
           fix: Wire the entry point

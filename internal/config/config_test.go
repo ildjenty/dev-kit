@@ -77,7 +77,7 @@ func TestStandardsDefaults(t *testing.T) {
 func TestConfigRejectsRenamedKey(t *testing.T) {
 	for _, raw := range []string{`{"norms":"policy"}`, `{"norms":null}`, `{"norms":"policy","standards":"policy"}`} {
 		t.Run(raw, func(t *testing.T) {
-			_, err := parse([]byte(raw))
+			_, err := Parse([]byte(raw))
 			testutil.Fails(t, err, "norms was renamed to standards")
 		})
 	}
@@ -125,5 +125,17 @@ func TestF3BacklogPathsRemainDecisionsUnderBroadGlobs(t *testing.T) {
 	changed.Files = append(changed.Files, gitx.File{Path: ".devkit/config.json", Status: "M"})
 	if len(DecisionChanges(c, changed)) == 0 {
 		t.Fatal("non-backlog decisions lost")
+	}
+}
+
+func TestSkillNamesDefaultsMergeAndValidation(t *testing.T) {
+	testutil.Equal(t, Defaults("").Skills, map[string]string{"devkit-runs": "devkit-runs", "devkit-discuss": "devkit-discuss", "devkit-optimize": "devkit-optimize"})
+	c := testutil.Must(Parse([]byte(`{"skills":{"devkit-runs":"run-42"}}`)))
+	testutil.Equal(t, c.Skills, map[string]string{"devkit-runs": "run-42", "devkit-discuss": "devkit-discuss", "devkit-optimize": "devkit-optimize"})
+	for _, raw := range []string{`{"skills":null}`, `{"skills":[]}`, `{"skills":{"extra":"name"}}`, `{"skills":{"devkit-runs":null}}`, `{"skills":{"devkit-runs":42}}`, `{"skills":{"devkit-runs":""}}`, `{"skills":{"devkit-runs":"RUN"}}`, `{"skills":{"devkit-runs":"run_name"}}`, `{"skills":{"devkit-runs":"a/b"}}`, `{"skills":{"devkit-runs":"a b"}}`, `{"skills":{"devkit-runs":"名前"}}`, `{"skills":{"devkit-runs":"devkit-discuss"}}`} {
+		t.Run(raw, func(t *testing.T) {
+			_, err := Parse([]byte(raw))
+			testutil.Fails(t, err, "invalid .devkit/config.json")
+		})
 	}
 }

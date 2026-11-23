@@ -149,7 +149,7 @@ nodes:
                     failure_scenario: { type: string }
                     evidence: { type: string }
                     fix: { type: string }
-                  required: [row, blocking, needs_decision, failure_scenario, evidence, fix]
+                  required: [deferred, mechanical, row, blocking, needs_decision, failure_scenario, evidence, fix]
             required: [verdict, checked, not_checked, findings]
         - id: structure-settle
           depends_on: [structure-write, structure-check, judge-structure]
@@ -308,7 +308,7 @@ nodes:
                     failure_scenario: { type: string }
                     evidence: { type: string }
                     fix: { type: string }
-                  required: [row, blocking, needs_decision, failure_scenario, evidence, fix]
+                  required: [deferred, mechanical, row, blocking, needs_decision, failure_scenario, evidence, fix]
               back:
                 type: object
                 additionalProperties: false

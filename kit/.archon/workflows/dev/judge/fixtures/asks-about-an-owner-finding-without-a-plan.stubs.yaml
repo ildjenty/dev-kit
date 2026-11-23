@@ -61,6 +61,7 @@ judge-structure:
           verdict: fail
     findings:
         - aspect: structure
+          deferred: false
           blocking: true
           evidence: authority.md access rules and the exported entry
           failure_scenario: The new module exposes data outside the audience the owner specified

@@ -142,7 +142,7 @@ nodes:
   output_format:
     type: object
     properties:
-      source: { type: string, enum: [jev, codex, all] }
+      source: { type: string, enum: [jev, claude, codex, all] }
       reason: { type: string }
       model: { type: string }
       qualities:
@@ -326,6 +326,7 @@ nodes:
           - blocking
           - needs_decision
           - mechanical
+          - deferred
           - failure_scenario
           - evidence
           - fix

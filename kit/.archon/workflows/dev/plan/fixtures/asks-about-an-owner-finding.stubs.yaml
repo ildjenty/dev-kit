@@ -48,6 +48,8 @@ judge-security:
     checked: D2
     findings:
         - blocking: false
+          deferred: false
+          mechanical: false
           evidence: apps/api/src/routes.ts
           failure_scenario: A new public entry point is exposed
           fix: The owner must decide whether exposure is permitted

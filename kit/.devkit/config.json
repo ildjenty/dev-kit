@@ -1,5 +1,12 @@
 {
+  "provider": "claude",
+  "sessions": ["claude"],
   "language": "ja",
+  "skills": {
+    "devkit-runs": "devkit-runs",
+    "devkit-discuss": "devkit-discuss",
+    "devkit-optimize": "devkit-optimize"
+  },
   "standards": ".devkit/standards",
   "docs": "docs",
   "decisions": ".devkit/decisions",

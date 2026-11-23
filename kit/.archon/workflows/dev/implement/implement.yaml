@@ -80,6 +80,7 @@ nodes:
           context: fresh
           output_format:
             type: object
+            additionalProperties: false
             properties:
               tests: { type: array, items: { type: string } }
             required: [tests]

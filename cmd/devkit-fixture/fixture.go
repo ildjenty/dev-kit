@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
@@ -156,7 +157,11 @@ func setup(workflow string, env cli.Env) error {
 			return err
 		}
 	}
-	if err := save(filepath.Join(env.Cwd, ".devkit/config.json"), doc{"language": "en", "checks": []doc{{"name": "fixture", "command": "test -f fixture.txt", "timeout_seconds": 5}}, "skeleton_check": []string{"fixture"}, "decision_paths": []doc{}}); err != nil {
+	settings, err := config.Load(env.Cwd)
+	if err != nil {
+		return err
+	}
+	if err := save(filepath.Join(env.Cwd, ".devkit/config.json"), doc{"provider": settings.Provider, "language": "en", "checks": []doc{{"name": "fixture", "command": "test -f fixture.txt", "timeout_seconds": 5}}, "skeleton_check": []string{"fixture"}, "decision_paths": []doc{}}); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(env.Cwd, "fixture.txt"), []byte("fixture result\n"), 0644); err != nil {

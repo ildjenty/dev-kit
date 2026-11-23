@@ -1,5 +1,5 @@
 ---
-name: dev-runs
+name: devkit-runs
 description: Start and monitor Archon development workflows, route requests through discussion and refinement or downstream delivery, and relay recorded questions, answers and approvals to the owner.
 ---
 
@@ -9,6 +9,13 @@ Use the installed Archon CLI skill, when available, for CLI syntax; otherwise co
 and `archon workflow --help`. This skill defines the development sequence and owner handoffs.
 
 ## Before starting
+
+Run `devkit doctor` for missing requirements and part-specific tools. Read `provider` and `sessions`
+from `devkit config`: workflow AI and the Jev fallback use the provider; this session uses the skills
+installed for its own tool under `.claude/skills/`.
+
+When `devkit config` shows no `checks`, the kit has not been fitted to this repository yet: say so
+and offer the `devkit-optimize` skill before starting development workflows.
 
 Run from the repository root. Invoke `archon` directly, without a project-specific command wrapper.
 `ARCHON_HOME` is optional: retain an existing project setting or export the same chosen value in every
@@ -22,7 +29,7 @@ a limit for every repository.
 
 Use a branch for each topic or work unit, and start workflows with `--branch <name> --detach`.
 
-- Unsettled request: `dev-discuss` → `refine` one topic at a time → exact-version approval →
+- Unsettled request: `devkit-discuss` → `refine` one topic at a time → exact-version approval →
   publish and merge the refine pull request → for each settled work unit, on its own branch:
   `requirements` (`unit=<id>`) → `plan` → `implement` → `judge` ⇄ `fix` → `pr`.
 - A settled development request: `requirements` → `plan` → `implement` → `judge` → `pr`.
@@ -50,7 +57,7 @@ separate branch for the unit and pass its ID as requirements' `unit`, for exampl
 Prepare loads the unit and its agreed decisions as constraints. Use `owner_words` for direct requests.
 Keep the branch and PR for later corrections unless the owner asks for another. After refine passes,
 publish its branch through the repository's PR process; refine itself only commits. Continue with the
-next pickable topic, using `dev-discuss` when choices need discussion. A unit waits until the refine PR
+next pickable topic, using `devkit-discuss` when choices need discussion. A unit waits until the refine PR
 that created it has merged and its prerequisite units are complete.
 
 ## Find and relay results
@@ -118,7 +125,7 @@ result is not a pass: inspect the `start` output and relay what prevented starti
 After starting, attach the session's background monitor, when available, to:
 
 ```sh
-bash .claude/skills/dev-runs/scripts/watch.sh <run-id> [<run-id> ...]
+bash .claude/skills/devkit-runs/scripts/watch.sh <run-id> [<run-id> ...]
 ```
 
 It prints a line when statuses change and exits when all runs end. Do not filter

@@ -35,7 +35,10 @@ type Limits struct {
 	Fixes    int `json:"fixes"`
 }
 type Config struct {
+	Provider      string             `json:"provider"`
+	Sessions      []string           `json:"sessions"`
 	Language      string             `json:"language"`
+	Skills        map[string]string  `json:"skills"`
 	Standards     string             `json:"standards"`
 	Docs          string             `json:"docs"`
 	Decisions     string             `json:"decisions"`
@@ -98,9 +101,9 @@ func Load(cwd string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return parse(data)
+	return Parse(data)
 }
-func parse(data []byte) (Config, error) {
+func Parse(data []byte) (Config, error) {
 	var supplied map[string]any
 	if err := json.Unmarshal(data, &supplied); err != nil {
 		var other any
@@ -120,7 +123,7 @@ func parse(data []byte) (Config, error) {
 	var merged map[string]any
 	_ = json.Unmarshal(base, &merged)
 	for key, value := range supplied {
-		if key == "limits" || key == "qualities" {
+		if key == "limits" || key == "qualities" || key == "skills" {
 			object, ok := value.(map[string]any)
 			if !ok {
 				return Config{}, invalid(key + " must be an object")
@@ -132,6 +135,9 @@ func parse(data []byte) (Config, error) {
 		} else {
 			merged[key] = value
 		}
+	}
+	if _, exists := supplied["sessions"]; !exists {
+		merged["sessions"] = []any{merged["provider"]}
 	}
 	if err := shape(merged); err != nil {
 		return Config{}, err
@@ -163,7 +169,7 @@ func ChecksAcrossBase(cwd, baseBranch string) ([]Check, error) {
 		if err != nil {
 			return nil, err
 		}
-		previous, err = parse([]byte(data))
+		previous, err = Parse([]byte(data))
 		if err != nil {
 			return nil, err
 		}
@@ -206,12 +212,45 @@ func keys(value any, allowed []string) bool {
 	}
 	return true
 }
+
+var SkillKeys = []string{"devkit-runs", "devkit-discuss", "devkit-optimize"}
+
 func shape(c map[string]any) error {
-	if !keys(c, []string{"language", "standards", "docs", "decisions", "units", "topics", "checks", "skeleton_check", "qualities", "decision_paths", "limits"}) {
+	if !keys(c, []string{"provider", "sessions", "language", "skills", "standards", "docs", "decisions", "units", "topics", "checks", "skeleton_check", "qualities", "decision_paths", "limits"}) {
 		return invalid("unknown setting")
+	}
+	if c["provider"] != "claude" && c["provider"] != "codex" {
+		return invalid("provider must be claude or codex")
+	}
+	sessions, ok := c["sessions"].([]any)
+	if !ok {
+		return invalid("sessions must be a list of claude or codex")
+	}
+	seenSessions := map[string]bool{}
+	for _, value := range sessions {
+		name, _ := value.(string)
+		if name != "claude" && name != "codex" || seenSessions[name] {
+			return invalid("sessions must contain distinct claude or codex entries")
+		}
+		seenSessions[name] = true
 	}
 	if !text(c["language"]) {
 		return invalid("language must be a non-empty string")
+	}
+	if !keys(c["skills"], SkillKeys) {
+		return invalid("skills must map " + strings.Join(SkillKeys, ", ") + " to skill names")
+	}
+	skills := c["skills"].(map[string]any)
+	used := map[string]bool{}
+	for _, key := range SkillKeys {
+		name, _ := skills[key].(string)
+		if !regexp.MustCompile(`^[a-z0-9-]+$`).MatchString(name) {
+			return invalid("skills." + key + " must contain only lowercase letters, digits and hyphens")
+		}
+		if used[name] {
+			return invalid("skill names must be distinct")
+		}
+		used[name] = true
 	}
 	for _, key := range []string{"standards", "docs", "decisions", "units", "topics"} {
 		s, _ := c[key].(string)

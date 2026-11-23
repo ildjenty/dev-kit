@@ -121,11 +121,13 @@ nodes:
   mutates_checkout: false
   output_format:
     type: object
+    additionalProperties: false
     properties:
       questions:
         type: array
         items:
           type: object
+          additionalProperties: false
           properties:
             index:
               type: integer
@@ -166,6 +168,7 @@ nodes:
             type: string
           headings:
             type: object
+            additionalProperties: false
             properties:
               what_changed: *2
               how_checked: *2

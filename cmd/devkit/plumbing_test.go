@@ -134,3 +134,73 @@ func TestWorkflowAIContracts(t *testing.T) {
 		t.Fatal("no AI nodes checked")
 	}
 }
+
+func strictSchema(t *testing.T, path string, value any) {
+	t.Helper()
+	switch node := value.(type) {
+	case map[string]any:
+		if properties, ok := node["properties"].(map[string]any); ok {
+			required, _ := node["required"].([]any)
+			if node["additionalProperties"] != false {
+				t.Errorf("%s: object allows additional properties", path)
+			}
+			for key := range properties {
+				if !slices.Contains(required, any(key)) {
+					t.Errorf("%s: %s is not required", path, key)
+				}
+			}
+		}
+		for key, child := range node {
+			strictSchema(t, path+"/"+key, child)
+		}
+	case []any:
+		for _, child := range node {
+			strictSchema(t, path, child)
+		}
+	}
+}
+
+func TestEveryAISchemaIsStrict(t *testing.T) {
+	count := 0
+	err := fs.WalkDir(kit.Files, ".archon/workflows", func(path string, entry fs.DirEntry, err error) error {
+		if err != nil || entry.IsDir() || !strings.HasSuffix(path, ".yaml") || strings.Contains(path, "/fixtures/") {
+			return err
+		}
+		data, err := kit.Files.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		var root any
+		if err := yaml.Unmarshal(data, &root); err != nil {
+			return err
+		}
+		var visit func(any)
+		visit = func(value any) {
+			switch node := value.(type) {
+			case map[string]any:
+				if _, ai := node["provider"]; ai {
+					count++
+					if node["output_format"] == nil {
+						t.Errorf("%s node %v lacks a schema", path, node["id"])
+					}
+					strictSchema(t, path, node["output_format"])
+				}
+				for _, child := range node {
+					visit(child)
+				}
+			case []any:
+				for _, child := range node {
+					visit(child)
+				}
+			}
+		}
+		visit(root)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count == 0 {
+		t.Fatal("no AI schemas checked")
+	}
+}

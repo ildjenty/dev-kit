@@ -6,9 +6,11 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/ildjenty/dev-kit/internal/claudecli"
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/codexcli"
 	"github.com/ildjenty/dev-kit/internal/concerns"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/jev"
 )
 
@@ -55,12 +57,22 @@ func runRouteTimeout(env cli.Env, timeout time.Duration) error {
 	if err != nil {
 		return err
 	}
-	answer, err := codexcli.Run(env, "judge", "judge/commands/route.md", string(schema), timeout)
+	settings, err := config.Load(env.Cwd)
+	if err != nil {
+		return err
+	}
+	runCLI := claudecli.Run
+	label := "Claude"
+	if settings.Provider == "codex" {
+		runCLI = codexcli.Run
+		label = "Codex"
+	}
+	answer, err := runCLI(env, "judge", "judge/commands/route.md", string(schema), timeout)
 	if err == nil {
-		answer["source"] = "codex"
+		answer["source"] = settings.Provider
 		return env.JSON(answer)
 	}
-	reason := fmt.Sprintf("Jev unavailable: %s; Codex unavailable: %s. Select every routable quality: an extra judge is cheaper than a missed one.", text(result["reason"]), err)
+	reason := fmt.Sprintf("Jev unavailable: %s; %s unavailable: %s. Select every routable quality: an extra judge is cheaper than a missed one.", text(result["reason"]), label, err)
 	selected := []doc{}
 	for _, f := range docs(changes["files"]) {
 		for _, q := range mapping.Judged("code") {

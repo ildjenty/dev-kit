@@ -31,7 +31,7 @@ func settled() document {
 	return document{"requirements_version": 1, "round": 3, "valid": true, "errors": []string{}, "skeleton_commit": sha("a"), "draft": draft(), "changes": []document{}, "prototype": "", "structure_question": "May work proceed with this structure?", "judgments": document{}, "needs_decision": []document{}, "not_assessed": []document{}, "fixable": []document{}, "back": nil}
 }
 func finding(extra document) document {
-	d := document{"row": "D1", "blocking": true, "needs_decision": false, "failure_scenario": "The entry point does not reach the result", "evidence": "src/entry.ext", "fix": "Wire the entry point"}
+	d := document{"row": "D1", "blocking": true, "needs_decision": false, "deferred": false, "mechanical": false, "failure_scenario": "The entry point does not reach the result", "evidence": "src/entry.ext", "fix": "Wire the entry point"}
 	for k, v := range extra {
 		d[k] = v
 	}

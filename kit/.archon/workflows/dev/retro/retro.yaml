@@ -91,6 +91,7 @@ nodes:
           command: write
           output_format:
             type: object
+            additionalProperties: false
             properties:
               draft: { type: string }
             required: [draft]
@@ -161,7 +162,7 @@ nodes:
                     fix:
                       type: "string"
                       minLength: 1
-                  required: ["aspect","item","blocking","needs_decision","failure_scenario","evidence","fix"]
+                  required: ["aspect","item","blocking","needs_decision","failure_scenario","evidence","fix","mechanical"]
             required: ["criteria","findings"]
 
         - id: round
