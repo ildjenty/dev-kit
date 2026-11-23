@@ -597,8 +597,27 @@ func draftErrors(ctx record.ContextData, artifacts string, value any, phases ...
 	for _, u := range items(draft["units"]) {
 		unitIDs = append(unitIDs, str(u["key"]))
 	}
+	retainedUnits := map[string]doc{}
+	previous := obj(obj(input["pending_proposal"])["content"])
 	for _, u := range items(draft["units"]) {
+		key := str(u["key"])
+		id := key
+		if input["previous_unapproved"] == true && str(obj(previous["mapping"])[key]) != "" {
+			id = str(obj(previous["mapping"])[key])
+		}
+		retainedUnits[id] = u
+		if strings.HasPrefix(key, "U-") {
+			existing := find(items(input["units"]), key)
+			if existing == nil {
+				errors = append(errors, key+": retained unit does not exist")
+			} else if existing["state"] == "done" {
+				errors = append(errors, "done unit may not be edited or removed: "+key)
+			}
+		}
 		for _, id := range stringsOf(u["decisions"]) {
+			if slices.Contains(superseded, id) {
+				errors = append(errors, key+": open unit cites superseded decision "+id)
+			}
 			if !slices.Contains(known, id) {
 				errors = append(errors, str(u["key"])+": missing decision "+id)
 			}
@@ -648,6 +667,23 @@ func draftErrors(ctx record.ContextData, artifacts string, value any, phases ...
 		}
 	}
 	if phase == "document" {
+		for _, u := range items(input["units"]) {
+			id := str(u["id"])
+			retained := retainedUnits[id]
+			if u["state"] == "done" || retained == nil && input["previous_unapproved"] == true && has(previous["unit_ids"], id) {
+				continue
+			}
+			for _, old := range stringsOf(u["decisions"]) {
+				if !slices.Contains(superseded, old) {
+					continue
+				}
+				for _, successor := range items(draft["decisions"]) {
+					if has(successor["supersedes"], old) && !has(retained["decisions"], str(successor["key"])) {
+						errors = append(errors, id+": open unit must be retained citing the successor of superseded decision "+old)
+					}
+				}
+			}
+		}
 		for _, u := range impact.Units {
 			handled := false
 			for _, k := range items(draft["kept_units"]) {
@@ -911,6 +947,14 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 	for _, kind := range []string{"decision", "unit", "topic"} {
 		for _, item := range items(draft[kind+"s"]) {
 			key := str(item["key"])
+			if kind == "unit" && strings.HasPrefix(key, "U-") {
+				existing := find(data.Units, key)
+				if existing == nil || existing["state"] == "done" {
+					return nil, fmt.Errorf("%s is not an open unit", key)
+				}
+				mapping[key] = key
+				continue
+			}
 			old := str(obj(previous["mapping"])[key])
 			var existing doc
 			switch kind {
@@ -1039,6 +1083,9 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 			id = str(v)
 		}
 		p := str(folders["units"]) + "/" + id + ".md"
+		if existing := find(data.Units, id); str(existing["path"]) != "" {
+			p = str(existing["path"])
+		}
 		body := str(u["goal"]) + "\n\n"
 		for _, c := range stringsOf(u["completion_conditions"]) {
 			body += "- " + c + "\n"

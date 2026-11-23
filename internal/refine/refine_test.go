@@ -228,6 +228,7 @@ func TestMaterializesProposalIDsThenApprovalAgreesSuccessorsAndReportsAffectedUn
 	r := setup(t, nil)
 	r.decision("D-000001", nil)
 	r.put(".devkit/units/U-000001.md", "---\nid: U-000001\ntitle: Old unit\ndecisions: [D-000001]\ndepends_on: []\n---\nOld goal\n\n- Old completion condition\n")
+	r.put(".devkit/units/U-000001.done.json", `{"unit":"U-000001","branch":"feature/previous"}`)
 	r.commit()
 	r.begin("Serve employees", "", "Confirmed memo")
 	d := draft()
@@ -612,6 +613,92 @@ func TestReproposalPreservesDoneUnitAndAllocatesFollowUp(t *testing.T) {
 				if obj(result["mapping"])["UN1"] == "U-abcdef" {
 					t.Fatal("reused a done unit")
 				}
+			}
+		})
+	}
+}
+
+func TestSupersedingDecisionRequiresOpenUnitSuccessorCitations(t *testing.T) {
+	for _, tc := range []struct {
+		name, key string
+		refs      []string
+		done      bool
+		pending   bool
+		valid     bool
+	}{
+		{name: "omitted open unit"},
+		{name: "retained stale citation", key: "U-abcdef", refs: []string{"D-000001"}},
+		{name: "retained unrelated citation", key: "U-abcdef", refs: []string{"D-000002"}},
+		{name: "retained successor and stale citation", key: "U-abcdef", refs: []string{"N1", "D-000001"}},
+		{name: "retained successor", key: "U-abcdef", refs: []string{"N1"}, valid: true},
+		{name: "unchanged done unit", done: true, valid: true},
+		{name: "retained done unit", key: "U-abcdef", refs: []string{"N1"}, done: true},
+		{name: "retained pending unit", key: "UN1", refs: []string{"N1"}, pending: true, valid: true},
+		{name: "stale pending unit", key: "UN1", refs: []string{"D-000001"}, pending: true},
+		{name: "withdrawn pending unit", pending: true, valid: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := setup(t, doc{"units": "docs/units"})
+			r.decision("D-000001", nil)
+			r.decision("D-000002", nil)
+			path := "docs/units/U-abcdef.md"
+			original := recordText(doc{"id": "U-abcdef", "title": "Existing work", "decisions": []string{"D-000001"}, "depends_on": []string{}}, []string{"id", "title", "decisions", "depends_on"}, "Existing goal\n\n- Existing completion condition")
+			r.put(path, original)
+			if tc.done {
+				r.put("docs/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/done"}`)
+			}
+			r.commit()
+			r.begin()
+			if tc.pending {
+				input := testutil.Must(readJSON(file(r.artifacts, "input.json")))
+				input["previous_unapproved"] = true
+				input["pending_proposal"] = doc{"content": doc{"mapping": doc{"UN1": "U-abcdef"}, "unit_ids": []string{"U-abcdef"}}}
+				r.artifact("input.json", input)
+			}
+			d := draft()
+			items(d["decisions"])[0]["supersedes"] = []string{"D-000001"}
+			d["kept_units"] = []doc{{"id": "U-abcdef", "reason": "Record the affected unit disposition"}}
+			d["kept_docs"] = []doc{{"path": path, "reason": "The unit disposition is applied by refine"}}
+			if tc.key == "" {
+				d["units"] = []doc{}
+			} else {
+				u := items(d["units"])[0]
+				u["key"], u["decisions"] = tc.key, tc.refs
+				u["title"], u["goal"] = "Existing work", "Existing goal"
+				u["completion_conditions"] = []string{"Existing completion condition"}
+			}
+			r.writeDraft(d)
+			r.artifact("approval.txt", "N1 U-abcdef UN1 approve=1 answers")
+			checked := testutil.Must(check(r.ctx, r.artifacts))
+			if checked["valid"] != tc.valid {
+				t.Fatalf("got %v; want valid=%v", checked, tc.valid)
+			}
+			if !tc.valid {
+				errors := strings.Join(stringsOf(checked["errors"]), "\n")
+				testutil.Contains(t, errors, "U-abcdef")
+				if !tc.done {
+					testutil.Contains(t, errors, "D-000001")
+				}
+				return
+			}
+			r.round(judgment())
+			testutil.Equal(t, r.finish()["outcome"], "question")
+			r.ctx.RunID = "r2"
+			started := testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"})))
+			testutil.Equal(t, started.Stopped, false)
+			testutil.Equal(t, testutil.Must(approve(r.ctx, "1"))["outcome"], "pass")
+			if tc.done {
+				testutil.Equal(t, readText(t, filepath.Join(r.cwd, path)), original)
+			} else if tc.key == "" {
+				_, err := os.Stat(filepath.Join(r.cwd, path))
+				testutil.Equal(t, os.IsNotExist(err), true)
+			} else {
+				successor := str(obj(obj(r.latest("proposal")["content"])["mapping"])["N1"])
+				u := find(r.data().Units, "U-abcdef")
+				testutil.Equal(t, stringsOf(u["decisions"]), []string{successor})
+				testutil.Equal(t, u["path"], path)
+				testutil.Equal(t, len(r.data().Units), 1)
+				testutil.Equal(t, strings.Replace(readText(t, filepath.Join(r.cwd, path)), successor, "D-000001", 1), original)
 			}
 		})
 	}

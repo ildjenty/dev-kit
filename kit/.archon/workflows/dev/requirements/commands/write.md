@@ -8,7 +8,9 @@ Read `$ARTIFACTS_DIR/requirements/input.json`: `requests` keeps `owner_words` an
 named by `writer_materials` (`criteria`, `common`, `authority`, numbered `principles` and
 `every_quality`, using the path before `#`). Apply `review/purpose.md` and these standards.
 Read the repository documents needed for the request and the supplied Issue/PR text in supplement.
-Address `returned` premises and observations first. Read all requests in order: an empty
+Address `returned` premises and observations first.
+For superseded decisions in `returned`, change only items that rest on the old decision; keep everything else as it is. When a successor changes nothing for an item, only move its citation to the successor.
+Read all requests in order: an empty
 `owner_words` carries a session fact, not a new owner request. Keep what still holds from `previous`
 and integrate later requests without losing retained completion-condition or open-point IDs.
 On later rounds read `$ARTIFACTS_DIR/requirements/rounds/latest.json` for schema errors and judgments.

@@ -18,6 +18,7 @@ Update ordinary prose only under `folders.docs`, citing the settled decision IDs
 keys. Every new decision must be reflected in a document. Inspect affected documents and units,
 including indirect dependencies: update documents or explain why they remain accurate in
 `kept_docs`; record each affected unit's disposition and reason in `kept_units`.
+When superseding a decision, retain every citing open unit in `units` with successor citations (use its existing unit ID as the key, or its previous `UN` key for an unapproved proposal), or withdraw it where already allowed; `kept_units` alone is insufficient.
 A unit whose `state` is `done` has finished work: preserve its file unchanged, including when it is affected.
 Explain its disposition in `kept_units` and cut a new unit for follow-up work. Never edit or delete it.
 Do not edit decision, unit or topic record files directly, even when located under the docs folder.

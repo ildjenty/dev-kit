@@ -1,0 +1,23 @@
+{
+  "fixture": {
+    "expect": "completed",
+    "reached": [
+      "start-stopped",
+      "result"
+    ]
+  },
+  "start": {
+    "stopped": true,
+    "stage": "start",
+    "reason": "the start conditions of fix do not hold, so it did not start",
+    "details": "/tmp/record",
+    "remaining": [
+      "decision D-abcdef was superseded on origin/main by D-fedcba and this branch's plan rests on it: run sync on this branch, then start plan"
+    ],
+    "start": "other",
+    "counted": false,
+    "restarts": 0
+  },
+  "start-stopped": "{\"stopped\": true}",
+  "result": "{\"stopped\": true}"
+}

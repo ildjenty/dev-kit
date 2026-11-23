@@ -129,7 +129,7 @@
         "properties": {
           "key": {
             "type": "string",
-            "pattern": "^UN[1-9][0-9]*$"
+            "pattern": "^(UN[1-9][0-9]*|U-[0-9a-f]{6,64})$"
           },
           "title": {
             "type": "string",

@@ -239,5 +239,16 @@ func Returned(ctx ContextData, workflow string) ([]Document, error) {
 			break
 		}
 	}
+	if ctx.Cwd != "" && (workflow == "requirements" || workflow == "plan") {
+		check, err := CheckBranchDecisions(ctx.Dir, ctx.Cwd, "", ctx.BaseBranch)
+		if err != nil {
+			return nil, err
+		}
+		if check.Target == workflow {
+			for _, d := range check.Superseded {
+				pending = append(pending, Document{"to": workflow, "base": check.Base, "decision": d.DecisionText, "successors": d.Successors, "citations": d.Citations})
+			}
+		}
+	}
 	return pending, nil
 }

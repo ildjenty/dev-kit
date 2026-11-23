@@ -152,6 +152,19 @@ scripts/test-kit.sh
 
 See the [workflow guide](kit/.archon/workflows/dev/README.md) for artifacts and execution contracts, and [design rationale](docs/design.md) in Japanese. Update these explanations alongside their authoritative code, YAML, schemas and standards.
 
+Delivery starts and `devkit status` check decisions cited by the branch's unit, latest requirements,
+and latest plan against the locally available remote base ref (or local base branch). If a cited
+decision is superseded there, run `sync` on the same branch, then `requirements` for unit/requirements
+citations or `plan` for plan-only citations. Later stages refuse to start; the target and earlier
+stages remain available. The target's `returned` input includes old and successor decision text and
+citing items: change only affected items, moving citations alone when the choice changes nothing.
+Refine owns unit files: when superseding a decision, it retains every citing open unit with successor
+citations or withdraws it where allowed; done units remain unchanged. Requirements refuses unit
+citations to decisions that are not agreed.
+Missing or done units still have their own start refusal. This check never fetches; a missing base
+ref is reported as a skipped check.
+
+
 ## Current limits
 
 There are no dependency facts from analysis tools and no narrowing of related decisions in `refine`; current materials use Git facts and full decision records. Source AI nodes use Claude; installed workflows and the read-only routing/reflection fallback use the configured provider. Codex workflow judges cannot be prevented from writing; checkout mutations are detected by Archon. If both are unavailable, routing selects every routable quality and reflection fails. Pull request publication supports GitHub through `gh`. Live AI behavior and external PR publication are outside fixture coverage.

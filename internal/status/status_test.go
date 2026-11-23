@@ -248,3 +248,52 @@ func TestBaseFailureNextExplainsRepairAndUncountedRestartAtLimit(t *testing.T) {
 		}
 	}
 }
+
+func TestStatusSupersessionUsesEachBranchAndConfiguredBase(t *testing.T) {
+	repo, state := testutil.Repo(t), t.TempDir()
+	testutil.Put(t, repo, ".archon/config.yaml", "worktree:\n  baseBranch: trunk\n")
+	testutil.Put(t, repo, ".devkit/decisions/D-abcdef.md", "---\nid: D-abcdef\ntitle: Old\nstatus: superseded\n---\nOld body\n")
+	testutil.Put(t, repo, ".devkit/decisions/D-fedcba.md", "---\nid: D-fedcba\ntitle: New\nstatus: agreed\nsupersedes: [D-abcdef]\n---\nNew body\n")
+	testutil.Git(t, repo, "add", ".")
+	testutil.Git(t, repo, "commit", "-qm", "decisions")
+	testutil.Git(t, repo, "branch", "trunk")
+	testutil.Git(t, repo, "branch", "feature/plan")
+	testutil.Put(t, repo, ".devkit/units/U-abcdef.md", "---\ndecisions: [D-abcdef]\n---\nUnit\n")
+	testutil.Git(t, repo, "add", ".")
+	testutil.Git(t, repo, "commit", "-qm", "branch unit")
+	testutil.Git(t, repo, "branch", "feature/unit")
+	testutil.Git(t, repo, "checkout", "-q", "feature/plan")
+	for _, name := range []string{"feature/unit", "feature/plan"} {
+		dir := branch(t, filepath.Join(state, "records"), name)
+		run1(t, dir, "implement", 1, map[string]any{"outcome": "pass"})
+		write(t, dir, "request", 1, map[string]any{"unit": "U-abcdef"})
+		write(t, dir, "plans", 1, map[string]any{"decisions": []any{map[string]any{"id": "P1", "ref": "D-abcdef"}}})
+	}
+	var out bytes.Buffer
+	values := map[string]string{"STATE_DIR": state}
+	env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &bytes.Buffer{}, Environ: os.Environ(), LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
+	registry := cli.New("", Commands())
+	testutil.Equal(t, registry.Execute([]string{"status"}, env), 0)
+	for _, text := range []string{"decision D-abcdef was superseded on trunk by D-fedcba", "Run sync on feature/unit, then start requirements", "Run sync on feature/plan, then start plan"} {
+		testutil.Contains(t, out.String(), text)
+	}
+	out.Reset()
+	testutil.Equal(t, registry.Execute([]string{"status", "--json"}, env), 0)
+	var parsed struct {
+		Branches []Branch `json:"branches"`
+	}
+	testutil.OK(t, json.Unmarshal(out.Bytes(), &parsed))
+	testutil.Equal(t, len(parsed.Branches), 2)
+	for _, b := range parsed.Branches {
+		target := "plan"
+		if b.Branch == "feature/unit" {
+			target = "requirements"
+		}
+		testutil.Equal(t, b.DecisionCheck.Target, target)
+		testutil.Equal(t, b.DecisionCheck.Superseded[0].SupersededBy, []string{"D-fedcba"})
+	}
+	values["BASE_BRANCH"] = "absent"
+	out.Reset()
+	testutil.Equal(t, registry.Execute([]string{"status"}, env), 0)
+	testutil.Contains(t, out.String(), "decision check skipped")
+}

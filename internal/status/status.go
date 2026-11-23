@@ -14,8 +14,10 @@ import (
 
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
+	"github.com/ildjenty/dev-kit/internal/decisions"
 	"github.com/ildjenty/dev-kit/internal/record"
 	"github.com/ildjenty/dev-kit/internal/unitdone"
+	"gopkg.in/yaml.v3"
 )
 
 const usage = "devkit status [--json] [branch]"
@@ -27,21 +29,22 @@ func Commands() []cli.Command {
 }
 
 type Branch struct {
-	PullRequest      *PullRequest `json:"pull_request,omitempty"`
-	PullRequestError string       `json:"pull_request_error,omitempty"`
-	Branch           string       `json:"branch"`
-	Unit             string       `json:"unit"`
-	Workflow         string       `json:"workflow"`
-	Outcome          string       `json:"outcome"`
-	At               string       `json:"recorded_at"`
-	RunID            string       `json:"run_id"`
-	Questions        []Question   `json:"questions"`
-	Back             any          `json:"back,omitempty"`
-	Stop             any          `json:"stop,omitempty"`
-	Carried          any          `json:"carried,omitempty"`
-	Restarts         int          `json:"restarts"`
-	Limit            int          `json:"restart_limit"`
-	Next             string       `json:"next"`
+	DecisionCheck    *decisions.BaseCheck `json:"decision_check,omitempty"`
+	PullRequest      *PullRequest         `json:"pull_request,omitempty"`
+	PullRequestError string               `json:"pull_request_error,omitempty"`
+	Branch           string               `json:"branch"`
+	Unit             string               `json:"unit"`
+	Workflow         string               `json:"workflow"`
+	Outcome          string               `json:"outcome"`
+	At               string               `json:"recorded_at"`
+	RunID            string               `json:"run_id"`
+	Questions        []Question           `json:"questions"`
+	Back             any                  `json:"back,omitempty"`
+	Stop             any                  `json:"stop,omitempty"`
+	Carried          any                  `json:"carried,omitempty"`
+	Restarts         int                  `json:"restarts"`
+	Limit            int                  `json:"restart_limit"`
+	Next             string               `json:"next"`
 }
 
 type Question struct {
@@ -84,11 +87,40 @@ func run(args []string, env cli.Env) error {
 	if err != nil {
 		return err
 	}
+
+	base := env.Getenv("BASE_BRANCH")
+	if base == "" {
+		settings := struct {
+			Worktree struct {
+				BaseBranch string `yaml:"baseBranch"`
+			} `yaml:"worktree"`
+		}{}
+		data, err := os.ReadFile(filepath.Join(root, ".archon/config.yaml"))
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+		if err == nil {
+			if err = yaml.Unmarshal(data, &settings); err != nil {
+				return err
+			}
+		}
+		base = settings.Worktree.BaseBranch
+	}
 	for i := range branches {
-		if branches[i].Workflow == "pr" && branches[i].Outcome == "pass" {
-			readPullRequest(env, &branches[i])
+		b := &branches[i]
+		if b.Workflow == "pr" && b.Outcome == "pass" {
+			readPullRequest(env, b)
+		}
+		check, err := record.CheckBranchDecisions(record.RecordDir(state, b.Branch), root, b.Branch, base)
+		if err != nil {
+			return err
+		}
+		b.DecisionCheck = &check
+		if check.Target != "" {
+			b.Next = fmt.Sprintf("Run sync on %s, then start %s on the same branch.", b.Branch, check.Target)
 		}
 	}
+
 	if asJSON {
 		return env.JSON(map[string]any{"state_dir": state, "branches": branches})
 	}
@@ -338,6 +370,14 @@ func show(env cli.Env, state, only string, branches []Branch) error {
 		}
 		if b.PullRequestError != "" {
 			fmt.Fprintf(w, "  pull request: %s\n", b.PullRequestError)
+		}
+		if b.DecisionCheck != nil {
+			for _, reason := range b.DecisionCheck.Reasons() {
+				fmt.Fprintf(w, "  %s\n", reason)
+			}
+			if b.DecisionCheck.Note != "" {
+				fmt.Fprintf(w, "  %s\n", b.DecisionCheck.Note)
+			}
 		}
 		for _, q := range b.Questions {
 			fmt.Fprintf(w, "  %s: %s\n", q.ID, indent(q.Text))

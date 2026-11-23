@@ -181,10 +181,12 @@ func JudgedStep(judgments []Document, changeID *string, commit string) *JudgedCh
 }
 
 type ConditionOptions struct {
-	Review   string
-	Commit   string
-	ChangeID func() (*string, error)
-	Answers  []Answer
+	Review     string
+	Cwd        string
+	BaseBranch string
+	Commit     string
+	ChangeID   func() (*string, error)
+	Answers    []Answer
 }
 
 func StartConditions(dir, workflow string, options ConditionOptions) ([]string, error) {
@@ -200,6 +202,15 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 		return nil, err
 	}
 	reasons := []string{}
+	if options.Cwd != "" {
+		check, err := CheckBranchDecisions(dir, options.Cwd, "", options.BaseBranch)
+		if err != nil {
+			return nil, err
+		}
+		if check.Refuses(workflow) {
+			reasons = append(reasons, check.Reasons()...)
+		}
+	}
 	if workflow != "refine" && workflow != "retro" && workflow != "requirements" && workflow != "sync" {
 		req, err := requirementsInput(dir, valid, workflow == "plan" || workflow == "implement" || workflow == "fix" && options.Review != "")
 		if err != nil {
@@ -308,6 +319,8 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 
 type StartOptions struct {
 	Review           string
+	Cwd              string
+	BaseBranch       string
 	UnitReasons      []string
 	RunID            string
 	Commit           string
@@ -386,7 +399,7 @@ func Start(dir, workflow string, o StartOptions) (StartOutput, error) {
 		return output(true, fmt.Sprintf("continue was passed, and this start does not reach the limit of restarts, so %s did not start and nothing was recorded", workflow), []string{fmt.Sprintf("this start (%s) %s counted, and the branch restarted %d times (limit %d); start it without continue", state.Start, counted, state.Restarts, limit)}, state), nil
 	}
 	now := timestamp(o.Now)
-	reasons, err := StartConditions(dir, workflow, ConditionOptions{Review: o.Review, Commit: o.Commit, ChangeID: o.ChangeID, Answers: o.Answers})
+	reasons, err := StartConditions(dir, workflow, ConditionOptions{Cwd: o.Cwd, BaseBranch: o.BaseBranch, Review: o.Review, Commit: o.Commit, ChangeID: o.ChangeID, Answers: o.Answers})
 	if err != nil {
 		return StartOutput{}, err
 	}

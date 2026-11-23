@@ -111,17 +111,9 @@ func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, display 
 		if unit == nil {
 			return nil, fmt.Errorf("unit %s does not exist", unitID)
 		}
-		for _, id := range stringsOf(unit["decisions"]) {
-			var found document
-			for _, d := range data.Decisions {
-				if d["id"] == id && d["status"] == "agreed" {
-					found = d
-				}
-			}
-			if found == nil {
-				return nil, fmt.Errorf("unit %s cites decision %s which is not agreed", unitID, id)
-			}
-			agreed = append(agreed, found)
+		agreed, err = decisions.UnitDecisions(data, unitID)
+		if err != nil {
+			return nil, err
 		}
 	}
 	asked := false

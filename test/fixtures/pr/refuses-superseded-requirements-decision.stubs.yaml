@@ -1,0 +1,34 @@
+{
+  "fixture": {
+    "expect": "completed",
+    "reached": [
+      "not-started",
+      "result"
+    ]
+  },
+  "start": {
+    "stopped": true,
+    "stage": "start",
+    "reason": "the start conditions of pr do not hold, so it did not start",
+    "details": "/tmp/record",
+    "remaining": [
+      "decision D-abcdef was superseded on origin/main by D-fedcba and this branch's requirements rests on it: run sync on this branch, then start requirements"
+    ],
+    "start": "other",
+    "counted": false,
+    "restarts": 0
+  },
+  "not-started": {
+    "stopped": true,
+    "stage": "start",
+    "reason": "the start conditions of pr do not hold, so it did not start",
+    "details": "/tmp/record",
+    "remaining": [
+      "decision D-abcdef was superseded on origin/main by D-fedcba and this branch's requirements rests on it: run sync on this branch, then start requirements"
+    ],
+    "start": "other",
+    "counted": false,
+    "restarts": 0
+  },
+  "result": {}
+}

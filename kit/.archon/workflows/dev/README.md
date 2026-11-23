@@ -121,3 +121,15 @@ The configured CLI is the Jev fallback. Codex uses `codex exec --sandbox read-on
 The plumbing test checks every YAML/prompt `devkit` call against command registration and rejects script nodes and non-Claude source providers, and checks strict AI schemas and Codex rendering. Go tests cover mechanical decisions and schema contracts. Live AI and external publication are outside fixture coverage. Dependency analysis tools and narrowing of related decisions in `refine` are absent; materials use Git facts and full records. The configured provider supplies AI writers, judges and the CLI fallback; PR publication uses GitHub.
 
 Doctor also reports required **kit and binary**: all commands in installed workflows and skills must be registered, otherwise it lists the missing commands. The separate **kit version** item (needed for a part) compares the stamp's digest to the binary's kit, names both versions on mismatch, or reports no stamp. It recommends reviewing differences with `devkit init`; this item alone never fails doctor.
+
+Delivery starts and `devkit status` check decisions cited by the branch's unit, latest requirements,
+and latest plan against the locally available remote base ref (or local base branch). If a cited
+decision is superseded there, run `sync` on the same branch, then `requirements` for unit/requirements
+citations or `plan` for plan-only citations. Later stages refuse to start; the target and earlier
+stages remain available. The target's `returned` input includes old and successor decision text and
+citing items: change only affected items, moving citations alone when the choice changes nothing.
+Refine owns unit files: when superseding a decision, it retains every citing open unit with successor
+citations or withdraws it where allowed; done units remain unchanged. Requirements refuses unit
+citations to decisions that are not agreed.
+Missing or done units still have their own start refusal. This check never fetches; a missing base
+ref is reported as a skipped check.

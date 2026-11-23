@@ -51,3 +51,27 @@ func UnitStartReasons(data Data, id string) []string {
 	}
 	return []string{fmt.Sprintf("unit %s does not exist", id)}
 }
+
+func UnitDecisions(data Data, id string) ([]Item, error) {
+	for _, unit := range data.Units {
+		if unit["id"] != id {
+			continue
+		}
+		agreed := []Item{}
+		refs, _ := list(unit["decisions"])
+		for _, ref := range refs {
+			var found Item
+			for _, d := range data.Decisions {
+				if d["id"] == ref && d["status"] == "agreed" {
+					found = d
+				}
+			}
+			if found == nil {
+				return nil, fmt.Errorf("unit %s cites decision %s which is not agreed", id, ref)
+			}
+			agreed = append(agreed, found)
+		}
+		return agreed, nil
+	}
+	return nil, fmt.Errorf("unit %s does not exist", id)
+}

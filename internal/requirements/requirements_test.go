@@ -193,9 +193,12 @@ func TestUnitInputLoadsAgreedDecisionsAsConstraintsAndSurvivesAnswers(t *testing
 	testutil.Equal(t, object(must(read(filepath.Join(a, "requirements/input.json")))["unit"])["id"], "U-abcdef")
 	_, err := prepare(ctx, a, "", "", "", "U-123456")
 	testutil.Fails(t, err, "does not exist")
-	testutil.Put(t, repo, ".devkit/decisions/D-abcdef.md", "---\nid: D-abcdef\nstatus: proposed\n---\nNot agreed\n")
-	_, err = prepare(ctx, a, "", "", "", "U-abcdef")
-	testutil.Fails(t, err, "not agreed")
+	for _, status := range []string{"proposed", "superseded"} {
+		testutil.Put(t, repo, ".devkit/decisions/D-abcdef.md", "---\nid: D-abcdef\nstatus: "+status+"\n---\nNot agreed\n")
+		testutil.Put(t, repo, ".devkit/decisions/D-fedcba.md", "---\nid: D-fedcba\nstatus: agreed\nsupersedes: [D-abcdef]\n---\nSuccessor\n")
+		_, err = prepare(ctx, a, "", "", "", "U-abcdef")
+		testutil.Fails(t, err, "unit U-abcdef cites decision D-abcdef which is not agreed")
+	}
 }
 
 func TestF7PrepareIncludesReturnedPremiseAndObservation(t *testing.T) {

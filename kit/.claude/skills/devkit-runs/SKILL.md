@@ -147,6 +147,14 @@ blocking findings require fix. PR returns its URL for the owner's merge decision
 For other `back` results, start the workflow named by `back.to`. Its prepare loads every valid,
 unconsumed premise and observation into `returned`; the writer addresses those first.
 
+When a start refuses because a cited decision was superseded on the base branch, tell the owner
+which old decision changed and which decisions supersede it. Run `sync` on the same branch, then
+start the named target (`requirements` or `plan`), before resuming delivery. The target receives the
+old and new decision text and the citing items in `returned`; later stages refuse until those
+citations are updated. The target and earlier stages can start. `devkit status` shows the same
+supersession and sync-then-target instruction. The check uses locally available remote base refs,
+falling back to the local base branch; it does not fetch, and reports a note if neither ref exists.
+
 For a `stop` with `stop.base_failed: true`, tell the owner that the named checks already fail on the
 base branch. Relay the failing checks and their log paths from `stop.unresolved`. Fix the base branch
 first, then start the same workflow again; `devkit record limit` classifies this as `retry_after_base`,

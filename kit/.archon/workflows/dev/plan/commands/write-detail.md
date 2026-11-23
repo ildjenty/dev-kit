@@ -4,7 +4,9 @@ Complete the remaining decision rows, release units and verification plan inside
 
 Read `$ARTIFACTS_DIR/plan/input.json`, `$ARTIFACTS_DIR/plan/structure.json`, `$ARTIFACTS_DIR/plan/facts-before.json` and, on later rounds, `$ARTIFACTS_DIR/plan/findings.json`. Read the fixed standards named by input `writer_materials`, including the relevant quality's Decisions, the common review rules and authority document.
 
-Address `returned` premises and observations first. On a later round correct the machine errors,
+Address `returned` premises and observations first.
+For superseded decisions in `returned`, change only items that rest on the old decision; keep everything else as it is. When a successor changes nothing for an item, only move its citation to the successor.
+On a later round correct the machine errors,
 blocking findings that need no owner decision and missing evidence you can supply; keep what holds.
 Verify claims against their cited files or library definitions before relying on them.
 
