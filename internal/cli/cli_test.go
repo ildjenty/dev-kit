@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ildjenty/dev-kit/internal/kitinfo"
 	"github.com/ildjenty/dev-kit/internal/testutil"
 )
 
@@ -22,11 +23,16 @@ func TestRegistry(t *testing.T) {
 	testutil.Contains(t, out.String(), "devkit version")
 	out.Reset()
 	testutil.Equal(t, r.Execute([]string{"version"}, env), 0)
-	testutil.Equal(t, out.String(), "v1\n")
+	testutil.Equal(t, out.String(), "v1 "+kitinfo.EmbeddedDigest()+"\n")
 	out.Reset()
 	testutil.Equal(t, r.Execute([]string{"sample", "run", "a"}, env), 0)
 	testutil.Equal(t, out.String(), "{\"ok\":true}\n")
 	testutil.Equal(t, r.Execute([]string{"missing"}, env), 2)
 	testutil.Contains(t, errout.String(), "Usage:")
 	testutil.Equal(t, len(r.Commands()), 1)
+}
+
+func TestMissingCommandsRejectsUnknownSubcommandsDespiteAreaFallback(t *testing.T) {
+	r := New("test", []Command{{Area: "plan"}, {Area: "plan", Name: "check"}, {Area: "status"}})
+	testutil.Equal(t, r.MissingCommands([]string{"plan check", "plan missing", "unknown run", "status", "help", "version"}), []string{"devkit plan missing", "devkit unknown run"})
 }

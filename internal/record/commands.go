@@ -140,6 +140,13 @@ func runStart(args []string, env cli.Env) error {
 	if err != nil {
 		return err
 	}
+	reason, err := KitStartReason(env, args[0])
+	if err != nil {
+		return err
+	}
+	if reason != "" {
+		return env.JSON(StartOutput{Stopped: true, Stage: "start", Reason: reason, Details: ctx.Dir, Remaining: []string{}})
+	}
 	c, err := config.Load(ctx.Cwd)
 	if err != nil {
 		return err

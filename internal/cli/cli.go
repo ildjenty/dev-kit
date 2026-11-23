@@ -8,9 +8,12 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/ildjenty/dev-kit/internal/kitinfo"
 )
 
 type Env struct {
+	Registry  *Registry
 	Stdin     io.Reader
 	Stdout    io.Writer
 	Stderr    io.Writer
@@ -72,7 +75,42 @@ func New(version string, groups ...[]Command) *Registry {
 
 func (r *Registry) Commands() []Command { return append([]Command(nil), r.commands...) }
 
+func (r *Registry) Version() string {
+	if r == nil {
+		return "dev"
+	}
+	return r.version
+}
+
+func (r *Registry) MissingCommands(calls []string) []string {
+	commands, areas := map[string]bool{"help": true, "version": true}, map[string]bool{}
+	if r != nil {
+		for _, command := range r.commands {
+			if command.Name == "" {
+				areas[command.Area] = true
+			} else {
+				commands[command.Area+" "+command.Name] = true
+			}
+		}
+		for _, command := range r.commands {
+			if command.Name != "" {
+				delete(areas, command.Area)
+			}
+		}
+	}
+	missing := []string{}
+	for _, call := range calls {
+		area, _, _ := strings.Cut(call, " ")
+		if !areas[area] && !commands[call] {
+			missing = append(missing, "devkit "+call)
+		}
+	}
+	sort.Strings(missing)
+	return missing
+}
+
 func (r *Registry) Run(args []string, env Env) error {
+	env.Registry = r
 	if len(args) == 0 || args[0] == "help" {
 		lines := []string{"devkit help", "devkit version"}
 		for _, command := range r.commands {
@@ -86,7 +124,7 @@ func (r *Registry) Run(args []string, env Env) error {
 		if len(args) != 1 {
 			return Usage("devkit version")
 		}
-		_, err := fmt.Fprintln(env.Stdout, r.version)
+		_, err := fmt.Fprintln(env.Stdout, r.version, kitinfo.EmbeddedDigest())
 		return err
 	}
 	for _, command := range r.commands {

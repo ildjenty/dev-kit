@@ -17,6 +17,13 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 	stopped := func(reason string) record.StartOutput {
 		return record.StartOutput{Stopped: true, Stage: "start", Reason: reason, Details: ctx.Dir, Remaining: []string{}}
 	}
+	reason, err := record.KitStartReason(env, "retro")
+	if err != nil {
+		return record.StartOutput{}, err
+	}
+	if reason != "" {
+		return stopped(reason), nil
+	}
 	if !strings.HasPrefix(ctx.Branch, "retro/") {
 		return stopped("retro requires a retro/<name> branch"), nil
 	}

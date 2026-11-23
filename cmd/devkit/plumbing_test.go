@@ -2,57 +2,30 @@ package main
 
 import (
 	"io/fs"
-	"regexp"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/ildjenty/dev-kit/internal/kitinfo"
 	"github.com/ildjenty/dev-kit/kit"
 	"gopkg.in/yaml.v3"
 )
 
 func TestWorkflowCommandsAreRegistered(t *testing.T) {
-	commands := map[string]bool{}
-	areas := map[string]bool{}
-	for _, command := range newRegistry().Commands() {
-		if command.Name == "" {
-			areas[command.Area] = true
-		} else {
-			commands[command.Area+" "+command.Name] = true
-		}
-	}
-	for _, command := range newRegistry().Commands() {
-		if command.Name != "" {
-			delete(areas, command.Area)
-		}
-	}
-	call := regexp.MustCompile(`\bdevkit[ \t]+([a-z][a-z-]*)(?:[ \t]+([a-z][a-z-]*))?`)
-	files, calls := 0, 0
-	err := fs.WalkDir(kit.Files, ".archon/workflows", func(path string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || !(strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml") || strings.Contains(path, "/commands/") && strings.HasSuffix(path, ".md")) {
-			return nil
-		}
-		files++
-		data, err := kit.Files.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		for _, match := range call.FindAllStringSubmatch(string(data), -1) {
-			calls++
-			if !areas[match[1]] && !commands[match[1]+" "+match[2]] {
-				t.Errorf("%s calls unregistered command %q", path, match[0])
-			}
-		}
-		return nil
-	})
+	calls, err := kitinfo.Invocations(kit.Files, ".archon/workflows", false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if files == 0 || calls == 0 {
-		t.Fatalf("no workflow plumbing checked: %d files, %d calls", files, calls)
+	if len(calls) == 0 {
+		t.Fatal("no workflow plumbing checked")
+	}
+	skills, err := kitinfo.Invocations(kit.Files, ".claude/skills", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls = append(calls, skills...)
+	if missing := newRegistry().MissingCommands(calls); len(missing) > 0 {
+		t.Fatalf("unregistered kit commands: %v", missing)
 	}
 }
 

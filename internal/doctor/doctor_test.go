@@ -2,6 +2,7 @@ package doctor
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
+	"github.com/ildjenty/dev-kit/internal/kitinfo"
 	"github.com/ildjenty/dev-kit/internal/testutil"
 	"github.com/ildjenty/dev-kit/kit"
 )
@@ -63,7 +65,14 @@ esac`)
 	t.Setenv("HOME", bin)
 	t.Setenv("TYPESAFE_API_KEY", "")
 	var out bytes.Buffer
-	return cli.Env{Cwd: root, Stdout: &out, Stderr: &out}, bin, &out
+	calls := testutil.Must(kitinfo.Invocations(kit.Files, ".archon/workflows", false))
+	skillCalls := testutil.Must(kitinfo.Invocations(kit.Files, ".claude/skills", true))
+	commands := []cli.Command{}
+	for _, call := range append(calls, skillCalls...) {
+		area, name, _ := strings.Cut(call, " ")
+		commands = append(commands, cli.Command{Area: area, Name: name})
+	}
+	return cli.Env{Registry: cli.New("test", commands), Cwd: root, Stdout: &out, Stderr: &out}, bin, &out
 }
 
 func TestPresentCommandsBothProvidersAndOptionalChecks(t *testing.T) {
@@ -183,16 +192,16 @@ esac`)
 	}
 	executable(t, bin, "archon", "printf version")
 	testutil.OK(t, os.Remove(filepath.Join(bin, "plugins/archon-provider-claude")))
-	testutil.Equal(t, cli.New("", Commands()).Execute([]string{"doctor"}, env), 1)
+	testutil.Equal(t, cli.New("test", append(Commands(), env.Registry.Commands()...)).Execute([]string{"doctor"}, env), 1)
 	out.Reset()
-	testutil.Equal(t, cli.New("", Commands()).Execute([]string{"doctor", "one", "two"}, env), 2)
+	testutil.Equal(t, cli.New("test", append(Commands(), env.Registry.Commands()...)).Execute([]string{"doctor", "one", "two"}, env), 2)
 }
 
 func TestConfiguredChecks(t *testing.T) {
 	env, _, out := environment(t, "codex")
 	testutil.Put(t, env.Cwd, ".devkit/config.json", `{"provider":"codex","skills":{"devkit-optimize":"fit-checks"},"checks":[{"name":"test","command":"do not execute this","timeout_seconds":1}]}`)
 	out.Reset()
-	testutil.Equal(t, cli.New("", Commands()).Execute([]string{"doctor", env.Cwd}, env), 0)
+	testutil.Equal(t, cli.New("test", append(Commands(), env.Registry.Commands()...)).Execute([]string{"doctor", env.Cwd}, env), 0)
 	testutil.Contains(t, out.String(), "[optional] checks: OK — 1 configured")
 }
 
@@ -309,6 +318,48 @@ func TestProviderWarningDoesNotFailDoctor(t *testing.T) {
  'doctor') printf '✓ Installed providers: claude (0.14.0)\n✗ claude: CLI unavailable\n' ;;
  *) exit 19 ;;
 esac`)
-	testutil.Equal(t, cli.New("", Commands()).Execute([]string{"doctor"}, env), 0)
+	testutil.Equal(t, cli.New("test", append(Commands(), env.Registry.Commands()...)).Execute([]string{"doctor"}, env), 0)
 	testutil.Contains(t, out.String(), "[required] Archon provider claude: OK — listed by archon doctor; warning: ✗ claude: CLI unavailable")
+}
+
+func TestKitCompatibilityAndAdvisoryVersion(t *testing.T) {
+	for _, state := range []string{"match", "different", "no-stamp", "workflow", "prompt", "skill", "script", "invalid-stamp"} {
+		t.Run(state, func(t *testing.T) {
+			env, _, out := environment(t, "claude")
+			stamp := kitinfo.Stamp{DevkitVersion: "older", KitDigest: kitinfo.EmbeddedDigest()}
+			if state == "different" {
+				stamp.KitDigest = "different"
+			}
+			data := testutil.Must(json.Marshal(stamp))
+			testutil.Put(t, env.Cwd, kitinfo.StampPath, string(data))
+			switch state {
+			case "no-stamp":
+				testutil.OK(t, os.Remove(filepath.Join(env.Cwd, kitinfo.StampPath)))
+			case "invalid-stamp":
+				testutil.Put(t, env.Cwd, kitinfo.StampPath, "invalid")
+			case "workflow":
+				testutil.Put(t, env.Cwd, kitinfo.Workflows+"/custom/custom.yml", "bash: devkit future start")
+			case "prompt":
+				testutil.Put(t, env.Cwd, kitinfo.Workflows+"/plan/commands/custom.md", "Run `devkit future start`.")
+			case "skill":
+				testutil.Put(t, env.Cwd, ".claude/skills/devkit-runs/SKILL.md", "Run `devkit future start`.")
+			case "script":
+				testutil.Put(t, env.Cwd, ".agents/skills/devkit-runs/scripts/watch.sh", "devkit future start")
+			}
+			incompatible := state == "workflow" || state == "prompt" || state == "skill" || state == "script"
+			testutil.Equal(t, Report(env), !incompatible)
+			if incompatible {
+				testutil.Contains(t, out.String(), "[required] kit and binary: MISSING — missing commands: devkit future start")
+			} else {
+				testutil.Contains(t, out.String(), "[required] kit and binary: OK")
+			}
+			if state == "no-stamp" {
+				testutil.Contains(t, out.String(), "[needed for a part] kit version: MISSING — no install stamp")
+			} else if state == "different" {
+				testutil.Contains(t, out.String(), "[needed for a part] kit version: MISSING — the installed kit was written by devkit older; this binary carries a different kit (test); `devkit init` shows the differences and asks before changing anything")
+			} else if state != "invalid-stamp" {
+				testutil.Contains(t, out.String(), "[needed for a part] kit version: OK")
+			}
+		})
+	}
 }

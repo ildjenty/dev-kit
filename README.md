@@ -20,6 +20,10 @@ devkit init
 
 Init compares all destinations before writing. It lists differing and extra files and asks once per workflow/skill folder: `replace N files and delete M files? [y/N]`. No keeps those files; missing files are still added. Extra files are considered only within kit-owned workflow and skill folders, including a skill's previous folder after a rename. Existing standards are repository-owned: any difference, missing file or extra file prompts once for the whole folder; No leaves it completely untouched. Each differing configuration file has its own question. Identical files produce no file-change lines, and absent files are written without asking.
 
+When workflows match the selected kit (a fresh install, Yes, or no workflow differences), init records `{ "devkit_version": "<version>", "kit_digest": "<digest>" }` in `.archon/workflows/dev/.devkit-installed.json`. No preserves the previous stamp, even when missing workflow files are added. The stamp belongs to the workflow group and is never an extra file. Hand edits do not update it. `devkit version` prints the binary version followed by the embedded kit's SHA-256 digest; identical embedded paths and contents give the same digest across builds.
+
+Every workflow checks its YAML and command files against the running binary's registered commands before recording a start. Within a run it reads the installed pack from `$PACK_DIR`. A missing command ends with `not_started`, names the command, and explains how to align the binary and kit, including the installing version when stamped. Tell the owner and do not retry that run.
+
 Choose the workflow provider and session tools independently:
 
 ```sh
@@ -33,6 +37,8 @@ devkit doctor
 Codex workflow judges run with full access: tool restrictions cannot prevent writes. `mutates_checkout: false` makes Archon fail a node that changed the checkout, detecting a write after it happens. The separate Codex CLI fallback uses `--sandbox read-only`. Claude fallback uses `-p --json-schema <schema> --allowedTools Read,Grep,Glob --tools Read,Grep,Glob --permission-mode dontAsk --output-format json`; its validated answer is `structured_output`, not the plain `result` text. `DEVKIT_CLAUDE` and `DEVKIT_CODEX` override fallback executables for tests.
 
 `devkit doctor [dir]` reports required items (Git and a committed repository, Archon/version, the selected Archon provider, devkit on PATH, installed kit files, config and standards ownership); parts (each session CLI, authenticated gh and origin for PR, and the provider CLI for fallback without a TypeSafe key); and optional items (key presence and configured checks). Missing items explain the blocked feature and remedy. Empty checks name the configured optimize skill. Required failures exit 1; other findings exit 0. It checks installation in the `Installed providers:` list from `archon doctor` with a 20-second timeout. If that list is absent or the command fails or times out, it checks for an executable regular file at `$ARCHON_HOME/plugins/archon-provider-<provider>` (default `~/.archon/plugins/`). Provider diagnostic failures are shown as warnings without failing the finding. Other external commands retain their three-second timeout. Init prints this report after its file summary without failing on findings, then names optimize on the first install.
+
+Doctor's required **kit and binary** item checks all installed workflow and skill commands and lists missing commands. Its separate **kit version** item (needed for a part) compares the recorded digest with this binary's kit; a difference names both versions and recommends `devkit init` to review differences and approve replacements. An absent stamp is reported explicitly. The version item alone never fails doctor, and a digest difference alone never rejects a workflow start.
 
 Choose distinct skill names using lowercase letters, digits and hyphens:
 

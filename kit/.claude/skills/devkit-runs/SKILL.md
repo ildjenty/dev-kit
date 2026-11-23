@@ -127,6 +127,10 @@ For `stop`, explain the state and unresolved items. Restarts are counted per bra
 continuation. Pass those words verbatim as `--input continue=<owner words>`. Do not supply `continue`
 before the start reaches its limit. Fix attempts also obey configured `limits.fixes`. A `not_started`
 result is not a pass: inspect the `start` output and relay what prevented starting.
+When it names a missing `devkit <area> <subcommand>`, the installed kit and binary come from different
+versions. Tell the owner the command and the installing version when given, and relay the remedy:
+run `devkit init` in the repository with the matching binary, or install the version that installed
+these workflows. Do not retry the run.
 
 ## After the pull request
 

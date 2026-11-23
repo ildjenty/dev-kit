@@ -232,6 +232,13 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 	stopped := func(reason string) record.StartOutput {
 		return record.StartOutput{Stopped: true, Stage: "start", Reason: reason, Details: ctx.Dir, Remaining: []string{}}
 	}
+	reason, err := record.KitStartReason(env, "refine")
+	if err != nil {
+		return record.StartOutput{}, err
+	}
+	if reason != "" {
+		return stopped(reason), nil
+	}
 	if !strings.HasPrefix(ctx.Branch, "refine/") {
 		return stopped("refine requires a refine/<name> branch"), nil
 	}

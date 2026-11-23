@@ -14,6 +14,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/concerns"
 	"github.com/ildjenty/dev-kit/internal/config"
+	"github.com/ildjenty/dev-kit/internal/kitinfo"
 	"github.com/ildjenty/dev-kit/kit"
 )
 
@@ -111,6 +112,35 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 		detail = fmt.Sprintf("%d kit files missing (first: %s); workflows or skills are incomplete. Run devkit init.", len(missing), missing[0])
 	}
 	finding("required", "kit files", walkErr == nil && len(missing) == 0, "workflow, skill, standards and configuration files installed", detail)
+	calls, callsErr := kitinfo.Invocations(os.DirFS(env.Cwd), kitinfo.Workflows, false)
+	for _, session := range settings.Sessions {
+		for _, name := range settings.Skills {
+			folder := ".claude/skills/"
+			if session == "codex" {
+				folder = ".agents/skills/"
+			}
+			invoked, err := kitinfo.Invocations(os.DirFS(env.Cwd), folder+name, true)
+			calls = append(calls, invoked...)
+			if err != nil && callsErr == nil {
+				callsErr = err
+			}
+		}
+	}
+	slices.Sort(calls)
+	absent := env.Registry.MissingCommands(slices.Compact(calls))
+	compatibility := "missing commands: " + strings.Join(absent, ", ")
+	if callsErr != nil {
+		compatibility += "; cannot read installed kit: " + callsErr.Error()
+	}
+	finding("required", "kit and binary", callsErr == nil && len(absent) == 0, "all installed workflow and skill commands are registered", compatibility)
+	stamp, stampErr := kitinfo.ReadStamp(filepath.Join(env.Cwd, kitinfo.Workflows))
+	kitVersion := "no install stamp; run devkit init to record the installed kit version"
+	if stampErr == nil {
+		kitVersion = fmt.Sprintf("the installed kit was written by devkit %s; this binary carries a different kit (%s); `devkit init` shows the differences and asks before changing anything", stamp.DevkitVersion, env.Registry.Version())
+	} else if !os.IsNotExist(stampErr) {
+		kitVersion = stampErr.Error()
+	}
+	finding("needed for a part", "kit version", stampErr == nil && stamp.KitDigest == kitinfo.EmbeddedDigest(), "installed kit digest matches this binary", kitVersion)
 	version, archon := command(env, limit, "archon", "--version")
 	version = strings.Join(strings.Fields(version), " ")
 	finding("required", "archon", archon, version, "Workflows cannot run; install Archon from https://archon.diy and run archon provider add "+settings.Provider+".")

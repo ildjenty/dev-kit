@@ -17,6 +17,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/doctor"
+	"github.com/ildjenty/dev-kit/internal/kitinfo"
 	"github.com/ildjenty/dev-kit/kit"
 	"gopkg.in/yaml.v3"
 )
@@ -26,6 +27,7 @@ const usage = "devkit init [--yes | --no] [--dry-run] [--provider <claude|codex>
 type options struct {
 	yes, no, dry bool
 	dir          string
+	version      string
 	skills       map[string]string
 	provider     string
 	sessions     []string
@@ -131,6 +133,7 @@ func run(args []string, env cli.Env, interactive bool) error {
 	if err != nil {
 		return err
 	}
+	o.version = env.Registry.Version()
 	root := filepath.Clean(env.Path(o.dir))
 	groups, original, skillsOnly, err := compare(root, o)
 	if err != nil {
@@ -231,6 +234,9 @@ func run(args []string, env cli.Env, interactive bool) error {
 		partial := g.path == ".devkit/config.json" && !g.answer && o.explicit() && !bytes.Equal(original, skillsOnly)
 		for _, c := range g.changes {
 			c.allowed = g.answer || !g.whole && !c.exists && !c.remove
+			if c.path == kitinfo.StampPath {
+				c.allowed = g.answer
+			}
 			if partial {
 				c.allowed = true
 				if !c.remove {
@@ -264,6 +270,21 @@ func run(args []string, env cli.Env, interactive bool) error {
 							}
 						}
 					}
+				}
+			}
+		}
+	}
+	for _, g := range groups {
+		complete := true
+		for _, c := range g.changes {
+			if !c.allowed {
+				complete = false
+			}
+		}
+		if !complete {
+			for _, c := range g.changes {
+				if c.path == kitinfo.StampPath {
+					c.allowed = false
 				}
 			}
 		}
@@ -479,6 +500,13 @@ func compare(root string, o options) ([]*group, []byte, []byte, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	stamp, err := json.MarshalIndent(kitinfo.Stamp{DevkitVersion: o.version, KitDigest: kitinfo.EmbeddedDigest()}, "", "  ")
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if err := put(kitinfo.StampPath, append(stamp, '\n')); err != nil {
+		return nil, nil, nil, err
+	}
 	skillsOnly := original
 	if original != nil && o.explicit() && validObject {
 		for _, key := range []string{"skills", "provider", "sessions"} {
@@ -544,6 +572,15 @@ func compare(root string, o options) ([]*group, []byte, []byte, error) {
 		} else if err := g.diff(root, path, wanted[path]); err != nil {
 			return nil, nil, nil, err
 		}
+		slices.SortStableFunc(g.changes, func(a, b *change) int {
+			if a.path == kitinfo.StampPath && b.path != kitinfo.StampPath {
+				return 1
+			}
+			if a.path != kitinfo.StampPath && b.path == kitinfo.StampPath {
+				return -1
+			}
+			return 0
+		})
 		if len(g.changes) > 0 {
 			groups = append(groups, g)
 		}
@@ -771,8 +808,10 @@ func (g *group) diff(root, path string, wanted *tree) error {
 		}
 		if !bytes.Equal(data, wanted.data) {
 			g.changes = append(g.changes, &change{path: path, data: wanted.data, exists: true})
-			g.replace++
-			g.ask = true
+			if path != kitinfo.StampPath {
+				g.replace++
+				g.ask = true
+			}
 		}
 	}
 	if g.whole && len(g.changes) > 0 {
