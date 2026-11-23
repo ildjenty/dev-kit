@@ -360,7 +360,15 @@ func Commands() []cli.Command {
 			}
 			only = strings.Split(args[1], ",")
 		}
-		gate, err := RunChecks(Options{Cwd: env.Cwd, ArtifactsDir: env.Getenv("ARTIFACTS_DIR"), BaseBranch: env.Getenv("BASE_BRANCH"), Only: only, Env: env.Environ})
+		artifacts := env.Getenv("ARTIFACTS_DIR")
+		if artifacts == "" {
+			dir, err := os.MkdirTemp("", "devkit-checks-")
+			if err != nil {
+				return err
+			}
+			artifacts = dir
+		}
+		gate, err := RunChecks(Options{Cwd: env.Cwd, ArtifactsDir: artifacts, BaseBranch: env.Getenv("BASE_BRANCH"), Only: only, Env: env.Environ})
 		if err != nil {
 			return err
 		}

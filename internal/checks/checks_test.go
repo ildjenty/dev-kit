@@ -140,6 +140,24 @@ func TestCLIEmptyChecks(t *testing.T) {
 	testutil.OK(t, err)
 }
 
+func TestCLIRunsFromASessionWithoutArtifactsDir(t *testing.T) {
+	repo := testutil.Repo(t)
+	testutil.Put(t, repo, ".devkit/config.json", `{"checks":[{"name":"always","command":"exit 0","timeout_seconds":30}]}`)
+	var stdout, stderr bytes.Buffer
+	env := cli.Env{Cwd: repo, Stdout: &stdout, Stderr: &stderr, LookupEnv: func(key string) (string, bool) {
+		if key == "BASE_BRANCH" {
+			return "main", true
+		}
+		return "", false
+	}}
+	testutil.Equal(t, cli.New("test", Commands()).Execute([]string{"checks"}, env), 0)
+	var gate Gate
+	testutil.OK(t, json.Unmarshal(stdout.Bytes(), &gate))
+	testutil.Equal(t, gate.Passed, true)
+	testutil.Contains(t, string(testutil.Must(os.ReadFile(gate.Results))), `"name":"always"`)
+	testutil.OK(t, os.RemoveAll(filepath.Dir(filepath.Dir(gate.Results))))
+}
+
 func TestBaseChecksStillRunWhenRemovedOrReplaced(t *testing.T) {
 	for _, current := range []string{`{"checks":[]}`, `{"checks":[{"name":"required","command":"printf current; exit 0","timeout_seconds":2}]}`} {
 		repo := testutil.Repo(t)

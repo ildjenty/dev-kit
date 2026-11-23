@@ -25,6 +25,31 @@ being edited. For an Issue request, check its recorded blocking dependencies bef
 not start a blocked Issue. Preserve any project-specific concurrency constraints rather than inventing
 a limit for every repository.
 
+## Decide whether the request needs the workflows
+
+The workflows exist for work that needs what they provide: owner decisions recorded and asked at the
+right time, a plan judged before code, independent judgment of the result. A small change gains
+nothing from them and costs many AI runs. Never send a small request through the full flow.
+
+Use the workflows only when the request needs one of these:
+
+- a decision the owner makes under the standards' `authority.md` (a choice that is hard to change
+  later, cost, permissions or exposure, a new external service, a change of the standards or checks);
+- a change of structure, stored data, a public contract, security or running cost that is worth a
+  plan: new modules or boundaries, a schema or migration, an interface others call, authorization;
+- a topic that is not settled yet (start with `devkit-discuss` and `refine`).
+
+Everything else is done directly in this session, without starting a workflow: a typo or wording,
+a small bug whose cause is clear, a test fix, a configuration tweak within agreed limits, a dependency
+update the repository already allows. Follow the standards in the configured standards folder while
+editing, then run the configured checks on the change with `devkit checks` (it selects the checks
+that apply to the changed files and prints the result; logs are in the folder it names). When the
+owner wants an independent review of such a change, commit it on a branch and run `judge` alone: on a
+branch without requirements it returns a report and nothing else.
+
+When you cannot tell which kind the request is, ask the owner once, naming the two ways and why it
+is unclear. When the owner explicitly asks for the workflows, use them.
+
 ## Choose the sequence
 
 Use a branch for each topic or work unit, and start workflows with `--branch <name> --detach`.
@@ -32,8 +57,8 @@ Use a branch for each topic or work unit, and start workflows with `--branch <na
 - Unsettled request: `devkit-discuss` → `refine` one topic at a time → exact-version approval →
   publish and merge the refine pull request → for each settled work unit, on its own branch:
   `requirements` (`unit=<id>`) → `plan` → `implement` → `judge` ⇄ `fix` → `pr`.
-- A settled development request: `requirements` → `plan` → `implement` → `judge` → `pr`.
-  Every request goes through `plan`, including a trivial request with few or no rows.
+- A settled request that needs the workflows: `requirements` → `plan` → `implement` → `judge` → `pr`.
+  Once a request is in this flow it goes through `plan`; small requests are not put in it at all.
 - Review only, without requirements: `judge` produces a report only. If the change needs an owner
   decision or a plan, start `requirements` describing the change, then follow the full delivery flow.
 - Fix findings on a branch with passed requirements and plan: `fix` → `judge` → `pr`. Repeat `fix` and `judge` while blocking findings remain,
