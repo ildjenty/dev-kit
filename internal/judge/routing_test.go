@@ -1,9 +1,12 @@
 package judge
 
 import (
+	"bytes"
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
+	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/concerns"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
@@ -62,6 +65,25 @@ func TestRouteUnionsPathsPlanRowsAndInferredQualitiesWithFiles(t *testing.T) {
 	testutil.Equal(t, docs(m["files"])[0]["path"], "unusual/source")
 	testutil.Equal(t, len(docs(m["routes"])), 1)
 	testutil.Equal(t, must(read(filepath.Join(a, "judge/route.json"))), routed)
+	for _, source := range []string{"jev", "codex", "all"} {
+		routed["source"] = source
+		values := map[string]string{"ARTIFACTS_DIR": a, "ROUTE": string(must(json.Marshal(routed)))}
+		env := cli.Env{Cwd: repo, Stdout: &bytes.Buffer{}, LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
+		testutil.OK(t, cli.New("", Commands()).Run([]string{"judge", "launch"}, env))
+		testutil.Equal(t, must(read(filepath.Join(a, "judge/route.json"))), routed)
+	}
+	var routedOutput bytes.Buffer
+	values := map[string]string{"ARTIFACTS_DIR": a, "PACK_DIR": must(filepath.Abs("../../kit/.archon/workflows/dev")), "DEVKIT_CODEX": filepath.Join(a, "not-installed")}
+	env := cli.Env{Cwd: repo, Stdout: &routedOutput, Stderr: &bytes.Buffer{}, LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
+	testutil.OK(t, cli.New("", Commands()).Run([]string{"judge", "route"}, env))
+	var conservative doc
+	testutil.OK(t, json.Unmarshal(routedOutput.Bytes(), &conservative))
+	testutil.Equal(t, conservative["source"], "all")
+	result = must(routeChanges(repo, a, conservative))
+	mapping := must(concerns.Load(filepath.Join(a, "criteria/.devkit/standards")))
+	for _, q := range mapping.Judged("code") {
+		testutil.Equal(t, result["launch_"+q], true)
+	}
 	for _, item := range []doc{{"quality": "imaginary", "file": "unusual/source", "reason": "Reason"}, {"quality": "delivery", "file": "unusual/source", "reason": "Plan-only quality"}, {"quality": "security", "file": "unchanged", "reason": "Reason"}, {"quality": "security", "file": "unusual/source", "reason": ""}} {
 		_, err := routeChanges(repo, a, doc{"qualities": []doc{item}})
 		if err == nil {

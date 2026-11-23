@@ -15,9 +15,8 @@ the proposed answer. Next topics carry their own question, required answer and d
 they do not substitute for an unresolved point needed to settle the selected topic. Compare candidates,
 including the simplest alternative, against the decision's evidence and reasons.
 
-For the document phase, assess faithful reflection of every new decision in prose, dispositions of
-affected documents and units, and the cut into work units only for settled areas. Apply the wording
-criteria mapped to refine to documents and approval text.
+For the document phase, apply the wording criteria mapped to refine to documents and approval text.
+The machine checks dispositions of affected documents and units and cuts into work units only for settled areas.
 
 Agreed decisions supplied with a unit are constraints cited by D-ID. Session supplement supplies
 facts and candidates; it does not by itself authorize additional requirements or owner choices.

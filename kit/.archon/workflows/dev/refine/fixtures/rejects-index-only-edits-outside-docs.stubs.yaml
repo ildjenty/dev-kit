@@ -96,12 +96,6 @@
   "judge-document": {
     "criteria": [
       {
-        "aspect": "reflection",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      },
-      {
         "aspect": "wording",
         "verdict": "pass",
         "checked": "Compared the input and draft",

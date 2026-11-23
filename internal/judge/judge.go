@@ -107,6 +107,7 @@ func Commands() []cli.Command {
 			}
 			return env.JSON(result)
 		}},
+		{Area: "judge", Name: "route", Usage: "devkit judge route", Run: runRoute},
 		{Area: "judge", Name: "launch", Usage: "devkit judge launch", Run: func(args []string, env cli.Env) error {
 			routed, err := envDoc(env, "ROUTE")
 			if err != nil {

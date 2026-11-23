@@ -735,6 +735,15 @@ func check(ctx record.ContextData, artifacts string, phases ...string) (doc, err
 	if e != nil {
 		return nil, e
 	}
+	if len(errors) == 0 && (len(phases) == 0 || phases[0] == "document") {
+		reflection, err := reflectionInput(ctx.Cwd, artifacts)
+		if err != nil {
+			return nil, err
+		}
+		if err = writeJSON(file(artifacts, "reflect-input.json"), reflection); err != nil {
+			return nil, err
+		}
+	}
 	out := doc{"valid": len(errors) == 0, "errors": errors}
 	return out, writeJSON(file(artifacts, "check.json"), out)
 }
@@ -759,7 +768,7 @@ func round(ctx record.ContextData, artifacts string, judgment any, phases ...str
 			phase = phases[0]
 		}
 		for _, finding := range items(j["findings"]) {
-			if !slices.Contains(phaseAspects(phase), str(finding["aspect"])) {
+			if !slices.Contains(phaseAspects(phase), str(finding["aspect"])) && !(phase == "document" && finding["aspect"] == "reflection") {
 				je = append(je, "finding is outside the current phase")
 			}
 		}
@@ -1380,7 +1389,7 @@ func approve(ctx record.ContextData, version string) (doc, error) {
 	return output(result, v, extra), nil
 }
 func Commands() []cli.Command {
-	commands := []cli.Command{}
+	commands := []cli.Command{{Area: "refine", Name: "reflect", Usage: "devkit refine reflect", Run: runReflect}}
 	for _, mode := range []string{"start", "prepare", "check", "round", "finish", "decided", "approve", "not-started"} {
 		commands = append(commands, cli.Command{Area: "refine", Name: mode, Usage: "devkit refine " + mode, Run: func(args []string, env cli.Env) error {
 			ctx, e := record.Context(env)
@@ -1410,6 +1419,15 @@ func Commands() []cli.Command {
 				case "round":
 					var j any
 					e = json.Unmarshal([]byte(env.Getenv("INPUTS_JUDGMENT")), &j)
+					if e == nil && env.Getenv("INPUTS_PHASE") == "document" {
+						checked, err := readJSON(file(resolve(ctx.Cwd, artifacts), "check.json"))
+						if err != nil {
+							return err
+						}
+						if checked["valid"] == true {
+							j, e = roundReflection(env, obj(j))
+						}
+					}
 					if e == nil {
 						out, e = round(ctx, artifacts, j, env.Getenv("INPUTS_PHASE"))
 					}
@@ -1432,14 +1450,14 @@ func Commands() []cli.Command {
 			return env.JSON(out)
 		}})
 	}
-	commands = append(commands, cli.Command{Area: "refine", Usage: "devkit refine start | prepare | check | round | decided | finish | approve | not-started", Run: func(args []string, env cli.Env) error {
+	commands = append(commands, cli.Command{Area: "refine", Usage: "devkit refine start | prepare | check | reflect | round | decided | finish | approve | not-started", Run: func(args []string, env cli.Env) error {
 		if _, err := record.Context(env); err != nil {
 			return err
 		}
 		if env.Getenv("ARTIFACTS_DIR") == "" {
 			return fmt.Errorf("ARTIFACTS_DIR must be set")
 		}
-		return &cli.ExitError{Code: 1, Message: "Usage: devkit refine start | prepare | check | round | decided | finish | approve | not-started"}
+		return &cli.ExitError{Code: 1, Message: "Usage: devkit refine start | prepare | check | reflect | round | decided | finish | approve | not-started"}
 	}})
 	return commands
 }

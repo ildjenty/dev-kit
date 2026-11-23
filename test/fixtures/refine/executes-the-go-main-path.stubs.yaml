@@ -15,7 +15,8 @@
       "judge-document",
       "round-document",
       "finish",
-      "result"
+      "result",
+      "reflect"
     ],
     "inputs": {
       "owner_words": "Update fixture.txt"
@@ -64,12 +65,6 @@
   },
   "judge-document": {
     "criteria": [
-      {
-        "aspect": "reflection",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      },
       {
         "aspect": "wording",
         "verdict": "pass",

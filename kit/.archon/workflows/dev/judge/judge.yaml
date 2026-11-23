@@ -137,15 +137,14 @@ nodes:
 - id: route
   depends_on: [changes]
   when: "$changes.output.proceed == true"
-  provider: claude
-  context: fresh
-  mutates_checkout: false
-  allowed_tools: [Read, Grep, Glob]
-  command: route
+  bash: devkit judge route
+  timeout: 1200000
   output_format:
     type: object
-    additionalProperties: false
     properties:
+      source: { type: string, enum: [jev, codex, all] }
+      reason: { type: string }
+      model: { type: string }
       qualities:
         type: array
         items:
@@ -156,9 +155,10 @@ nodes:
             file: { type: string }
             reason: { type: string, minLength: 1 }
           required: [quality, file, reason]
-    required: [qualities]
+    required: [source, qualities]
 - id: launch
   depends_on: [route]
+  when: "$changes.output.proceed == true"
   bash: |
     route=$route.output
     ROUTE="$route" devkit judge launch

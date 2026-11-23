@@ -29,5 +29,3 @@ judge-structure:
           not_checked: ""
           verdict: pass
     findings: []
-route:
-    qualities: []

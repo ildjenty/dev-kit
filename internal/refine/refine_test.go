@@ -327,7 +327,7 @@ func TestMissingJudgeAspectsUnassessedCriteriaAndFailedVerdictsCannotClearRound(
 	r.begin()
 	r.writeDraft()
 	j := judgment()
-	j["criteria"] = items(j["criteria"])[:1]
+	j["criteria"] = []doc{}
 	testutil.Equal(t, r.round(j)["valid"], false)
 	j = judgment()
 	items(j["criteria"])[0]["verdict"] = "not_assessed"
@@ -507,6 +507,7 @@ func TestCommands(t *testing.T) {
 			r.writeDraft()
 			testutil.Equal(t, run("check")["valid"], true)
 			vars["INPUTS_PHASE"] = "document"
+			vars["INPUTS_REFLECT"] = `{"source":"codex","not_reflected":[]}`
 			vars["INPUTS_JUDGMENT"] = string(testutil.Must(json.Marshal(judgment())))
 			testutil.Equal(t, run("round")["valid"], true)
 			testutil.Equal(t, run("finish")["outcome"], "question")

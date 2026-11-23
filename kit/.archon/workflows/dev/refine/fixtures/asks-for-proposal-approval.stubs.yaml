@@ -13,7 +13,8 @@
       "write-document",
       "check-document",
       "judge-document",
-      "round-document"
+      "round-document",
+      "reflect"
     ],
     "inputs": {
       "owner_words": "Provide staff access"
@@ -94,12 +95,6 @@
   "judge-document": {
     "criteria": [
       {
-        "aspect": "reflection",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      },
-      {
         "aspect": "wording",
         "verdict": "pass",
         "checked": "Compared the input and draft",
@@ -157,5 +152,10 @@
       }
     ],
     "reasons": []
+  },
+  "reflect": {
+    "model": "jev-stub",
+    "not_reflected": [],
+    "source": "jev"
   }
 }

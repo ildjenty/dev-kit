@@ -1,0 +1,161 @@
+{
+  "fixture": {
+    "expect": "completed",
+    "reached": [
+      "prepare",
+      "write-decide",
+      "check-decide",
+      "judge-decide",
+      "round-decide",
+      "decided",
+      "finish",
+      "result",
+      "write-document",
+      "check-document",
+      "judge-document",
+      "round-document",
+      "reflect"
+    ],
+    "inputs": {
+      "owner_words": "Provide staff access"
+    }
+  },
+  "start": {
+    "stopped": false,
+    "stage": "start",
+    "reason": "",
+    "details": "/tmp/record",
+    "remaining": [],
+    "start": "first",
+    "counted": false,
+    "restarts": 0
+  },
+  "prepare": {
+    "input": "/tmp/refine/input.json",
+    "criteria": "/tmp/criteria"
+  },
+  "decided": {
+    "ready": true
+  },
+  "write-decide": {
+    "draft": "/tmp/refine/draft.json"
+  },
+  "check-decide": {
+    "valid": true,
+    "errors": []
+  },
+  "judge-decide": {
+    "criteria": [
+      {
+        "aspect": "coverage",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      },
+      {
+        "aspect": "additions",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      },
+      {
+        "aspect": "open_points",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      },
+      {
+        "aspect": "consistency",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      },
+      {
+        "aspect": "sufficiency",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      }
+    ],
+    "findings": []
+  },
+  "round-decide": {
+    "round": 1,
+    "valid": true,
+    "blocking_count": 0,
+    "not_assessed_count": 0
+  },
+  "write-document": {
+    "draft": "/tmp/refine/draft.json"
+  },
+  "check-document": {
+    "valid": true,
+    "errors": []
+  },
+  "judge-document": {
+    "criteria": [
+      {
+        "aspect": "wording",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      }
+    ],
+    "findings": []
+  },
+  "round-document": {
+    "round": 1,
+    "valid": true,
+    "blocking_count": 0,
+    "not_assessed_count": 0
+  },
+  "finish": {
+    "outcome": "question",
+    "proposal_version": 1,
+    "decision_ids": [
+      "D-abcdef"
+    ],
+    "unit_ids": [
+      "U-abcdef"
+    ],
+    "affected": {
+      "decisions": [],
+      "documents": [],
+      "units": []
+    },
+    "questions": [
+      {
+        "id": "Q1",
+        "text": "Decision D-abcdef. Unit U-abcdef. Start approve=1, or answers for changes."
+      }
+    ],
+    "reasons": []
+  },
+  "result": {
+    "outcome": "question",
+    "proposal_version": 1,
+    "decision_ids": [
+      "D-abcdef"
+    ],
+    "unit_ids": [
+      "U-abcdef"
+    ],
+    "affected": {
+      "decisions": [],
+      "documents": [],
+      "units": []
+    },
+    "questions": [
+      {
+        "id": "Q1",
+        "text": "Decision D-abcdef. Unit U-abcdef. Start approve=1, or answers for changes."
+      }
+    ],
+    "reasons": []
+  },
+  "reflect": {
+    "model": "jev-stub",
+    "not_reflected": [],
+    "source": "jev"
+  }
+}

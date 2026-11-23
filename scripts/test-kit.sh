@@ -62,10 +62,42 @@ git add -A || exit 1
 git -c user.name=dev-kit -c user.email=dev-kit@example.invalid -c commit.gpgsign=false -c core.hooksPath=/dev/null commit -qm "Add source-only executed fixtures" || exit 1
 mkdir -p "$temp/fixture-bin"
 export DEVKIT_FIXTURE_BINARY="$temp/bin/devkit"
+export DEVKIT_CODEX="$temp/fixture-bin/codex"
+cat > "$DEVKIT_CODEX" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+test "$#" -eq 11
+test "$1 $2 $3 $4" = 'exec --sandbox read-only --cd'
+test "$5" = "$PWD"
+test "$6" = --output-schema
+test -s "$7"
+test "$8" = -o
+test "${10}" = --skip-git-repo-check
+test "${11}" = -
+prompt="$(cat)"
+case "$prompt" in
+  *'$ARTIFACTS_DIR'*|*'$PACK_DIR'*) exit 1 ;;
+esac
+case "$prompt" in
+  *"$ARTIFACTS_DIR/judge/diff.patch"*)
+    test -s "$ARTIFACTS_DIR/judge/changes.json"
+    printf '{"qualities":[]}' > "$9"
+    ;;
+  *"$ARTIFACTS_DIR/refine/reflect-input.json"*)
+    test -s "$ARTIFACTS_DIR/refine/reflect-input.json"
+    printf '{"not_reflected":[]}' > "$9"
+    ;;
+  *) exit 1 ;;
+esac
+printf 'Fake Codex transcript\n'
+printf 'Fake Codex diagnostics\n' >&2
+SH
+chmod +x "$DEVKIT_CODEX"
 cat > "$temp/fixture-bin/devkit" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 export DEVKIT_FIXTURE=1
+unset TYPESAFE_API_KEY
 export GIT_EDITOR=true
 export BASE_BRANCH="devkit-base-$(basename "$PWD")"
 devkit-fixture before "$@"

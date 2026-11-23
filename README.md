@@ -4,7 +4,7 @@ dev-kit gives Archon a portable development process: the owner decides what matt
 
 ## Install
 
-Target repositories need Git, Archon with its authenticated Claude provider, and `devkit` on `PATH`. Pull requests use an authenticated GitHub CLI (`gh`) and the `origin` remote. Supply the tools required by your repository's checks. Go and mise are needed only to build and test dev-kit itself.
+Target repositories need Git, Archon with an authenticated Claude provider, and `devkit` on `PATH`. The signed-in `codex` CLI is needed only for the routing and document-reflection fallback when `TYPESAFE_API_KEY` is unset or Jev cannot answer. Pull requests use an authenticated GitHub CLI (`gh`) and the `origin` remote. Supply the tools required by your repository's checks. Go and mise are needed only to build and test dev-kit itself.
 
 From this checkout:
 
@@ -17,6 +17,8 @@ devkit init
 ```
 
 `scripts/install.sh --bin /your/bin` changes the binary destination. `devkit init [--force] [dir]` installs the embedded kit without committing: `.archon/workflows/dev/`, `.claude/skills/dev-discuss/`, `.claude/skills/dev-runs/`, initial standards in `.devkit/standards/`, and configuration. Kit-owned workflows and skills are refreshed; existing repository-owned configuration and standards are preserved unless `--force` is supplied. Review and commit the installed files before starting runs. A committed base branch is required for workflow execution.
+
+Optionally set `TYPESAFE_API_KEY` in the workflow environment to use Jev for routing and document reflection. For `judge` routing, each changed file's diff is sent to TypeSafe's API. For `refine`, the documents that cite new decisions and those decisions' titles and bodies are sent. Without a key, nothing is sent to TypeSafe and Codex performs these checks. The key is read only from the environment and is never recorded. A failed or malformed Jev result also falls back to Codex; partial results are discarded. `TYPESAFE_API_URL` overrides the endpoint for tests.
 
 The supplied `.archon/config.yaml` disables bundled default workflows and commands and sets `worktree.baseBranch` to `main`. Incorporate these settings into existing Archon configuration; change the base branch there when necessary. Keep workflow sources committed and unchanged while starting runs.
 
@@ -32,7 +34,7 @@ dev-discuss → refine one topic → approval → refine PR → owner merges
 
 `dev-discuss` compares the owner's words with agreed decisions and prepares a confirmed memo in the session. `dev-runs` starts and watches workflows and relays their recorded results. Workflows do not invoke one another.
 
-Run `refine` on a `refine/<name>` branch. One run settles one topic: first decisions and next topics, then documents and units for settled areas. Each phase has its own three-round machine-check/judge loop. Open points end with `question`; a cleared proposal ends with an approval question. Restart with `approve=<version>` only for the version the owner approved. Approval marks decisions agreed and the current topic settled. Publish the branch through the repository's PR process; merge its refine PR before starting any unit it created. `refine` itself does not publish a PR.
+Run `refine` on a `refine/<name>` branch. One run settles one topic: first decisions and next topics, then documents and units for settled areas. Each phase has its own three-round machine-check/judge loop. In the document phase, the machine requires a citation for every new decision; Jev checks reflection at probability >= 0.5, or Codex checks it when Jev is unavailable. Missing reflection blocks the round, and Claude judges wording. Open points end with `question`; a cleared proposal ends with an approval question. Restart with `approve=<version>` only for the version the owner approved. Approval marks decisions agreed and the current topic settled. Publish the branch through the repository's PR process; merge its refine PR before starting any unit it created. `refine` itself does not publish a PR.
 
 Find open topics whose decision dependencies are agreed with `devkit decisions topics`. Pass a selected topic as refine's `topic`. For a work unit, honor its `depends_on`, make a separate branch and pass its ID directly:
 
@@ -55,7 +57,7 @@ Each quality has one `review/<quality>.md` with Decisions, Code, Blocking and No
 
 Decision records `<decisions>/D-<id>.md` hold repository decisions. IDs derive from branch and draft key using six lowercase hexadecimal characters, extending on collision; units and topics use the same scheme with `U-` and `T-`. Re-proposals retain kept keys' IDs and remove withdrawn proposed files. Agreed records are replaced through `supersedes`. Dependency traversal identifies affected decisions, documents and units. Passed owner/principle plan rows also become agreed decision records; provisional rows remain in the plan and PR body.
 
-Plan settles structure before detail. New structure rows explain kind, reasons for change, volatility and callers with evidence or `unknown`. After structure passes, detail may change signatures but cannot add, remove or move files. Code judgment receives uncovered changed files, folder spread and ancestor siblings. Structural defects on the change's path block even if pre-existing; defects elsewhere are deferred. A fresh routing node selects qualities from the diff, alongside configured globs and plan rows. Scope always runs; source/test changes also select test and readability.
+Plan settles structure before detail. New structure rows explain kind, reasons for change, volatility and callers with evidence or `unknown`. After structure passes, detail may change signatures but cannot add, remove or move files. Code judgment receives uncovered changed files, folder spread and ancestor siblings. Structural defects on the change's path block even if pre-existing; defects elsewhere are deferred. Jev selects qualities from each file's diff, using each quality's `routing` description and `routing_threshold` in `concerns.json`; when unavailable, `devkit judge route` runs the Codex CLI in a read-only sandbox. Configured globs and plan rows also select judges. Scope always runs; source/test changes also select test and readability.
 
 Before pushing, PR commits `.devkit/backlog/<encoded-branch>.json`: deferred and carried findings, mechanical-check candidates and accepted objections, with their source judgments. Backlog files are excluded from judged-change identity. Identity otherwise preserves file names and every added/removed line, including whitespace, while ignoring hunk positions. `retro`, on a `retro/<name>` branch from the base, proposes work units, check additions and standard edits from the backlog. Its machine gate and independent judge precede an approval question. Approved changes and deletion of consumed backlog files share one commit.
 
@@ -90,4 +92,4 @@ See the [workflow guide](kit/.archon/workflows/dev/README.md) for artifacts and 
 
 ## Current limits
 
-There are no dependency facts from analysis tools and no Jev-style narrowing of related decisions; current materials use Git facts and full decision records. AI nodes support Claude only. Pull request publication supports GitHub through `gh`. Live AI behavior and external PR publication are outside fixture coverage.
+There are no dependency facts from analysis tools and no narrowing of related decisions in `refine`; current materials use Git facts and full decision records. All workflow AI nodes use Claude; `devkit judge route` and `devkit refine reflect` run the Codex CLI with `--sandbox read-only` only when Jev cannot answer. If both are unavailable, routing selects every routable quality and reflection fails. Pull request publication supports GitHub through `gh`. Live AI behavior and external PR publication are outside fixture coverage.

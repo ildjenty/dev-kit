@@ -21,11 +21,13 @@ const Consumers = "writer:implement writer:requirements writer:plan writer:refin
 func Names() []string { return strings.Fields(Qualities) }
 
 type Quality struct {
-	Title      string   `json:"title"`
-	Decides    string   `json:"decides"`
-	Principles []string `json:"principles"`
-	Plan       []string `json:"plan"`
-	Code       []string `json:"code"`
+	Title            string   `json:"title"`
+	Decides          string   `json:"decides"`
+	Routing          string   `json:"routing,omitempty"`
+	RoutingThreshold float64  `json:"routing_threshold,omitempty"`
+	Principles       []string `json:"principles"`
+	Plan             []string `json:"plan"`
+	Code             []string `json:"code"`
 }
 type Map struct {
 	Qualities    map[string]Quality  `json:"qualities"`
@@ -123,6 +125,12 @@ func (m Map) Check(dir string) error {
 		}
 		if strings.TrimSpace(entry.Title) == "" || strings.TrimSpace(entry.Decides) == "" {
 			add("quality needs title and decides: " + q)
+		}
+		if Routed(q) && len(entry.Code) > 0 && strings.TrimSpace(entry.Routing) == "" {
+			add("quality needs a routing description: " + q)
+		}
+		if Routed(q) && len(entry.Code) > 0 && (entry.RoutingThreshold <= 0 || entry.RoutingThreshold > 1) {
+			add("quality needs a routing_threshold above 0 and at most 1: " + q)
 		}
 		for _, phase := range [][]string{entry.Plan, entry.Code} {
 			if len(phase) > 0 && !slices.Equal(phase, []string{"review/" + q + ".md"}) {
@@ -255,4 +263,8 @@ func Commands() []cli.Command {
 		}
 		return env.JSON(map[string]bool{"valid": true})
 	}}}
+}
+
+func Routed(quality string) bool {
+	return quality != "scope" && quality != "test" && quality != "readability" && quality != "delivery"
 }

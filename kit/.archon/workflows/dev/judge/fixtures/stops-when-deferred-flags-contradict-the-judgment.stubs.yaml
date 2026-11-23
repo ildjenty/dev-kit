@@ -104,6 +104,7 @@ prepare:
     reason: ""
     stopped: false
 route:
+    source: codex
     qualities: []
 start:
     counted: false

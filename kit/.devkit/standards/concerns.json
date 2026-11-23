@@ -3,6 +3,8 @@
     "structure": {
       "title": "Structure",
       "decides": "Where responsibilities live and how boundaries and dependencies contain change.",
+      "routing": "where code lives, which module owns a responsibility, dependencies between modules, or module boundaries: files or folders added, removed or moved, new imports across modules",
+      "routing_threshold": 0.75,
       "principles": [
         "structure/principles.md#1",
         "structure/principles.md#2",
@@ -25,6 +27,8 @@
     "data": {
       "title": "Data",
       "decides": "How facts, valid states, ownership and lifetime preserve meaning and invariants.",
+      "routing": "stored data: schemas, migrations, the source of truth of a fact, deletion or overwriting of stored records, transactions and invariants",
+      "routing_threshold": 0.6,
       "principles": [
         "data.md#1",
         "data.md#2",
@@ -44,6 +48,8 @@
     "contract": {
       "title": "Contract",
       "decides": "What callers may supply, observe and rely on through failure, reruns and concurrency.",
+      "routing": "what callers may send or receive: public interfaces, request and response shapes, accepted values and validation, error and failure responses, retries, reruns and concurrency",
+      "routing_threshold": 0.65,
       "principles": [
         "engineering.md#1",
         "engineering.md#2",
@@ -59,6 +65,8 @@
     "security": {
       "title": "Security",
       "decides": "Which trust boundaries, permissions, dependencies and records protect operations and information.",
+      "routing": "untrusted input handling, secrets and personal data in code or logs, authentication, authorization checks, permissions, exposure, rate limits, or third-party dependencies",
+      "routing_threshold": 0.3,
       "principles": [
         "security.md#1",
         "security.md#2",
@@ -78,6 +86,8 @@
     "ui": {
       "title": "Ui",
       "decides": "How users understand and complete their task through visible states and interactions.",
+      "routing": "what a person sees or operates on a screen: components, states, transitions, layout, texts shown to users",
+      "routing_threshold": 0.8,
       "principles": [
         "ui.md#1",
         "ui.md#2",
@@ -101,6 +111,8 @@
     "cost": {
       "title": "Cost",
       "decides": "Which performance, observability, rollout and operational measures justify their cost.",
+      "routing": "running cost: paid API or model calls, their limits and retries, schedules and frequencies, caches in front of paid calls, instance sizes and counts",
+      "routing_threshold": 0.75,
       "principles": [
         "designing.md#6"
       ],

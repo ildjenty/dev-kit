@@ -1,0 +1,179 @@
+changes:
+    changes_count: 1
+    launch_contract: true
+    launch_cost: true
+    launch_data: true
+    launch_readability: true
+    launch_scope: true
+    launch_security: true
+    launch_structure: true
+    launch_test: true
+    launch_ui: true
+    proceed: true
+    unlisted_count: 0
+checks:
+    failing: []
+    passed: true
+    results: /tmp/checks/1.jsonl
+    round: 1
+    skipped: []
+    stuck: false
+    stuck_checks: []
+collect:
+    blocking_count: 0
+    findings_count: 0
+    judges_count: 9
+completion:
+    checked_count: 1
+    missing_count: 0
+    path: /tmp/judge/completion.json
+    proceed: true
+finish:
+    base: b0
+    commit: c1
+    outcome: pass
+    run_id: r1
+fixture:
+    expect: completed
+    reached:
+        - route
+        - launch
+        - checks
+        - completion
+        - collect
+        - finish
+        - judge-structure
+        - judge-data
+        - judge-contract
+        - judge-security
+        - judge-ui
+        - judge-cost
+        - judge-test
+        - judge-scope
+        - judge-readability
+judge-contract:
+    criteria:
+        - aspect: contract
+          checked: quality source and rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-cost:
+    criteria:
+        - aspect: cost
+          checked: quality source and rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-data:
+    criteria:
+        - aspect: data
+          checked: quality source and rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-readability:
+    criteria:
+        - aspect: readability
+          checked: Names and comments follow the criteria
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-scope:
+    criteria:
+        - aspect: scope
+          checked: quality source and rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-security:
+    criteria:
+        - aspect: security
+          checked: quality source and rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-structure:
+    criteria:
+        - aspect: structure
+          checked: quality source and rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-test:
+    criteria:
+        - aspect: test
+          checked: quality source and rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-ui:
+    criteria:
+        - aspect: ui
+          checked: quality source and rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+launch:
+    changes_count: 1
+    launch_contract: true
+    launch_cost: true
+    launch_data: true
+    launch_readability: true
+    launch_scope: true
+    launch_security: true
+    launch_structure: true
+    launch_test: true
+    launch_ui: true
+    proceed: true
+    unlisted_count: 0
+prepare:
+    accepted_objections_count: 0
+    base: b0
+    commit: c1
+    criteria_commit: k0
+    details: []
+    has_plan: true
+    has_requirements: true
+    reason: ""
+    stopped: false
+route:
+    source: all
+    reason: Jev unavailable; Codex unavailable; an extra judge is cheaper than a missed one.
+    qualities:
+        - quality: structure
+          file: fixture.txt
+          reason: Jev unavailable; Codex unavailable.
+        - quality: data
+          file: fixture.txt
+          reason: Jev unavailable; Codex unavailable.
+        - quality: contract
+          file: fixture.txt
+          reason: Jev unavailable; Codex unavailable.
+        - quality: security
+          file: fixture.txt
+          reason: Jev unavailable; Codex unavailable.
+        - quality: ui
+          file: fixture.txt
+          reason: Jev unavailable; Codex unavailable.
+        - quality: cost
+          file: fixture.txt
+          reason: Jev unavailable; Codex unavailable.
+        - quality: test
+          file: fixture.txt
+          reason: Jev unavailable; Codex unavailable.
+        - quality: scope
+          file: fixture.txt
+          reason: Jev unavailable; Codex unavailable.
+        - quality: readability
+          file: fixture.txt
+          reason: Jev unavailable; Codex unavailable.
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: next
+    stopped: false

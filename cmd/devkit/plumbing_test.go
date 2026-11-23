@@ -65,13 +65,13 @@ func TestFixtureHelpersAreNotShipped(t *testing.T) {
 }
 
 func TestWorkflowAIContracts(t *testing.T) {
-	judges := map[string]bool{"judge": true, "judge-quality": true, "judge-delivery": true, "judge-decide": true, "judge-document": true, "quality": true, "route": true, "step-back": true, "dispute": true}
+	judges := map[string]bool{"judge": true, "judge-quality": true, "judge-delivery": true, "judge-decide": true, "judge-document": true, "quality": true, "route": true, "reflect": true, "step-back": true, "dispute": true}
 	checked := 0
 	err := fs.WalkDir(kit.Files, ".archon/workflows", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() || !strings.HasSuffix(path, ".yaml") || strings.Contains(path, "/fixtures/") {
+		if entry.IsDir() || !(strings.HasSuffix(path, ".yaml") || strings.HasSuffix(path, ".yml")) || strings.Contains(path, "/fixtures/") {
 			return nil
 		}
 		data, err := kit.Files.ReadFile(path)
@@ -88,6 +88,9 @@ func TestWorkflowAIContracts(t *testing.T) {
 			case map[string]any:
 				if _, ok := value["wait"]; ok {
 					t.Errorf("%s uses a wait node", path)
+				}
+				if _, ok := value["script"]; ok {
+					t.Errorf("%s uses a script node", path)
 				}
 				if provider, ok := value["provider"]; ok {
 					checked++

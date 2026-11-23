@@ -36,6 +36,8 @@ finish:
 fixture:
     expect: completed
     reached:
+        - route
+        - launch
         - completion
 judge-scope:
     criteria:
@@ -83,6 +85,8 @@ prepare:
     reason: ""
     stopped: false
 route:
+    source: jev
+    model: jev-reported
     qualities: []
 start:
     counted: false

@@ -128,7 +128,7 @@ func phaseAspects(phase string) []string {
 	if phase == "decide" {
 		return []string{"coverage", "additions", "open_points", "consistency", "sufficiency"}
 	}
-	return []string{"reflection", "wording"}
+	return []string{"wording"}
 }
 
 func phaseErrors(ctx record.ContextData, artifacts, phase string, draft, input doc) []string {

@@ -160,21 +160,47 @@ nodes:
           bash: INPUTS_PHASE=document devkit refine check
           output_format: {"type": "object", "properties": {"valid": {"type": "boolean"}, "errors": {"type": "array", "items": {"type": "string"}}}, "required": ["valid", "errors"]}
 
-        - id: judge-document
+        - id: reflect
           depends_on: [check-document]
+          when: "$check-document.output.valid == true"
+          bash: devkit refine reflect
+          timeout: 1200000
+          output_format:
+            type: object
+            properties:
+              source: { type: string, enum: [jev, codex] }
+              model: { type: string }
+              not_reflected:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    title: { type: string }
+                    probability: { type: number }
+                    decision: { type: string, minLength: 1 }
+                    documents: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
+                    reason: { type: string, minLength: 1 }
+                  required: [decision, documents]
+            required: [source, not_reflected]
+
+        - id: judge-document
+          depends_on: [check-document, reflect]
+          trigger_rule: none_failed_min_one_success
           provider: claude
           settingSources: [user]
           command: judge-document
           context: fresh
           mutates_checkout: false
           allowed_tools: [Read, Grep, Glob]
-          output_format: {"type": "object", "additionalProperties": false, "properties": {"criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["reflection", "wording"]}, "verdict": {"type": "string", "enum": ["pass", "fail", "not_assessed"]}, "checked": {"type": "string"}, "not_checked": {"type": "string"}}, "required": ["aspect", "verdict", "checked", "not_checked"]}}, "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["reflection", "wording"]}, "item": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "needs_decision": {"type": "boolean"}, "mechanical": {"type": "boolean"}, "failure_scenario": {"type": "string", "minLength": 1}, "evidence": {"type": "string", "minLength": 1}, "fix": {"type": "string", "minLength": 1}}, "required": ["aspect", "item", "blocking", "needs_decision", "failure_scenario", "evidence", "fix"]}}}, "required": ["criteria", "findings"]}
+          output_format: {"type": "object", "additionalProperties": false, "properties": {"criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["wording"]}, "verdict": {"type": "string", "enum": ["pass", "fail", "not_assessed"]}, "checked": {"type": "string"}, "not_checked": {"type": "string"}}, "required": ["aspect", "verdict", "checked", "not_checked"]}}, "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["wording"]}, "item": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "needs_decision": {"type": "boolean"}, "mechanical": {"type": "boolean"}, "failure_scenario": {"type": "string", "minLength": 1}, "evidence": {"type": "string", "minLength": 1}, "fix": {"type": "string", "minLength": 1}}, "required": ["aspect", "item", "blocking", "needs_decision", "failure_scenario", "evidence", "fix"]}}}, "required": ["criteria", "findings"]}
 
         - id: round-document
-          depends_on: [judge-document]
+          depends_on: [judge-document, reflect]
+          trigger_rule: none_failed_min_one_success
           bash: |
             judgment=$judge-document.output
-            INPUTS_PHASE=document INPUTS_JUDGMENT="$judgment" devkit refine round
+            reflect=$reflect.output
+            INPUTS_PHASE=document INPUTS_JUDGMENT="$judgment" INPUTS_REFLECT="$reflect" devkit refine round
           output_format: {"type": "object", "properties": {"round": {"type": "integer"}, "valid": {"type": "boolean"}, "blocking_count": {"type": "integer"}, "not_assessed_count": {"type": "integer"}}, "required": ["round", "valid", "blocking_count", "not_assessed_count"]}
       until_bash: 'v=$round-document.output.valid; b=$round-document.output.blocking_count; n=$round-document.output.not_assessed_count; test "$v" = true && test "$b" = 0 && test "$n" = 0'
 

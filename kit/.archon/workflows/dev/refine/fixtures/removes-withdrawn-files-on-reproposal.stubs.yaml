@@ -13,7 +13,8 @@
       "write-document",
       "check-document",
       "judge-document",
-      "round-document"
+      "round-document",
+      "reflect"
     ],
     "inputs": {
       "answers": "[{\"question_id\":\"Q1\",\"answer\":\"Withdraw N2, UN2 and TN1; retain N1 and UN1\"}]"
@@ -94,12 +95,6 @@
   "judge-document": {
     "criteria": [
       {
-        "aspect": "reflection",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      },
-      {
         "aspect": "wording",
         "verdict": "pass",
         "checked": "Compared the input and draft",
@@ -157,5 +152,10 @@
       }
     ],
     "reasons": []
+  },
+  "reflect": {
+    "model": "jev-stub",
+    "not_reflected": [],
+    "source": "jev"
   }
 }
