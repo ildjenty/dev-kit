@@ -69,6 +69,12 @@ Use a branch for each topic or work unit, and start workflows with `--branch <na
 
 Workflows do not invoke one another; the session chooses the next one from the recorded result.
 
+Pass owner text, answers, memos and review comments without putting them in the command line:
+`--input` takes only `name=value`, and quotes, `$` or backquotes in the text would break or change
+the command. Write each value to a file outside the checkout with your file-writing tool (for
+`answers`, valid JSON), then pass it as `--input "<name>=$(cat <file>)"`. Text read this way is not
+interpreted again by the shell. Never edit the text to make it fit a command.
+
 For refine, use a `refine/<name>` branch. One run settles one topic in decide and document phases,
 each with a three-round limit. Use `devkit decisions topics` to find open topics with agreed decision
 dependencies and pass the selected ID as `topic`; leave it empty for the initial request topic. Pass the owner's words verbatim as `owner_words`, your
@@ -113,12 +119,10 @@ question about facts. Relay the owner's answers verbatim, without answering omit
 Start the question's `next_workflows` workflow on the same branch with:
 
 ```sh
-archon workflow run <workflow> --branch <branch> --detach \
-  --input 'answers=[{"question_id":"Q1","answer":"<owner answer verbatim>"}]'
+archon workflow run <workflow> --branch <branch> --detach --input "answers=$(cat <answers file>)"
 ```
 
-Use shell-safe quoting or the CLI's supported file input when text contains quotes or substitutions.
-Do not change the answer to fit a shell example.
+where the answers file holds `[{"question_id":"Q1","answer":"<owner answer verbatim>"}]`.
 
 For refine's or retro's single proposal approval question, show the full question and the exact version. Only
 when the owner approves that version, start that workflow again on the same branch with
@@ -198,7 +202,7 @@ inline comments or the failure cause. Preserve the text verbatim with provenance
 - A CI failure goes to `fix` with the job name and verbatim failure excerpt as `review`. Suggest
   adding that job as a configured check through `devkit-optimize` so it is caught before the PR.
 
-Use shell-safe quoting or supported file input for review and owner text. Never answer or resolve
+Pass review and owner text through files as described above. Never answer or resolve
 review comments on the reviewer's behalf. The owner decides whether to merge.
 
 After the merge, run `archon complete <branch>`: it removes the worktree and local branch and keeps
