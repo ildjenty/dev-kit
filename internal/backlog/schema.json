@@ -6,7 +6,33 @@
     "deferred": {"$ref": "#/$defs/entries"},
     "carried": {"$ref": "#/$defs/entries"},
     "mechanical": {"$ref": "#/$defs/entries"},
-    "accepted_objections": {"$ref": "#/$defs/entries"}
+    "accepted_objections": {"$ref": "#/$defs/entries"},
+    "review": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["finding", "source"],
+        "properties": {
+          "finding": {
+            "type": "object", "additionalProperties": false,
+            "required": ["id", "text"],
+            "properties": {"id": {"$ref": "#/$defs/text"}, "text": {"$ref": "#/$defs/text"}}
+          },
+          "source": {
+            "type": "object", "additionalProperties": false,
+            "required": ["kind", "run_id", "target"],
+            "properties": {
+              "kind": {"const": "review"}, "run_id": {"$ref": "#/$defs/text"},
+              "target": {
+                "type": "object", "additionalProperties": false,
+                "required": ["commit"],
+                "properties": {"commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"}}
+              }
+            }
+          }
+        }
+      }
+    }
   },
   "$defs": {
     "text": {"type": "string", "minLength": 1},

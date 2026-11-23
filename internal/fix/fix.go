@@ -45,6 +45,8 @@ type disputeRound struct {
 }
 
 type state struct {
+	Review              string            `json:"review,omitempty"`
+	OutsideRequirements []record.Document `json:"outside_requirements,omitempty"`
 	Start               string            `json:"start"`
 	ChangeID            *string           `json:"change_id"`
 	RequirementsVersion any               `json:"requirements_version"`
@@ -60,9 +62,10 @@ type state struct {
 }
 
 type codeOutput struct {
-	OwnerDecisions  []record.Document `json:"owner_decisions"`
-	BrokenDecisions []record.Document `json:"broken_decisions"`
-	CommitMessage   any               `json:"commit_message"`
+	OutsideRequirements []record.Document `json:"outside_requirements"`
+	OwnerDecisions      []record.Document `json:"owner_decisions"`
+	BrokenDecisions     []record.Document `json:"broken_decisions"`
+	CommitMessage       any               `json:"commit_message"`
 }
 
 type stepBack struct {
@@ -251,6 +254,13 @@ func outcome(p preparedFile, s state, back *stepBack) record.Document {
 		ended = "stuck"
 	}
 	loops = append(loops, record.Document{"name": "fix-checks", "ended": ended, "rounds": s.Round})
+	if len(s.OutsideRequirements) > 0 {
+		items := []string{}
+		for _, item := range s.OutsideRequirements {
+			items = append(items, text(item["item"])+": "+text(item["reason"]))
+		}
+		return record.Document{"outcome": "back", "loops": loops, "outside_requirements": s.OutsideRequirements, "back": record.Document{"to": "requirements", "premise": strings.Join(items, "\n"), "observation": s.Review}}
+	}
 	if len(s.OwnerDecisions) > 0 {
 		rows := []record.Document{}
 		for _, d := range s.OwnerDecisions {
@@ -359,6 +369,20 @@ func prepare(ctx record.ContextData, artifacts string) (prepared, error) {
 	if err != nil {
 		return prepared{}, err
 	}
+	runs, err := record.List(ctx.Dir, "run")
+	if err != nil {
+		return prepared{}, err
+	}
+	review := ""
+	for _, run := range runs {
+		if run["run_id"] == ctx.RunID {
+			review = text(object(run["review"])["text"])
+		}
+	}
+	if review != "" {
+		judged = true
+		findings = []record.Document{{"id": ctx.RunID + "/review", "source": "review", "text": review, "evidence": review}}
+	}
 	fixes := fixesSinceImplement(results)
 	reason := ""
 	if !judged {
@@ -424,7 +448,7 @@ func prepare(ctx record.ContextData, artifacts string) (prepared, error) {
 	if err != nil {
 		return prepared{}, err
 	}
-	s := state{Start: head, ChangeID: changeID, RequirementsVersion: requirements["version"], PlanVersion: plan["version"], Current: []record.Document{}, Disputes: []disputeRound{}, Objections: objections{[]record.Document{}, []record.Document{}}, OwnerDecisions: []record.Document{}, BrokenDecisions: []record.Document{}}
+	s := state{Review: review, Start: head, ChangeID: changeID, RequirementsVersion: requirements["version"], PlanVersion: plan["version"], Current: []record.Document{}, Disputes: []disputeRound{}, Objections: objections{[]record.Document{}, []record.Document{}}, OwnerDecisions: []record.Document{}, BrokenDecisions: []record.Document{}}
 	if err := writeJSON(filepath.Join(dir, "state.json"), s); err != nil {
 		return prepared{}, err
 	}
@@ -509,6 +533,12 @@ func takeObjections(artifacts string) (record.Document, error) {
 	if err := writeJSON(filepath.Join(dir, "objections", strconv.Itoa(s.Round)+".json"), record.Document{"objections": valid, "invalid": invalid}); err != nil {
 		return nil, err
 	}
+	if s.Review != "" {
+		for _, objection := range valid {
+			s.OutsideRequirements = append(s.OutsideRequirements, record.Document{"item": objection["text"], "reason": objection["evidence"]})
+		}
+		valid = []record.Document{}
+	}
 	s.Current = valid
 	if err := writeJSON(filepath.Join(dir, "state.json"), s); err != nil {
 		return nil, err
@@ -562,6 +592,7 @@ func roundEnd(ctx record.ContextData, artifacts string, gate *checks.Gate, code 
 	s.OwnerDecisions = []record.Document{}
 	s.BrokenDecisions = []record.Document{}
 	if code != nil {
+		s.OutsideRequirements = append(s.OutsideRequirements, code.OutsideRequirements...)
 		if code.OwnerDecisions != nil {
 			s.OwnerDecisions = code.OwnerDecisions
 		}
@@ -569,7 +600,7 @@ func roundEnd(ctx record.ContextData, artifacts string, gate *checks.Gate, code 
 			s.BrokenDecisions = code.BrokenDecisions
 		}
 	}
-	if gate != nil && gate.Passed {
+	if gate != nil && gate.Passed && len(s.OutsideRequirements) == 0 {
 		input, err := readJSON[record.Document](filepath.Join(dir, "input.json"))
 		if err != nil {
 			return nil, err
@@ -591,7 +622,7 @@ func roundEnd(ctx record.ContextData, artifacts string, gate *checks.Gate, code 
 		return nil, err
 	}
 	passed, stuck := gate != nil && gate.Passed, gate != nil && gate.Stuck
-	return record.Document{"round": s.Round, "finished": stuck || len(s.OwnerDecisions) > 0 || len(s.BrokenDecisions) > 0 || (passed && s.Pending == 0), "passed": passed, "stuck": stuck, "pending": s.Pending, "needs_owner": len(s.OwnerDecisions), "broken": len(s.BrokenDecisions)}, nil
+	return record.Document{"round": s.Round, "finished": len(s.OutsideRequirements) > 0 || stuck || len(s.OwnerDecisions) > 0 || len(s.BrokenDecisions) > 0 || (passed && s.Pending == 0), "passed": passed, "stuck": stuck, "pending": s.Pending, "needs_owner": len(s.OwnerDecisions), "broken": len(s.BrokenDecisions)}, nil
 }
 
 func judgeBack(artifacts string) (record.Document, error) {
@@ -599,7 +630,7 @@ func judgeBack(artifacts string) (record.Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	return record.Document{"judge_back": len(s.OwnerDecisions) == 0 && ((s.Gate != nil && s.Gate.Stuck) || len(s.BrokenDecisions) > 0)}, nil
+	return record.Document{"judge_back": len(s.OutsideRequirements) == 0 && len(s.OwnerDecisions) == 0 && ((s.Gate != nil && s.Gate.Stuck) || len(s.BrokenDecisions) > 0)}, nil
 }
 
 func disputeTarget(s state, base string) record.Document {

@@ -3,6 +3,9 @@ description: |
   The fix part. Input: the commit checked out (HEAD) and the findings of the code judgments the
   record binds to it (blocking, not the owner's), with the latest requirements and, when there is one, the latest
   plan; the owner's answers when the session passes them (input `answers`).
+  Input `review` supplies verbatim review comments or CI failure text with provenance instead of judge findings.
+  It requires passed requirements and plan and the latest judged change to match HEAD by PR identity.
+  Items outside the requirements or plan, including objections to review items, return back to requirements.
   Stops without fixing when this fix would exceed the configured limits.fixes since the last implement.
   Otherwise a fresh session fixes the findings, or objects to one
   with evidence; a fresh dispute judge that neither made the finding nor fixes it accepts or rejects each objection
@@ -15,6 +18,9 @@ description: |
 worktree:
   enabled: true
 inputs:
+  review:
+    default: ""
+    description: Review comments or a CI failure, verbatim with its source, or empty to fix blocking judge findings.
   answers:
     default: ""
     description: The owner's answers as a JSON array of {question_id, answer}, or empty.
@@ -84,6 +90,15 @@ nodes:
             type: object
             additionalProperties: false
             properties:
+              outside_requirements:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    item: { type: string }
+                    reason: { type: string }
+                  required: [item, reason]
               owner_decisions:
                 type: array
                 items:
@@ -113,7 +128,7 @@ nodes:
                     finding: { type: string }
                     change: { type: string }
                   required: [finding, change]
-            required: [owner_decisions, broken_decisions, fixed, commit_message]
+            required: [outside_requirements, owner_decisions, broken_decisions, fixed, commit_message]
         - id: objections
           depends_on: [fix-code]
           bash: devkit fix objections

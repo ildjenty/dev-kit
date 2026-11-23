@@ -2,6 +2,7 @@ package record
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -189,10 +190,39 @@ func runStart(args []string, env cli.Env) error {
 			if err != nil {
 				return err
 			}
+
+			recordedUnit, err := unitdone.RequestUnit(env.Path(ctx.Dir))
+			if err != nil {
+				return err
+			}
+			if recordedUnit == unit {
+				results, err := List(env.Path(ctx.Dir), "result")
+				if err != nil {
+					return err
+				}
+				for _, result := range results {
+					if result["workflow"] != "pr" || result["outcome"] != "pass" {
+						continue
+					}
+					bytes, err := os.ReadFile(filepath.Join(ctx.Cwd, c.Units, unit+".done.json"))
+					if err != nil {
+						break
+					}
+					marker, err := unitdone.Parse(bytes)
+					if err == nil && marker.Unit == unit && marker.Branch == ctx.Branch {
+						for _, item := range data.Units {
+							if item["id"] == unit {
+								item["state"] = "open"
+							}
+						}
+					}
+					break
+				}
+			}
 			unitReasons = decisions.UnitStartReasons(data, unit)
 		}
 	}
-	out, err := Start(env.Path(ctx.Dir), args[0], StartOptions{UnitReasons: unitReasons, RunID: ctx.RunID, Commit: commit, ChangeID: func() (*string, error) {
+	out, err := Start(env.Path(ctx.Dir), args[0], StartOptions{Review: env.Getenv("INPUTS_REVIEW"), UnitReasons: unitReasons, RunID: ctx.RunID, Commit: commit, ChangeID: func() (*string, error) {
 		g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, env.Path(ctx.Dir))
 		if err != nil {
 			return nil, err

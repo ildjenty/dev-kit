@@ -181,6 +181,7 @@ func JudgedStep(judgments []Document, changeID *string, commit string) *JudgedCh
 }
 
 type ConditionOptions struct {
+	Review   string
 	Commit   string
 	ChangeID func() (*string, error)
 	Answers  []Answer
@@ -200,7 +201,7 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 	}
 	reasons := []string{}
 	if workflow != "refine" && workflow != "retro" && workflow != "requirements" && workflow != "sync" {
-		req, err := requirementsInput(dir, valid, workflow == "plan" || workflow == "implement")
+		req, err := requirementsInput(dir, valid, workflow == "plan" || workflow == "implement" || workflow == "fix" && options.Review != "")
 		if err != nil {
 			return nil, err
 		}
@@ -230,11 +231,20 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 					reasons = append(reasons, "judge has no valid result, so no commit passed the judgment")
 				}
 			} else {
+				if workflow == "pr" {
+					index, _ := judge["run_index"].(int)
+					for _, run := range h.Runs[index+1:] {
+						if run["workflow"] == "fix" && run["review"] != nil {
+							reasons = append(reasons, "a review fix started after the latest judge result; run judge again before pr")
+							break
+						}
+					}
+				}
 				judgments, err := List(dir, "judgment")
 				if err != nil {
 					return nil, err
 				}
-				if workflow == "fix" {
+				if workflow == "fix" && options.Review == "" {
 					if judge["commit"] != options.Commit {
 						reasons = append(reasons, fmt.Sprintf("the latest result of judge (run %v) judged %v, but HEAD is %s", judge["run_id"], judge["commit"], options.Commit))
 					}
@@ -250,7 +260,7 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 						reasons = append(reasons, fmt.Sprintf("the latest result of judge (run %v) has no blocking finding", judge["run_id"]))
 					}
 				} else {
-					if judge["outcome"] != "pass" {
+					if workflow == "pr" && judge["outcome"] != "pass" {
 						reasons = append(reasons, fmt.Sprintf("the latest result of judge (run %v) is %v", judge["run_id"], judge["outcome"]))
 					}
 					var id *string
@@ -297,6 +307,7 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 }
 
 type StartOptions struct {
+	Review           string
 	UnitReasons      []string
 	RunID            string
 	Commit           string
@@ -375,7 +386,7 @@ func Start(dir, workflow string, o StartOptions) (StartOutput, error) {
 		return output(true, fmt.Sprintf("continue was passed, and this start does not reach the limit of restarts, so %s did not start and nothing was recorded", workflow), []string{fmt.Sprintf("this start (%s) %s counted, and the branch restarted %d times (limit %d); start it without continue", state.Start, counted, state.Restarts, limit)}, state), nil
 	}
 	now := timestamp(o.Now)
-	reasons, err := StartConditions(dir, workflow, ConditionOptions{Commit: o.Commit, ChangeID: o.ChangeID, Answers: o.Answers})
+	reasons, err := StartConditions(dir, workflow, ConditionOptions{Review: o.Review, Commit: o.Commit, ChangeID: o.ChangeID, Answers: o.Answers})
 	if err != nil {
 		return StartOutput{}, err
 	}
@@ -404,7 +415,11 @@ func Start(dir, workflow string, o StartOptions) (StartOutput, error) {
 			return StartOutput{}, err
 		}
 	}
-	if _, err := Append(dir, "run", Document{"run_id": o.RunID, "workflow": workflow, "started_at": now, "start": state.Start, "counted": state.Counted, "answers": answered}); err != nil {
+	run := Document{"run_id": o.RunID, "workflow": workflow, "started_at": now, "start": state.Start, "counted": state.Counted, "answers": answered}
+	if workflow == "fix" && o.Review != "" {
+		run["review"] = Document{"text": o.Review, "commit": o.Commit}
+	}
+	if _, err := Append(dir, "run", run); err != nil {
 		return StartOutput{}, err
 	}
 	if needsRequest {

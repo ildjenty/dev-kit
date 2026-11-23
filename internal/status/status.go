@@ -27,19 +27,21 @@ func Commands() []cli.Command {
 }
 
 type Branch struct {
-	Branch    string     `json:"branch"`
-	Unit      string     `json:"unit"`
-	Workflow  string     `json:"workflow"`
-	Outcome   string     `json:"outcome"`
-	At        string     `json:"recorded_at"`
-	RunID     string     `json:"run_id"`
-	Questions []Question `json:"questions"`
-	Back      any        `json:"back,omitempty"`
-	Stop      any        `json:"stop,omitempty"`
-	Carried   any        `json:"carried,omitempty"`
-	Restarts  int        `json:"restarts"`
-	Limit     int        `json:"restart_limit"`
-	Next      string     `json:"next"`
+	PullRequest      *PullRequest `json:"pull_request,omitempty"`
+	PullRequestError string       `json:"pull_request_error,omitempty"`
+	Branch           string       `json:"branch"`
+	Unit             string       `json:"unit"`
+	Workflow         string       `json:"workflow"`
+	Outcome          string       `json:"outcome"`
+	At               string       `json:"recorded_at"`
+	RunID            string       `json:"run_id"`
+	Questions        []Question   `json:"questions"`
+	Back             any          `json:"back,omitempty"`
+	Stop             any          `json:"stop,omitempty"`
+	Carried          any          `json:"carried,omitempty"`
+	Restarts         int          `json:"restarts"`
+	Limit            int          `json:"restart_limit"`
+	Next             string       `json:"next"`
 }
 
 type Question struct {
@@ -81,6 +83,11 @@ func run(args []string, env cli.Env) error {
 	branches, err := Read(filepath.Join(state, "records"), branch, limit)
 	if err != nil {
 		return err
+	}
+	for i := range branches {
+		if branches[i].Workflow == "pr" && branches[i].Outcome == "pass" {
+			readPullRequest(env, &branches[i])
+		}
 	}
 	if asJSON {
 		return env.JSON(map[string]any{"state_dir": state, "branches": branches})
@@ -317,6 +324,18 @@ func show(env cli.Env, state, only string, branches []Branch) error {
 		if b.Unit != "" {
 			fmt.Fprintf(w, "  unit: %s\n", b.Unit)
 		}
+		if pr := b.PullRequest; pr != nil {
+			fmt.Fprintf(w, "  pull request: %s %s\n", pr.State, pr.URL)
+			if pr.ReviewDecision != "" {
+				fmt.Fprintf(w, "  review decision: %s\n", pr.ReviewDecision)
+			}
+			for _, check := range pr.FailingChecks {
+				fmt.Fprintf(w, "  failing check: %s\n", check)
+			}
+		}
+		if b.PullRequestError != "" {
+			fmt.Fprintf(w, "  pull request: %s\n", b.PullRequestError)
+		}
 		for _, q := range b.Questions {
 			fmt.Fprintf(w, "  %s: %s\n", q.ID, indent(q.Text))
 		}
@@ -345,3 +364,76 @@ func listOf(v any) []string {
 }
 
 func indent(s string) string { return strings.ReplaceAll(strings.TrimSpace(s), "\n", "\n    ") }
+
+type PullRequest struct {
+	State          string   `json:"state"`
+	URL            string   `json:"url"`
+	ReviewDecision string   `json:"review_decision"`
+	FailingChecks  []string `json:"failing_checks"`
+}
+
+func readPullRequest(env cli.Env, b *Branch) {
+	if _, err := exec.LookPath("gh"); err != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "gh", "pr", "view", b.Branch, "--json", "state,url,reviewDecision,statusCheckRollup")
+	cmd.Dir, cmd.Env = env.Cwd, env.Environ
+	out, err := cmd.Output()
+	if err != nil {
+		if ctx.Err() != nil {
+			err = ctx.Err()
+		}
+		b.PullRequestError = fmt.Sprintf("gh pr view failed: %v", err)
+		if exit, ok := err.(*exec.ExitError); ok && len(exit.Stderr) > 0 {
+			b.PullRequestError += ": " + strings.TrimSpace(string(exit.Stderr))
+		}
+		return
+	}
+	var value struct {
+		State          string `json:"state"`
+		URL            string `json:"url"`
+		ReviewDecision string `json:"reviewDecision"`
+		Checks         []struct {
+			Name       string `json:"name"`
+			Context    string `json:"context"`
+			Conclusion string `json:"conclusion"`
+			State      string `json:"state"`
+		} `json:"statusCheckRollup"`
+	}
+	if err := json.Unmarshal(out, &value); err != nil {
+		b.PullRequestError = fmt.Sprintf("could not read gh pr view: %v", err)
+		return
+	}
+	pr := &PullRequest{State: strings.ToLower(value.State), URL: value.URL, ReviewDecision: value.ReviewDecision, FailingChecks: []string{}}
+	for _, check := range value.Checks {
+		switch check.Conclusion {
+		case "FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE", "STALE":
+		default:
+			if check.State != "FAILURE" && check.State != "ERROR" {
+				continue
+			}
+		}
+		name := check.Name
+		if name == "" {
+			name = check.Context
+		}
+		pr.FailingChecks = append(pr.FailingChecks, name)
+	}
+	b.PullRequest = pr
+	switch pr.State {
+	case "open":
+		if len(pr.FailingChecks) > 0 {
+			b.Next = "Pass the failing check's log to fix as `review`."
+		} else if pr.ReviewDecision == "CHANGES_REQUESTED" {
+			b.Next = "Pass the review comments to fix as `review`, or to requirements when they change what is asked."
+		}
+	case "merged":
+		b.Next = "Clean up with `archon complete " + b.Branch + "`."
+	case "closed":
+		b.Next = "Closed without merging."
+	default:
+		b.PullRequest, b.PullRequestError = nil, "could not read gh pr view: unknown pull request state"
+	}
+}

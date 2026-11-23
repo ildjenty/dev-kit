@@ -59,7 +59,22 @@ func commitBacklog(ctx record.ContextData, judgments, results []doc) (string, er
 	if err := os.MkdirAll(filepath.Join(ctx.Cwd, filepath.Dir(file)), 0755); err != nil {
 		return "", err
 	}
-	if err := save(filepath.Join(ctx.Cwd, file), backlog(judgments, results)); err != nil {
+	runs, err := record.List(ctx.Dir, "run")
+	if err != nil {
+		return "", err
+	}
+	value := backlog(judgments, results)
+	reviews := []doc{}
+	for _, run := range runs {
+		review := object(run["review"])
+		if run["workflow"] == "fix" && review != nil {
+			reviews = append(reviews, doc{"finding": doc{"id": text(run["run_id"]) + "/review", "text": review["text"]}, "source": doc{"kind": "review", "run_id": run["run_id"], "target": doc{"commit": review["commit"]}}})
+		}
+	}
+	if len(reviews) > 0 {
+		value["review"] = reviews
+	}
+	if err := save(filepath.Join(ctx.Cwd, file), value); err != nil {
 		return "", err
 	}
 	files := []string{file}

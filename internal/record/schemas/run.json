@@ -4,6 +4,15 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {"type": "string", "minLength": 1},
+        "commit": {"$ref": "common.json#/$defs/sha"}
+      },
+      "required": ["text", "commit"]
+    },
     "run_id": {
       "$ref": "common.json#/$defs/run_id"
     },

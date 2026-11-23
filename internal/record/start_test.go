@@ -448,3 +448,120 @@ func TestRequirementsUnitStartConditions(t *testing.T) {
 		})
 	}
 }
+
+func TestReviewFixStartUsesPRIdentityAndRecordsVerbatimInput(t *testing.T) {
+	for _, tc := range []struct {
+		name, commit, change string
+		review               bool
+		blocked              bool
+	}{
+		{"head", sha("d"), strings.Repeat("a", 64), true, false},
+		{"backlog", sha("e"), strings.Repeat("a", 64), true, false},
+		{"changed", sha("e"), strings.Repeat("b", 64), true, true},
+		{"without review", sha("d"), strings.Repeat("a", 64), false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := afterPlan(t)
+			begin(dir, "judge", "j1")
+			judgment(dir, "j1", "scope", nil)
+			end(dir, "judge", "j1", Document{"outcome": "pass"})
+			begin(dir, "pr", "pr1")
+			end(dir, "pr", "pr1", Document{"outcome": "pass"})
+			review := ""
+			if tc.review {
+				review = "Review comment by alice on a.go:3: fix this\n  verbatim\n"
+			}
+			out := must(Start(dir, "fix", StartOptions{RunID: "f1", Commit: tc.commit, Review: review, ChangeID: func() (*string, error) { return &tc.change, nil }, Now: "t"}))
+			testutil.Equal(t, out.Stopped, tc.blocked)
+			runs := must(List(dir, "run"))
+			if !tc.blocked {
+				testutil.Equal(t, object(runs[len(runs)-1]["review"]), Document{"text": review, "commit": tc.commit})
+				testutil.Equal(t, beginAt(dir, "pr", "pr2", sha("f"), strings.Repeat("b", 64)).Stopped, true)
+			} else {
+				testutil.Equal(t, runs[len(runs)-1]["run_id"], "pr1")
+			}
+		})
+	}
+}
+
+func TestReviewFixRequiresPassedRequirementsPlanAndValidJudge(t *testing.T) {
+	for _, stage := range []string{"empty", "requirements", "plan", "judge", "blocked judge", "invalidated judge"} {
+		t.Run(stage, func(t *testing.T) {
+			dir := newRecord(t)
+			if stage != "empty" {
+				dir = afterRequirements(t)
+			}
+			if stage != "empty" && stage != "requirements" {
+				begin(dir, "plan", "p1")
+				plan(dir)
+				end(dir, "plan", "p1", Document{"outcome": "pass"})
+			}
+			if stage == "judge" || stage == "blocked judge" || stage == "invalidated judge" {
+				begin(dir, "judge", "j1")
+				judgment(dir, "j1", "scope", nil)
+				doc := Document{"outcome": "pass"}
+				if stage == "blocked judge" {
+					doc = stopped()
+				}
+				end(dir, "judge", "j1", doc)
+			}
+			if stage == "invalidated judge" {
+				begin(dir, "plan", "p2")
+				plan(dir, "p2")
+				end(dir, "plan", "p2", Document{"outcome": "pass"})
+			}
+			out := must(Start(dir, "fix", StartOptions{RunID: "f1", Commit: sha("d"), Review: "CI job test failed: error", Now: "t"}))
+			testutil.Equal(t, out.Stopped, stage != "judge" && stage != "blocked judge")
+		})
+	}
+}
+
+func TestRequirementsReopensOnlyItsOwnPreviouslyPublishedUnit(t *testing.T) {
+	for _, tc := range []struct {
+		name, markerBranch string
+		published          bool
+		blocked            bool
+	}{
+		{"own published", "feature/x", true, false},
+		{"other branch", "feature/other", true, true},
+		{"unpublished", "feature/x", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, state := testutil.Repo(t), t.TempDir()
+			testutil.Put(t, repo, ".devkit/units/U-abcdef.md", "---\nid: U-abcdef\ntitle: Unit\ndecisions: []\ndepends_on: []\n---\nGoal\n")
+			testutil.Put(t, repo, ".devkit/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"`+tc.markerBranch+`"}`)
+			testutil.Git(t, repo, "add", ".")
+			testutil.Git(t, repo, "commit", "-qm", "unit marker")
+			dir := RecordDir(state, "feature/x")
+			request(dir)
+			saved := must(Latest(dir, "request"))
+			saved["unit"] = "U-abcdef"
+			data := must(json.Marshal(saved))
+			testutil.Put(t, dir, "request/1.json", string(data))
+			if tc.published {
+				result(dir, "pr1", "pr", "pass", nil)
+			}
+			var out, stderr bytes.Buffer
+			env := commandEnv(repo, map[string]string{"STATE_DIR": state, "WORKFLOW_ID": "r2"}, &out, &stderr)
+			testutil.Equal(t, cli.New("", Commands()).Execute([]string{"record", "start", "requirements"}, env), 0)
+			var got StartOutput
+			testutil.OK(t, json.Unmarshal(out.Bytes(), &got))
+			testutil.Equal(t, got.Stopped, tc.blocked)
+		})
+	}
+}
+
+func TestReviewFixRequiresNewJudgeEvenWhenChangeIdentityIsUnchanged(t *testing.T) {
+	dir := afterPlan(t)
+	begin(dir, "judge", "j1")
+	judgment(dir, "j1", "scope", nil)
+	end(dir, "judge", "j1", Document{"outcome": "pass"})
+	out := must(Start(dir, "fix", StartOptions{RunID: "f1", Commit: sha("d"), Review: "Review comment by alice: verify input", Now: "t"}))
+	testutil.Equal(t, out.Stopped, false)
+	end(dir, "fix", "f1", Document{"outcome": "pass"})
+	testutil.Contains(t, begin(dir, "pr", "pr1").Remaining[0], "run judge again")
+	begin(dir, "judge", "j2")
+	judgment(dir, "j2", "scope", nil)
+	end(dir, "judge", "j2", Document{"outcome": "pass"})
+	testutil.Equal(t, begin(dir, "pr", "pr2").Stopped, false)
+}

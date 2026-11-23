@@ -71,11 +71,32 @@ archon workflow run requirements --branch feature/filter --detach \
   --input unit=U-a1b2c3
 ```
 
-Requirements refuses to start a done unit or one waiting for prerequisites. Prepare reads the unit and its cited agreed decisions as constraints. For a direct settled request, use `owner_words` instead; keep session findings in `supplement`. Every delivery request goes through `plan`, even when its decision list is empty.
+Requirements refuses to start a done unit or one waiting for prerequisites. The same recorded request can resume after its successful PR when its valid done marker names that branch. Prepare reads the unit and its cited agreed decisions as constraints. For a direct settled request, use `owner_words` instead; keep session findings in `supplement`. Every delivery request goes through `plan`, even when its decision list is empty.
 
 The delivery owner questions belong in requirements and plan. Implementation, code judgment and fixes return `back` to plan for newly discovered owner decisions. PR asks only about configured `ask` changes not already covered by an owner-decided row's `touches`. `pr` judges the body, commits review backlog and the branch unit's `<units>/<unit-id>.done.json` marker together, pushes and opens or updates a GitHub PR; the owner decides merging. `sync` rebases and returns `needs_judge` after conflict resolution.
 
 `devkit status` shows, for every branch with a recorded run, its unit ID from the request record, the last outcome, the unanswered questions and the next workflow to start; a session uses it to pick up open requests. A question ends its run. Relay its exact ID and text; restart the named `next_workflows` workflow with the owner's verbatim `answers` JSON. Follow `back.to` for a step back. A stop or rejected start is not a pass. Restart and fix limits default to 3; only the owner's words in `continue` authorize a start that reaches the restart limit. The installed `devkit-runs` skill gives the handoff procedure.
+
+## After the pull request
+
+Read comments and checks with `gh pr view <branch> --comments` and `gh pr checks <branch>`.
+Pass in-scope corrections or CI failures verbatim, including their source, to `fix` as `review`
+(for example `Review comment by <login> on path:line: ...` or `CI job <name> failed: <log excerpt>`).
+Review fixes require passed requirements and plan and the same judged change as HEAD; the PR's
+backlog/done-marker commit is accepted. A passing fix needs `judge` again, then `pr` updates the PR.
+Review findings are saved in the next backlog with source `review`.
+
+Comments that change or add to the request go to `requirements` on the same branch as `owner_words`,
+then through the usual flow. Fix returns out-of-scope or disputed review items as `outside_requirements`
+with reasons and `back` to requirements. Never answer or resolve comments on the reviewer's behalf.
+For CI failures, suggest `devkit-optimize` to add the job as a configured pre-PR check.
+
+For a branch whose last result is a passing PR, `devkit status` uses `gh` when available to show its
+state, URL, review decision and failing checks. The lookup has a 15-second timeout; failures are shown
+without failing status. `next` routes failing checks or requested changes to review fix/requirements,
+merged PRs to `archon complete <branch>` and closed PRs to “closed without merging”.
+After merging, `archon complete <branch>` removes the worktree and local branch and keeps the remote.
+Periodically run `archon isolation cleanup --merged`.
 
 ## Why the parts fit together
 

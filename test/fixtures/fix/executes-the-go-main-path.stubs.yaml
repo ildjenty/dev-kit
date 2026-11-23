@@ -2,4 +2,4 @@ exec-code: true
 fixture:
   expect: completed
   reached: ["start", "prepare", "proceed", "fix-code", "objections", "dispute-end", "checks", "round-end", "fix-state", "finish", "result"]
-fix-code: { owner_decisions: [], broken_decisions: [], fixed: [{ finding: diff/F1, change: "Added validation in a.ts" }], commit_message: "fix: address validation finding" }
+fix-code: { outside_requirements: [], owner_decisions: [], broken_decisions: [], fixed: [{ finding: diff/F1, change: "Added validation in a.ts" }], commit_message: "fix: address validation finding" }

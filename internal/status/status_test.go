@@ -142,3 +142,96 @@ func TestStatusShowsRequestUnitInTextAndJSON(t *testing.T) {
 	testutil.OK(t, run([]string{"--json"}, env))
 	testutil.Contains(t, out.String(), `"unit":"U-abcdef"`)
 }
+
+func TestStatusReadsPullRequestStatesAndReportsNonfatalFailures(t *testing.T) {
+	for _, tc := range []struct {
+		name, response, next, state string
+		failed                      bool
+	}{
+		{"open", `{"state":"OPEN","url":"https://example.invalid/pr/1","reviewDecision":"APPROVED","statusCheckRollup":[]}`, "owner reviews", "open", false},
+		{"checks", `{"state":"OPEN","url":"https://example.invalid/pr/1","reviewDecision":"CHANGES_REQUESTED","statusCheckRollup":[{"name":"tests","conclusion":"FAILURE"},{"context":"legacy","state":"ERROR"},{"name":"ok","conclusion":"SUCCESS"},{"name":"pending","state":"PENDING"}]}`, "failing check's log", "open", false},
+		{"changes requested", `{"state":"OPEN","url":"https://example.invalid/pr/1","reviewDecision":"CHANGES_REQUESTED","statusCheckRollup":null}`, "review comments to fix", "open", false},
+		{"merged", `{"state":"MERGED","url":"https://example.invalid/pr/1","reviewDecision":"APPROVED","statusCheckRollup":[]}`, "archon complete feature/x", "merged", false},
+		{"closed", `{"state":"CLOSED","url":"https://example.invalid/pr/1","reviewDecision":"","statusCheckRollup":[]}`, "Closed without merging", "closed", false},
+		{"failed", "", "gh pr view failed", "", true},
+		{"malformed", "{broken", "could not read gh pr view", "", true},
+		{"unknown state", `{"state":"UNKNOWN"}`, "unknown pull request state", "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, state, bin := testutil.Repo(t), t.TempDir(), t.TempDir()
+			script := "#!/bin/sh\n[ \"$*\" = 'pr view feature/x --json state,url,reviewDecision,statusCheckRollup' ] || exit 2\nprintf '%s' '" + tc.response + "'\n"
+			if tc.name == "failed" {
+				script = "#!/bin/sh\nprintf 'authentication failed' >&2\nexit 1\n"
+			}
+			testutil.Put(t, bin, "gh", script)
+			testutil.OK(t, os.Chmod(filepath.Join(bin, "gh"), 0755))
+			t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+			dir := branch(t, filepath.Join(state, "records"), "feature/x")
+			run1(t, dir, "pr", 1, map[string]any{"outcome": "pass"})
+			var out bytes.Buffer
+			env := cli.Env{Cwd: repo, Stdout: &out, Environ: os.Environ(), LookupEnv: func(k string) (string, bool) { return state, k == "STATE_DIR" }}
+			testutil.OK(t, run([]string{"--json"}, env))
+			var parsed struct{ Branches []Branch }
+			testutil.OK(t, json.Unmarshal(out.Bytes(), &parsed))
+			b := parsed.Branches[0]
+			if tc.failed {
+				testutil.Contains(t, b.PullRequestError, tc.next)
+			} else {
+				testutil.Equal(t, b.PullRequest.State, tc.state)
+				testutil.Equal(t, b.PullRequest.URL, "https://example.invalid/pr/1")
+				testutil.Contains(t, b.Next, tc.next)
+				if tc.name == "checks" {
+					testutil.Equal(t, b.PullRequest.FailingChecks, []string{"tests", "legacy"})
+				}
+			}
+			out.Reset()
+			testutil.OK(t, run(nil, env))
+			if tc.failed {
+				testutil.Contains(t, out.String(), tc.next)
+			} else {
+				testutil.Contains(t, out.String(), "pull request: "+tc.state)
+				testutil.Equal(t, strings.Contains(out.String(), "review decision:"), b.PullRequest.ReviewDecision != "")
+			}
+			if tc.name == "checks" {
+				testutil.Contains(t, out.String(), "failing check: tests")
+			}
+		})
+	}
+}
+
+func TestPullRequestLookupIsOptionalAndBounded(t *testing.T) {
+	t.Run("missing gh", func(t *testing.T) {
+		t.Setenv("PATH", t.TempDir())
+		b := Branch{Next: "previous"}
+		readPullRequest(cli.Env{}, &b)
+		testutil.Equal(t, b.Next, "previous")
+		testutil.Equal(t, b.PullRequestError, "")
+	})
+	t.Run("timeout", func(t *testing.T) {
+		bin := t.TempDir()
+		testutil.Put(t, bin, "gh", "#!/bin/sh\nexec /bin/sleep 30\n")
+		testutil.OK(t, os.Chmod(filepath.Join(bin, "gh"), 0755))
+		t.Setenv("PATH", bin)
+		b := Branch{Branch: "feature/x"}
+		readPullRequest(cli.Env{}, &b)
+		testutil.Contains(t, b.PullRequestError, "deadline exceeded")
+	})
+	t.Run("only passing pr", func(t *testing.T) {
+		repo, state, bin := testutil.Repo(t), t.TempDir(), t.TempDir()
+		testutil.Put(t, bin, "gh", "#!/bin/sh\ntouch '"+filepath.Join(bin, "called")+"'\nexit 1\n")
+		testutil.OK(t, os.Chmod(filepath.Join(bin, "gh"), 0755))
+		t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+		for _, workflow := range []string{"fix", "pr"} {
+			dir := branch(t, filepath.Join(state, "records"), workflow)
+			outcome := "pass"
+			if workflow == "pr" {
+				outcome = "stop"
+			}
+			run1(t, dir, workflow, 1, map[string]any{"outcome": outcome})
+		}
+		env := cli.Env{Cwd: repo, Stdout: &bytes.Buffer{}, Environ: os.Environ(), LookupEnv: func(k string) (string, bool) { return state, k == "STATE_DIR" }}
+		testutil.OK(t, run(nil, env))
+		_, err := os.Stat(filepath.Join(bin, "called"))
+		testutil.Equal(t, os.IsNotExist(err), true)
+	})
+}

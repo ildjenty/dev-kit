@@ -168,3 +168,51 @@ func TestBacklogCommitWritesAndPreservesUnitDoneMarker(t *testing.T) {
 		})
 	}
 }
+
+func TestReviewFindingsReachBacklogWithSourceAndRemainConsumable(t *testing.T) {
+	repo := testutil.Repo(t)
+	testutil.Git(t, repo, "config", "user.name", "Test")
+	testutil.Git(t, repo, "config", "user.email", "test@example.invalid")
+	testutil.Git(t, repo, "config", "commit.gpgsign", "false")
+	testutil.Put(t, repo, "a.ext", "source\n")
+	testutil.Git(t, repo, "add", ".")
+	testutil.Git(t, repo, "commit", "-qm", "source")
+	ctx := record.ContextData{Cwd: repo, Dir: t.TempDir(), Branch: "feature/x", RunID: "pr2"}
+	g := must(gitx.New(repo, "main", ctx.Dir))
+	id := must(g.ChangeID("HEAD"))
+	head := must(g.Head())
+	review := "CI job integration failed: assertion error\n  full text\n"
+	must(record.Append(ctx.Dir, "run", doc{"run_id": "fix-review", "workflow": "fix", "started_at": "t", "start": "next", "counted": false, "answers": []string{}, "review": doc{"text": review, "commit": head}}))
+	next := must(commitBacklog(ctx, nil, nil))
+	value := must(read(filepath.Join(repo, ".devkit/backlog/feature%2Fx.json")))
+	entries := docs(value["review"])
+	testutil.Equal(t, len(entries), 1)
+	testutil.Equal(t, object(entries[0]["source"]), doc{"kind": "review", "run_id": "fix-review", "target": doc{"commit": head}})
+	testutil.Equal(t, object(entries[0]["finding"]), doc{"id": "fix-review/review", "text": review})
+	testutil.Equal(t, must(g.ChangeID(next)), id)
+	testutil.Equal(t, must(commitBacklog(ctx, nil, nil)), next)
+	testutil.Standards(t, repo, ".devkit/standards")
+	testutil.Git(t, repo, "add", ".")
+	testutil.Git(t, repo, "commit", "-qm", "standards")
+	testutil.Git(t, repo, "branch", "-f", "main", "HEAD")
+	testutil.Git(t, repo, "switch", "-qc", "retro/review")
+	artifacts := t.TempDir()
+	vars := map[string]string{"STATE_DIR": t.TempDir(), "WORKFLOW_ID": "retro-review", "ARTIFACTS_DIR": artifacts, "BASE_BRANCH": "main"}
+	var stdout, stderr bytes.Buffer
+	env := cli.Env{Cwd: repo, Stdout: &stdout, Stderr: &stderr, LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
+	registry := cli.New("", retro.Commands())
+	for _, command := range []string{"start", "prepare"} {
+		if code := registry.Execute([]string{"retro", command}, env); code != 0 {
+			t.Fatalf("%s: %s", command, stderr.String())
+		}
+	}
+	input := must(read(filepath.Join(artifacts, "retro/input.json")))
+	found := false
+	for _, entry := range docs(input["entries"]) {
+		if entry["kind"] == "review" {
+			found = true
+			testutil.Equal(t, object(entry["content"]), entries[0])
+		}
+	}
+	testutil.Equal(t, found, true)
+}

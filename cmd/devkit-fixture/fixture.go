@@ -167,7 +167,7 @@ func setup(workflow string, env cli.Env) error {
 	if err := os.WriteFile(filepath.Join(env.Cwd, "fixture.txt"), []byte("fixture result\n"), 0644); err != nil {
 		return err
 	}
-	if workflow == "requirements" && env.Getenv("INPUTS_UNIT") != "" || workflow == "pr" {
+	if workflow == "requirements" && env.Getenv("INPUTS_UNIT") != "" || workflow == "pr" || workflow == "fix" && env.Getenv("INPUTS_REVIEW") != "" {
 		for path, body := range map[string]string{
 			".devkit/decisions/D-abcdef.md": "---\nid: D-abcdef\ntitle: Fixture constraint\nstatus: agreed\ndecided_by: owner\nrequest: refine/fixture\ndepends_on: []\nsupersedes: []\n---\nKeep the fixture result.\n",
 			".devkit/units/U-abcdef.md":     "---\nid: U-abcdef\ntitle: Fixture unit\ndecisions: [D-abcdef]\ndepends_on: []\n---\nUpdate fixture.txt.\n",
@@ -247,7 +247,7 @@ func setup(workflow string, env cli.Env) error {
 	if _, err = record.Write(ctx, "request", doc{"owner_words": "Update fixture.txt", "supplement": ""}, ""); err != nil {
 		return err
 	}
-	if workflow == "pr" {
+	if workflow == "pr" || workflow == "fix" && env.Getenv("INPUTS_REVIEW") != "" {
 		if _, err = record.Write(ctx, "request", doc{"owner_words": "", "supplement": "", "unit": "U-abcdef"}, ""); err != nil {
 			return err
 		}
@@ -315,7 +315,7 @@ func setup(workflow string, env cli.Env) error {
 		return err
 	}
 	findings, verdict, outcome := []doc{}, "pass", doc{"outcome": "pass"}
-	if workflow == "fix" {
+	if workflow == "fix" && env.Getenv("INPUTS_REVIEW") == "" {
 		findings = []doc{{"id": "F1", "blocking": true, "needs_decision": false, "text": "Update fixture result", "evidence": "fixture.txt"}}
 		verdict, outcome = "fail", doc{"outcome": "stop", "stop": doc{"state": "Blocking fixture finding", "unresolved": []string{"scope/F1"}, "premise": ""}}
 	}
@@ -328,8 +328,35 @@ func setup(workflow string, env cli.Env) error {
 			return err
 		}
 	}
-	_, err = record.WriteResult(ctx.Dir, "judge", outcome, record.ResultOptions{RunID: ctx.RunID, Base: base, Commit: head})
-	return err
+	if _, err = record.WriteResult(ctx.Dir, "judge", outcome, record.ResultOptions{RunID: ctx.RunID, Base: base, Commit: head}); err != nil {
+		return err
+	}
+	if workflow == "fix" && env.Getenv("INPUTS_REVIEW") != "" {
+		ctx.RunID = "fixture-pr"
+		if _, err = record.Start(ctx.Dir, "pr", record.StartOptions{RunID: ctx.RunID, Commit: head, BaseCommit: base}); err != nil {
+			return err
+		}
+		if err = save(filepath.Join(env.Cwd, ".devkit/backlog", record.EncodeURIComponent(ctx.Branch)+".json"), doc{"deferred": []doc{}, "carried": []doc{}, "mechanical": []doc{}, "accepted_objections": []doc{}}); err != nil {
+			return err
+		}
+		if err = save(filepath.Join(env.Cwd, ".devkit/units/U-abcdef.done.json"), doc{"unit": "U-abcdef", "branch": ctx.Branch}); err != nil {
+			return err
+		}
+		if err = run("add", "."); err != nil {
+			return err
+		}
+		if err = run("commit", "-qm", "chore: record review backlog"); err != nil {
+			return err
+		}
+		head, err = gitx.Run(env.Cwd, "rev-parse", "HEAD")
+		if err != nil {
+			return err
+		}
+		if _, err = record.WriteResult(ctx.Dir, "pr", doc{"outcome": "pass"}, record.ResultOptions{RunID: ctx.RunID, Base: base, Commit: head}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func after(args []string, env cli.Env) error {
@@ -355,6 +382,9 @@ func after(args []string, env cli.Env) error {
 		state, err := read(filepath.Join(env.Getenv("ARTIFACTS_DIR"), args[0], "state.json"))
 		if err != nil {
 			return err
+		}
+		if outside, ok := state["outside_requirements"].([]any); ok && len(outside) > 0 {
+			expected = "back"
 		}
 		if owners, ok := state["owner_decisions"].([]any); ok && len(owners) > 0 {
 			expected = "back"

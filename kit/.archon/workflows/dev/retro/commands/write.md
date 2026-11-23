@@ -11,7 +11,7 @@ numbered principle references (path before `#`), including `harness.md` and `rev
 
 Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
 - `summary`: the proposed correction.
-- `units`: work for deferred or carried findings, with stable draft `key`, `title`, `goal`,
+- `units`: work for deferred or carried findings, or follow-up work traced to review entries, with stable draft `key`, `title`, `goal`,
   `completion_conditions`, and source `entries`.
 - `checks`: checks for mechanical findings, with the config check fields, `reason` and `entries`.
   Add precisely those checks to `.devkit/config.json`, retaining all existing settings and checks.

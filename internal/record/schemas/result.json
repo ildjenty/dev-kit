@@ -4,6 +4,18 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "outside_requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "item": {"$ref": "common.json#/$defs/text"},
+          "reason": {"$ref": "common.json#/$defs/text"}
+        },
+        "required": ["item", "reason"]
+      }
+    },
     "proposal_version": {
       "type": "integer",
       "minimum": 1

@@ -128,6 +128,38 @@ continuation. Pass those words verbatim as `--input continue=<owner words>`. Do 
 before the start reaches its limit. Fix attempts also obey configured `limits.fixes`. A `not_started`
 result is not a pass: inspect the `start` output and relay what prevented starting.
 
+## After the pull request
+
+For a passing PR, `devkit status <branch>` reads the GitHub state, URL, review decision and failing
+checks when `gh` is available. Lookup failures are reported without preventing status output.
+Read the feedback before choosing the next workflow:
+
+```sh
+gh pr view <branch> --comments
+gh pr checks <branch>
+```
+
+Read the actual review comments and failing job logs as well; these summaries alone may not contain
+inline comments or the failure cause. Preserve the text verbatim with provenance, for example
+`Review comment by <login> on path:line: ...` or `CI job <name> failed: <log excerpt>`.
+
+- A comment that repairs the change within what was asked goes to `fix` on the same branch with
+  the sourced text as `review` (`--input review=<text>`). A passing review fix needs `judge` again,
+  then `pr` updates the existing pull request. The backlog/done-marker commit does not invalidate
+  the judged change for this start.
+- A comment that changes or adds to what was asked goes to `requirements` on the same branch with
+  the comment as `owner_words`, then the usual plan → implement → judge → pr flow. An item the fix
+  writer believes is outside the requirements or plan, or wrong, returns in `outside_requirements`
+  with a reason and `back.to: requirements`; start requirements there for the owner to settle it.
+- A CI failure goes to `fix` with the job name and verbatim failure excerpt as `review`. Suggest
+  adding that job as a configured check through `devkit-optimize` so it is caught before the PR.
+
+Use shell-safe quoting or supported file input for review and owner text. Never answer or resolve
+review comments on the reviewer's behalf. The owner decides whether to merge.
+
+After the merge, run `archon complete <branch>`: it removes the worktree and local branch and keeps
+the remote branch. From time to time, run `archon isolation cleanup --merged` for merged worktrees.
+
 ## Watch runs
 
 After starting, attach the session's background monitor, when available, to:

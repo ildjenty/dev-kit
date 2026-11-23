@@ -4,7 +4,7 @@ fixture:
 start: { stopped: false, stage: start, reason: "", details: "", remaining: [], start: next, counted: false, restarts: 0 }
 prepare: { ready: true, reason: "", findings: 1, rounds: 0, limit_reached: false, limit: 3 }
 proceed: { proceed: true }
-fix-code: { owner_decisions: [], broken_decisions: [], fixed: [{ finding: judge-run/scope/F1, change: "Added validation in a.ts" }], commit_message: "fix: address validation finding" }
+fix-code: { outside_requirements: [], owner_decisions: [], broken_decisions: [], fixed: [{ finding: judge-run/scope/F1, change: "Added validation in a.ts" }], commit_message: "fix: address validation finding" }
 objections: { round: 1, count: 0 }
 dispute-end: { pending: 0 }
 checks: { round: 1, passed: true, stuck: false, failing: [], stuck_checks: [], skipped: [], results: x }

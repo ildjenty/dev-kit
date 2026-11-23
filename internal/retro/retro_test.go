@@ -634,3 +634,15 @@ func TestRetroPreservesDoneUnitsAndCutsNewWork(t *testing.T) {
 	testutil.OK(t, os.Remove(filepath.Join(r.cwd, path)))
 	testutil.Contains(t, r.errors(d), "done unit may not be edited or removed: U-abcdef")
 }
+
+func TestReviewBacklogRequiresRunProvenance(t *testing.T) {
+	for _, review := range []any{nil, "text", []doc{{"finding": doc{"id": "review-1", "text": "Review text"}, "source": doc{"run_id": "fix1", "kind": "code", "target": doc{"commit": strings.Repeat("a", 40)}}}}, []doc{{"finding": doc{"id": "review-1", "text": "Review text"}, "source": doc{"run_id": "fix1", "kind": "review", "target": doc{}}}}} {
+		b := backlog()
+		b["review"] = review
+		r := setup(t, b)
+		_, _, err := readBacklog(r.cwd)
+		if err == nil {
+			t.Fatalf("invalid review provenance accepted: %v", review)
+		}
+	}
+}

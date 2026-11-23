@@ -1,0 +1,6 @@
+exec-code: true
+fixture:
+  expect: completed
+  inputs: { review: "Review comment by alice on fixture.txt:1: add a public endpoint" }
+  reached: [start, prepare, fix-code, objections, checks, round-end, fix-state, finish, result]
+fix-code: { outside_requirements: [{ item: "add a public endpoint", reason: "The endpoint already rejects this input; the reported failure cannot occur" }], owner_decisions: [], broken_decisions: [], fixed: [], commit_message: "fix: address validation finding" }

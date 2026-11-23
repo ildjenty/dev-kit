@@ -20,6 +20,33 @@ After backlog reaches the base branch, run `retro` on a `retro/<name>` branch cr
 
 A `question` result ends the run. Relay every question and ID and restart its named `next_workflows` workflow with verbatim owner answers. Refine and retro approval use the exact recorded version. Requirements and plan ask unresolved request/design questions; implementation, judge and fix return `back` to plan for owner decisions. PR asks only for uncovered `ask` changes. Follow `back.to`; `stop` describes unresolved work, and `not_started` means prerequisites rejected the start. `carry` is a plan result carrying detail findings forward. Counted restarts and fix runs obey configured limits; supply owner words as `continue` only when the restart limit is reached.
 
+## After the pull request
+
+Read `gh pr view <branch> --comments` and `gh pr checks <branch>`, then read the actual inline comments
+or failing job logs. An in-scope repair or CI failure goes to `fix` on the same branch as `review`,
+verbatim with provenance (`Review comment by <login> on path:line: ...` or
+`CI job <name> failed: <log excerpt>`). Review starts need passed requirements and plan and the latest
+judge's change matching HEAD by PR identity, including after the backlog/done-marker commit.
+The run stores the review text and starting commit; its fix findings have source `review`.
+Items outside requirements or plan, and disputed review items, appear in `outside_requirements`
+with `item` and `reason` and return `back` to requirements with those items as premise and the full
+review as observation. Review objections bypass the dispute judge. Checks and fix/restart limits
+still apply; this return makes no fix commit. A pass needs a new judge run before PR, even if the
+change identity stayed the same; PR then updates the existing pull request.
+
+A comment that changes or adds to the request goes directly to requirements on the same branch as
+`owner_words`, then follows the usual flow. A recorded unit request can resume after its successful
+PR when its valid done marker names that branch. Never answer or resolve comments on the reviewer's
+behalf. For a CI failure, suggest adding the job through `devkit-optimize` as a configured check.
+
+After a passing PR, status optionally runs `gh pr view <branch> --json state,url,reviewDecision,statusCheckRollup`
+with a 15-second timeout. It shows state, URL, review decision and failing checks in text and JSON;
+lookup failures are shown and never fatal. `next` routes open failures to fix with `review`, requested
+changes to fix with `review` or requirements when the request changes, merged PRs to
+`archon complete <branch>` and closed PRs to closed without merging.
+`archon complete <branch>` removes the worktree and local branch and keeps the remote; periodically
+run `archon isolation cleanup --merged`.
+
 ## Concerns, decisions and structure
 
 The code quality set is `internal/concerns`; the repository-owned `<standards>/concerns.json` assigns principles and plan/code criteria to structure, data, contract, security, ui, cost, test, delivery, scope and readability. Every numbered standard principle has exactly one assignment: one quality, `every_quality`, or a named writer/non-quality judge in `others`. Every named document exists and every review document except `review/README.md` is mapped. `devkit concerns check` validates the map, including during plan, judge, refine and retro prepare on fixed criteria.
@@ -60,7 +87,7 @@ Passing judgments cover HEAD or an identical merge-base change: file names and e
 
 ## Backlog contract
 
-Before pushing, PR commits `.devkit/backlog/<encoded-branch>.json` with a `chore:` subject. When the request record names a unit, the same commit includes `<units>/<unit-id>.done.json` with `unit` and `branch`, validated against embedded `unit-done.json`. Reruns keep the marker unchanged; branches without a unit write none. The unit becomes done on the base branch when its PR merges. `devkit decisions check` reports invalid markers or missing units. Refine and retro preserve done unit files and cut new follow-up units instead. The backlog's four arrays are `deferred`, `carried`, `mechanical`, `accepted_objections`. Each entry has `finding` (the original recorded object) and `source` (`run_id`, one-based `judgment` record number, `judge`, `kind`, full `target`). Accepted objections are nonblocking dispute findings with the original finding reference. An entry may occur in multiple arrays. Retro input IDs are `<backlog-path>#<category>/<zero-based-index>` and preserve this content and provenance. Consumed files are removed only with approved corrections.
+Before pushing, PR commits `.devkit/backlog/<encoded-branch>.json` with a `chore:` subject. When the request record names a unit, the same commit includes `<units>/<unit-id>.done.json` with `unit` and `branch`, validated against embedded `unit-done.json`. Reruns keep the marker unchanged; branches without a unit write none. The unit becomes done on the base branch when its PR merges. `devkit decisions check` reports invalid markers or missing units. Refine and retro preserve done unit files and cut new follow-up units instead. The backlog's four required arrays are `deferred`, `carried`, `mechanical`, `accepted_objections`. Each entry has `finding` (the original recorded object) and `source` (`run_id`, one-based `judgment` record number, `judge`, `kind`, full `target`). Accepted objections are nonblocking dispute findings with the original finding reference. An entry may occur in multiple arrays. Retro input IDs are `<backlog-path>#<category>/<zero-based-index>` and preserve this content and provenance. The optional `review` array stores each review fix input as a finding with its full text, with source `kind: review`, fix `run_id` and `target.commit`; it refers to a run rather than a judgment. Retro reads these entries too. Consumed files are removed only with approved corrections.
 
 ## Configuration and verification
 

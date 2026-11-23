@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -287,4 +288,67 @@ func TestAcceptedObjectionCannotSuppressFindingFromAnotherJudgeRun(t *testing.T)
 	testutil.Equal(t, remaining[0]["id"], "j2/contract/F1")
 	_, remaining = findingsOn([]record.Document{old, accepted}, sha("c"), "")
 	testutil.Equal(t, len(remaining), 0)
+}
+
+func TestReviewFixPreparesRecordedFindingsAfterBacklogAndRequiresJudgeAgain(t *testing.T) {
+	ctx, artifacts, _, head := setup(t, 3)
+	review := "Review comment by alice on a.mjs:1: reject invalid input\n  keep spaces\n"
+	runs := testutil.Must(record.List(ctx.Dir, "run"))
+	runs[0]["review"] = record.Document{"text": review, "commit": head}
+	putJSON(t, filepath.Join(ctx.Dir, "runs/1.json"), runs[0])
+	testutil.Put(t, ctx.Cwd, ".devkit/backlog/work.json", `{"deferred":[],"carried":[],"mechanical":[],"accepted_objections":[]}`)
+	testutil.Git(t, ctx.Cwd, "add", ".")
+	testutil.Git(t, ctx.Cwd, "commit", "-qm", "backlog")
+	testutil.Equal(t, testutil.Must(prepare(ctx, artifacts)).Ready, true)
+	findings := testutil.Must(readJSON[record.Document](filepath.Join(artifacts, "fix/findings.json")))
+	list := documents(findings["findings"])
+	testutil.Equal(t, len(list), 1)
+	testutil.Equal(t, list[0]["source"], "review")
+	testutil.Equal(t, list[0]["text"], review)
+	testutil.Must(takeObjections(artifacts))
+	testutil.Must(disputeEnd(artifacts, nil))
+	testutil.Put(t, ctx.Cwd, "a.mjs", "export const valid = true;\n")
+	testutil.Must(roundEnd(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "repair: validate input"}))
+	testutil.Equal(t, testutil.Must(finish(ctx, artifacts, nil))["outcome"], "pass")
+	reasons := testutil.Must(record.StartConditions(ctx.Dir, "pr", record.ConditionOptions{Commit: testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD")}))
+	testutil.Equal(t, len(reasons) > 0, true)
+}
+
+func TestOutsideReviewItemsReturnToRequirementsWithoutCommitOrDispute(t *testing.T) {
+	for _, objection := range []bool{false, true} {
+		t.Run(strconv.FormatBool(objection), func(t *testing.T) {
+			ctx, artifacts, _, head := setup(t, 3)
+			review := "Review comment by alice on a.mjs:1: add a public endpoint"
+			runs := testutil.Must(record.List(ctx.Dir, "run"))
+			runs[0]["review"] = record.Document{"text": review, "commit": head}
+			putJSON(t, filepath.Join(ctx.Dir, "runs/1.json"), runs[0])
+			testutil.Must(prepare(ctx, artifacts))
+			item := record.Document{"item": review, "reason": "The requirements and plan do not cover a public endpoint"}
+			code := &codeOutput{OutsideRequirements: []record.Document{item}}
+			if objection {
+				putJSON(t, filepath.Join(artifacts, "objections.json"), record.Document{"objections": []record.Document{{"finding": ctx.RunID + "/review", "evidence": "The reported failure cannot happen"}}})
+				item["reason"] = "The reported failure cannot happen"
+				code = nil
+			}
+			testutil.Equal(t, testutil.Must(takeObjections(artifacts))["count"], 0)
+			testutil.Must(disputeEnd(artifacts, nil))
+			gate := gateFixture()
+			if objection {
+				gate.Passed = false
+				gate.Stuck = true
+			}
+			testutil.Equal(t, testutil.Must(roundEnd(ctx, artifacts, gate, code))["finished"], true)
+			testutil.Equal(t, testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD"), head)
+			testutil.Equal(t, testutil.Must(judgeBack(artifacts))["judge_back"], false)
+			result := testutil.Must(finish(ctx, artifacts, nil))
+			testutil.Equal(t, result["outcome"], "back")
+			testutil.Equal(t, object(result["back"]), record.Document{"to": "requirements", "premise": text(item["item"]) + ": " + text(item["reason"]), "observation": review})
+			testutil.Equal(t, documents(result["outside_requirements"]), []record.Document{item})
+			judgments := testutil.Must(record.List(ctx.Dir, "judgment"))
+			testutil.Equal(t, len(judgments), 1)
+			returned := testutil.Must(record.Returned(record.ContextData{Dir: ctx.Dir}, "requirements"))
+			testutil.Equal(t, len(returned), 1)
+			testutil.Equal(t, returned[0]["observation"], review)
+		})
+	}
 }

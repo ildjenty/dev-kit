@@ -67,7 +67,13 @@ Jev の HTTP クライアントは `internal/jev` に共有し、ルーティン
 
 `fix` は停止対象の指摘を修正する。誤った指摘には証拠付きで異議を出し、指摘にも修正にも関わっていない判定者が判断する。指摘の参照は `<judge-run>/<judge>/<finding-id>` とし、別の判定で同じローカル ID が使われても、以前の異議採用では消えない。
 
-`pr` は本文の判定後、push の前に `.devkit/backlog/<エンコードしたブランチ>.json` をコミットする。保留した指摘、計画から持ち越した指摘、機械検査の候補になる指摘、採用した異議を、それぞれ元の判定への参照と保存する。依頼記録に単位がある場合、同じ `chore:` コミットに `<units>/<unit-id>.done.json` を含める。内容は `unit` と `branch` で、埋め込みスキーマで検証する。同じブランチで再実行しても既存マーカーは変更せず、単位のない依頼では作らない。PR がマージされると基点ブランチにもマーカーが届き、そこで単位は完了となる。基点のチェックアウトで一覧を読み、開始可能な単位を選ぶ。`devkit decisions check` は内容が不正なマーカーと、存在しない単位を指すマーカーを報告する。refine と retro は完了済み単位を編集・削除せず、追加作業には新しい単位を切る。refine の文書段階では影響対象に含まれていてもこの制約を適用し、インデックスと作業ツリーの変更を機械検査する。
+PR 作成後のコメントや CI 失敗は、出典を含む原文を `review` 入力として同じブランチの `fix` に渡す。例は `Review comment by <login> on path:line: ...`、`CI job <name> failed: <log excerpt>` である。入力は開始に成功した run の `review.text` と `review.commit` に保存し、その fix の指摘は `source: review` とする。開始には合格した要件・計画と、有効な最新 judge の判定済み変更が HEAD と同一であることが必要で、blocking 指摘は要求しない。PR と同じ変更同一性を使うため、backlog と done marker だけのコミット後も開始できる。`review` のない fix の開始条件は従来どおりである。
+
+レビューが要件・計画の範囲を超える場合と、執筆者が指摘に異議を持つ場合は、実装せず `outside_requirements` に `item` と `reason` を出す。異議の判定者には渡さず、その項目と理由を `premise`、レビュー原文を `observation` にした `back` で `requirements` に戻す。セッションは同じブランチで requirements を開始し、所有者がそこで決める。検査・回数上限・既存の step-back は維持し、この差し戻しでは修正コミットを作らない。合格した review fix は変更同一性が変わらなくても再度 judge が必要で、その後 pr が既存 PR を更新する。
+
+依頼自体を追加・変更するコメントは、同じブランチの requirements に `owner_words` として渡し、通常の工程を進める。単位に紐づく既存依頼では、過去に成功した PR があり、有効な done marker がそのブランチを指す場合に requirements の再開始を許可する。別ブランチの完了済み単位の新規開始は拒否する。`devkit-runs` は `gh pr view <branch> --comments` と `gh pr checks <branch>`、実際のインラインコメント・失敗ログの読み取り、この振り分けを案内する。CI 失敗時には `devkit-optimize` でそのジョブを設定済み検査へ追加することを提案する。レビュー担当者の代わりに返信・解決済み化をせず、マージ後は `archon complete <branch>` で worktree とローカルブランチを削除し、リモートは保持する。定期的に `archon isolation cleanup --merged` も使う。
+
+`pr` は本文の判定後、push の前に `.devkit/backlog/<エンコードしたブランチ>.json` をコミットする。保留した指摘、計画から持ち越した指摘、機械検査の候補になる指摘、採用した異議を、それぞれ元の判定への参照と保存する。review 入力は次の pr で任意の `review` 配列に保存する。各要素は原文の指摘と、`kind: review`、修正 run の `run_id`、`target.commit` を持つ出典であり、判定番号を捏造しない。既存4配列は必須のままで、retro は review 配列も読み取る。依頼記録に単位がある場合、同じ `chore:` コミットに `<units>/<unit-id>.done.json` を含める。内容は `unit` と `branch` で、埋め込みスキーマで検証する。同じブランチで再実行しても既存マーカーは変更せず、単位のない依頼では作らない。PR がマージされると基点ブランチにもマーカーが届き、そこで単位は完了となる。基点のチェックアウトで一覧を読み、開始可能な単位を選ぶ。`devkit decisions check` は内容が不正なマーカーと、存在しない単位を指すマーカーを報告する。refine と retro は完了済み単位を編集・削除せず、追加作業には新しい単位を切る。refine の文書段階では影響対象に含まれていてもこの制約を適用し、インデックスと作業ツリーの変更を機械検査する。
 
 計画・refine・retro の全ラウンドを記録し、後のラウンドで解消した指摘も機械化候補として収集する。各項目は `finding` と `source` を持ち、`source` は実行、判定番号、判定者、対象を保持する。
 
@@ -78,6 +84,8 @@ Jev の HTTP クライアントは `internal/jev` に共有し、ルーティン
 ## 実行をまたぐ記録
 
 記録は Git の外の `$STATE_DIR/records/<エンコードしたブランチ>/` に置く。依頼、提案、要件、計画、判定、開始、結果、質問、回答、許可、続行許可を保存する。機械が必要な内容を `$ARTIFACTS_DIR` に取り出し、AI に記録フォルダーを直接渡さない。スキーマは `internal/record/schemas/` を正本としてバイナリへ埋め込み、書き込みごとに検証する。計画の執筆用スキーマも準備処理が成果物へ書き出す。セッションからは `devkit status` で読む。テキスト・JSON の両方で各ブランチの依頼記録にある単位 ID も示す。`archon project list --json` から状態のフォルダーを見つけ(`STATE_DIR` があればそれを使う)、ブランチごとに最後の結果、未回答の質問、停止や差し戻しの中身、次に起動するワークフローを示す。
+
+最後の結果が合格した `pr` のブランチでは、`devkit status` が gh を利用可能な場合に `gh pr view <branch> --json state,url,reviewDecision,statusCheckRollup` を15秒の制限で実行し、open・merged・closed、URL、レビュー判断、失敗した検査をテキストと JSON に示す。実行・タイムアウト・JSON 読み取りの失敗は表示し、status 自体は失敗させない。`next` は open で検査失敗ならログを `review` とした fix、変更要求ならコメントを `review` とした fix または依頼変更時の requirements、merged なら `archon complete <branch>`、closed なら未マージで閉じた旨を示す。検査失敗と変更要求が両方あれば検査失敗の案内を優先する。
 
 開始条件は、前工程の結果、未回答質問、渡された回答、チェックアウトとワークフローの状態を検査する。開始が成功するまで回答を保存しない。前工程を再開始すると下流の結果を無効にする。`question` で終わった実行は、回答を付けた新しい実行で続ける。Archon 内の待機ノードは置かない。
 
