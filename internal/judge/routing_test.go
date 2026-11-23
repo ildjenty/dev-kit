@@ -73,7 +73,7 @@ func TestRouteUnionsPathsPlanRowsAndInferredQualitiesWithFiles(t *testing.T) {
 		testutil.Equal(t, must(read(filepath.Join(a, "judge/route.json"))), routed)
 	}
 	var routedOutput bytes.Buffer
-	values := map[string]string{"ARTIFACTS_DIR": a, "PACK_DIR": must(filepath.Abs("../../kit/.archon/workflows/dev")), "DEVKIT_CODEX": filepath.Join(a, "not-installed")}
+	values := map[string]string{"ARTIFACTS_DIR": a, "PACK_DIR": must(filepath.Abs("../../kit/.archon/workflows/dev")), "DEVKIT_CODEX": filepath.Join(a, "not-installed"), "DEVKIT_CLAUDE": filepath.Join(a, "not-installed")}
 	env := cli.Env{Cwd: repo, Stdout: &routedOutput, Stderr: &bytes.Buffer{}, LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
 	testutil.OK(t, cli.New("", Commands()).Run([]string{"judge", "route"}, env))
 	var conservative doc

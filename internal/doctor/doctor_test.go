@@ -28,7 +28,11 @@ func environment(t *testing.T, provider string) (cli.Env, string, *bytes.Buffer)
 		if err != nil || e.IsDir() {
 			return err
 		}
-		testutil.Put(t, root, path, string(testutil.Must(kit.Files.ReadFile(path))))
+		content := string(testutil.Must(kit.Files.ReadFile(path)))
+		if strings.HasSuffix(path, ".yaml") {
+			content = strings.ReplaceAll(content, "provider: claude", "provider: "+provider)
+		}
+		testutil.Put(t, root, path, content)
 		return nil
 	}))
 	testutil.Put(t, root, ".devkit/config.json", fmt.Sprintf(`{"provider":%q,"sessions":["claude","codex"],"skills":{"devkit-optimize":"fit-checks"}}`, provider))
@@ -79,6 +83,24 @@ func TestPresentCommandsBothProvidersAndOptionalChecks(t *testing.T) {
 			testutil.Equal(t, strings.Contains(out.String(), "Jev fallback"), false)
 		})
 	}
+}
+
+func TestEveryProviderUsedByAnInstalledWorkflowIsRequired(t *testing.T) {
+	env, bin, out := environment(t, "claude")
+	executable(t, bin, "archon", `case "$*" in
+ '--version') printf 'test-version\n' ;;
+ 'doctor') printf '✓ Installed providers: claude (0.14.0)\n' ;;
+ *) exit 19 ;;
+esac`)
+	testutil.Equal(t, Report(env), true)
+	testutil.Equal(t, strings.Contains(out.String(), "Archon provider codex"), false)
+	file := filepath.Join(env.Cwd, ".archon/workflows/dev/requirements/requirements.yaml")
+	edited := strings.Replace(string(testutil.Must(os.ReadFile(file))), "provider: claude", "provider: codex", 1)
+	testutil.OK(t, os.WriteFile(file, []byte(edited), 0644))
+	out.Reset()
+	testutil.Equal(t, Report(env), false)
+	testutil.Contains(t, out.String(), "[required] Archon provider claude: OK")
+	testutil.Contains(t, out.String(), "[required] Archon provider codex: MISSING — Provider is not installed; run archon provider add codex, then archon doctor.")
 }
 
 func TestProviderInstallationFromDoctor(t *testing.T) {

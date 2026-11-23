@@ -1,6 +1,6 @@
 ---
 name: devkit-optimize
-description: Fit a freshly installed dev-kit to this repository. Use right after `devkit init` in an existing repository, or when its build, tests, conventions or folder layout changed. Sets `.devkit/config.json` and `.archon/config.yaml` from what the repository actually does (checks, paths that select judges and decisions, base branch, worktree preparation), reconciles the installed standards with the repository's own conventions, fits the routing descriptions to its layout, and points agent instructions at the kit's skills.
+description: Fit an installed dev-kit to this repository, following the owner's instructions. Use right after `devkit init` in an existing repository, when its build, tests, conventions or folder layout changed, or when the owner wants the kit to work differently (for example which provider, model or effort each workflow node uses). Sets `.devkit/config.json` and `.archon/config.yaml` from what the repository actually does (checks, paths that select judges and decisions, base branch, worktree preparation), reconciles the installed standards with the repository's own conventions, fits the routing descriptions to its layout, points agent instructions at the kit's skills, and edits the workflows the way the owner wants them.
 ---
 
 # Fit dev-kit to this repository
@@ -13,15 +13,38 @@ conventions as findings. This skill reads the repository, proposes changes with 
 each, lets the owner decide what only the owner knows, writes what the owner approved, and proves
 the result works in a fresh worktree.
 
+It is not an automatic pass. The owner may tell you what they want before or during it, and what the
+owner says comes first: it decides what you look at, overrides what you would have inferred, and can
+ask for things this document does not list. You may be asked for the whole fit, or for one thing
+only (a provider assignment, one check, one standard); do what was asked and leave the rest alone.
+
 What you may change, and only after the owner approved that change:
 
 - `.devkit/config.json` and `.archon/config.yaml`;
 - documents in the standards folder (the `standards` setting), including `routing` in `concerns.json`;
-- the repository's agent instruction files (`CLAUDE.md`, `AGENTS.md`), by adding a short section.
+- the repository's agent instruction files (`CLAUDE.md`, `AGENTS.md`), by adding a short section;
+- the workflows under `.archon/workflows/dev/`: the YAML and the prompts, when the owner asks for a
+  change (see "The workflows" below).
 
-Never change the workflows, the repository's code, CI or scripts here: say what you would change and
-why, and leave it to the owner. Everything you propose rests on something you read or ran; where you
-could not observe it, say so instead of guessing.
+Never change the repository's code, CI or scripts here: say what you would change and why, and leave
+it to the owner. Everything you propose rests on something you read or ran; where you could not
+observe it, say so instead of guessing.
+
+## Start from the owner's instructions
+
+Read what the owner said when starting this skill. If they gave instructions, restate them in one or
+two lines and follow them. If they gave none, ask once, briefly, before reading the repository:
+whether they want the whole fit or something specific, and whether they already know how they want
+the AI nodes assigned (which provider, model or effort for which nodes), which checks matter, or
+anything that must not be touched. "Decide for me" is an answer: then propose from what you observe.
+
+- An instruction is followed as given. When it conflicts with something you observe (a check the
+  owner named fails on the base branch, a node the owner named does not exist, an assignment Archon
+  rejects), do not silently adjust it: show the conflict and the options, and ask.
+- An instruction can come at any point. When the owner changes their mind after seeing the proposal,
+  redo the affected part and show it again; do not treat an earlier approval as covering the new
+  request.
+- Keep the owner's instructions in the final report next to what you did about each.
 
 ## 1. Check that the kit itself works
 
@@ -103,7 +126,7 @@ Start from the current files and keep what already fits. For each change, keep t
   definitions, CI definitions, env examples, and the kit's own files (`.archon/**`, the standards
   folder, `.devkit/config.json`). Keep `ask: true` on those the owner must allow before a pull request
   (cost, permissions and exposure, CI, the kit's own rules); ask the owner about any you are unsure of.
-- `limits`, `skills`, `provider` and `sessions`: leave as they are.
+- `limits`, `skills`, `provider` and `sessions`: leave as they are unless the owner asks.
 
 Confirm that every glob you keep or add matches at least one tracked file, and list those that match
 nothing:
@@ -120,6 +143,45 @@ git ls-files -- ':(glob)<pattern>' | head -3
   they are slow. A worktree contains only tracked files: anything untracked that the checks need (env
   files, local databases) has to be created by these commands or supplied by the environment. When the
   repository already has an Archon configuration, add to it; do not replace it.
+
+**The workflows**
+
+The workflows are files in this repository: once installed they are the repository's to change. Edit
+them directly when the owner wants the kit to work differently. Do not change them on your own
+initiative; the fit to the repository is made in the settings and standards above.
+
+- **Who runs each AI node.** A node that has `prompt:` or `command:` is an AI node; `provider:`,
+  `model:` and `effort:` on it decide what runs it. List the AI nodes for the owner when they want to
+  assign them: workflow, node id, whether it writes (code, tests, a draft) or judges (`context: fresh`
+  with `mutates_checkout: false`), and its current provider, model and effort.
+
+  ```sh
+  grep -n -B1 -A8 'provider:' .archon/workflows/dev/*/*.yaml
+  ```
+
+  Write exactly the assignment the owner gave. When they describe it by rule ("judges on Codex,
+  writers on Claude", "everything on Codex except the plan"), expand the rule to the nodes, show the
+  expanded list, and edit after they confirm. Do not choose providers, models or effort yourself
+  unless the owner asked you to; then say what you based the choice on.
+- **What changes with the provider.** Codex does not support `allowed_tools`, `denied_tools` and
+  `settingSources`: remove them from a node you move to Codex, and put back what the same node has in
+  the kit when you move one to Claude. Keep `mutates_checkout: false` on every node that has it.
+  Tell the owner once, when it applies: Archon cannot restrict a Codex node to reading, so a judge on
+  Codex is not prevented from writing to the checkout; a write is detected and fails the node. Every
+  provider a node uses has to be installed in Archon and signed in. `provider` in
+  `.devkit/config.json` still decides the CLI used when Jev cannot answer and where the skills are
+  installed; it does not have to match the nodes.
+- **Other changes** the owner asks for (a loop limit, an added or removed node, a prompt) are edits
+  to the same files. Keep what the Go side relies on: node ids that `devkit` commands or later nodes
+  read, each node's `output_format`, and the `devkit` command lines.
+- **After any edit**, `archon validate workflows` must report no errors and no warnings, and
+  `archon workflow test` must pass; a fixture that stubs a node you renamed or removed is updated with
+  it. If either fails and you cannot make it pass without departing from what the owner asked, stop
+  and show the failure.
+- **Tell the owner what happens at the next kit update**: `devkit init` compares these files with the
+  kit's and lists each edited one as a difference. Answering No keeps the edits; answering Yes
+  replaces them with the kit's version, so changes they still want have to be made again or merged by
+  hand from the diff. List every file you edited in the report.
 
 ## 4. Reconcile the standards with the repository's conventions
 
@@ -170,7 +232,9 @@ Show everything before writing anything:
 - each disagreement between a standard and a convention, with both texts, where the convention is
   written or seen, your recommendation and the exact edit;
 - the proposed `routing` sentences next to the current ones;
-- the section for the agent instruction file.
+- the section for the agent instruction file;
+- every edit of a workflow file as a diff, and for a node assignment the list of nodes with their
+  provider, model and effort before and after.
 
 Then ask, each with the candidates and your recommendation where there is a choice:
 
@@ -180,7 +244,8 @@ Then ask, each with the candidates and your recommendation where there is a choi
 - the base branch or the language, only when the evidence disagrees;
 - for each standards disagreement: keep, adapt or take the repository's rule.
 
-Do not ask about what the repository already settles. Write only what the owner approved; a standards
+Do not ask about what the repository already settles, or about what the owner already told you.
+Write only what the owner approved; a standards
 edit the owner did not answer stays unwritten and is listed in the report.
 
 ## 7. Prove it in a fresh worktree
@@ -189,6 +254,8 @@ The workflows run in worktrees, so a setting that works in this checkout proves 
 
 ```sh
 devkit config && devkit concerns check && archon validate workflows
+archon workflow test          # when the workflows changed: the fixtures still pass
+devkit doctor                 # what the environment still lacks
 git worktree add --detach "$(mktemp -d)/devkit-optimize" HEAD
 ```
 
@@ -201,8 +268,8 @@ or report what the repository lacks, and run it again.
 
 ## 8. Report and hand over
 
-Report what you changed and why, what you ran with its result, what you could not verify, and what
-you recommend but did not change (wrapper scripts for environment failures, standards disagreements
+Report the owner's instructions and what you did about each, what you changed and why, what you ran
+with its result, what you could not verify, and what you recommend but did not change (wrapper scripts for environment failures, standards disagreements
 left open, instructions that contradict the workflows).
 
 The changes take effect for runs started after they are on the base branch: the kit treats its own

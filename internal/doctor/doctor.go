@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -113,8 +114,10 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 	version, archon := command(env, limit, "archon", "--version")
 	version = strings.Join(strings.Fields(version), " ")
 	finding("required", "archon", archon, version, "Workflows cannot run; install Archon from https://archon.diy and run archon provider add "+settings.Provider+".")
-	providerOK, providerDetail := providerInstalled(env, providerLimit, settings.Provider)
-	finding("required", "Archon provider "+settings.Provider, providerOK, providerDetail, "Provider is not installed; run archon provider add "+settings.Provider+", then archon doctor.")
+	for _, provider := range usedProviders(env.Cwd, settings.Provider) {
+		providerOK, providerDetail := providerInstalled(env, providerLimit, provider)
+		finding("required", "Archon provider "+provider, providerOK, providerDetail, "Provider is not installed; run archon provider add "+provider+", then archon doctor.")
+	}
 	_, devkit := exec.LookPath("devkit")
 	finding("required", "devkit on PATH", devkit == nil, "workflows can invoke devkit", "Workflow bash nodes cannot run; install devkit with scripts/install.sh and add its bin directory to PATH.")
 	for _, session := range settings.Sessions {
@@ -135,6 +138,25 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 	finding("optional", "TYPESAFE_API_KEY", key, "set; TypeSafe receives changed-file diffs for routing and new decisions plus their citing documents for reflection", "Not set; the configured provider CLI performs routing and reflection. Set TYPESAFE_API_KEY to use TypeSafe (diffs, new decisions and citing documents are sent).")
 	finding("optional", "checks", len(settings.Checks) > 0, fmt.Sprintf("%d configured; command availability is checked when they run", len(settings.Checks)), "No verification runs; run the "+settings.Skills["devkit-optimize"]+" skill to configure repository checks.")
 	return valid
+}
+
+func usedProviders(root, configured string) []string {
+	providers := []string{configured}
+	files, _ := filepath.Glob(filepath.Join(root, ".archon/workflows/dev/*/*.yaml"))
+	for _, file := range files {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			continue
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			name, ok := strings.CutPrefix(strings.TrimSpace(line), "provider:")
+			name = strings.TrimSpace(name)
+			if ok && name != "" && !slices.Contains(providers, name) {
+				providers = append(providers, name)
+			}
+		}
+	}
+	return providers
 }
 
 func providerInstalled(env cli.Env, limit time.Duration, provider string) (bool, string) {
