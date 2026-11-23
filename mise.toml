@@ -1,2 +1,6 @@
 [tools]
-node = "26.13.0"
+go = "1.27.4"
+
+[env]
+GOCACHE = "{{config_root}}/.local/go/cache"
+GOMODCACHE = "{{config_root}}/.local/go/mod"

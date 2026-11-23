@@ -1,0 +1,4 @@
+exec-code: true
+fixture: {"expect": "completed", "reached": ["start", "prepare", "write", "check", "judge", "round", "finish", "result"]}
+write: {"draft": "/tmp/retro/draft.json"}
+judge: {"criteria": [{"aspect": "traceability", "verdict": "pass", "checked": "Compared the proposal and its entries", "not_checked": ""}, {"aspect": "evidence", "verdict": "pass", "checked": "Compared the proposal and its entries", "not_checked": ""}, {"aspect": "mechanism", "verdict": "pass", "checked": "Compared the proposal and its entries", "not_checked": ""}], "findings": []}

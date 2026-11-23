@@ -1,0 +1,54 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deferred", "carried", "mechanical", "accepted_objections"],
+  "properties": {
+    "deferred": {"$ref": "#/$defs/entries"},
+    "carried": {"$ref": "#/$defs/entries"},
+    "mechanical": {"$ref": "#/$defs/entries"},
+    "accepted_objections": {"$ref": "#/$defs/entries"}
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["finding", "source"],
+        "properties": {
+          "finding": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "text"],
+            "properties": {
+              "id": {"$ref": "#/$defs/text"},
+              "judge": {"$ref": "#/$defs/text"},
+              "text": {"$ref": "#/$defs/text"},
+              "evidence": {"type": "string"},
+              "blocking": {"type": "boolean"},
+              "needs_decision": {"type": "boolean"},
+              "deferred": {"type": "boolean"},
+              "mechanical": {"type": "boolean"},
+              "resolved": {"type": "boolean"}
+            }
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["run_id", "judgment", "judge", "kind", "target"],
+            "properties": {
+              "run_id": {"$ref": "#/$defs/text"},
+              "judgment": {"type": "integer", "minimum": 1},
+              "judge": {"$ref": "#/$defs/text"},
+              "kind": {"$ref": "#/$defs/text"},
+              "target": {"type": "object"},
+              "phase": {"type": "string"},
+              "round": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    }
+  }
+}

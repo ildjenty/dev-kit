@@ -1,0 +1,53 @@
+{
+  "decisions": [
+    {
+      "id": "D1",
+      "what": "Update the existing fixture file",
+      "chosen": "Keep the existing location",
+      "candidates": [
+        "Keep",
+        "Move"
+      ],
+      "principles": [
+        "Keep the existing boundary"
+      ],
+      "evidence": [
+        {
+          "source": "author",
+          "text": "fixture.txt exists"
+        }
+      ],
+      "decided_by": "principle",
+      "when": "now",
+      "decide_when": "",
+      "quality": "structure",
+      "touches": [
+        "fixture.txt"
+      ],
+      "nature": {
+        "kind": "unknown",
+        "reasons_for_change": "unknown",
+        "volatility": "unknown",
+        "callers": "unknown"
+      }
+    }
+  ],
+  "increments": [
+    {
+      "id": "U1",
+      "summary": "Update fixture result",
+      "criteria": [
+        "C1"
+      ]
+    }
+  ],
+  "tests": [
+    {
+      "criterion": "C1",
+      "method": "test",
+      "file": "fixture.txt",
+      "name": "fixture result"
+    }
+  ],
+  "kept_behaviors": []
+}

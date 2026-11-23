@@ -1,0 +1,5 @@
+exec-code: true
+fixture:
+  expect: completed
+  reached: [start, rebase, resolve, continue, rebased, checks, finish, result]
+resolve: {resolved: true, contradiction: ''}

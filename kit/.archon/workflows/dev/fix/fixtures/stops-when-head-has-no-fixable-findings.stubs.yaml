@@ -1,0 +1,9 @@
+fixture:
+  expect: completed
+  reached: [prepare, proceed, fix-state, finish, result]
+start: { stopped: false, stage: start, reason: "", details: "", remaining: [], start: next, counted: false, restarts: 0 }
+prepare: { ready: false, reason: "No fixable findings are bound to HEAD", findings: 0, rounds: 0, limit_reached: false, limit: 3 }
+proceed: { proceed: false }
+fix-state: { judge_back: false }
+finish: '{"outcome":"stop"}'
+result: '{"outcome":"stop"}'

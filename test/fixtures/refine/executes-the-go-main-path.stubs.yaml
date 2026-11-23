@@ -1,0 +1,82 @@
+{
+  "exec-code": true,
+  "fixture": {
+    "expect": "completed",
+    "reached": [
+      "start",
+      "prepare",
+      "write-decide",
+      "check-decide",
+      "judge-decide",
+      "round-decide",
+      "decided",
+      "write-document",
+      "check-document",
+      "judge-document",
+      "round-document",
+      "finish",
+      "result"
+    ],
+    "inputs": {
+      "owner_words": "Update fixture.txt"
+    }
+  },
+  "write-decide": {
+    "draft": "/tmp/refine/draft.json"
+  },
+  "write-document": {
+    "draft": "/tmp/refine/draft.json"
+  },
+  "judge-decide": {
+    "criteria": [
+      {
+        "aspect": "coverage",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      },
+      {
+        "aspect": "additions",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      },
+      {
+        "aspect": "open_points",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      },
+      {
+        "aspect": "consistency",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      },
+      {
+        "aspect": "sufficiency",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      }
+    ],
+    "findings": []
+  },
+  "judge-document": {
+    "criteria": [
+      {
+        "aspect": "reflection",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      },
+      {
+        "aspect": "wording",
+        "verdict": "pass",
+        "checked": "Compared the input and draft",
+        "not_checked": ""
+      }
+    ],
+    "findings": []
+  }
+}

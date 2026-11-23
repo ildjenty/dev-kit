@@ -1,0 +1,33 @@
+{
+  "summary": "Update fixture result",
+  "decisions": [
+    {
+      "key": "N1",
+      "title": "Keep fixture result",
+      "body": "Compare keeping the existing file with moving it. Keep the simplest existing location.",
+      "decided_by": "owner",
+      "depends_on": [],
+      "supersedes": [],
+      "source": "owner_words"
+    }
+  ],
+  "rebased": [],
+  "kept_docs": [],
+  "units": [
+    {
+      "key": "UN1",
+      "title": "Update fixture result",
+      "goal": "Update fixture.txt",
+      "completion_conditions": [
+        "fixture.txt contains fixture result"
+      ],
+      "decisions": [
+        "N1"
+      ],
+      "depends_on": []
+    }
+  ],
+  "open_points": [],
+  "topics": [],
+  "kept_units": []
+}

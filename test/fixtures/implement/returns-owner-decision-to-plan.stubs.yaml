@@ -1,0 +1,6 @@
+exec-code: true
+fixture:
+  expect: completed
+  reached: ["start", "prepare", "unit", "tests-written", "checks", "unit-end", "units-state", "finish", "result"]
+tests: { tests: ["a.test.ts: does it"] }
+code: { owner_decisions: [{row: D9, question: "Choose the audience for the new entry point"}], uncertain: [], commit_message: "feat: allow cancellation" }

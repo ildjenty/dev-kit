@@ -1,0 +1,189 @@
+name: implement
+description: |
+  The implement part. Input: the latest passed requirements and plan, both
+  from the record of the branch; the answers of the owner when the session passes them (input `answers`).
+  Makes the plan's increments one by one in order: for each unit a fresh session first writes the tests of its completion conditions, then another writes
+  the code, and the checks the change needs run. A unit whose checks pass is committed with the run, the unit and the
+  versions it was made from as trailers, so a later run on the same versions goes on from the next unit. The loop
+  runs at most 5 times over all the units.
+  Decisions the implementation made or settled (rows decided later) go into a new version of the plan's decision
+  list; a decision the owner has to make is not implemented: the run returns back to plan with the pending owner row. When the same check
+  fails twice, a fresh judge names the premise that broke and where to go back.
+  Ends with pass, back or stop, written to the record by devkit record result. Output: the result as recorded, or the
+  start's output when the start conditions did not hold.
+worktree:
+  enabled: true
+inputs:
+  answers:
+    default: ""
+    description: The owner's answers as a JSON array of {question_id, answer}, or empty.
+  continue:
+    default: ""
+    description: The owner's words, as written, that let the branch start past the limit of restarts (devkit record limit), or empty. Only a start that reaches the limit takes them; any other start stops when they are passed.
+returns: result
+nodes:
+  - id: start
+    bash: devkit record start implement
+    output_format:
+      type: object
+      properties:
+        stopped: { type: boolean }
+        stage: { type: string }
+        reason: { type: string }
+        details: { type: string }
+        remaining: { type: array, items: { type: string } }
+        start: { type: string }
+        counted: { type: boolean }
+        restarts: { type: integer }
+      required: [stopped, stage, reason, details, remaining, start, counted, restarts]
+
+  - id: start-stopped
+    depends_on: [start]
+    when: "$start.output.stopped == true"
+    bash: |
+      value=$start.output
+      printf '%s' "$value"
+
+  - id: prepare
+    depends_on: [start]
+    when: "$start.output.stopped == false"
+    bash: devkit implement prepare
+    output_format:
+      type: object
+      properties:
+        units: { type: integer }
+        remaining: { type: integer }
+        has_plan: { type: boolean }
+      required: [units, remaining, has_plan]
+
+  - id: units
+    depends_on: [prepare]
+    when: "$prepare.output.remaining > 0"
+    loop_group:
+      max_iterations: 5
+      on_exhausted: complete
+      nodes:
+        - id: unit
+          bash: devkit implement next
+          output_format:
+            type: object
+            properties:
+              unit: { type: string }
+              tests_written: { type: boolean }
+              round: { type: integer }
+            required: [unit, tests_written, round]
+        - id: tests
+          depends_on: [unit]
+          when: "$unit.output.tests_written == false"
+          provider: claude
+          command: tests
+          context: fresh
+          output_format:
+            type: object
+            properties:
+              tests: { type: array, items: { type: string } }
+            required: [tests]
+        - id: tests-written
+          depends_on: [tests]
+          bash: devkit implement tests-written
+          output_format:
+            type: object
+            properties:
+              unit: { type: string }
+            required: [unit]
+        - id: code
+          depends_on: [unit, tests-written]
+          trigger_rule: none_failed_min_one_success
+          provider: claude
+          command: implement
+          context: fresh
+          output_format: &code
+            type: object
+            additionalProperties: false
+            properties:
+              owner_decisions:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    row: { type: string }
+                    question: { type: string }
+                  required: [row, question]
+              uncertain: { type: array, items: { type: string } }
+              commit_message: { type: string }
+            required: [owner_decisions, uncertain, commit_message]
+        - id: checks
+          depends_on: [code]
+          bash: devkit checks
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              passed: { type: boolean }
+              stuck: { type: boolean }
+              failing: { type: array, items: { type: string } }
+              stuck_checks: { type: array, items: { type: string } }
+              skipped: { type: array, items: { type: string } }
+              results: { type: string }
+            required: [round, passed, stuck, failing, stuck_checks, skipped, results]
+        - id: unit-end
+          depends_on: [checks]
+          bash: |
+            gate=$checks.output
+            code=$code.output
+            GATE="$gate" CODE="$code" devkit implement end
+          output_format:
+            type: object
+            properties:
+              unit: { type: string }
+              committed: { type: boolean }
+              all_done: { type: boolean }
+              finished: { type: boolean }
+              needs_owner: { type: integer }
+              stuck: { type: boolean }
+              decision_errors: { type: integer }
+            required: [unit, committed, all_done, finished, needs_owner, stuck, decision_errors]
+      until_bash: 'f=$unit-end.output.finished; test "$f" = true'
+
+  - id: units-state
+    depends_on: [prepare, units]
+    trigger_rule: none_failed_min_one_success
+    bash: devkit implement state
+    output_format:
+      type: object
+      properties:
+        stuck: { type: boolean }
+      required: [stuck]
+
+  - id: step-back
+    depends_on: [units-state]
+    when: "$units-state.output.stuck == true"
+    provider: claude
+    command: step-back
+    context: fresh
+    mutates_checkout: false
+    denied_tools: [Edit, Write, NotebookEdit]
+    output_format:
+      type: object
+      additionalProperties: false
+      properties:
+        next: { type: string, enum: [requirements, plan, implement, environment] }
+        premise: { type: string }
+        observation: { type: string }
+      required: [next, premise, observation]
+
+  - id: finish
+    depends_on: [units-state, step-back]
+    trigger_rule: none_failed_min_one_success
+    bash: |
+      back=$step-back.output
+      STEP_BACK="$back" devkit implement finish
+
+  - id: result
+    depends_on: [finish, start-stopped]
+    trigger_rule: one_success
+    bash: |
+      finish=$finish.output
+      stopped=$start-stopped.output
+      printf '%s' "$finish$stopped"

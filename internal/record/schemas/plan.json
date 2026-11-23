@@ -1,0 +1,383 @@
+{
+  "$id": "plan.json",
+  "description": "A plan version: decisions, skeleton commit, release increments and verification. requirements_version identifies the requirements used.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "check": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": [
+            "test",
+            "screen_record",
+            "owner_check"
+          ]
+        },
+        "file": {
+          "$ref": "common.json#/$defs/text"
+        },
+        "name": {
+          "$ref": "common.json#/$defs/text"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "if": {
+        "properties": {
+          "method": {
+            "const": "test"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "file",
+          "name"
+        ]
+      }
+    }
+  },
+  "properties": {
+    "version": {
+      "$ref": "common.json#/$defs/version"
+    },
+    "requirements_version": {
+      "$ref": "common.json#/$defs/version"
+    },
+    "run_id": {
+      "$ref": "common.json#/$defs/run_id"
+    },
+    "recorded_at": {
+      "$ref": "common.json#/$defs/at"
+    },
+    "skeleton_commit": {
+      "$ref": "common.json#/$defs/sha"
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "what": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "chosen": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "candidates": {
+            "$ref": "common.json#/$defs/texts"
+          },
+          "principles": {
+            "$ref": "common.json#/$defs/texts"
+          },
+          "evidence": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "machine",
+                    "author"
+                  ]
+                },
+                "text": {
+                  "$ref": "common.json#/$defs/text"
+                }
+              },
+              "required": [
+                "source",
+                "text"
+              ]
+            }
+          },
+          "decided_by": {
+            "type": "string",
+            "enum": [
+              "machine_rule",
+              "principle",
+              "provisional",
+              "owner"
+            ]
+          },
+          "when": {
+            "type": "string",
+            "enum": [
+              "now",
+              "later"
+            ]
+          },
+          "decide_when": {
+            "type": "string"
+          },
+          "quality": {
+            "type": "string",
+            "enum": []
+          },
+          "touches": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "common.json#/$defs/text"
+            }
+          },
+          "ref": {
+            "type": "string",
+            "pattern": "^D-[0-9a-f]{6,64}$"
+          },
+          "nature": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "oneOf": [
+                  {
+                    "const": "unknown"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "value": {
+                        "$ref": "common.json#/$defs/text"
+                      },
+                      "evidence": {
+                        "$ref": "common.json#/$defs/text"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "evidence"
+                    ]
+                  }
+                ]
+              },
+              "reasons_for_change": {
+                "oneOf": [
+                  {
+                    "const": "unknown"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "value": {
+                        "$ref": "common.json#/$defs/text"
+                      },
+                      "evidence": {
+                        "$ref": "common.json#/$defs/text"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "evidence"
+                    ]
+                  }
+                ]
+              },
+              "volatility": {
+                "oneOf": [
+                  {
+                    "const": "unknown"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "value": {
+                        "$ref": "common.json#/$defs/text"
+                      },
+                      "evidence": {
+                        "$ref": "common.json#/$defs/text"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "evidence"
+                    ]
+                  }
+                ]
+              },
+              "callers": {
+                "oneOf": [
+                  {
+                    "const": "unknown"
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "value": {
+                        "$ref": "common.json#/$defs/text"
+                      },
+                      "evidence": {
+                        "$ref": "common.json#/$defs/text"
+                      }
+                    },
+                    "required": [
+                      "value",
+                      "evidence"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "reasons_for_change",
+              "volatility",
+              "callers"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "what",
+          "chosen",
+          "candidates",
+          "principles",
+          "evidence",
+          "decided_by",
+          "when",
+          "decide_when",
+          "quality",
+          "touches"
+        ],
+        "if": {
+          "properties": {
+            "when": {
+              "const": "later"
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "decide_when": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "quality": {
+                  "const": "structure"
+                }
+              },
+              "not": {
+                "required": [
+                  "ref"
+                ]
+              }
+            },
+            "then": {
+              "required": [
+                "nature"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "increments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "summary": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "criteria": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "common.json#/$defs/text"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "summary",
+          "criteria"
+        ]
+      }
+    },
+    "tests": {
+      "description": "Verification for each completion condition.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/$defs/check"
+          }
+        ],
+        "properties": {
+          "criterion": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "method": true,
+          "file": true,
+          "name": true
+        },
+        "additionalProperties": false,
+        "required": [
+          "criterion"
+        ]
+      }
+    },
+    "kept_behaviors": {
+      "description": "Existing behavior to preserve when changing code, and how to verify it.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "#/$defs/check"
+          }
+        ],
+        "properties": {
+          "behavior": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "method": true,
+          "file": true,
+          "name": true
+        },
+        "additionalProperties": false,
+        "required": [
+          "behavior"
+        ]
+      }
+    },
+    "derived_from": {
+      "$ref": "common.json#/$defs/version"
+    }
+  },
+  "required": [
+    "version",
+    "requirements_version",
+    "run_id",
+    "recorded_at",
+    "skeleton_commit",
+    "decisions",
+    "increments",
+    "tests",
+    "kept_behaviors"
+  ]
+}

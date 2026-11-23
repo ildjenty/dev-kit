@@ -1,0 +1,13 @@
+exec-code: true
+fixture:
+  expect: completed
+  reached: ["start", "prepare", "write", "judge", "round", "finish", "result"]
+  inputs: {unit: U-abcdef}
+write:
+  goal: Filter the shop list by name
+  completion_conditions: [{ id: C1, text: Entering part of a name shows only shops whose names contain it }]
+  constraints: ["D-abcdef: Keep the fixture result"]
+  open_points: []
+judge:
+  criteria: [{ aspect: coverage, verdict: pass, checked: Requests and requirements, not_checked: "" }, { aspect: additions, verdict: pass, checked: Sources, not_checked: "" }, { aspect: open_points, verdict: pass, checked: Open points, not_checked: "" }, { aspect: decidable, verdict: pass, checked: Conditions, not_checked: "" }]
+  findings: []

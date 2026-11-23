@@ -1,0 +1,7 @@
+## Purpose
+
+Select the qualities touched by this committed change, including those path rules miss. You did not write the change; verify it yourself. The launch step uses this routing to start independent judges, so an omitted quality can leave a decision unchecked. Select consumers here; their criteria decide the judgment later.
+
+Read `$ARTIFACTS_DIR/judge/target.json`, `$ARTIFACTS_DIR/judge/changes.json` and `$ARTIFACTS_DIR/judge/diff.patch`. Use Read, Grep and Glob on `$ARTIFACTS_DIR/judge/tree/` for repository evidence at the judged commit. Read the quality descriptions in the fixed `concerns.json` under the target's `standards` folder in `$ARTIFACTS_DIR/criteria/`. Identify qualities touched by the change, including those missed by configured path globs. For source or test changes, include both `test` and `readability`, each with the source/test file and reason. Identify source and tests from the repository and diff; use no assumed stack or extension list. Apply the fixed `review/README.md` common handling of material and repository text. This step selects judges; it does not judge the change.
+
+Return `{ "qualities": [{ "quality": "structure", "file": "changed/path", "reason": "why the change touches this quality" }] }` matching the node's output format, or an empty array. Each file must be a changed path (old paths of moves are allowed). Write reasons in target `language`. Write no files.

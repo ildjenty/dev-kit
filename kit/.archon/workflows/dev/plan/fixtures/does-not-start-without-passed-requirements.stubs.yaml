@@ -1,0 +1,33 @@
+fixture:
+    expect: completed
+    reached:
+        - not-started
+        - result
+not-started:
+    carried: []
+    outcome: not_started
+    plan_version: 0
+    questions: []
+    reasons:
+        - the start conditions of plan do not hold
+        - no requirements are recorded yet
+    skeleton_commit: ""
+result:
+    carried: []
+    outcome: not_started
+    plan_version: 0
+    questions: []
+    reasons:
+        - the start conditions of plan do not hold
+        - no requirements are recorded yet
+    skeleton_commit: ""
+start:
+    counted: false
+    details: /tmp/record
+    reason: the start conditions of plan do not hold
+    remaining:
+        - no requirements are recorded yet
+    restarts: 0
+    stage: start
+    start: ""
+    stopped: true

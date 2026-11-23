@@ -1,0 +1,98 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "criteria": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "traceability",
+              "evidence",
+              "mechanism"
+            ]
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "not_assessed"
+            ]
+          },
+          "checked": {
+            "type": "string"
+          },
+          "not_checked": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "aspect",
+          "verdict",
+          "checked",
+          "not_checked"
+        ]
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "aspect": {
+            "type": "string",
+            "enum": [
+              "traceability",
+              "evidence",
+              "mechanism"
+            ]
+          },
+          "item": {
+            "type": "string",
+            "minLength": 1
+          },
+          "blocking": {
+            "type": "boolean"
+          },
+          "needs_decision": {
+            "type": "boolean"
+          },
+          "failure_scenario": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fix": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mechanical": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "aspect",
+          "item",
+          "blocking",
+          "needs_decision",
+          "failure_scenario",
+          "evidence",
+          "fix"
+        ]
+      }
+    }
+  },
+  "required": [
+    "criteria",
+    "findings"
+  ]
+}

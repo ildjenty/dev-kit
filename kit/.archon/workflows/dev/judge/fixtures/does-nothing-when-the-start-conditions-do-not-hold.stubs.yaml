@@ -1,0 +1,12 @@
+fixture:
+    expect: completed
+start:
+    counted: false
+    details: /tmp/record
+    reason: the start conditions of judge do not hold, so it did not start
+    remaining:
+        - Q1 (asked by judge, run r0) has no answer
+    restarts: 0
+    stage: start
+    start: ""
+    stopped: true

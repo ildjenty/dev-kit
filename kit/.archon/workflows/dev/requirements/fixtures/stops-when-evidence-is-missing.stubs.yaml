@@ -1,0 +1,18 @@
+fixture:
+  expect: completed
+  reached: [prepare, write, judge, round, finish, result]
+  inputs:
+    owner_words: Filter the shop list by name
+start: { stopped: false, stage: start, reason: "", details: /tmp/record, remaining: [], start: first, counted: false, restarts: 0 }
+prepare: { input: /tmp/requirements/input.json, criteria: /tmp/criteria }
+write:
+  goal: Filter the shop list by name
+  completion_conditions: [{ id: C1, text: Entering part of a name shows only shops whose names contain it }]
+  constraints: []
+  open_points: []
+judge:
+  criteria: [{ aspect: coverage, verdict: not_assessed, checked: "", not_checked: Required issue text is missing }]
+  findings: []
+round: { round: 3, valid: true, blocking_count: 0, not_assessed_count: 1 }
+finish: { outcome: stop, requirements_version: 1, questions: [], reasons: ["coverage was not assessed: Required issue text is missing"] }
+result: { outcome: stop, requirements_version: 1, questions: [], reasons: ["coverage was not assessed: Required issue text is missing"] }

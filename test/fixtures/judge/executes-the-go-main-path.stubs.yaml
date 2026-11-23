@@ -1,0 +1,33 @@
+exec-code: true
+fixture:
+    expect: completed
+    reached:
+        - start
+        - prepare
+        - changes
+        - route
+        - launch
+        - checks
+        - completion
+        - collect
+        - finish
+judge-scope:
+    criteria:
+        - aspect: scope
+          checked: no comment added
+          not_checked: ""
+          verdict: pass
+        - aspect: decisions
+          checked: the body follows D1
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-structure:
+    criteria:
+        - aspect: structure
+          checked: Existing fixture boundary
+          not_checked: ""
+          verdict: pass
+    findings: []
+route:
+    qualities: []

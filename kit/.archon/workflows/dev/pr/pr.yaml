@@ -1,0 +1,332 @@
+---
+name: pr
+description: Verify that passing judgments reach HEAD, record explicit allow or deny
+  answers, ask about ask-changes not covered by owner rows' touches, assemble and judge the PR body
+  for at most three rounds, then push and open or update the pull request with gh.
+  Never merge.
+worktree:
+  enabled: true
+inputs:
+  answers:
+    default: ''
+    description: The owner's answers to earlier questions, a JSON array of {question_id,
+      answer} with the owner's words as they are, or empty.
+  continue:
+    default: ''
+    description: The owner's words, as written, that let the branch start past the
+      limit of restarts (devkit record limit), or empty. Only a start that reaches the
+      limit takes them; any other start stops when they are passed.
+returns: result
+nodes:
+- id: start
+  bash: devkit record start pr
+  output_format: &1
+    type: object
+    properties:
+      stopped:
+        type: boolean
+      stage:
+        type: string
+      reason:
+        type: string
+      details:
+        type: string
+      remaining:
+        type: array
+        items:
+          type: string
+      start:
+        type: string
+      counted:
+        type: boolean
+      restarts:
+        type: integer
+    required:
+    - stopped
+    - stage
+    - reason
+    - details
+    - remaining
+    - start
+    - counted
+    - restarts
+- id: not-started
+  depends_on:
+  - start
+  when: "$start.output.stopped == true"
+  bash: |
+    value=$start.output
+    printf '%s' "$value"
+  output_format: *1
+- id: allow
+  depends_on:
+  - start
+  bash: devkit pr answers
+  output_format:
+    type: object
+    properties:
+      allowed_count:
+        type: integer
+      denied_count:
+        type: integer
+      denied:
+        type: array
+        items:
+          type: string
+    required:
+    - allowed_count
+    - denied_count
+    - denied
+  when: "$start.output.stopped == false"
+- id: facts
+  depends_on:
+  - allow
+  when: "$allow.output.denied_count == 0"
+  bash: devkit pr facts
+  timeout: 600000
+  output_format:
+    type: object
+    properties:
+      ready:
+        type: boolean
+      outcome:
+        type: string
+        enum:
+        - ready
+        - question
+        - stop
+      reasons:
+        type: array
+        items:
+          type: string
+      question_count:
+        type: integer
+      head:
+        type: string
+    required:
+    - ready
+    - outcome
+    - reasons
+    - question_count
+    - head
+- id: questions
+  depends_on:
+  - facts
+  when: "$facts.output.outcome == 'question'"
+  provider: claude
+  command: questions
+  context: fresh
+  allowed_tools:
+  - Read
+  mutates_checkout: false
+  output_format:
+    type: object
+    properties:
+      questions:
+        type: array
+        items:
+          type: object
+          properties:
+            index:
+              type: integer
+            text: &2
+              type: string
+          required:
+          - index
+          - text
+    required:
+    - questions
+- id: body
+  depends_on:
+  - facts
+  when: "$facts.output.ready == true"
+  loop_group:
+    max_iterations: 3
+    on_exhausted: complete
+    nodes:
+    - id: body-write
+      provider: claude
+      command: write
+      allowed_tools:
+      - Read
+      - Grep
+      - Glob
+      mutates_checkout: false
+      output_format:
+        type: object
+        additionalProperties: false
+        properties:
+          title:
+            type: string
+          opening:
+            type: string
+          how_to_see:
+            type: string
+          after_merge:
+            type: string
+          headings:
+            type: object
+            properties:
+              what_changed: *2
+              how_checked: *2
+              what_remains: *2
+              decisions: *2
+              after_merge: *2
+            required:
+            - what_changed
+            - how_checked
+            - what_remains
+            - decisions
+            - after_merge
+        required:
+        - title
+        - opening
+        - how_to_see
+        - after_merge
+        - headings
+      context: fresh
+    - id: body-assemble
+      depends_on:
+      - body-write
+      bash: |
+        text=$body-write.output
+        INPUTS_TEXT="$text" devkit pr assemble
+      output_format:
+        type: object
+        properties:
+          path:
+            type: string
+        required:
+        - path
+    - id: body-judge
+      depends_on:
+      - body-assemble
+      provider: claude
+      command: judge
+      context: fresh
+      allowed_tools:
+      - Read
+      - Grep
+      - Glob
+      mutates_checkout: false
+      output_format:
+        type: object
+        additionalProperties: false
+        properties:
+          verdict:
+            type: string
+            enum:
+            - pass
+            - fail
+            - not_assessed
+          findings:
+            type: array
+            items:
+              type: object
+              additionalProperties: false
+              properties:
+                id:
+                  type: string
+                blocking:
+                  type: boolean
+                needs_decision:
+                  type: boolean
+                text:
+                  type: string
+                evidence:
+                  type: string
+              required:
+              - id
+              - blocking
+              - needs_decision
+              - text
+              - evidence
+          observations:
+            type: array
+            items:
+              type: string
+        required:
+        - verdict
+        - findings
+        - observations
+    - id: body-record
+      depends_on:
+      - body-judge
+      bash: |
+        judgment=$body-judge.output
+        INPUTS_JUDGMENT="$judgment" devkit pr judgment
+      output_format: &3
+        type: object
+        properties:
+          passed:
+            type: boolean
+          round:
+            type: integer
+        required:
+        - passed
+        - round
+    until_bash: p=$body-record.output.passed; test "$p" = true
+- id: report-state
+  depends_on:
+  - body
+  bash: devkit pr state
+  output_format: *3
+- id: open
+  depends_on:
+  - report-state
+  when: "$report-state.output.passed == true"
+  bash: devkit pr open
+  timeout: 600000
+  output_format:
+    type: object
+    properties:
+      url:
+        type: string
+      branch:
+        type: string
+      commit:
+        type: string
+    required:
+    - url
+    - branch
+    - commit
+- id: finish
+  depends_on:
+  - allow
+  - facts
+  - report-state
+  - open
+  - questions
+  trigger_rule: none_failed_min_one_success
+  bash: |
+    questions=$questions.output
+    INPUTS_QUESTIONS="$questions" devkit pr finish
+  output_format:
+    type: object
+    properties:
+      outcome:
+        type: string
+        enum:
+        - pass
+        - question
+        - stop
+      questions:
+        type: array
+      stop: {}
+      commit:
+        type: string
+    required:
+    - outcome
+    - questions
+    - stop
+    - commit
+- id: result
+  depends_on:
+  - not-started
+  - finish
+  trigger_rule: one_success
+  bash: |
+    started=$not-started.output
+    finished=$finish.output
+    opened=$open.output
+    devkit pr output "$started" "$finished" "$opened"

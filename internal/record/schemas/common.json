@@ -1,0 +1,73 @@
+{
+  "$id": "common.json",
+  "$defs": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    },
+    "texts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workflow": {
+      "type": "string",
+      "enum": [
+        "refine",
+        "requirements",
+        "plan",
+        "implement",
+        "judge",
+        "fix",
+        "pr",
+        "sync",
+        "retro"
+      ]
+    },
+    "run_id": {
+      "$ref": "#/$defs/text"
+    },
+    "at": {
+      "$ref": "#/$defs/text"
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requirements_version": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/version"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "plan_version": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/version"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "requirements_version",
+        "plan_version"
+      ]
+    }
+  }
+}

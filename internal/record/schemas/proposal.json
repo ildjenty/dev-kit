@@ -1,0 +1,14 @@
+{
+  "$id": "proposal.json",
+  "description": "A version of a refine or retro proposal. Content is owned and validated by its workflow. Request counts the requests read to produce this proposal.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "$ref": "common.json#/$defs/version" },
+    "request": { "$ref": "common.json#/$defs/version" },
+    "run_id": { "$ref": "common.json#/$defs/run_id" },
+    "recorded_at": { "$ref": "common.json#/$defs/at" },
+    "content": { "type": "object" }
+  },
+  "required": ["version", "request", "run_id", "recorded_at", "content"]
+}

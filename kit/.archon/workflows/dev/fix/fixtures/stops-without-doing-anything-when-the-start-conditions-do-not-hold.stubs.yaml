@@ -1,0 +1,6 @@
+fixture:
+  expect: completed
+  reached: [start-stopped, result]
+start: { stopped: true, stage: start, reason: "the start conditions of fix do not hold, so it did not start", details: /state, remaining: ["Q2 (asked by judge, run r3) has no answer"], start: other, counted: false, restarts: 0 }
+start-stopped: '{"stopped":true}'
+result: '{"stopped":true}'

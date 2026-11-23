@@ -1,0 +1,343 @@
+{
+  "$id": "result.json",
+  "description": "One result per run. Inputs are the latest requirements and plan versions at recording time, base is the base branch merge base and commit is HEAD.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "proposal_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "decision_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^D-[0-9a-f]{6,64}$"
+      }
+    },
+    "unit_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^U-[0-9a-f]{6,64}$"
+      }
+    },
+    "affected": {
+      "type": "object",
+      "properties": {
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "units": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "decisions",
+        "documents",
+        "units"
+      ],
+      "additionalProperties": false
+    },
+    "run_id": {
+      "$ref": "common.json#/$defs/run_id"
+    },
+    "workflow": {
+      "$ref": "common.json#/$defs/workflow"
+    },
+    "recorded_at": {
+      "$ref": "common.json#/$defs/at"
+    },
+    "outcome": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "carry",
+        "question",
+        "back",
+        "stop"
+      ]
+    },
+    "inputs": {
+      "$ref": "common.json#/$defs/versions"
+    },
+    "base": {
+      "$ref": "common.json#/$defs/sha"
+    },
+    "commit": {
+      "$ref": "common.json#/$defs/sha"
+    },
+    "criteria_commit": {
+      "$ref": "common.json#/$defs/sha"
+    },
+    "loops": {
+      "description": "How each loop ended.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "ended": {
+            "type": "string",
+            "enum": [
+              "cleared",
+              "stuck",
+              "max_iterations"
+            ]
+          },
+          "rounds": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "name",
+          "ended",
+          "rounds"
+        ]
+      }
+    },
+    "carried": {
+      "description": "Findings carried forward.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "judge": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "text": {
+            "$ref": "common.json#/$defs/text"
+          }
+        },
+        "required": [
+          "id",
+          "judge",
+          "text"
+        ]
+      }
+    },
+    "questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "allOf": [
+          {
+            "$ref": "question.json#/$defs/asked"
+          }
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^Q[1-9][0-9]*$"
+          },
+          "text": true,
+          "target": true,
+          "next_workflows": true,
+          "invalidates": true
+        },
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ]
+      }
+    },
+    "back": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "to": {
+          "$ref": "common.json#/$defs/workflow"
+        },
+        "premise": {
+          "$ref": "common.json#/$defs/text"
+        },
+        "observation": {
+          "$ref": "common.json#/$defs/text"
+        },
+        "pending_owner_rows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "$ref": "common.json#/$defs/text"
+              },
+              "what": {
+                "$ref": "common.json#/$defs/text"
+              },
+              "decided_by": {
+                "const": "owner"
+              }
+            },
+            "required": [
+              "id",
+              "what",
+              "decided_by"
+            ]
+          }
+        }
+      },
+      "required": [
+        "to",
+        "premise",
+        "observation"
+      ]
+    },
+    "stop": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": {
+          "$ref": "common.json#/$defs/text"
+        },
+        "unresolved": {
+          "$ref": "common.json#/$defs/texts"
+        },
+        "premise": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "unresolved",
+        "premise"
+      ]
+    }
+  },
+  "required": [
+    "run_id",
+    "workflow",
+    "recorded_at",
+    "outcome",
+    "inputs",
+    "base",
+    "commit",
+    "criteria_commit",
+    "loops"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "carry"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "carried"
+        ],
+        "properties": {
+          "workflow": {
+            "const": "plan"
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "carried"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "question"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "questions"
+        ],
+        "properties": {
+          "workflow": {
+            "enum": [
+              "refine",
+              "requirements",
+              "plan",
+              "pr",
+              "retro"
+            ]
+          }
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "questions"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "back"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "back"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "back"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "stop"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "stop"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "stop"
+          ]
+        }
+      }
+    }
+  ]
+}

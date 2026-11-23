@@ -1,0 +1,20 @@
+fixture:
+  expect: completed
+  reached: [round, finish, result]
+  inputs:
+    owner_words: Filter the shop list by name
+start: { stopped: false, stage: start, reason: "", details: /tmp/record, remaining: [], start: first, counted: false, restarts: 0 }
+prepare: { input: /tmp/requirements/input.json, criteria: /tmp/criteria }
+write:
+  goal: Filter the shop list by name
+  completion_conditions: [{ id: C1, text: Make it easy to use }]
+  constraints: []
+  open_points: []
+judge:
+  criteria: [{ aspect: decidable, verdict: fail, checked: Completion conditions, not_checked: "" }]
+  findings:
+    - { aspect: decidable, item: "completion_conditions[0]", blocking: true, needs_decision: false, failure_scenario: Completion cannot be determined, evidence: Make it easy to use, fix: State an observable result }
+# The same blocking judgment every round: the loop runs out and finish writes stop.
+round: { round: 3, valid: false, blocking_count: 1, not_assessed_count: 0 }
+finish: { outcome: stop, requirements_version: 0, questions: [], reasons: ["Invalid requirements schema"] }
+result: { outcome: stop, requirements_version: 0, questions: [], reasons: ["Invalid requirements schema"] }

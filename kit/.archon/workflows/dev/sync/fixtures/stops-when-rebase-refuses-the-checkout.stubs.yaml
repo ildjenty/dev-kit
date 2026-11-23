@@ -1,0 +1,51 @@
+---
+fixture:
+  expect: completed
+  reached:
+  - rebase
+  - rebased
+  - finish
+  - result
+start:
+  stopped: false
+  stage: start
+  reason: ''
+  details: "/tmp/record"
+  remaining: []
+  start: next
+  counted: false
+  restarts: 0
+rebase:
+  state: refused
+  previous: p
+  onto: o
+  ref: origin/main
+  rounds: 0
+  contradiction: ''
+  files:
+  - a.ts
+  commit: r
+rebased:
+  state: refused
+  previous: p
+  onto: o
+  ref: origin/main
+  rounds: 0
+  contradiction: main removed f, which the branch calls
+  files:
+  - a.ts
+  commit: p
+finish:
+  outcome: stop
+  needs_judge: false
+  conflict_rounds: 0
+  onto: o
+  previous: p
+  commit: p
+  failing: []
+  stop:
+    state: s
+    unresolved:
+    - x
+    premise: ''
+result: {}

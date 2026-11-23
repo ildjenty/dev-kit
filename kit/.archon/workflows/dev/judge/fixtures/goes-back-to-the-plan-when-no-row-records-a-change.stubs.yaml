@@ -1,0 +1,39 @@
+changes:
+    changes_count: 1
+    launch_contract: true
+    launch_cost: false
+    launch_data: false
+    launch_readability: false
+    launch_scope: true
+    launch_security: false
+    launch_structure: true
+    launch_test: true
+    launch_ui: false
+    proceed: false
+    unlisted_count: 1
+finish:
+    base: b0
+    commit: c1
+    outcome: back
+    run_id: r1
+fixture:
+    expect: completed
+prepare:
+    accepted_objections_count: 0
+    base: b0
+    commit: c1
+    criteria_commit: k0
+    details: []
+    has_plan: true
+    has_requirements: true
+    reason: ""
+    stopped: false
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: next
+    stopped: false

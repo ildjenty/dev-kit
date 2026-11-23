@@ -1,0 +1,239 @@
+{
+  "language": "ja",
+  "standards": ".devkit/standards",
+  "docs": "docs",
+  "decisions": ".devkit/decisions",
+  "units": ".devkit/units",
+  "checks": [],
+  "skeleton_check": [],
+  "qualities": {
+    "structure": {
+      "paths": [
+        "**/package.json",
+        "**/package-lock.json",
+        "**/yarn.lock",
+        "**/bun.lock",
+        "**/bun.lockb",
+        "**/Cargo.toml",
+        "**/Cargo.lock",
+        "**/go.mod",
+        "**/go.sum",
+        "**/pyproject.toml",
+        "**/requirements*.txt",
+        "**/Pipfile",
+        "**/Pipfile.lock",
+        "**/poetry.lock",
+        "**/uv.lock",
+        "**/Gemfile",
+        "**/Gemfile.lock",
+        "**/*.gemspec",
+        "**/composer.json",
+        "**/composer.lock",
+        "**/pom.xml",
+        "**/build.gradle",
+        "**/build.gradle.kts",
+        "**/gradle.lockfile",
+        "**/*.csproj",
+        "**/*.fsproj",
+        "**/packages.lock.json",
+        "**/Package.swift",
+        "**/Package.resolved",
+        ".archon/**",
+        ".devkit/standards/**"
+      ]
+    },
+    "data": {
+      "paths": [
+        "**/migrations/**",
+        "**/migration/**",
+        "**/db/migrate/**",
+        "**/schema/**",
+        "**/schemas/**",
+        "**/*.sql",
+        "**/models/**"
+      ]
+    },
+    "contract": {
+      "paths": [
+        "**/api/**",
+        "**/routes/**",
+        "**/proto/**",
+        "**/*.proto",
+        "**/openapi*",
+        "**/graphql/**",
+        "**/*.graphql"
+      ]
+    },
+    "security": {
+      "paths": [
+        "**/.env.example",
+        "**/.env.*.example",
+        "**/.env.sample",
+        "**/.env.template",
+        ".github/workflows/**",
+        ".gitlab-ci.yml",
+        ".gitlab/ci/**",
+        ".circleci/**",
+        "Jenkinsfile",
+        ".buildkite/**",
+        "azure-pipelines.yml",
+        "**/auth/**",
+        "**/security/**",
+        "**/permissions/**",
+        "**/policies/**"
+      ]
+    },
+    "ui": {
+      "paths": [
+        "**/ui/**",
+        "**/components/**",
+        "**/pages/**",
+        "**/views/**",
+        "**/*.css",
+        "**/*.scss",
+        "**/*.html",
+        "**/*.jsx",
+        "**/*.tsx",
+        "**/*.vue",
+        "**/*.svelte",
+        "**/*.swift"
+      ]
+    },
+    "cost": {
+      "paths": [
+        "infra/**",
+        "infrastructure/**",
+        "deploy/**",
+        "**/Dockerfile",
+        "**/Dockerfile.*",
+        "**/compose*.yaml",
+        "**/compose*.yml",
+        "**/*.tf",
+        "**/*.tf.json",
+        "**/k8s/**",
+        "**/kubernetes/**"
+      ]
+    },
+    "test": {
+      "paths": [
+        "**/test/**",
+        "**/tests/**",
+        "**/__tests__/**",
+        "**/*.test.*",
+        "**/*.spec.*",
+        "**/*_test.go",
+        "**/test_*.py",
+        "**/*_test.py"
+      ]
+    },
+    "delivery": {
+      "paths": []
+    },
+    "scope": {
+      "paths": []
+    },
+    "readability": {
+      "paths": []
+    }
+  },
+  "decision_paths": [
+    {
+      "paths": [
+        "**/package.json",
+        "**/package-lock.json",
+        "**/yarn.lock",
+        "**/bun.lock",
+        "**/bun.lockb",
+        "**/Cargo.toml",
+        "**/Cargo.lock",
+        "**/go.mod",
+        "**/go.sum",
+        "**/pyproject.toml",
+        "**/requirements*.txt",
+        "**/Pipfile",
+        "**/Pipfile.lock",
+        "**/poetry.lock",
+        "**/uv.lock",
+        "**/Gemfile",
+        "**/Gemfile.lock",
+        "**/*.gemspec",
+        "**/composer.json",
+        "**/composer.lock",
+        "**/pom.xml",
+        "**/build.gradle",
+        "**/build.gradle.kts",
+        "**/gradle.lockfile",
+        "**/*.csproj",
+        "**/*.fsproj",
+        "**/packages.lock.json",
+        "**/Package.swift",
+        "**/Package.resolved"
+      ],
+      "quality": "structure",
+      "ask": true
+    },
+    {
+      "paths": [
+        "**/migrations/**",
+        "**/migration/**",
+        "**/db/migrate/**"
+      ],
+      "quality": "data",
+      "ask": true
+    },
+    {
+      "paths": [
+        "infra/**",
+        "infrastructure/**",
+        "deploy/**",
+        "**/Dockerfile",
+        "**/Dockerfile.*",
+        "**/compose*.yaml",
+        "**/compose*.yml",
+        "**/*.tf",
+        "**/*.tf.json",
+        "**/k8s/**",
+        "**/kubernetes/**"
+      ],
+      "quality": "cost",
+      "ask": true
+    },
+    {
+      "paths": [
+        ".github/workflows/**",
+        ".gitlab-ci.yml",
+        ".gitlab/ci/**",
+        ".circleci/**",
+        "Jenkinsfile",
+        ".buildkite/**",
+        "azure-pipelines.yml"
+      ],
+      "quality": "security",
+      "ask": true
+    },
+    {
+      "paths": [
+        "**/.env.example",
+        "**/.env.*.example",
+        "**/.env.sample",
+        "**/.env.template"
+      ],
+      "quality": "security",
+      "ask": true
+    },
+    {
+      "paths": [
+        ".archon/**",
+        ".devkit/standards/**",
+        ".devkit/config.json"
+      ],
+      "quality": "structure",
+      "ask": true
+    }
+  ],
+  "limits": {
+    "restarts": 3,
+    "fixes": 3
+  },
+  "topics": ".devkit/topics"
+}

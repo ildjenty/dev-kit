@@ -1,0 +1,112 @@
+changes:
+    changes_count: 2
+    launch_contract: false
+    launch_cost: false
+    launch_data: false
+    launch_readability: false
+    launch_scope: true
+    launch_security: false
+    launch_structure: true
+    launch_test: true
+    launch_ui: false
+    proceed: true
+    unlisted_count: 0
+checks:
+    failing: []
+    passed: true
+    results: /tmp/checks/1.jsonl
+    round: 1
+    skipped: []
+    stuck: false
+    stuck_checks: []
+collect:
+    blocking_count: 1
+    findings_count: 1
+    judges_count: 3
+completion:
+    checked_count: 0
+    missing_count: 0
+    path: /tmp/judge/completion.json
+    proceed: true
+finish:
+    base: b0
+    commit: c1
+    outcome: stop
+    reason: "this change needs requirements and a plan: start `requirements` describing it"
+    run_id: r1
+fixture:
+    expect: completed
+    reached:
+        - route
+        - launch
+        - checks
+        - completion
+        - judge-test
+        - judge-scope
+        - collect
+        - finish
+        - judge-structure
+judge-scope:
+    criteria:
+        - aspect: scope
+          checked: no comment added
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-structure:
+    criteria:
+        - aspect: structure
+          checked: facts and diff
+          not_checked: ""
+          verdict: fail
+    findings:
+        - aspect: structure
+          blocking: true
+          evidence: authority.md access rules and the exported entry
+          failure_scenario: The new module exposes data outside the audience the owner specified
+          file: src/service/a.js
+          fix: Ask the owner to choose the audience
+          line: "1"
+          mechanical: false
+          needs_decision: true
+judge-test:
+    criteria:
+        - aspect: checks
+          checked: no check weakened
+          not_checked: ""
+          verdict: pass
+    findings: []
+launch:
+    changes_count: 2
+    launch_contract: false
+    launch_cost: false
+    launch_data: false
+    launch_readability: false
+    launch_scope: true
+    launch_security: false
+    launch_structure: true
+    launch_test: true
+    launch_ui: false
+    proceed: true
+    unlisted_count: 0
+prepare:
+    accepted_objections_count: 0
+    base: b0
+    commit: c1
+    criteria_commit: k0
+    details: []
+    has_plan: false
+    has_requirements: false
+    reason: ""
+    stopped: false
+route:
+    qualities: []
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: first
+    stopped: false

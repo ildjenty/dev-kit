@@ -1,0 +1,62 @@
+---
+fixture:
+  expect: completed
+  reached:
+  - facts
+  - body-record
+  - open
+  - finish
+  - result
+start:
+  stopped: false
+  stage: start
+  reason: ''
+  details: "/tmp/record"
+  remaining: []
+  start: next
+  counted: false
+  restarts: 0
+allow:
+  allowed_count: 0
+  denied_count: 0
+  denied: []
+facts:
+  ready: true
+  outcome: ready
+  reasons: []
+  question_count: 0
+  head: abc
+body-write:
+  title: t
+  opening: o
+  how_to_see: h
+  after_merge: ''
+  headings:
+    what_changed: What changed
+    how_checked: How it was checked
+    what_remains: What remains
+    decisions: Decisions
+    after_merge: Work after merge
+body-assemble:
+  path: "/tmp/pr/pr.md"
+body-judge:
+  verdict: pass
+  findings: []
+  observations:
+  - read pr.md
+body-record:
+  passed: true
+  round: 1
+report-state:
+  passed: true
+  round: 1
+open:
+  url: https://example.invalid/pull/1
+  branch: feature/x
+  commit: abc
+finish:
+  outcome: pass
+  questions: []
+  stop: 
+  commit: abc
+result: {}

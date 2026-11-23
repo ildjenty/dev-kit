@@ -1,0 +1,363 @@
+name: plan
+description: |
+  Plan the latest passed requirements in two loops, each at most three rounds.
+  First write structure rows and the skeleton, run machine checks and the fresh structure judge,
+  and settle owner questions before detail. Then write other rows, release units and tests inside
+  the fixed structure. Detail may change signatures but no file or folder may be added, removed
+  or moved relative to the structure commit; a required structure change ends with stop.
+  Rows carry evidence. New structure rows carry nature. Prepare exports the draft schema into artifacts.
+  Record judgments and outcomes: pass, carry (detail findings), question, back to requirements, or stop.
+  Inputs: owner answers and optional authorization to pass the request's restart limit.
+inputs:
+  answers:
+    default: ""
+    description: 'The owner''s answers, a JSON array of {"question_id": "Q1", "answer": "..."}, or empty.'
+  continue:
+    default: ""
+    description: The owner's words, as written, that let the branch start past the limit of restarts (devkit record limit), or empty. Only a start that reaches the limit takes them; any other start stops when they are passed.
+returns: result
+nodes:
+  - id: start
+    bash: devkit record start plan
+    output_format:
+      type: object
+      properties:
+        stopped: { type: boolean }
+        stage: { type: string }
+        reason: { type: string }
+        details: { type: string }
+        remaining: { type: array, items: { type: string } }
+        start: { type: string }
+        counted: { type: boolean }
+        restarts: { type: integer }
+      required: [stopped, stage, reason, details, remaining, start, counted, restarts]
+
+  - id: not-started
+    depends_on: [start]
+    when: "$start.output.stopped == true"
+    bash: |
+      value=$start.output
+      devkit plan not-started "$value"
+    output_format: &result
+      type: object
+      properties:
+        outcome: { type: string, enum: [not_started, pass, carry, question, back, stop] }
+        plan_version: { type: integer }
+        skeleton_commit: { type: string }
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              text: { type: string }
+            required: [id, text]
+        carried: { type: array, items: { type: string } }
+        reasons: { type: array, items: { type: string } }
+      required: [outcome, plan_version, skeleton_commit, questions, carried, reasons]
+
+  - id: prepare
+    depends_on: [start]
+    when: "$start.output.stopped == false"
+    bash: devkit plan prepare
+    output_format:
+      type: object
+      properties:
+        input: { type: string }
+        criteria: { type: string }
+        base: { type: string }
+      required: [input, criteria, base]
+
+  - id: facts
+    depends_on: [prepare]
+    bash: devkit plan facts
+    timeout: 600000
+    output_format:
+      type: object
+      properties:
+        path: { type: string }
+        paths: { type: integer }
+      required: [path, paths]
+
+  - id: structure
+    depends_on: [facts]
+    loop_group:
+      max_iterations: 3
+      on_exhausted: complete
+      nodes:
+        - id: structure-write
+          provider: claude
+          command: write-structure
+          output_format:
+            type: object
+            additionalProperties: false
+            properties:
+              prototype: { type: string }
+              structure_question: { type: string, minLength: 1 }
+              provisional: { type: array, items: { type: string } }
+              uncertain: { type: array, items: { type: string } }
+            required: [prototype, structure_question, provisional, uncertain]
+
+        - id: structure-check
+          depends_on: [structure-write]
+          bash: PLAN_PHASE=structure devkit plan check
+          timeout: 1800000
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              valid: { type: boolean }
+              errors: { type: array, items: { type: string } }
+              skeleton_commit: { type: string }
+              materials: { type: string }
+              structure: { type: boolean }
+              data: { type: boolean }
+              contract: { type: boolean }
+              security: { type: boolean }
+              ui: { type: boolean }
+              cost: { type: boolean }
+            required: [round, valid, errors, skeleton_commit, materials, structure, data, contract, security, ui, cost]
+
+        - id: judge-structure
+          depends_on: [structure-check]
+          when: "$structure-check.output.valid == true && $structure-check.output.structure == true"
+          provider: claude
+          settingSources: [user]
+          command: judge-quality
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          with: { quality: structure, materials: "$structure-check.output.materials" }
+          output_format: &judgment
+            type: object
+            additionalProperties: false
+            properties:
+              verdict: { type: string, enum: [pass, fail, not_assessed] }
+              checked: { type: string }
+              not_checked: { type: string }
+              findings:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    deferred: { type: boolean }
+                    mechanical: { type: boolean }
+                    row: { type: string }
+                    blocking: { type: boolean }
+                    needs_decision: { type: boolean }
+                    failure_scenario: { type: string }
+                    evidence: { type: string }
+                    fix: { type: string }
+                  required: [row, blocking, needs_decision, failure_scenario, evidence, fix]
+            required: [verdict, checked, not_checked, findings]
+        - id: structure-settle
+          depends_on: [structure-write, structure-check, judge-structure]
+          trigger_rule: all_done
+          bash: |
+            prototype=$structure-write.output.prototype
+            structure_question=$structure-write.output.structure_question
+            structure=$judge-structure.output
+            INPUTS_PROTOTYPE="$prototype" INPUTS_STRUCTURE_QUESTION="$structure_question" INPUTS_STRUCTURE="$structure" devkit plan settle
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              valid: { type: boolean }
+              fixable_count: { type: integer }
+              needs_decision_count: { type: integer }
+              not_assessed_count: { type: integer }
+              back: { type: boolean }
+              done: { type: boolean }
+            required: [round, valid, fixable_count, needs_decision_count, not_assessed_count, back, done]
+      until_bash: 'd=$structure-settle.output.done; test "$d" = true'
+
+  - id: advance
+    depends_on: [structure]
+    bash: devkit plan advance
+    output_format:
+      type: object
+      properties:
+        proceed: { type: boolean }
+      required: [proceed]
+
+  - id: detail
+    depends_on: [advance]
+    when: "$advance.output.proceed == true"
+    loop_group:
+      max_iterations: 3
+      on_exhausted: complete
+      nodes:
+        - id: write
+          provider: claude
+          command: write-detail
+          output_format:
+            type: object
+            additionalProperties: false
+            properties:
+              prototype: { type: string }
+              structure_question: { type: string, minLength: 1 }
+              provisional: { type: array, items: { type: string } }
+              uncertain: { type: array, items: { type: string } }
+            required: [prototype, structure_question, provisional, uncertain]
+
+        - id: check
+          depends_on: [write]
+          bash: PLAN_PHASE=detail devkit plan check
+          timeout: 1800000
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              valid: { type: boolean }
+              errors: { type: array, items: { type: string } }
+              skeleton_commit: { type: string }
+              materials: { type: string }
+              structure: { type: boolean }
+              data: { type: boolean }
+              contract: { type: boolean }
+              security: { type: boolean }
+              ui: { type: boolean }
+              cost: { type: boolean }
+            required: [round, valid, errors, skeleton_commit, materials, structure, data, contract, security, ui, cost]
+
+        - id: judge-data
+          depends_on: [check]
+          when: "$check.output.valid == true && $check.output.data == true"
+          provider: claude
+          settingSources: [user]
+          command: judge-quality
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          with: { quality: data, materials: "$check.output.materials" }
+          output_format: *judgment
+        - id: judge-contract
+          depends_on: [check]
+          when: "$check.output.valid == true && $check.output.contract == true"
+          provider: claude
+          settingSources: [user]
+          command: judge-quality
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          with: { quality: contract, materials: "$check.output.materials" }
+          output_format: *judgment
+        - id: judge-security
+          depends_on: [check]
+          when: "$check.output.valid == true && $check.output.security == true"
+          provider: claude
+          settingSources: [user]
+          command: judge-quality
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          with: { quality: security, materials: "$check.output.materials" }
+          output_format: *judgment
+        - id: judge-ui
+          depends_on: [check]
+          when: "$check.output.valid == true && $check.output.ui == true"
+          provider: claude
+          settingSources: [user]
+          command: judge-quality
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          with: { quality: ui, materials: "$check.output.materials" }
+          output_format: *judgment
+        - id: judge-cost
+          depends_on: [check]
+          when: "$check.output.valid == true && $check.output.cost == true"
+          provider: claude
+          settingSources: [user]
+          command: judge-quality
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          with: { quality: cost, materials: "$check.output.materials" }
+          output_format: *judgment
+
+        - id: judge-delivery
+          depends_on: [check]
+          when: "$check.output.valid == true"
+          provider: claude
+          settingSources: [user]
+          command: judge-delivery
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          with: { materials: "$check.output.materials" }
+          output_format:
+            type: object
+            additionalProperties: false
+            properties:
+              verdict: { type: string, enum: [pass, fail, not_assessed] }
+              checked: { type: string }
+              not_checked: { type: string }
+              findings:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    deferred: { type: boolean }
+                    mechanical: { type: boolean }
+                    row: { type: string }
+                    blocking: { type: boolean }
+                    needs_decision: { type: boolean }
+                    failure_scenario: { type: string }
+                    evidence: { type: string }
+                    fix: { type: string }
+                  required: [row, blocking, needs_decision, failure_scenario, evidence, fix]
+              back:
+                type: object
+                additionalProperties: false
+                properties:
+                  needed: { type: boolean }
+                  premise: { type: string }
+                  observation: { type: string }
+                required: [needed, premise, observation]
+            required: [verdict, checked, not_checked, findings, back]
+
+        - id: settle
+          depends_on: [write, check, judge-data, judge-contract, judge-security, judge-ui, judge-cost, judge-delivery]
+          trigger_rule: all_done
+          bash: |
+            prototype=$write.output.prototype
+            structure_question=$write.output.structure_question
+            data=$judge-data.output
+            contract=$judge-contract.output
+            security=$judge-security.output
+            ui=$judge-ui.output
+            cost=$judge-cost.output
+            delivery=$judge-delivery.output
+            INPUTS_PROTOTYPE="$prototype" INPUTS_STRUCTURE_QUESTION="$structure_question" INPUTS_DATA="$data" INPUTS_CONTRACT="$contract" \
+              INPUTS_SECURITY="$security" INPUTS_UI="$ui" INPUTS_COST="$cost" INPUTS_DELIVERY="$delivery" \
+              devkit plan settle
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              valid: { type: boolean }
+              fixable_count: { type: integer }
+              needs_decision_count: { type: integer }
+              not_assessed_count: { type: integer }
+              back: { type: boolean }
+              done: { type: boolean }
+            required: [round, valid, fixable_count, needs_decision_count, not_assessed_count, back, done]
+      until_bash: 'd=$settle.output.done; test "$d" = true'
+
+  - id: finish
+    depends_on: [advance, detail]
+    trigger_rule: none_failed_min_one_success
+    bash: devkit plan finish
+    output_format: *result
+
+  - id: result
+    depends_on: [not-started, finish]
+    trigger_rule: none_failed_min_one_success
+    bash: |
+      finished=$finish.output
+      skipped=$not-started.output
+      printf '%s' "${finished:-$skipped}"
+    output_format: *result

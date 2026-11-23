@@ -1,0 +1,14 @@
+fixture:
+  expect: completed
+  reached: [prepare, proceed, fix-code, objections, dispute-end, round-end, fix-state, finish, result]
+start: { stopped: false, stage: start, reason: "", details: "", remaining: [], start: next, counted: false, restarts: 0 }
+prepare: { ready: true, reason: "", findings: 1, rounds: 0, limit_reached: false, limit: 3 }
+proceed: { proceed: true }
+fix-code: { owner_decisions: [], broken_decisions: [], fixed: [{ finding: judge-run/scope/F1, change: "Added validation in a.ts" }], commit_message: "fix: address validation finding" }
+objections: { round: 1, count: 0 }
+dispute-end: { pending: 0 }
+checks: { round: 1, passed: true, stuck: false, failing: [], stuck_checks: [], skipped: [], results: x }
+round-end: { round: 1, finished: true, passed: true, stuck: false, pending: 0, needs_owner: 0, broken: 0 }
+fix-state: { judge_back: false }
+finish: '{"outcome":"pass"}'
+result: '{"outcome":"pass"}'

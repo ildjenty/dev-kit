@@ -1,0 +1,44 @@
+{
+  "$id": "continuation.json",
+  "description": "The owner's words authorizing a start at the restart limit, with the count, limit and run. Count restarts only after the latest run authorized this way.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "by": {
+      "const": "owner"
+    },
+    "answer": {
+      "$ref": "common.json#/$defs/text"
+    },
+    "restarts": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "run_id": {
+      "$ref": "common.json#/$defs/run_id"
+    },
+    "workflow": {
+      "$ref": "common.json#/$defs/workflow"
+    },
+    "start": {
+      "$ref": "run.json#/properties/start"
+    },
+    "recorded_at": {
+      "$ref": "common.json#/$defs/at"
+    }
+  },
+  "required": [
+    "by",
+    "answer",
+    "restarts",
+    "limit",
+    "run_id",
+    "workflow",
+    "start",
+    "recorded_at"
+  ]
+}

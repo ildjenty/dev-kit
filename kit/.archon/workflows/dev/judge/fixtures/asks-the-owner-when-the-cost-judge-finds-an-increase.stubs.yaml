@@ -1,0 +1,115 @@
+changes:
+    changes_count: 1
+    launch_contract: false
+    launch_cost: true
+    launch_data: false
+    launch_readability: false
+    launch_scope: true
+    launch_security: false
+    launch_structure: false
+    launch_test: true
+    launch_ui: false
+    proceed: true
+    unlisted_count: 0
+checks:
+    failing: []
+    passed: true
+    results: /tmp/checks/1.jsonl
+    round: 1
+    skipped: []
+    stuck: false
+    stuck_checks: []
+collect:
+    blocking_count: 1
+    findings_count: 1
+    judges_count: 3
+completion:
+    checked_count: 1
+    missing_count: 0
+    path: /tmp/judge/completion.json
+    proceed: true
+finish:
+    base: b0
+    commit: c1
+    outcome: back
+    run_id: r1
+fixture:
+    expect: completed
+    reached:
+        - completion
+judge-cost:
+    criteria:
+        - aspect: cost
+          checked: MAX_ATTEMPTS went from 3 to 10
+          not_checked: ""
+          verdict: fail
+        - aspect: decisions
+          checked: no cost row
+          not_checked: ""
+          verdict: pass
+    findings:
+        - aspect: cost
+          blocking: true
+          evidence: authority.md cost item; MAX_ATTEMPTS = 10
+          failure_scenario: a failing paid call is retried up to 10 times instead of 3
+          file: packages/shop/src/retry.ts
+          fix: keep 3, or have the owner allow 10
+          line: "4"
+          mechanical: false
+          needs_decision: true
+judge-scope:
+    criteria:
+        - aspect: scope
+          checked: diff
+          not_checked: ""
+          verdict: pass
+        - aspect: decisions
+          checked: rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-test:
+    criteria:
+        - aspect: test
+          checked: C1
+          not_checked: ""
+          verdict: pass
+        - aspect: checks
+          checked: none
+          not_checked: ""
+          verdict: pass
+    findings: []
+launch:
+    changes_count: 1
+    launch_contract: false
+    launch_cost: true
+    launch_data: false
+    launch_readability: false
+    launch_scope: true
+    launch_security: false
+    launch_structure: false
+    launch_test: true
+    launch_ui: false
+    proceed: true
+    unlisted_count: 0
+prepare:
+    accepted_objections_count: 0
+    base: b0
+    commit: c1
+    criteria_commit: k0
+    details: []
+    has_plan: true
+    has_requirements: true
+    reason: ""
+    stopped: false
+route:
+    qualities: []
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: next
+    stopped: false

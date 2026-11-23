@@ -1,0 +1,25 @@
+{
+  "deferred": [
+    {
+      "finding": {
+        "id": "F1",
+        "text": "A deferred repair",
+        "blocking": false,
+        "needs_decision": false,
+        "evidence": "fixture.txt"
+      },
+      "source": {
+        "run_id": "fixture-judge",
+        "judge": "structure",
+        "judgment": 1,
+        "kind": "code",
+        "target": {
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      }
+    }
+  ],
+  "carried": [],
+  "mechanical": [],
+  "accepted_objections": []
+}

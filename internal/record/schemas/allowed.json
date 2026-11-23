@@ -1,0 +1,46 @@
+{
+  "$id": "allowed.json",
+  "description": "An owner-authorized change in cost, permissions or another value. Numeric values cover values no greater than the allowed value; strings cover only the identical value.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "question_id": {
+      "type": "string",
+      "pattern": "^Q[1-9][0-9]*$"
+    },
+    "run_id": {
+      "$ref": "common.json#/$defs/run_id"
+    },
+    "recorded_at": {
+      "$ref": "common.json#/$defs/at"
+    },
+    "category": {
+      "$ref": "common.json#/$defs/text"
+    },
+    "file": {
+      "$ref": "common.json#/$defs/text"
+    },
+    "item": {
+      "$ref": "common.json#/$defs/text"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "$ref": "common.json#/$defs/text"
+        }
+      ]
+    }
+  },
+  "required": [
+    "question_id",
+    "run_id",
+    "recorded_at",
+    "category",
+    "file",
+    "item",
+    "value"
+  ]
+}

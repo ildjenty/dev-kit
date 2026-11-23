@@ -1,0 +1,47 @@
+{
+  "$id": "answer.json",
+  "description": "The owner's verbatim answer, tied to the question ID, target, versions and commit. Each question has at most one answer.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "question_id": {
+      "type": "string",
+      "pattern": "^Q[1-9][0-9]*$"
+    },
+    "answer": {
+      "$ref": "common.json#/$defs/text"
+    },
+    "run_id": {
+      "$ref": "common.json#/$defs/run_id"
+    },
+    "workflow": {
+      "$ref": "common.json#/$defs/workflow"
+    },
+    "answered_at": {
+      "$ref": "common.json#/$defs/at"
+    },
+    "question": {
+      "$ref": "common.json#/$defs/text"
+    },
+    "target": {
+      "$ref": "question.json#/$defs/asked/properties/target"
+    },
+    "versions": {
+      "$ref": "common.json#/$defs/versions"
+    },
+    "commit": {
+      "$ref": "common.json#/$defs/sha"
+    }
+  },
+  "required": [
+    "question_id",
+    "answer",
+    "run_id",
+    "workflow",
+    "answered_at",
+    "question",
+    "target",
+    "versions",
+    "commit"
+  ]
+}

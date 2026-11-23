@@ -1,82 +1,93 @@
 # dev-kit
 
-dev-kit is a tool for running a repository-specific development loop inside Claude Code or Codex CLI sessions.
+dev-kit gives Archon a portable development process: the owner decides what matters, a change stays in one place, and the process corrects itself from observed failures. Nine workflows, two session skills, repository-owned standards and the Go binary `devkit` work together. AI sessions write and judge; the binary checks facts, enforces transitions and preserves evidence.
 
-dev-kit is this repository, kit is the name for everything it provides, and `devkit` is the binary. The repository owner composes a loop template from stages, checks, and human gates. Devkit enforces the chosen order, independent judgments, approvals, and records. The repository owns and maintains the installed principles, stages, review criteria, plan templates, brief templates, rules, and decision authority; the binary owns the record schemas and host configuration fragments.
+## Install
 
-## Installation
+Target repositories need Git, Archon with its authenticated Claude provider, and `devkit` on `PATH`. Pull requests use an authenticated GitHub CLI (`gh`) and the `origin` remote. Supply the tools required by your repository's checks. Go and mise are needed only to build and test dev-kit itself.
 
-Install Go (the version required by `go.mod`) and Git, then clone this repository and run the installer. It builds `devkit` and places it in a directory on `PATH`:
+From this checkout:
 
 ```sh
+mise install go
+scripts/install.sh
 export PATH="$HOME/.local/bin:$PATH"
-/path/to/dev-kit/install.sh
-```
-
-Usage: `/path/to/dev-kit/install.sh [--bin DIR]`. `--bin DIR` sets the directory for `devkit` (default: `$HOME/.local/bin`); it must be on `PATH`.
-
-Then run `devkit init` in each repository that uses devkit:
-
-```sh
 cd /path/to/your-repository
 devkit init
 ```
 
-`devkit init` preserves existing repository settings and assets and merges missing kit settings, including deny defaults. After showing the changes and receiving confirmation, it installs and commits the files; `--no-commit` skips that commit. Before creating work records, `devkit start` requires an existing HEAD and checks that existing configured norm paths, `devkit.toml`, and agent definitions are committed and unmodified. Commit the installation changes first if start refuses them. Init writes `kit_version = "v3"`, which identifies record-format compatibility rather than an installed norm copy.
+`scripts/install.sh --bin /your/bin` changes the binary destination. `devkit init [--force] [dir]` installs the embedded kit without committing: `.archon/workflows/dev/`, `.claude/skills/dev-discuss/`, `.claude/skills/dev-runs/`, initial standards in `.devkit/standards/`, and configuration. Kit-owned workflows and skills are refreshed; existing repository-owned configuration and standards are preserved unless `--force` is supplied. Review and commit the installed files before starting runs. A committed base branch is required for workflow execution.
 
-The `default` and `fix` templates require `command:test`, `test`, and `diff` during implementation, and `command:test`, `test`, and `harness` during retrospective. The `docs` template requires `wording` during document editing and only `harness` during retrospective. If `command:test` is not registered, its check returns a fixable failure: the first work creates the tests and verification method and registers it in `devkit.toml`. A human confirms the registration before it takes effect in the next round. A registration looks like this:
+The supplied `.archon/config.yaml` disables bundled default workflows and commands and sets `worktree.baseBranch` to `main`. Incorporate these settings into existing Archon configuration; change the base branch there when necessary. Keep workflow sources committed and unchanged while starting runs.
 
-```toml
-[commands.test]
-executable = "./scripts/test"
-args = []
-timeout_seconds = 120
+## Use the flow
+
+```text
+dev-discuss → refine one topic → approval → refine PR → owner merges
+  → next pickable topic, or for each settled work unit:
+    requirements (unit=<id>) → plan → implement → judge ⇄ fix → pr
+    sync → judge when needs_judge → pr
+  → retro → approval → correction PR → owner merges
 ```
 
-```json
-{ "aspect": "command:test", "required": true }
+`dev-discuss` compares the owner's words with agreed decisions and prepares a confirmed memo in the session. `dev-runs` starts and watches workflows and relays their recorded results. Workflows do not invoke one another.
+
+Run `refine` on a `refine/<name>` branch. One run settles one topic: first decisions and next topics, then documents and units for settled areas. Each phase has its own three-round machine-check/judge loop. Open points end with `question`; a cleared proposal ends with an approval question. Restart with `approve=<version>` only for the version the owner approved. Approval marks decisions agreed and the current topic settled. Publish the branch through the repository's PR process; merge its refine PR before starting any unit it created. `refine` itself does not publish a PR.
+
+Find open topics whose decision dependencies are agreed with `devkit decisions topics`. Pass a selected topic as refine's `topic`. For a work unit, honor its `depends_on`, make a separate branch and pass its ID directly:
+
+```sh
+archon workflow run requirements --branch feature/filter --detach \
+  --input unit=U-a1b2c3
 ```
 
-To remove devkit from a repository, run `devkit uninstall` there. It shows the changes and asks for confirmation (`--yes` skips it), then removes runtime state, the skill link, and installed norms and agent definitions that still match the bundled defaults. It strips installed fragments from host settings and `.gitignore`, and removes `devkit.toml` only when it contains no repository-specific settings. Modified files and repository products such as requirements and structure records are preserved; retained configuration and modified installed files are listed. To remove the binary, delete `devkit` from the `--bin` directory.
+Prepare reads the unit and its cited agreed decisions as constraints. For a direct settled request, use `owner_words` instead; keep session findings in `supplement`. Every delivery request goes through `plan`, even when its decision list is empty.
 
-In Codex, trust the project interactively and trust each project hook through `/hooks`. In Claude Code, accept workspace trust. Start a new host session and run `devkit doctor`, then use `/devkit` to begin. Run `devkit help` for command arguments. See [install](docs/architecture/modules.md#install) and [doctor](docs/architecture/modules.md#doctor-の確認項目) for the design.
+The delivery owner questions belong in requirements and plan. Implementation, code judgment and fixes return `back` to plan for newly discovered owner decisions. PR asks only about configured `ask` changes not already covered by an owner-decided row's `touches`. `pr` judges the body, commits review backlog, pushes and opens or updates a GitHub PR; the owner decides merging. `sync` rebases and returns `needs_judge` after conflict resolution.
 
-Tools such as Go, npm, and pip that write caches outside the repository may fail when agents run them inside the host sandbox; host sandbox settings can allow those locations, while devkit's own verification commands run outside the sandbox.
+A question ends its run. Relay its exact ID and text; restart the named `next_workflows` workflow with the owner's verbatim `answers` JSON. Follow `back.to` for a step back. A stop or rejected start is not a pass. Restart and fix limits default to 3; only the owner's words in `continue` authorize a start that reaches the restart limit. The installed `dev-runs` skill gives the handoff procedure.
 
-A repository can opt into parallel stage work with `split: true` in a template and `units` in its plan (each with `id`, `description`, and `scope`). Concurrency follows the [global and per-role limits](docs/architecture/data.md#依頼の入力). Devkit creates detached unit worktrees under the ignored `.devkit/worktrees/<instruction_id>/`, issues `devkit-worker` instructions, fixes accepted results by SHA, and merges them into the work checkout for one ordinary stage round. Conflicts return to the session worker for a fix round; judgments, gates, loop-edit confirmation, limits, back/replan, and questions remain at stage level. Pause stops new instructions; abort and completion remove unchanged unit worktrees and report changed ones that remain. The bundled templates do not split stages.
+## Why the parts fit together
 
-The [default development flow](docs/architecture/flow.md#既定の開発フロー) takes a request through interviews, external design, technology choices, release increments, detailed design, implementation, demos, and acceptance. Human decisions follow the repository’s [authority rules](docs/architecture/data.md#権限の文書-authority), and retrospective adjusts that boundary from human feedback. Plan approval follows the [configured policy](docs/architecture/data.md#計画のバージョン), which defaults to `deviation`.
+`<standards>/concerns.json` maps ten qualities—structure, data, contract, security, ui, cost, test, delivery, scope and readability—to their principles and phase criteria. Every numbered principle has exactly one owner, counting `every_quality` as one shared assignment. Every review document except `review/README.md` must be mapped. `devkit concerns check` validates this and prepare stops on violations. The machine derives writer/judge materials from this map. Common judgment rules live in `review/README.md`; owner authority lives in `authority.md`.
 
-## Reading order
+Each quality has one `review/<quality>.md` with Decisions, Code, Blocking and Not reported sections. Plan judges choices and the skeleton; code judges bodies and conformance to passed choices. Agreed choices are carried by reference rather than judged again.
 
-1. [docs/architecture.md](docs/architecture.md): Overview of the structure and behavior, the work flow and the scope of the guarantees.
-2. [docs/design.md](docs/design.md): Basic policy and the roles of the seven parts.
-3. [principles/README.md](assets/principles/README.md): The principles that [check](docs/parts/check.md) (the part for evaluation and judgment) uses as criteria, and how to write a principle.
+Decision records `<decisions>/D-<id>.md` hold repository decisions. IDs derive from branch and draft key using six lowercase hexadecimal characters, extending on collision; units and topics use the same scheme with `U-` and `T-`. Re-proposals retain kept keys' IDs and remove withdrawn proposed files. Agreed records are replaced through `supersedes`. Dependency traversal identifies affected decisions, documents and units. Passed owner/principle plan rows also become agreed decision records; provisional rows remain in the plan and PR body.
 
-The work procedure follows the [flow](docs/architecture/flow.md); record contracts and guarantees follow [docs/architecture/](docs/architecture/).
+Plan settles structure before detail. New structure rows explain kind, reasons for change, volatility and callers with evidence or `unknown`. After structure passes, detail may change signatures but cannot add, remove or move files. Code judgment receives uncovered changed files, folder spread and ancestor siblings. Structural defects on the change's path block even if pre-existing; defects elsewhere are deferred. A fresh routing node selects qualities from the diff, alongside configured globs and plan rows. Scope always runs; source/test changes also select test and readability.
 
-Pausing and resuming, and the Stop continuation limit, follow [interruption](docs/architecture/guarantees.md#中断).
+Before pushing, PR commits `.devkit/backlog/<encoded-branch>.json`: deferred and carried findings, mechanical-check candidates and accepted objections, with their source judgments. Backlog files are excluded from judged-change identity. Identity otherwise preserves file names and every added/removed line, including whitespace, while ignoring hunk positions. `retro`, on a `retro/<name>` branch from the base, proposes work units, check additions and standard edits from the backlog. Its machine gate and independent judge precede an approval question. Approved changes and deletion of consumed backlog files share one commit.
 
-The design documents under `docs/` are written in Japanese; the principles under `assets/principles/` are written in English. Everything devkit distributes is under `assets/`; `docs/` is for developing dev-kit and is not distributed.
+## Repository settings
 
-## Files
+Edit `.devkit/config.json`; `devkit config` prints effective settings. The authoritative defaults and validation are in `internal/config`, and installed values are in `kit/.devkit/config.json`.
 
-- [docs/architecture.md](docs/architecture.md): Design overview.
-- [docs/architecture/](docs/architecture/): Design details.
-  - [flow.md](docs/architecture/flow.md): The flow from start to completion.
-  - [data.md](docs/architecture/data.md): Records and state.
-  - [modules.md](docs/architecture/modules.md): Modules and their dependencies.
-  - [layout.md](docs/architecture/layout.md): Directory layout.
-  - [hooks.md](docs/architecture/hooks.md): The five hooks.
-  - [guarantees.md](docs/architecture/guarantees.md): The prevention mechanism for each failure.
-  - [examples.md](docs/architecture/examples.md): Minimal examples of a template, plan, settings, aspect and pre-commit.
-- [docs/design.md](docs/design.md): Basic policy and the list of parts.
-- [docs/parts/](docs/parts/): The contract of each part.
-- [docs/loop-plan.md](docs/loop-plan.md): The format and rules for loop templates (definitions composed by the user) and per-task plans.
-- [docs/stages.md](docs/stages.md): Candidate stages for a template.
-- [docs/checks.md](docs/checks.md): Candidate [aspect files](docs/architecture/modules.md#check) (files that state check's judgment criteria).
-- [docs/rules.md](docs/rules.md): The design-level list of rules imposed on target code and documents, and their enforcement. Repository-owned decisions follow [Rules](docs/architecture/data.md#規則と強制手段-rules).
-- [docs/repository.md](docs/repository.md): How the using repository's layout maps to the execution mechanisms.
-- [docs/meta-loop.md](docs/meta-loop.md): The procedure for improving the loop itself.
-- [assets/](assets/): Everything devkit distributes. `devkit init` installs repository-owned norms at their configured locations, defaulting to `.devkit/principles/`, `.devkit/stages/`, `.devkit/plans/`, `.devkit/templates/`, `.devkit/rules.md`, `.devkit/git.md`, and `.devkit/authority.md`. Requirements and structure records are repository products. Execution records stay in the fixed, untracked `.devkit/run/` directory; skills and subagent definitions are installed in their host locations.
-  - [principles/](assets/principles/): The principles and review criteria, split into files by where they apply.
+- `language`: owner-facing prose; default `ja`.
+- `standards`, `docs`, `decisions`, `units`, `topics`: default `.devkit/standards`, `docs`, `.devkit/decisions`, `.devkit/units`, `.devkit/topics`.
+- `checks`: named shell commands with `command`, `timeout_seconds` and optional `paths`. No checks are installed by default; add the repository's real checks. Omitted paths run every time; an empty paths array selects none. Exit 0 passes, 75 retries once as an environment error, 77 means not run, and other exits fail. Timeouts are environment errors.
+- `skeleton_check`: names of checks to run on the skeleton; empty by default.
+- `qualities`: path globs for the fixed qualities. Routing and plan rows also select judges; the concern map controls their plan/code phases.
+- `decision_paths`: `{paths, quality, ask}` detection rules. Defaults include dependencies, migrations, infrastructure, CI, environment examples, workflows, standards and `.devkit/config.json`. Before/after check configurations are combined so deleting a check does not bypass it.
+- `limits.restarts`, `limits.fixes`: default 3 each.
+
+Missing settings use defaults; quality and limit entries merge individually, while other supplied arrays replace defaults. Globs support `**`, `*` and `?`. Repository-specific facts and conventions belong in these settings and standards.
+
+## Test the kit
+
+From this source checkout:
+
+```sh
+mise exec -- go build ./...
+mise exec -- go vet ./...
+mise exec -- go test ./...
+scripts/test-kit.sh
+```
+
+`scripts/test-kit.sh [workflow ...]` builds both executables, initializes a temporary repository under `.local/tmp/`, validates workflows, checks principle ownership, tests a fresh installation, then copies source-only executed fixtures and tests them. Its isolated Archon home uses `$HOME/.archon/plugins`, overridable with `KIT_ARCHON_PLUGINS`. Every workflow has an executed main path: bash runs for real and AI is stubbed. PR publication is stubbed; sync exercises a real local rebase conflict. `cmd/devkit-fixture` supplies test-only setup and file writes and is absent from the shipped binary. The plumbing test rejects YAML/prompt calls to unregistered commands.
+
+See the [workflow guide](kit/.archon/workflows/dev/README.md) for artifacts and execution contracts, and [design rationale](docs/design.md) in Japanese. Update these explanations alongside their authoritative code, YAML, schemas and standards.
+
+## Current limits
+
+There are no dependency facts from analysis tools and no Jev-style narrowing of related decisions; current materials use Git facts and full decision records. AI nodes support Claude only. Pull request publication supports GitHub through `gh`. Live AI behavior and external PR publication are outside fixture coverage.

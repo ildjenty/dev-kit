@@ -1,0 +1,14 @@
+fixture:
+  expect: completed
+  reached: [prepare, tests, code, unit-end, finish, result]
+start: { stopped: false, stage: start, reason: "", details: "", remaining: [], start: next, counted: false, restarts: 0 }
+prepare: { units: 1, remaining: 1, has_plan: true }
+unit: { unit: U1, tests_written: false, round: 1 }
+tests: { tests: ["a.test.ts: does it"] }
+tests-written: { unit: U1 }
+code: { owner_decisions: [], uncertain: [], commit_message: "feat: allow cancellation" }
+checks: { round: 1, passed: true, stuck: false, failing: [], stuck_checks: [], skipped: [], results: x }
+unit-end: { unit: U1, committed: true, all_done: true, finished: true, needs_owner: 0, stuck: false, decision_errors: 0 }
+units-state: { stuck: false }
+finish: '{"outcome":"pass"}'
+result: '{"outcome":"pass"}'

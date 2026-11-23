@@ -1,0 +1,340 @@
+{
+  "$id": "judgment.json",
+  "description": "One judgment: target, criteria commit, materials, observations and verdict. Versioned work targets versions; code and reports target base and commit. Code also identifies the judged change.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "$ref": "common.json#/$defs/run_id"
+    },
+    "recorded_at": {
+      "$ref": "common.json#/$defs/at"
+    },
+    "judge": {
+      "type": "string",
+      "enum": [
+        "requirements",
+        "dispute",
+        "refine",
+        "report",
+        "retro"
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "proposal",
+        "requirements",
+        "plan",
+        "code",
+        "report"
+      ]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "proposal_version": {
+          "$ref": "common.json#/$defs/version"
+        },
+        "requirements_version": {
+          "$ref": "common.json#/$defs/version"
+        },
+        "plan_version": {
+          "$ref": "common.json#/$defs/version"
+        },
+        "skeleton_commit": {
+          "$ref": "common.json#/$defs/sha"
+        },
+        "base": {
+          "$ref": "common.json#/$defs/sha"
+        },
+        "commit": {
+          "$ref": "common.json#/$defs/sha"
+        },
+        "change_id": {
+          "description": "SHA-256 of the merge-base change, preserving file names and line contents including whitespace, ignoring hunk positions and only the schema-valid backlog file for the current branch.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "criteria_commit": {
+      "$ref": "common.json#/$defs/sha"
+    },
+    "materials": {
+      "$ref": "common.json#/$defs/texts"
+    },
+    "observations": {
+      "$ref": "common.json#/$defs/texts"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "fail",
+        "not_assessed"
+      ]
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "blocking": {
+            "type": "boolean"
+          },
+          "needs_decision": {
+            "type": "boolean"
+          },
+          "text": {
+            "$ref": "common.json#/$defs/text"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "deferred": {
+            "type": "boolean"
+          },
+          "mechanical": {
+            "type": "boolean"
+          },
+          "resolved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "blocking",
+          "needs_decision",
+          "text",
+          "evidence"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "deferred"
+              ],
+              "properties": {
+                "deferred": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "blocking": {
+                  "const": false
+                },
+                "needs_decision": {
+                  "const": false
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "structure",
+        "detail",
+        "decide",
+        "document",
+        "retro"
+      ]
+    },
+    "round": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "required": [
+    "run_id",
+    "recorded_at",
+    "judge",
+    "kind",
+    "target",
+    "criteria_commit",
+    "materials",
+    "observations",
+    "verdict",
+    "findings"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "proposal"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "required": [
+              "proposal_version"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "requirements"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "type": "object",
+            "required": [
+              "requirements_version"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "plan"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "type": "object",
+            "required": [
+              "requirements_version",
+              "plan_version",
+              "skeleton_commit"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "code"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "type": "object",
+            "required": [
+              "base",
+              "commit"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "report"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "type": "object",
+            "required": [
+              "requirements_version",
+              "base",
+              "commit"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "phase"
+        ],
+        "properties": {
+          "phase": {
+            "enum": [
+              "decide",
+              "document"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "judge": {
+            "const": "refine"
+          },
+          "kind": {
+            "const": "proposal"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "phase"
+        ],
+        "properties": {
+          "phase": {
+            "enum": [
+              "structure",
+              "detail"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "kind": {
+            "const": "plan"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "phase"
+        ],
+        "properties": {
+          "phase": {
+            "const": "retro"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "judge": {
+            "const": "retro"
+          },
+          "kind": {
+            "const": "proposal"
+          }
+        }
+      }
+    }
+  ]
+}

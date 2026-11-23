@@ -1,0 +1,47 @@
+{
+  "$id": "run.json",
+  "description": "A run that passed the start conditions. Start classifies how it began. Counted starts (step back, continuation after stop and retry after error) consume the restart limit.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run_id": {
+      "$ref": "common.json#/$defs/run_id"
+    },
+    "workflow": {
+      "$ref": "common.json#/$defs/workflow"
+    },
+    "started_at": {
+      "$ref": "common.json#/$defs/at"
+    },
+    "start": {
+      "type": "string",
+      "enum": [
+        "first",
+        "next",
+        "answer",
+        "step_back",
+        "continue_after_stop",
+        "retry_after_error",
+        "other"
+      ]
+    },
+    "counted": {
+      "type": "boolean"
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^Q[1-9][0-9]*$"
+      }
+    }
+  },
+  "required": [
+    "run_id",
+    "workflow",
+    "started_at",
+    "start",
+    "counted",
+    "answers"
+  ]
+}

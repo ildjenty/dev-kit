@@ -1,0 +1,102 @@
+{
+  "$id": "question.json",
+  "description": "A question recorded with a question outcome. Versions and commit identify the state when the question was asked.",
+  "$defs": {
+    "asked": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "$ref": "common.json#/$defs/text"
+        },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "open_point",
+                "proposal",
+                "decision",
+                "change",
+                "finding"
+              ]
+            },
+            "ref": {
+              "$ref": "common.json#/$defs/text"
+            },
+            "content_hash": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "kind",
+            "ref"
+          ]
+        },
+        "next_workflows": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "common.json#/$defs/workflow"
+          }
+        },
+        "invalidates": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "required": [
+        "text",
+        "target",
+        "next_workflows",
+        "invalidates"
+      ]
+    }
+  },
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/$defs/asked"
+    }
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^Q[1-9][0-9]*$"
+    },
+    "run_id": {
+      "$ref": "common.json#/$defs/run_id"
+    },
+    "workflow": {
+      "$ref": "common.json#/$defs/workflow"
+    },
+    "asked_at": {
+      "$ref": "common.json#/$defs/at"
+    },
+    "versions": {
+      "$ref": "common.json#/$defs/versions"
+    },
+    "commit": {
+      "$ref": "common.json#/$defs/sha"
+    },
+    "text": true,
+    "target": true,
+    "next_workflows": true,
+    "invalidates": true
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "run_id",
+    "workflow",
+    "asked_at",
+    "versions",
+    "commit"
+  ]
+}

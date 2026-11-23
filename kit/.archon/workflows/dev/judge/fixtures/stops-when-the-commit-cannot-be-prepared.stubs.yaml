@@ -1,0 +1,29 @@
+finish:
+    base: b0
+    commit: c1
+    outcome: stop
+    run_id: r1
+fixture:
+    expect: completed
+    reached:
+        - prepare
+        - finish
+prepare:
+    accepted_objections_count: 0
+    base: b0
+    commit: c1
+    criteria_commit: k0
+    details: []
+    has_plan: true
+    has_requirements: true
+    reason: The checkout changed after start
+    stopped: true
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: next
+    stopped: false

@@ -1,0 +1,71 @@
+advance:
+    proceed: false
+facts:
+    path: /tmp/plan/facts-before.json
+    paths: 2
+finish:
+    carried: []
+    outcome: question
+    plan_version: 0
+    questions:
+        - id: Q1
+          text: Build a prototype on a separate branch and report format compatibility
+    reasons: []
+    skeleton_commit: def
+fixture:
+    expect: completed
+    reached:
+        - structure-write
+        - structure-check
+        - structure-settle
+        - advance
+        - finish
+        - result
+prepare:
+    base: abc
+    criteria: /tmp/criteria
+    input: /tmp/plan/input.json
+result:
+    carried: []
+    outcome: question
+    plan_version: 0
+    questions:
+        - id: Q1
+          text: Build a prototype on a separate branch and report format compatibility
+    reasons: []
+    skeleton_commit: def
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: next
+    stopped: false
+structure-check:
+    contract: false
+    cost: false
+    data: false
+    errors:
+        - The plan draft is missing
+    materials: /tmp/plan/rounds/1
+    round: 1
+    security: false
+    skeleton_commit: def
+    structure: false
+    ui: false
+    valid: false
+structure-settle:
+    back: false
+    done: true
+    fixable_count: 1
+    needs_decision_count: 0
+    not_assessed_count: 0
+    round: 1
+    valid: false
+structure-write:
+    prototype: Measure whether the proposed format can represent the existing data
+    provisional: []
+    structure_question: May work proceed with this structure?
+    uncertain: []

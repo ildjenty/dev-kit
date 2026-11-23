@@ -1,0 +1,56 @@
+{
+  "fixture": {
+    "expect": "completed",
+    "reached": [
+      "not-started",
+      "result"
+    ],
+    "inputs": {
+      "approve": "1"
+    }
+  },
+  "start": {
+    "stopped": true,
+    "stage": "start",
+    "reason": "The start conditions do not hold",
+    "details": "/tmp/record",
+    "remaining": [
+      "Q2 has no answer"
+    ],
+    "start": "answer",
+    "counted": false,
+    "restarts": 0
+  },
+  "not-started": {
+    "outcome": "not_started",
+    "proposal_version": 0,
+    "decision_ids": [],
+    "unit_ids": [],
+    "affected": {
+      "decisions": [],
+      "documents": [],
+      "units": []
+    },
+    "questions": [],
+    "reasons": [
+      "The start conditions do not hold",
+      "Q2 has no answer"
+    ]
+  },
+  "result": {
+    "outcome": "not_started",
+    "proposal_version": 0,
+    "decision_ids": [],
+    "unit_ids": [],
+    "affected": {
+      "decisions": [],
+      "documents": [],
+      "units": []
+    },
+    "questions": [],
+    "reasons": [
+      "The start conditions do not hold",
+      "Q2 has no answer"
+    ]
+  }
+}

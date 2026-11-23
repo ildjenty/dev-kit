@@ -1,0 +1,234 @@
+name: fix
+description: |
+  The fix part. Input: the commit checked out (HEAD) and the findings of the code judgments the
+  record binds to it (blocking, not the owner's), with the latest requirements and, when there is one, the latest
+  plan; the owner's answers when the session passes them (input `answers`).
+  Stops without fixing when this fix would exceed the configured limits.fixes since the last implement.
+  Otherwise a fresh session fixes the findings, or objects to one
+  with evidence; a fresh dispute judge that neither made the finding nor fixes it accepts or rejects each objection
+  (accepted: not fixed; rejected: fixed in the next pass). The checks the change needs run after each pass, at most 3
+  passes. A pass whose checks passed is committed with the run and the commit it fixed as trailers; the judge part
+  judges the new commit. A decision only the owner can make returns back to plan with a pending owner row; a decision of the plan
+  that does not hold, or a check that keeps failing, goes to a fresh judge that names the premise and where to go back.
+  Ends with pass, back or stop, written to the record by devkit record result with the dispute judgments. Output:
+  the result as recorded, or the start's output when the start conditions did not hold.
+worktree:
+  enabled: true
+inputs:
+  answers:
+    default: ""
+    description: The owner's answers as a JSON array of {question_id, answer}, or empty.
+  continue:
+    default: ""
+    description: The owner's words, as written, that let the branch start past the limit of restarts (devkit record limit), or empty. Only a start that reaches the limit takes them; any other start stops when they are passed.
+returns: result
+nodes:
+  - id: start
+    bash: devkit record start fix
+    output_format:
+      type: object
+      properties:
+        stopped: { type: boolean }
+        stage: { type: string }
+        reason: { type: string }
+        details: { type: string }
+        remaining: { type: array, items: { type: string } }
+        start: { type: string }
+        counted: { type: boolean }
+        restarts: { type: integer }
+      required: [stopped, stage, reason, details, remaining, start, counted, restarts]
+
+  - id: start-stopped
+    depends_on: [start]
+    when: "$start.output.stopped == true"
+    bash: |
+      value=$start.output
+      printf '%s' "$value"
+
+  - id: prepare
+    depends_on: [start]
+    when: "$start.output.stopped == false"
+    bash: devkit fix prepare
+    output_format:
+      type: object
+      properties:
+        ready: { type: boolean }
+        reason: { type: string }
+        findings: { type: integer }
+        rounds: { type: integer }
+        limit_reached: { type: boolean }
+        limit: { type: integer }
+      required: [ready, reason, findings, rounds, limit_reached, limit]
+
+  - id: proceed
+    depends_on: [prepare]
+    bash: devkit fix proceed
+    output_format:
+      type: object
+      properties:
+        proceed: { type: boolean }
+      required: [proceed]
+
+  - id: repair
+    depends_on: [proceed]
+    when: "$proceed.output.proceed == true"
+    loop_group:
+      max_iterations: 3
+      on_exhausted: complete
+      nodes:
+        - id: fix-code
+          provider: claude
+          command: fix
+          context: fresh
+          output_format:
+            type: object
+            additionalProperties: false
+            properties:
+              owner_decisions:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    target: { type: string, enum: [finding, decision] }
+                    ref: { type: string }
+                    question: { type: string }
+                  required: [target, ref, question]
+              broken_decisions:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    row: { type: string }
+                    observation: { type: string }
+                  required: [row, observation]
+              commit_message: { type: string }
+              fixed:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    finding: { type: string }
+                    change: { type: string }
+                  required: [finding, change]
+            required: [owner_decisions, broken_decisions, fixed, commit_message]
+        - id: objections
+          depends_on: [fix-code]
+          bash: devkit fix objections
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              count: { type: integer }
+            required: [round, count]
+        - id: dispute
+          depends_on: [objections]
+          when: "$objections.output.count > 0"
+          provider: claude
+          command: dispute
+          context: fresh
+          mutates_checkout: false
+          denied_tools: [Edit, Write, NotebookEdit]
+          output_format:
+            type: object
+            additionalProperties: false
+            properties:
+              decisions:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    finding: { type: string }
+                    decision: { type: string, enum: [accepted, rejected] }
+                    reason: { type: string }
+                    observations: { type: array, items: { type: string } }
+                  required: [finding, decision, reason, observations]
+            required: [decisions]
+        - id: dispute-end
+          depends_on: [objections, dispute]
+          trigger_rule: none_failed_min_one_success
+          bash: |
+            dispute=$dispute.output
+            DISPUTE="$dispute" devkit fix dispute-end
+          output_format:
+            type: object
+            properties:
+              pending: { type: integer }
+            required: [pending]
+        - id: checks
+          depends_on: [dispute-end]
+          bash: devkit checks
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              passed: { type: boolean }
+              stuck: { type: boolean }
+              failing: { type: array, items: { type: string } }
+              stuck_checks: { type: array, items: { type: string } }
+              skipped: { type: array, items: { type: string } }
+              results: { type: string }
+            required: [round, passed, stuck, failing, stuck_checks, skipped, results]
+        - id: round-end
+          depends_on: [checks]
+          bash: |
+            gate=$checks.output
+            code=$fix-code.output
+            GATE="$gate" CODE="$code" devkit fix round-end
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              finished: { type: boolean }
+              passed: { type: boolean }
+              stuck: { type: boolean }
+              pending: { type: integer }
+              needs_owner: { type: integer }
+              broken: { type: integer }
+            required: [round, finished, passed, stuck, pending, needs_owner, broken]
+      until_bash: 'f=$round-end.output.finished; test "$f" = true'
+
+  - id: fix-state
+    depends_on: [proceed, repair]
+    trigger_rule: none_failed_min_one_success
+    bash: devkit fix state
+    output_format:
+      type: object
+      properties:
+        judge_back: { type: boolean }
+      required: [judge_back]
+
+  - id: step-back
+    depends_on: [fix-state]
+    when: "$fix-state.output.judge_back == true"
+    provider: claude
+    command: step-back
+    context: fresh
+    mutates_checkout: false
+    denied_tools: [Edit, Write, NotebookEdit]
+    output_format:
+      type: object
+      additionalProperties: false
+      properties:
+        next: { type: string, enum: [requirements, plan, implement, fix, environment] }
+        premise: { type: string }
+        observation: { type: string }
+      required: [next, premise, observation]
+
+  - id: finish
+    depends_on: [fix-state, step-back]
+    trigger_rule: none_failed_min_one_success
+    bash: |
+      back=$step-back.output
+      STEP_BACK="$back" devkit fix finish
+
+  - id: result
+    depends_on: [finish, start-stopped]
+    trigger_rule: one_success
+    bash: |
+      finish=$finish.output
+      stopped=$start-stopped.output
+      printf '%s' "$finish$stopped"

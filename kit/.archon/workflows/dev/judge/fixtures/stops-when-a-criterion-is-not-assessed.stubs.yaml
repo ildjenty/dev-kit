@@ -1,0 +1,95 @@
+changes:
+    changes_count: 1
+    launch_contract: false
+    launch_cost: false
+    launch_data: false
+    launch_readability: false
+    launch_scope: true
+    launch_security: false
+    launch_structure: false
+    launch_test: true
+    launch_ui: false
+    proceed: true
+    unlisted_count: 0
+checks:
+    failing: []
+    passed: true
+    results: /tmp/checks/1.jsonl
+    round: 1
+    skipped: []
+    stuck: false
+    stuck_checks: []
+collect:
+    blocking_count: 0
+    findings_count: 0
+    judges_count: 2
+completion:
+    checked_count: 1
+    missing_count: 0
+    path: /tmp/judge/completion.json
+    proceed: true
+finish:
+    base: b0
+    commit: c1
+    outcome: stop
+    run_id: r1
+fixture:
+    expect: completed
+    reached:
+        - completion
+judge-scope:
+    criteria:
+        - aspect: scope
+          checked: no comment added
+          not_checked: The supporting source is missing
+          verdict: not_assessed
+        - aspect: decisions
+          checked: the body follows D1
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-test:
+    criteria:
+        - aspect: test
+          checked: C1 is checked by its test
+          not_checked: ""
+          verdict: pass
+        - aspect: checks
+          checked: no check weakened
+          not_checked: ""
+          verdict: pass
+    findings: []
+launch:
+    changes_count: 1
+    launch_contract: false
+    launch_cost: false
+    launch_data: false
+    launch_readability: false
+    launch_scope: true
+    launch_security: false
+    launch_structure: false
+    launch_test: true
+    launch_ui: false
+    proceed: true
+    unlisted_count: 0
+prepare:
+    accepted_objections_count: 0
+    base: b0
+    commit: c1
+    criteria_commit: k0
+    details: []
+    has_plan: true
+    has_requirements: true
+    reason: ""
+    stopped: false
+route:
+    qualities: []
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: next
+    stopped: false

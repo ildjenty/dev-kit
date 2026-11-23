@@ -1,0 +1,74 @@
+advance:
+    proceed: false
+facts:
+    path: /tmp/plan/facts-before.json
+    paths: 2
+finish:
+    carried: []
+    outcome: stop
+    plan_version: 1
+    questions: []
+    reasons:
+        - 'structure: Missing source'
+    skeleton_commit: def
+fixture:
+    expect: completed
+    reached:
+        - structure-write
+        - structure-check
+        - judge-structure
+        - structure-settle
+        - advance
+        - finish
+        - result
+judge-structure:
+    checked: ""
+    findings: []
+    not_checked: Missing source
+    verdict: not_assessed
+prepare:
+    base: abc
+    criteria: /tmp/criteria
+    input: /tmp/plan/input.json
+result:
+    carried: []
+    outcome: stop
+    plan_version: 1
+    questions: []
+    reasons:
+        - 'structure: Missing source'
+    skeleton_commit: def
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: next
+    stopped: false
+structure-check:
+    contract: false
+    cost: false
+    data: false
+    errors: []
+    materials: /tmp/plan/rounds/1
+    round: 1
+    security: false
+    skeleton_commit: def
+    structure: true
+    ui: false
+    valid: true
+structure-settle:
+    back: false
+    done: false
+    fixable_count: 0
+    needs_decision_count: 0
+    not_assessed_count: 1
+    round: 3
+    valid: true
+structure-write:
+    prototype: ""
+    provisional: []
+    structure_question: May work proceed with this structure?
+    uncertain: []

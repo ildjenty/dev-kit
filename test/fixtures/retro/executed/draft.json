@@ -1,0 +1,19 @@
+{
+  "summary": "Repair deferred defect",
+  "units": [
+    {
+      "key": "repair",
+      "title": "Repair defect",
+      "goal": "Remove the observed defect",
+      "completion_conditions": [
+        "The defect no longer occurs"
+      ],
+      "entries": [
+        ".devkit/backlog/fixture.json#deferred/0"
+      ]
+    }
+  ],
+  "checks": [],
+  "standards": [],
+  "dismissed": []
+}

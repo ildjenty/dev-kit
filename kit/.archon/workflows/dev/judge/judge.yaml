@@ -1,0 +1,549 @@
+---
+name: judge
+description: Judge the committed change using fixed criteria, configured decision
+  paths and quality materials. Checks and fresh quality judges run together. Missing
+  planned tests block; unlisted decisions return to plan. Record pass, back
+  or stop.
+inputs:
+  answers:
+    default: ''
+    description: The owner's answers, a JSON array of {question_id, answer} as the
+      owner wrote them, or empty.
+  continue:
+    default: ''
+    description: The owner's words, as written, that let the branch start past the
+      limit of restarts (devkit record limit), or empty. Only a start that reaches the
+      limit takes them; any other start stops when they are passed.
+worktree:
+  enabled: true
+returns: finish
+nodes:
+- id: start
+  bash: devkit record start judge
+  output_format:
+    type: object
+    properties:
+      stopped:
+        type: boolean
+      stage:
+        type: string
+      reason:
+        type: string
+      details:
+        type: string
+      remaining:
+        type: array
+        items:
+          type: string
+      start:
+        type: string
+      counted:
+        type: boolean
+      restarts:
+        type: integer
+    required:
+    - stopped
+    - stage
+    - reason
+    - details
+    - remaining
+    - start
+    - counted
+    - restarts
+- id: prepare
+  depends_on:
+  - start
+  when: "$start.output.stopped == false"
+  bash: devkit judge prepare
+  output_format:
+    type: object
+    properties:
+      stopped:
+        type: boolean
+      reason:
+        type: string
+      details:
+        type: array
+        items:
+          type: string
+      base:
+        type: string
+      commit:
+        type: string
+      criteria_commit:
+        type: string
+      has_requirements:
+        type: boolean
+      has_plan:
+        type: boolean
+      accepted_objections_count:
+        type: integer
+    required:
+    - stopped
+    - reason
+    - details
+    - base
+    - commit
+    - criteria_commit
+    - has_requirements
+    - has_plan
+    - accepted_objections_count
+- id: changes
+  depends_on:
+  - prepare
+  when: "$prepare.output.stopped == false"
+  bash: devkit judge changes
+  timeout: 1200000
+  output_format:
+    type: object
+    properties:
+      proceed:
+        type: boolean
+      changes_count:
+        type: integer
+      unlisted_count:
+        type: integer
+      launch_structure:
+        type: boolean
+      launch_data:
+        type: boolean
+      launch_contract:
+        type: boolean
+      launch_security:
+        type: boolean
+      launch_ui:
+        type: boolean
+      launch_cost:
+        type: boolean
+      launch_test:
+        type: boolean
+      launch_scope:
+        type: boolean
+      launch_readability:
+        type: boolean
+    required:
+    - proceed
+    - changes_count
+    - unlisted_count
+    - launch_structure
+    - launch_data
+    - launch_contract
+    - launch_security
+    - launch_ui
+    - launch_cost
+    - launch_test
+    - launch_scope
+    - launch_readability
+- id: route
+  depends_on: [changes]
+  when: "$changes.output.proceed == true"
+  provider: claude
+  context: fresh
+  mutates_checkout: false
+  allowed_tools: [Read, Grep, Glob]
+  command: route
+  output_format:
+    type: object
+    additionalProperties: false
+    properties:
+      qualities:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          properties:
+            quality: { type: string }
+            file: { type: string }
+            reason: { type: string, minLength: 1 }
+          required: [quality, file, reason]
+    required: [qualities]
+- id: launch
+  depends_on: [route]
+  bash: |
+    route=$route.output
+    ROUTE="$route" devkit judge launch
+  output_format:
+    type: object
+    properties:
+      proceed:
+        type: boolean
+      changes_count:
+        type: integer
+      unlisted_count:
+        type: integer
+      launch_structure:
+        type: boolean
+      launch_data:
+        type: boolean
+      launch_contract:
+        type: boolean
+      launch_security:
+        type: boolean
+      launch_ui:
+        type: boolean
+      launch_cost:
+        type: boolean
+      launch_test:
+        type: boolean
+      launch_scope:
+        type: boolean
+      launch_readability:
+        type: boolean
+    required:
+    - proceed
+    - changes_count
+    - unlisted_count
+    - launch_structure
+    - launch_data
+    - launch_contract
+    - launch_security
+    - launch_ui
+    - launch_cost
+    - launch_test
+    - launch_scope
+    - launch_readability
+- id: checks
+  depends_on:
+  - changes
+  when: "$changes.output.proceed == true"
+  bash: devkit checks
+  output_format:
+    type: object
+    properties:
+      round:
+        type: integer
+      passed: &1
+        type: boolean
+      stuck: *1
+      failing: &2
+        type: array
+        items: &3
+          type: string
+      stuck_checks: *2
+      skipped: *2
+      results: *3
+    required:
+    - round
+    - passed
+    - stuck
+    - failing
+    - stuck_checks
+    - skipped
+    - results
+  timeout: 7200000
+- id: completion
+  depends_on:
+  - changes
+  when: "$changes.output.proceed == true"
+  bash: devkit judge completion
+  timeout: 600000
+  output_format:
+    type: object
+    properties:
+      proceed:
+        type: boolean
+      checked_count:
+        type: integer
+      missing_count:
+        type: integer
+      path:
+        type: string
+    required:
+    - proceed
+    - checked_count
+    - missing_count
+    - path
+- id: judge-structure
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_structure == true"
+  with:
+    quality: structure
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
+  output_format: &4
+    type: object
+    additionalProperties: false
+    properties:
+      criteria:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          properties:
+            aspect:
+              type: string
+            verdict:
+              type: string
+              enum:
+              - pass
+              - fail
+              - not_assessed
+            checked:
+              type: string
+            not_checked:
+              type: string
+          required:
+          - aspect
+          - verdict
+          - checked
+          - not_checked
+      findings:
+        type: array
+        items:
+          type: object
+          additionalProperties: false
+          properties:
+            aspect:
+              type: string
+            file:
+              type: string
+            line:
+              type: string
+            blocking:
+              type: boolean
+            needs_decision:
+              type: boolean
+            deferred: { type: boolean }
+            mechanical:
+              type: boolean
+            failure_scenario:
+              type: string
+            evidence:
+              type: string
+            fix:
+              type: string
+          required:
+          - aspect
+          - file
+          - line
+          - blocking
+          - needs_decision
+          - mechanical
+          - failure_scenario
+          - evidence
+          - fix
+    required:
+    - criteria
+    - findings
+  settingSources:
+  - user
+- id: judge-data
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_data == true"
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  denied_tools:
+  - Edit
+  - Write
+  - NotebookEdit
+  output_format: *4
+  with:
+    quality: data
+  settingSources:
+  - user
+- id: judge-contract
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_contract == true"
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  denied_tools:
+  - Edit
+  - Write
+  - NotebookEdit
+  output_format: *4
+  with:
+    quality: contract
+  settingSources:
+  - user
+- id: judge-security
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_security == true"
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  denied_tools:
+  - Edit
+  - Write
+  - NotebookEdit
+  output_format: *4
+  with:
+    quality: security
+  settingSources:
+  - user
+- id: judge-ui
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_ui == true"
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  denied_tools:
+  - Edit
+  - Write
+  - NotebookEdit
+  output_format: *4
+  with:
+    quality: ui
+  settingSources:
+  - user
+- id: judge-cost
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_cost == true"
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  denied_tools:
+  - Edit
+  - Write
+  - NotebookEdit
+  output_format: *4
+  with:
+    quality: cost
+  settingSources:
+  - user
+- id: judge-test
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_test == true"
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  denied_tools:
+  - Edit
+  - Write
+  - NotebookEdit
+  output_format: *4
+  with:
+    quality: test
+  settingSources:
+  - user
+- id: judge-scope
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_scope == true"
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  denied_tools:
+  - Edit
+  - Write
+  - NotebookEdit
+  output_format: *4
+  with:
+    quality: scope
+  settingSources:
+  - user
+- id: judge-readability
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_readability == true"
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  denied_tools:
+  - Edit
+  - Write
+  - NotebookEdit
+  output_format: *4
+  with:
+    quality: readability
+  settingSources:
+  - user
+- id: collect
+  depends_on:
+  - launch
+  - judge-structure
+  - judge-data
+  - judge-contract
+  - judge-security
+  - judge-ui
+  - judge-cost
+  - judge-test
+  - judge-scope
+  - judge-readability
+  trigger_rule: none_failed_min_one_success
+  when: "$changes.output.proceed == true"
+  bash: |
+    changes=$launch.output
+    structure=$judge-structure.output
+    data=$judge-data.output
+    contract=$judge-contract.output
+    security=$judge-security.output
+    ui=$judge-ui.output
+    cost=$judge-cost.output
+    test=$judge-test.output
+    readability=$judge-readability.output
+    scope=$judge-scope.output
+    CHANGES="$changes" JUDGE_STRUCTURE="$structure" JUDGE_DATA="$data" JUDGE_CONTRACT="$contract" JUDGE_SECURITY="$security" JUDGE_UI="$ui" JUDGE_COST="$cost" JUDGE_TEST="$test" JUDGE_READABILITY="$readability" JUDGE_SCOPE="$scope" devkit judge collect
+  output_format:
+    type: object
+    properties:
+      judges_count:
+        type: integer
+      findings_count:
+        type: integer
+      blocking_count:
+        type: integer
+    required:
+    - judges_count
+    - findings_count
+    - blocking_count
+- id: finish
+  depends_on:
+  - start
+  - prepare
+  - changes
+  - launch
+  - checks
+  - completion
+  - collect
+  trigger_rule: all_done
+  when: "$start.output.stopped == false"
+  bash: |
+    prepare=$prepare.output
+    changes=$changes.output
+    gate=$checks.output
+    completion=$completion.output
+    collect=$collect.output
+    PREPARE="$prepare" CHANGES="$changes" GATE="$gate" COMPLETION="$completion" COLLECT="$collect" devkit judge finish
+  output_format:
+    type: object
+    properties:
+      run_id:
+        type: string
+      outcome:
+        type: string
+        enum:
+        - pass
+        - back
+        - stop
+      commit:
+        type: string
+      base:
+        type: string
+    required:
+    - run_id
+    - outcome
+    - commit
+    - base

@@ -1,0 +1,131 @@
+changes:
+    changes_count: 3
+    launch_contract: true
+    launch_cost: false
+    launch_data: false
+    launch_readability: false
+    launch_scope: true
+    launch_security: false
+    launch_structure: true
+    launch_test: true
+    launch_ui: false
+    proceed: true
+    unlisted_count: 0
+checks:
+    failing: []
+    passed: true
+    results: /tmp/checks/1.jsonl
+    round: 1
+    skipped: []
+    stuck: false
+    stuck_checks: []
+collect:
+    blocking_count: 2
+    findings_count: 2
+    judges_count: 4
+completion:
+    checked_count: 2
+    missing_count: 0
+    path: /tmp/judge/completion.json
+    proceed: true
+finish:
+    base: b0
+    commit: c2
+    outcome: stop
+    run_id: r1
+fixture:
+    expect: completed
+    reached:
+        - completion
+judge-contract:
+    criteria:
+        - aspect: contract
+          checked: placeOrder accepts a negative amount
+          not_checked: ""
+          verdict: fail
+        - aspect: decisions
+          checked: D2
+          not_checked: ""
+          verdict: pass
+    findings:
+        - aspect: contract
+          blocking: true
+          evidence: data.md criterion3
+          failure_scenario: a negative amount is stored
+          file: packages/shop/src/orders/place.ts
+          fix: validate the amount
+          line: "12"
+          mechanical: false
+          needs_decision: false
+judge-scope:
+    criteria:
+        - aspect: scope
+          checked: diff
+          not_checked: ""
+          verdict: pass
+        - aspect: decisions
+          checked: rows
+          not_checked: ""
+          verdict: pass
+    findings: []
+judge-structure:
+    criteria:
+        - aspect: structure
+          checked: facts and diff
+          not_checked: ""
+          verdict: fail
+    findings:
+        - aspect: structure
+          blocking: true
+          evidence: 'smells.md: criterion'
+          failure_scenario: orders and payments import each other
+          file: packages/shop/src/orders/place.ts
+          fix: move the shared type down
+          line: ""
+          mechanical: false
+          needs_decision: false
+judge-test:
+    criteria:
+        - aspect: test
+          checked: C1, C2
+          not_checked: ""
+          verdict: pass
+        - aspect: checks
+          checked: none
+          not_checked: ""
+          verdict: pass
+    findings: []
+launch:
+    changes_count: 3
+    launch_contract: true
+    launch_cost: false
+    launch_data: false
+    launch_readability: false
+    launch_scope: true
+    launch_security: false
+    launch_structure: true
+    launch_test: true
+    launch_ui: false
+    proceed: true
+    unlisted_count: 0
+prepare:
+    accepted_objections_count: 1
+    base: b0
+    commit: c2
+    criteria_commit: k0
+    details: []
+    has_plan: true
+    has_requirements: true
+    reason: ""
+    stopped: false
+route:
+    qualities: []
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: next
+    stopped: false

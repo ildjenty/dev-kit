@@ -1,0 +1,68 @@
+---
+fixture:
+  expect: completed
+  reached:
+  - resolve
+  - continue
+  - rebased
+  - checks
+  - finish
+  - result
+start:
+  stopped: false
+  stage: start
+  reason: ''
+  details: "/tmp/record"
+  remaining: []
+  start: next
+  counted: false
+  restarts: 0
+rebase:
+  state: conflict
+  previous: p
+  onto: o
+  ref: origin/main
+  rounds: 0
+  contradiction: ''
+  files:
+  - a.ts
+  commit: r
+resolve:
+  resolved: true
+  contradiction: ''
+continue:
+  state: done
+  previous: p
+  onto: o
+  ref: origin/main
+  rounds: 1
+  contradiction: ''
+  files: []
+  commit: c
+rebased:
+  state: done
+  previous: p
+  onto: o
+  ref: origin/main
+  rounds: 1
+  contradiction: ''
+  files: []
+  commit: c
+finish:
+  outcome: pass
+  needs_judge: true
+  conflict_rounds: 1
+  onto: o
+  previous: p
+  commit: c
+  failing: []
+  stop: 
+result: {}
+checks:
+  round: 1
+  passed: true
+  stuck: false
+  failing: []
+  stuck_checks: []
+  skipped: []
+  results: x

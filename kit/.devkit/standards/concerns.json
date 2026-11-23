@@ -1,0 +1,229 @@
+{
+  "qualities": {
+    "structure": {
+      "title": "Structure",
+      "decides": "Where responsibilities live and how boundaries and dependencies contain change.",
+      "principles": [
+        "structure/principles.md#1",
+        "structure/principles.md#2",
+        "structure/principles.md#3",
+        "structure/principles.md#4",
+        "structure/principles.md#5",
+        "structure/principles.md#6",
+        "structure/principles.md#7",
+        "designing.md#2",
+        "designing.md#4",
+        "designing.md#5"
+      ],
+      "plan": [
+        "review/structure.md"
+      ],
+      "code": [
+        "review/structure.md"
+      ]
+    },
+    "data": {
+      "title": "Data",
+      "decides": "How facts, valid states, ownership and lifetime preserve meaning and invariants.",
+      "principles": [
+        "data.md#1",
+        "data.md#2",
+        "data.md#3",
+        "data.md#4",
+        "data.md#5",
+        "data.md#6",
+        "data.md#7"
+      ],
+      "plan": [
+        "review/data.md"
+      ],
+      "code": [
+        "review/data.md"
+      ]
+    },
+    "contract": {
+      "title": "Contract",
+      "decides": "What callers may supply, observe and rely on through failure, reruns and concurrency.",
+      "principles": [
+        "engineering.md#1",
+        "engineering.md#2",
+        "engineering.md#7"
+      ],
+      "plan": [
+        "review/contract.md"
+      ],
+      "code": [
+        "review/contract.md"
+      ]
+    },
+    "security": {
+      "title": "Security",
+      "decides": "Which trust boundaries, permissions, dependencies and records protect operations and information.",
+      "principles": [
+        "security.md#1",
+        "security.md#2",
+        "security.md#3",
+        "security.md#4",
+        "security.md#5",
+        "security.md#6",
+        "engineering.md#6"
+      ],
+      "plan": [
+        "review/security.md"
+      ],
+      "code": [
+        "review/security.md"
+      ]
+    },
+    "ui": {
+      "title": "Ui",
+      "decides": "How users understand and complete their task through visible states and interactions.",
+      "principles": [
+        "ui.md#1",
+        "ui.md#2",
+        "ui.md#3",
+        "ui.md#4",
+        "ui.md#5",
+        "ui.md#6",
+        "ui.md#7",
+        "ui.md#8",
+        "ui.md#9",
+        "ui.md#10",
+        "ui.md#11"
+      ],
+      "plan": [
+        "review/ui.md"
+      ],
+      "code": [
+        "review/ui.md"
+      ]
+    },
+    "cost": {
+      "title": "Cost",
+      "decides": "Which performance, observability, rollout and operational measures justify their cost.",
+      "principles": [
+        "designing.md#6"
+      ],
+      "plan": [
+        "review/cost.md"
+      ],
+      "code": [
+        "review/cost.md"
+      ]
+    },
+    "test": {
+      "title": "Test",
+      "decides": "Which executable evidence detects failures of the agreed behavior.",
+      "principles": [
+        "testing.md#1",
+        "testing.md#2",
+        "testing.md#3",
+        "testing.md#4",
+        "testing.md#5",
+        "testing.md#6",
+        "testing.md#7",
+        "testing.md#8",
+        "testing.md#9",
+        "working.md#3"
+      ],
+      "plan": [],
+      "code": [
+        "review/test.md"
+      ]
+    },
+    "delivery": {
+      "title": "Delivery",
+      "decides": "How ordered release units and verification cover the request end to end.",
+      "principles": [
+        "designing.md#3",
+        "working.md#2"
+      ],
+      "plan": [
+        "review/delivery.md"
+      ],
+      "code": []
+    },
+    "scope": {
+      "title": "Scope",
+      "decides": "Which changes fulfill the agreed request and preserve affected uses within authority.",
+      "principles": [
+        "engineering.md#5",
+        "working.md#6",
+        "working.md#7"
+      ],
+      "plan": [],
+      "code": [
+        "review/scope.md"
+      ]
+    },
+    "readability": {
+      "title": "Readability",
+      "decides": "Which names, comments and conventions make the changed code understandable.",
+      "principles": [
+        "engineering.md#3",
+        "engineering.md#4",
+        "designing.md#7"
+      ],
+      "plan": [],
+      "code": [
+        "review/readability.md"
+      ]
+    }
+  },
+  "every_quality": [
+    "designing.md#1"
+  ],
+  "others": {
+    "writer:implement": [
+      "context.md#1",
+      "context.md#2",
+      "context.md#4",
+      "context.md#5",
+      "working.md#5",
+      "verification.md#3"
+    ],
+    "judge:requirements": [
+      "review/purpose.md",
+      "working.md#1",
+      "context.md#3"
+    ],
+    "judge:pr-body": [
+      "review/report.md",
+      "writing.md#1",
+      "verification.md#1",
+      "verification.md#2",
+      "verification.md#4"
+    ],
+    "judge:refine": [
+      "review/wording.md",
+      "review/purpose.md",
+      "writing.md#2",
+      "writing.md#3",
+      "writing.md#4",
+      "writing.md#5",
+      "writing.md#6",
+      "writing.md#7",
+      "writing.md#8",
+      "writing.md#9"
+    ],
+    "judge:retro": [
+      "review/harness.md",
+      "harness.md#1",
+      "harness.md#3",
+      "harness.md#4"
+    ],
+    "judge:step-back": [
+      "harness.md#2",
+      "working.md#4"
+    ],
+    "writer:requirements": [],
+    "writer:plan": [],
+    "writer:refine": [],
+    "writer:tests": [],
+    "writer:fix": [],
+    "writer:pr-body": [],
+    "writer:sync": [],
+    "judge:dispute": [],
+    "writer:retro": []
+  }
+}

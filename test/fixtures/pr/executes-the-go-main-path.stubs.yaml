@@ -1,0 +1,24 @@
+exec-code: true
+fixture:
+  expect: completed
+  reached: ["start", "allow", "facts", "body-assemble", "body-record", "report-state", "open", "finish", "result"]
+body-write:
+  title: t
+  opening: o
+  how_to_see: h
+  after_merge: ''
+  headings:
+    what_changed: What changed
+    how_checked: How it was checked
+    what_remains: What remains
+    decisions: Decisions
+    after_merge: Work after merge
+body-judge:
+  verdict: pass
+  findings: []
+  observations:
+  - read pr.md
+open:
+  url: https://example.invalid/pull/1
+  branch: feature/x
+  commit: abc

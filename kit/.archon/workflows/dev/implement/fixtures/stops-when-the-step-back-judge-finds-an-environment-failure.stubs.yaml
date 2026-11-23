@@ -1,0 +1,13 @@
+fixture:
+  expect: completed
+  reached: [unit-end, step-back, finish, result]
+start: { stopped: false, stage: start, reason: "", details: "", remaining: [], start: next, counted: false, restarts: 0 }
+prepare: { units: 1, remaining: 1, has_plan: true }
+unit: { unit: U1, tests_written: true, round: 2 }
+code: { owner_decisions: [], uncertain: [], commit_message: "feat: allow cancellation" }
+checks: { round: 2, passed: false, stuck: true, failing: [test], stuck_checks: [test], skipped: [], results: x }
+unit-end: { unit: U1, committed: false, all_done: false, finished: true, needs_owner: 0, stuck: true, decision_errors: 0 }
+units-state: { stuck: true }
+step-back: { next: environment, premise: "A required executable is unavailable", observation: "checks/2-test.log:12" }
+finish: '{"outcome":"stop"}'
+result: '{"outcome":"stop"}'

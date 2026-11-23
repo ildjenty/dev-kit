@@ -1,0 +1,42 @@
+exec-code: true
+fixture:
+    expect: completed
+    reached:
+        - start
+        - prepare
+        - facts
+        - structure-write
+        - structure-check
+        - judge-structure
+        - structure-settle
+        - advance
+        - write
+        - check
+        - judge-delivery
+        - settle
+        - finish
+        - result
+judge-delivery:
+    back:
+        needed: false
+        observation: ""
+        premise: ""
+    checked: Release units and test plan
+    findings: []
+    not_checked: ""
+    verdict: pass
+judge-structure:
+    checked: D1 and skeleton
+    findings: []
+    not_checked: ""
+    verdict: pass
+structure-write:
+    prototype: ""
+    provisional: []
+    structure_question: May work proceed with this structure?
+    uncertain: []
+write:
+    prototype: ""
+    provisional: []
+    structure_question: May work proceed with this structure?
+    uncertain: []

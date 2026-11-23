@@ -1,0 +1,187 @@
+name: requirements
+description: |
+  The requirements part: turns the request into requirements (goal, completion conditions with
+  IDs, constraints, open points) and has a fresh judge compare them with the requests and the owner's answers
+  (review/purpose.md in the configured criteria folder), rewriting until nothing blocks, at most 3 times.
+  Runs on its own on the branch of the request: the first
+  node checks the start conditions on the record of the request ($STATE_DIR/records/<branch>/) and records the
+  owner's answers; the last writes the requirements, the judgment and the result there. Ends with pass, question
+  (one question per open point, answered by starting this workflow again with the answers) or stop.
+  Inputs: unit (a unit ID, or empty for a direct request), owner_words (the owner's words of a new request; empty when only answering), supplement (what the
+  session added, kept apart), answers (a JSON array of {question_id, answer}, or empty), continue (the owner's
+  words that let the branch start past the limit of restarts, or empty).
+inputs:
+  unit:
+    default: ""
+    description: A unit ID from the configured units folder; its agreed decisions are constraints.
+  owner_words:
+    default: ""
+    description: The owner's words of the request, as written. Empty when the run only passes answers.
+  supplement:
+    default: ""
+    description: What the session added to the owner's words, including Issue or PR text. Treated as candidates, not constraints.
+  answers:
+    default: ""
+    description: 'The owner''s answers, a JSON array of {"question_id": "Q1", "answer": "..."}, or empty.'
+  continue:
+    default: ""
+    description: The owner's words, as written, that let the branch start past the limit of restarts (devkit record limit), or empty. Only a start that reaches the limit takes them; any other start stops when they are passed.
+returns: result
+nodes:
+  - id: start
+    bash: devkit record start requirements
+    output_format: &start
+      type: object
+      properties:
+        stopped: { type: boolean }
+        stage: { type: string }
+        reason: { type: string }
+        details: { type: string }
+        remaining: { type: array, items: { type: string } }
+        start: { type: string }
+        counted: { type: boolean }
+        restarts: { type: integer }
+      required: [stopped, stage, reason, details, remaining, start, counted, restarts]
+
+  - id: not-started
+    depends_on: [start]
+    when: "$start.output.stopped == true"
+    bash: |
+      value=$start.output
+      devkit requirements not-started "$value"
+    output_format: &result
+      type: object
+      properties:
+        outcome: { type: string, enum: [not_started, pass, question, stop] }
+        requirements_version: { type: integer }
+
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              text: { type: string }
+            required: [id, text]
+        reasons: { type: array, items: { type: string } }
+      required: [outcome, requirements_version, questions, reasons]
+
+  - id: prepare
+    depends_on: [start]
+    when: "$start.output.stopped == false"
+    bash: devkit requirements prepare
+    output_format:
+      type: object
+      properties:
+        input: { type: string }
+        criteria: { type: string }
+      required: [input, criteria]
+
+  - id: draft
+    depends_on: [prepare]
+    loop_group:
+      max_iterations: 3
+      on_exhausted: complete
+      nodes:
+        - id: write
+          provider: claude
+          command: write
+          mutates_checkout: false
+          denied_tools: [Edit, Write, NotebookEdit]
+          output_format:
+            type: object
+            additionalProperties: false
+            properties:
+              goal: { type: string }
+              completion_conditions:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    id: { type: string }
+                    text: { type: string }
+                  required: [id, text]
+              constraints: { type: array, items: { type: string } }
+              open_points:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    id: { type: string }
+                    text: { type: string }
+                  required: [id, text]
+            required: [goal, completion_conditions, constraints, open_points]
+
+        - id: judge
+          depends_on: [write]
+          provider: claude
+          settingSources: [user]
+          command: judge
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          output_format:
+            type: object
+            additionalProperties: false
+            properties:
+              criteria:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    aspect: { type: string, enum: [coverage, additions, open_points, decidable] }
+                    verdict: { type: string, enum: [pass, fail, not_assessed] }
+                    checked: { type: string }
+                    not_checked: { type: string }
+                  required: [aspect, verdict, checked, not_checked]
+              findings:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    aspect: { type: string, enum: [coverage, additions, open_points, decidable] }
+                    item: { type: string }
+                    blocking: { type: boolean }
+                    needs_decision: { type: boolean }
+                    failure_scenario: { type: string }
+                    evidence: { type: string }
+                    fix: { type: string }
+                  required: [aspect, item, blocking, needs_decision, failure_scenario, evidence, fix]
+
+
+            required: [criteria, findings]
+
+        - id: round
+          depends_on: [judge]
+          bash: |
+            requirements=$write.output
+            judgment=$judge.output
+            INPUTS_REQUIREMENTS="$requirements" INPUTS_JUDGMENT="$judgment" \
+              devkit requirements round
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              valid: { type: boolean }
+              blocking_count: { type: integer }
+              not_assessed_count: { type: integer }
+            required: [round, valid, blocking_count, not_assessed_count]
+      until_bash: 'v=$round.output.valid; b=$round.output.blocking_count; n=$round.output.not_assessed_count; test "$v" = true && test "$b" = 0 && test "$n" = 0'
+
+  - id: finish
+    depends_on: [draft]
+    bash: devkit requirements finish
+    output_format: *result
+
+  - id: result
+    depends_on: [not-started, finish]
+    trigger_rule: none_failed_min_one_success
+    bash: |
+      finished=$finish.output
+      skipped=$not-started.output
+      printf '%s' "${finished:-$skipped}"
+    output_format: *result

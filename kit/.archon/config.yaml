@@ -1,0 +1,6 @@
+defaults:
+  loadDefaultWorkflows: false
+  loadDefaultCommands: false
+worktree:
+  baseBranch: main
+  postCreate: []

@@ -1,0 +1,9 @@
+fixture:
+  expect: completed
+  reached: [not-started, result]
+  inputs:
+    answers: '[{"question_id":"Q1","answer":"name"}]'
+start: { stopped: true, stage: start, reason: the answers were not recorded, details: /tmp/record, remaining: ["Q1 is already answered"], start: "", counted: false, restarts: 0 }
+not-started: { outcome: not_started, requirements_version: 0, questions: [], reasons: ["the answers were not recorded", "Q1 is already answered"] }
+# No stub for prepare, write, judge, round or finish: a run that reaches them fails this fixture.
+result: { outcome: not_started, requirements_version: 0, questions: [], reasons: ["the answers were not recorded", "Q1 is already answered"] }

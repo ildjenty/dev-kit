@@ -1,0 +1,103 @@
+advance:
+    proceed: true
+check:
+    contract: false
+    cost: false
+    data: false
+    errors:
+        - Completion condition C1 has no test-plan entry
+    materials: /tmp/plan/rounds/3
+    round: 3
+    security: false
+    skeleton_commit: def
+    structure: false
+    ui: false
+    valid: false
+facts:
+    path: /tmp/plan/facts-before.json
+    paths: 0
+finish:
+    carried: []
+    outcome: stop
+    plan_version: 0
+    questions: []
+    reasons:
+        - Completion condition C1 has no test-plan entry
+    skeleton_commit: def
+fixture:
+    expect: completed
+    reached:
+        - structure-write
+        - structure-check
+        - judge-structure
+        - structure-settle
+        - advance
+        - write
+        - check
+        - settle
+        - finish
+        - result
+judge-structure:
+    checked: Structure
+    findings: []
+    not_checked: ""
+    verdict: pass
+prepare:
+    base: abc
+    criteria: /tmp/criteria
+    input: /tmp/plan/input.json
+result:
+    carried: []
+    outcome: stop
+    plan_version: 0
+    questions: []
+    reasons:
+        - Completion condition C1 has no test-plan entry
+    skeleton_commit: def
+settle:
+    back: false
+    done: false
+    fixable_count: 1
+    needs_decision_count: 0
+    not_assessed_count: 0
+    round: 3
+    valid: false
+start:
+    counted: false
+    details: /tmp/record
+    reason: ""
+    remaining: []
+    restarts: 0
+    stage: start
+    start: next
+    stopped: false
+structure-check:
+    contract: false
+    cost: false
+    data: false
+    errors: []
+    materials: /tmp/plan/rounds/1
+    round: 1
+    security: false
+    skeleton_commit: def
+    structure: true
+    ui: false
+    valid: true
+structure-settle:
+    back: false
+    done: true
+    fixable_count: 0
+    needs_decision_count: 0
+    not_assessed_count: 0
+    round: 1
+    valid: true
+structure-write:
+    prototype: ""
+    provisional: []
+    structure_question: May work proceed with this structure?
+    uncertain: []
+write:
+    prototype: ""
+    provisional: []
+    structure_question: May work proceed with this structure?
+    uncertain: []
