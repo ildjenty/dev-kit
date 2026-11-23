@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ildjenty/dev-kit/internal/backlog"
+	"github.com/ildjenty/dev-kit/internal/unitdone"
 	"io"
 	"os"
 	"os/exec"
@@ -25,11 +26,12 @@ type Changes struct {
 	AddedDirectories   []string `json:"addedDirectories"`
 	RemovedDirectories []string `json:"removedDirectories"`
 	Patch              string   `json:"patch"`
-	Backlog            string   `json:"-"`
+	Excluded           []string `json:"-"`
 }
 type Git struct {
-	Cwd  string
-	Refs []string
+	Cwd       string
+	Refs      []string
+	RecordDir string
 }
 
 func raw(cwd string, args []string, input string, env []string) (string, error) {
@@ -52,11 +54,17 @@ func Run(cwd string, args ...string) (string, error) {
 	out, err := raw(cwd, args, "", nil)
 	return strings.TrimSpace(out), err
 }
-func New(cwd, baseBranch string) (*Git, error) {
+func New(cwd, baseBranch string, recordDirs ...string) (*Git, error) {
 	if baseBranch == "" {
 		baseBranch = "main"
 	}
 	g := &Git{Cwd: cwd, Refs: []string{}}
+	if len(recordDirs) > 0 {
+		g.RecordDir = recordDirs[0]
+		if g.RecordDir != "" && !filepath.IsAbs(g.RecordDir) {
+			g.RecordDir = filepath.Join(cwd, g.RecordDir)
+		}
+	}
 	for _, ref := range []string{"origin/" + baseBranch, baseBranch} {
 		if g.OK("rev-parse", "--verify", "--quiet", ref+"^{commit}") {
 			g.Refs = append(g.Refs, ref)
@@ -152,7 +160,7 @@ func (g *Git) snapshot(from, to string, env []string) (Changes, error) {
 	}
 	sort.Strings(result.AddedDirectories)
 	sort.Strings(result.RemovedDirectories)
-	result.Backlog, err = g.backlogPath(to)
+	result.Excluded, err = g.excludedPaths(to)
 	if err != nil {
 		return result, err
 	}
@@ -209,10 +217,10 @@ func (g *Git) WorkingChanges(from string) (Changes, error) {
 	return g.snapshot(from, strings.TrimSpace(tree), env)
 }
 func (g *Git) IsAncestor(a, b string) bool { return g.OK("merge-base", "--is-ancestor", a, b) }
-func (g *Git) backlogPath(commit string) (string, error) {
+func (g *Git) excludedPaths(commit string) ([]string, error) {
 	branch, err := g.Branch()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	var slug strings.Builder
 	for _, c := range []byte(branch) {
@@ -222,17 +230,56 @@ func (g *Git) backlogPath(commit string) (string, error) {
 			fmt.Fprintf(&slug, "%%%02X", c)
 		}
 	}
+	paths := []string{}
 	path := ".devkit/backlog/" + slug.String() + ".json"
 	if data, e := g.Bytes("show", commit+":"+path); e == nil && backlog.Validate(data) == nil {
 		mode, e := g.Run("ls-tree", commit, "--", path)
 		if e != nil {
-			return "", e
+			return nil, e
 		}
 		if strings.HasPrefix(mode, "100644 blob ") || strings.HasPrefix(mode, "100755 blob ") {
-			return path, nil
+			paths = append(paths, path)
 		}
 	}
-	return "", nil
+	dir := g.RecordDir
+	if dir == "" && os.Getenv("STATE_DIR") != "" {
+		dir = filepath.Join(os.Getenv("STATE_DIR"), "records", slug.String())
+		if !filepath.IsAbs(dir) {
+			dir = filepath.Join(g.Cwd, dir)
+		}
+	}
+	if dir == "" {
+		return paths, nil
+	}
+	unit, err := unitdone.RequestUnit(dir)
+	if err != nil {
+		return nil, err
+	}
+	if unit == "" {
+		return paths, nil
+	}
+	settings := struct {
+		Units string `json:"units"`
+	}{Units: ".devkit/units"}
+	if data, e := g.Bytes("show", commit+":.devkit/config.json"); e == nil {
+		if err = json.Unmarshal(data, &settings); err != nil {
+			return nil, err
+		}
+	}
+	path = filepath.ToSlash(filepath.Join(settings.Units, unit+".done.json"))
+	if data, e := g.Bytes("show", commit+":"+path); e == nil {
+		marker, e := unitdone.Parse(data)
+		if e == nil && marker.Unit == unit && marker.Branch == branch {
+			mode, e := g.Run("ls-tree", commit, "--", path)
+			if e != nil {
+				return nil, e
+			}
+			if strings.HasPrefix(mode, "100644 blob ") || strings.HasPrefix(mode, "100755 blob ") {
+				paths = append(paths, path)
+			}
+		}
+	}
+	return paths, nil
 }
 
 func (g *Git) ChangeID(commit string) (*string, error) {
@@ -241,11 +288,11 @@ func (g *Git) ChangeID(commit string) (*string, error) {
 		return nil, err
 	}
 	args := []string{"diff", "-U0", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--binary", from, commit, "--", "."}
-	path, err := g.backlogPath(commit)
+	paths, err := g.excludedPaths(commit)
 	if err != nil {
 		return nil, err
 	}
-	if path != "" {
+	for _, path := range paths {
 		args = append(args, ":(exclude,literal)"+path)
 	}
 	diff, err := raw(g.Cwd, args, "", nil)

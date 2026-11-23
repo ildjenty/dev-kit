@@ -86,7 +86,7 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 		}
 	}
 	return record.Start(ctx.Dir, "retro", record.StartOptions{RunID: ctx.RunID, Commit: head, BaseCommit: base, ChangeID: func() (*string, error) {
-		g, e := gitx.New(ctx.Cwd, ctx.BaseBranch)
+		g, e := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 		if e != nil {
 			return nil, e
 		}

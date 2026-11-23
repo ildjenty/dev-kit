@@ -298,7 +298,7 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 		return strings.Split(s, "\n")
 	}
 	return record.Start(ctx.Dir, "refine", record.StartOptions{RunID: ctx.RunID, Commit: head, BaseCommit: base, ChangeID: func() (*string, error) {
-		g, e := gitx.New(ctx.Cwd, ctx.BaseBranch)
+		g, e := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 		if e != nil {
 			return nil, e
 		}
@@ -624,6 +624,11 @@ func draftErrors(ctx record.ContextData, artifacts string, value any, phases ...
 		return nil, e
 	}
 	folders := obj(input["folders"])
+	for _, u := range items(input["units"]) {
+		if u["state"] == "done" && slices.Contains(edited, str(u["path"])) {
+			errors = append(errors, "done unit may not be edited or removed: "+str(u["id"]))
+		}
+	}
 	for _, p := range edited {
 		if !inside(p, str(folders["docs"])) {
 			errors = append(errors, "edited outside the docs folder: "+p)
@@ -909,6 +914,9 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 				}
 			case "unit":
 				existing = find(data.Units, old)
+				if existing["state"] == "done" {
+					existing = nil
+				}
 			case "topic":
 				existing = find(data.Topics, old)
 				if existing["status"] != "open" {
@@ -961,6 +969,9 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 				if item == nil {
 					continue
 				}
+				if kind == "unit" && item["state"] == "done" {
+					continue
+				}
 				if kind == "decision" && item["status"] != "proposed" || kind == "topic" && item["status"] != "open" {
 					return nil, fmt.Errorf("cannot withdraw settled record %s", id)
 				}
@@ -991,6 +1002,9 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 	}
 	slices.Sort(sorted)
 	for _, p := range sorted {
+		if slices.ContainsFunc(data.Units, func(u doc) bool { return u["state"] == "done" && u["path"] == p }) {
+			continue
+		}
 		text := replaceKeys(docs[p], mapping)
 		if text != docs[p] {
 			if e = put(filepath.Join(ctx.Cwd, p), text); e != nil {

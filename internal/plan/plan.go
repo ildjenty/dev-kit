@@ -248,7 +248,7 @@ func prepare(ctx record.ContextData, artifacts, display string) (document, error
 	if err = write(file, input); err != nil {
 		return nil, err
 	}
-	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +382,7 @@ func Commands() []cli.Command {
 				case "advance":
 					out, err = advance(ctx, artifacts)
 				case "finish":
-					g, e := gitx.New(ctx.Cwd, ctx.BaseBranch)
+					g, e := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 					if e != nil {
 						return e
 					}

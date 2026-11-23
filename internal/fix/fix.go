@@ -342,7 +342,7 @@ func prepare(ctx record.ContextData, artifacts string) (prepared, error) {
 	if err != nil {
 		return prepared{}, err
 	}
-	repo, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	repo, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return prepared{}, err
 	}
@@ -627,7 +627,7 @@ func finish(ctx record.ContextData, artifacts string, back *stepBack) (record.Do
 		return nil, err
 	}
 	doc := outcome(p, s, back)
-	repo, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	repo, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return nil, err
 	}
@@ -648,7 +648,7 @@ func finish(ctx record.ContextData, artifacts string, back *stepBack) (record.Do
 	if err := writeJSON(filepath.Join(dir, "outcome.json"), doc); err != nil {
 		return nil, err
 	}
-	repo, err = gitx.New(ctx.Cwd, ctx.BaseBranch)
+	repo, err = gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return nil, err
 	}

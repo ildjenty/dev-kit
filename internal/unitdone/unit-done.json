@@ -1,0 +1,10 @@
+{
+  "$id": "https://devkit.invalid/unit-done.json",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "unit": { "type": "string", "pattern": "^U-[0-9a-f]{6,64}$" },
+    "branch": { "type": "string", "minLength": 1 }
+  },
+  "required": ["unit", "branch"]
+}

@@ -425,7 +425,7 @@ func Commands() []cli.Command {
 				if mode == "prepare" {
 					out, err = prepare(ctx, artifacts, env.Getenv("INPUTS_OWNER_WORDS"), env.Getenv("INPUTS_SUPPLEMENT"), env.Getenv("ARTIFACTS_DIR"), env.Getenv("INPUTS_UNIT"))
 				} else {
-					g, e := gitx.New(ctx.Cwd, ctx.BaseBranch)
+					g, e := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 					if e != nil {
 						return e
 					}

@@ -20,6 +20,9 @@ Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
   and source `entries`. Make these edits in the checkout, and trace every changed standard document.
 - `dismissed`: source `entries` and a reason for each entry that needs no correction.
 
+The input also lists existing units with `state`. A unit with `state: done` is finished work:
+preserve its file unchanged and propose a new unit for follow-up work; never edit or delete the done unit.
+
 Keep keys of retained units when revising a proposal and omit withdrawn ones. Use the exact entry IDs supplied in input. Cover every entry with a proposal or dismissal.
 Write units only in the draft; the machine materializes them on approval. Edit only the config
 and the configured standards folder. Do not commit. Revisions must address the previous round and answers.

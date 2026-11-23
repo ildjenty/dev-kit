@@ -297,6 +297,7 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 }
 
 type StartOptions struct {
+	UnitReasons      []string
 	RunID            string
 	Commit           string
 	ChangeID         func() (*string, error)
@@ -379,6 +380,7 @@ func Start(dir, workflow string, o StartOptions) (StartOutput, error) {
 		return StartOutput{}, err
 	}
 
+	reasons = append(reasons, o.UnitReasons...)
 	if state.Reached && o.Continuation == "" {
 		reasons = append(reasons, fmt.Sprintf("the branch already restarted %d times (limit %d) and this start (%s) would be another; it starts when the owner's words that let it go on are passed as continue", state.Restarts, limit, state.Start))
 	}

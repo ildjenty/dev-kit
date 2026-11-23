@@ -2,6 +2,7 @@ package pr
 
 import (
 	"bytes"
+	"github.com/ildjenty/dev-kit/internal/unitdone"
 	"io"
 	"os"
 	"path/filepath"
@@ -51,6 +52,8 @@ func TestPRCommitsBacklogBeforePushAndKeepsJudgedChangeIdentity(t *testing.T) {
 	testutil.Git(t, repo, "remote", "add", "origin", remote)
 	state, a := t.TempDir(), t.TempDir()
 	ctx := record.ContextData{Cwd: repo, Dir: record.RecordDir(state, "feature/x"), Branch: "feature/x", BaseBranch: "main", RunID: "pr1"}
+	testutil.Put(t, ctx.Dir, "request/1.json", `{"unit":"U-abcdef"}`)
+	g.RecordDir = ctx.Dir
 	report := judgment("pr1", "report", base, head, doc{"kind": "report", "criteria_commit": base})
 	must(record.Append(ctx.Dir, "judgment", report))
 	testutil.OK(t, os.MkdirAll(filepath.Join(a, "pr"), 0755))
@@ -70,7 +73,8 @@ func TestPRCommitsBacklogBeforePushAndKeepsJudgedChangeIdentity(t *testing.T) {
 		t.Fatal("backlog was not committed")
 	}
 	testutil.Contains(t, testutil.Git(t, repo, "log", "-1", "--format=%s"), "chore:")
-	testutil.Equal(t, testutil.Git(t, repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"), ".devkit/backlog/feature%2Fx.json")
+	testutil.Equal(t, testutil.Git(t, repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"), ".devkit/backlog/feature%2Fx.json\n.devkit/units/U-abcdef.done.json")
+	testutil.Equal(t, testutil.Git(t, remote, "show", "refs/heads/feature/x:.devkit/units/U-abcdef.done.json"), `{"unit":"U-abcdef","branch":"feature/x"}`)
 	testutil.Equal(t, testutil.Git(t, remote, "rev-parse", "refs/heads/feature/x"), next)
 	testutil.Equal(t, must(g.ChangeID(next)), id)
 	testutil.Equal(t, must(read(filepath.Join(repo, ".devkit/backlog/feature%2Fx.json"))), backlog([]doc{report}, nil))
@@ -127,4 +131,40 @@ func TestF12ResolvedMechanicalFindingsStillReachBacklog(t *testing.T) {
 	testutil.Equal(t, source["round"], 1)
 	testutil.Equal(t, source["phase"], "structure")
 	testutil.Equal(t, object(docs(out["mechanical"])[0]["finding"])["resolved"], true)
+}
+
+func TestBacklogCommitWritesAndPreservesUnitDoneMarker(t *testing.T) {
+	for _, unit := range []string{"", "U-abcdef"} {
+		t.Run(unit, func(t *testing.T) {
+			repo, dir := testutil.Repo(t), t.TempDir()
+			testutil.Put(t, repo, ".devkit/config.json", `{"units":"work/units"}`)
+			testutil.Git(t, repo, "add", ".")
+			testutil.Git(t, repo, "commit", "-qm", "config")
+			ctx := record.ContextData{Cwd: repo, Dir: dir, Branch: "feature/x", RunID: "pr1"}
+			if unit != "" {
+				testutil.Put(t, dir, "request/1.json", `{"unit":"U-abcdef"}`)
+			}
+			g := must(gitx.New(repo, "main", dir))
+			before := must(g.ChangeID("HEAD"))
+			head := must(commitBacklog(ctx, nil, nil))
+			path := filepath.Join(repo, "work/units/U-abcdef.done.json")
+			if unit == "" {
+				_, err := os.Stat(path)
+				testutil.Equal(t, os.IsNotExist(err), true)
+			} else {
+				marker := must(unitdone.Parse(must(os.ReadFile(path))))
+				testutil.Equal(t, marker, unitdone.Marker{Unit: unit, Branch: ctx.Branch})
+				testutil.Equal(t, testutil.Git(t, repo, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"), ".devkit/backlog/feature%2Fx.json\nwork/units/U-abcdef.done.json")
+				testutil.Equal(t, must(g.ChangeID(head)), before)
+				kept := "{\n  \"branch\": \"feature/x\", \"unit\": \"U-abcdef\"\n}\n"
+				testutil.OK(t, os.WriteFile(path, []byte(kept), 0644))
+				testutil.Git(t, repo, "add", ".")
+				testutil.Git(t, repo, "commit", "-qm", "existing marker formatting")
+				head = must(g.Head())
+				testutil.Equal(t, must(commitBacklog(ctx, nil, nil)), head)
+				testutil.Equal(t, string(must(os.ReadFile(path))), kept)
+			}
+			testutil.Equal(t, must(commitBacklog(ctx, nil, nil)), head)
+		})
+	}
 }

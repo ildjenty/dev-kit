@@ -172,7 +172,7 @@ func facts(args []string, env cli.Env) error {
 	if err != nil {
 		return err
 	}
-	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return err
 	}

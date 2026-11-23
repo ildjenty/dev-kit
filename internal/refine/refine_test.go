@@ -558,3 +558,61 @@ func TestPrepareRejectsInvalidFixedConcernMap(t *testing.T) {
 	_, err = prepare(r.ctx, r.artifacts, "A request", "", "")
 	testutil.Fails(t, err, "missing quality: scope")
 }
+
+func TestDoneUnitCannotBeEditedOrRemovedByDocumentWriter(t *testing.T) {
+	for _, operation := range []string{"edit", "delete", "index"} {
+		t.Run(operation, func(t *testing.T) {
+			r := setup(t, nil)
+			path := ".devkit/units/U-abcdef.md"
+			original := "---\nid: U-abcdef\ntitle: Finished\ndecisions: []\ndepends_on: []\n---\nCompleted goal.\n"
+			r.put(path, original)
+			r.put(".devkit/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/done"}`)
+			r.commit()
+			r.begin()
+			r.writeDraft()
+			testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts))["valid"], true)
+			if operation == "delete" {
+				testutil.OK(t, os.Remove(filepath.Join(r.cwd, path)))
+			} else {
+				r.put(path, original+"Changed\n")
+				if operation == "index" {
+					r.git("add", path)
+					r.put(path, original)
+				}
+			}
+			testutil.OK(t, os.Remove(filepath.Join(r.cwd, ".devkit/units/U-abcdef.done.json")))
+			errors := testutil.Must(draftErrors(r.ctx, r.artifacts, draft()))
+			testutil.Contains(t, strings.Join(errors, "\n"), "done unit may not be edited or removed: U-abcdef")
+		})
+	}
+}
+
+func TestReproposalPreservesDoneUnitAndAllocatesFollowUp(t *testing.T) {
+	for _, retained := range []bool{false, true} {
+		t.Run(fmt.Sprint(retained), func(t *testing.T) {
+			r := setup(t, doc{"units": "docs/units"})
+			path := "docs/units/U-abcdef.md"
+			original := "---\nid: U-abcdef\ntitle: Finished\ndecisions: []\ndepends_on: []\n---\nCompleted N1 goal.\n"
+			r.put(path, original)
+			r.put("docs/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/done"}`)
+			r.commit()
+			r.begin()
+			input := testutil.Must(readJSON(file(r.artifacts, "input.json")))
+			input["previous_unapproved"] = true
+			input["pending_proposal"] = doc{"content": doc{"mapping": doc{"UN1": "U-abcdef"}, "unit_ids": []string{"U-abcdef"}}}
+			d := draft()
+			if !retained {
+				d["units"] = []doc{}
+			} else {
+				items(d["units"])[0]["decisions"] = []string{}
+			}
+			result := testutil.Must(materialize(r.ctx, r.artifacts, d, input))
+			testutil.Equal(t, string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, path)))), original)
+			if retained {
+				if obj(result["mapping"])["UN1"] == "U-abcdef" {
+					t.Fatal("reused a done unit")
+				}
+			}
+		})
+	}
+}

@@ -167,7 +167,7 @@ func setup(workflow string, env cli.Env) error {
 	if err := os.WriteFile(filepath.Join(env.Cwd, "fixture.txt"), []byte("fixture result\n"), 0644); err != nil {
 		return err
 	}
-	if workflow == "requirements" && env.Getenv("INPUTS_UNIT") != "" {
+	if workflow == "requirements" && env.Getenv("INPUTS_UNIT") != "" || workflow == "pr" {
 		for path, body := range map[string]string{
 			".devkit/decisions/D-abcdef.md": "---\nid: D-abcdef\ntitle: Fixture constraint\nstatus: agreed\ndecided_by: owner\nrequest: refine/fixture\ndepends_on: []\nsupersedes: []\n---\nKeep the fixture result.\n",
 			".devkit/units/U-abcdef.md":     "---\nid: U-abcdef\ntitle: Fixture unit\ndecisions: [D-abcdef]\ndepends_on: []\n---\nUpdate fixture.txt.\n",
@@ -179,6 +179,19 @@ func setup(workflow string, env cli.Env) error {
 			if err := os.WriteFile(file, []byte(body), 0644); err != nil {
 				return err
 			}
+		}
+	}
+	if workflow == "requirements" && env.Getenv("INPUTS_UNIT") == "U-d00001" {
+		if err := os.WriteFile(filepath.Join(env.Cwd, ".devkit/units/U-d00001.md"), []byte("---\nid: U-d00001\ntitle: Done fixture unit\ndecisions: []\ndepends_on: []\n---\nDone work.\n"), 0644); err != nil {
+			return err
+		}
+		if err := save(filepath.Join(env.Cwd, ".devkit/units/U-d00001.done.json"), doc{"unit": "U-d00001", "branch": "fixture/done"}); err != nil {
+			return err
+		}
+	}
+	if workflow == "requirements" && env.Getenv("INPUTS_UNIT") == "U-d00002" {
+		if err := os.WriteFile(filepath.Join(env.Cwd, ".devkit/units/U-d00002.md"), []byte("---\nid: U-d00002\ntitle: Waiting fixture unit\ndecisions: []\ndepends_on: [U-abcdef]\n---\nFollow-up work.\n"), 0644); err != nil {
+			return err
 		}
 	}
 	if workflow == "retro" {
@@ -233,6 +246,11 @@ func setup(workflow string, env cli.Env) error {
 	}
 	if _, err = record.Write(ctx, "request", doc{"owner_words": "Update fixture.txt", "supplement": ""}, ""); err != nil {
 		return err
+	}
+	if workflow == "pr" {
+		if _, err = record.Write(ctx, "request", doc{"owner_words": "", "supplement": "", "unit": "U-abcdef"}, ""); err != nil {
+			return err
+		}
 	}
 	if _, err = record.Write(ctx, "requirements", doc{"goal": "Update fixture.txt", "completion_conditions": []doc{{"id": "C1", "text": "fixture.txt contains fixture result"}}, "constraints": []string{}, "open_points": []doc{}}, ""); err != nil {
 		return err

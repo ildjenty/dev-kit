@@ -1,0 +1,42 @@
+{
+  "fixture": {
+    "expect": "completed",
+    "reached": [
+      "not-started",
+      "result"
+    ],
+    "inputs": {
+      "unit": "U-abcdef"
+    }
+  },
+  "start": {
+    "stopped": true,
+    "stage": "start",
+    "reason": "the start conditions of requirements do not hold, so it did not start",
+    "details": "/tmp/record",
+    "remaining": [
+      "unit U-abcdef waits for U-fedcba"
+    ],
+    "start": "first",
+    "counted": false,
+    "restarts": 0
+  },
+  "not-started": {
+    "outcome": "not_started",
+    "requirements_version": 0,
+    "questions": [],
+    "reasons": [
+      "the start conditions of requirements do not hold, so it did not start",
+      "unit U-abcdef waits for U-fedcba"
+    ]
+  },
+  "result": {
+    "outcome": "not_started",
+    "requirements_version": 0,
+    "questions": [],
+    "reasons": [
+      "the start conditions of requirements do not hold, so it did not start",
+      "unit U-abcdef waits for U-fedcba"
+    ]
+  }
+}

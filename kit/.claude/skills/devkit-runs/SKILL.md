@@ -51,14 +51,16 @@ research separately as `supplement`, and the owner-confirmed discussion memo ver
 Do not add unsaid requirements to owner words. An Issue's body is owner words; related Issue/PR bodies,
 comments and researched facts belong in supplement so the read-only judges have the materials.
 
-Start a unit only after the refine pull request that created it has merged. Read its complete file
-from the configured units folder and honor `depends_on`: finish prerequisite units first. Make a
+Start a unit only after the refine pull request that created it has merged.
+Run `devkit decisions units` (or `--json`) in the base checkout, updated from the remote, to find open units marked ready,
+and start ready units. Read the selected unit's complete file from the configured units folder.
+PR records its done marker; the unit becomes done on the base branch when its pull request merges. Make a
 separate branch for the unit and pass its ID as requirements' `unit`, for example `--input unit=U-a1b2c3`.
 Prepare loads the unit and its agreed decisions as constraints. Use `owner_words` for direct requests.
 Keep the branch and PR for later corrections unless the owner asks for another. After refine passes,
 publish its branch through the repository's PR process; refine itself only commits. Continue with the
-next pickable topic, using `devkit-discuss` when choices need discussion. A unit waits until the refine PR
-that created it has merged and its prerequisite units are complete.
+next pickable topic, using `devkit-discuss` when choices need discussion. Use `devkit decisions units`
+again after merging a unit PR to find units that are now ready.
 
 ## Find and relay results
 
@@ -70,8 +72,8 @@ devkit status <branch>       # one branch
 devkit status --json         # the same, for reading fields
 ```
 
-For each branch it shows the last workflow and its outcome, the questions still unanswered (ID and
-full text), the unresolved items of a stop, the premise and observation of a `back`, and `next`: the
+For each branch it shows its unit ID from the request record, the last workflow and its outcome,
+the questions still unanswered (ID and full text), the unresolved items of a stop, the premise and observation of a `back`, and `next`: the
 workflow to start and the input it needs. Use it after a watched run ends, at the start of a session
 to pick up requests left open, and whenever the owner asks where things are. A run with
 `no result` is still running or failed: check it with `archon workflow get <run-id>`. A run whose

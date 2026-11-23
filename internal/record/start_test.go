@@ -398,3 +398,53 @@ func TestF15StartResolvesRemoteOnlyBase(t *testing.T) {
 	testutil.Equal(t, cli.New("test", Commands()).Execute([]string{"record", "start", "requirements"}, env), 0)
 	testutil.Contains(t, out.String(), `"stopped":false`)
 }
+
+func TestRequirementsUnitStartConditions(t *testing.T) {
+	for _, tc := range []struct {
+		name, marker, reason string
+		recorded             bool
+	}{
+		{"ready", "", "", false},
+		{"done", "U-abcdef", "unit U-abcdef is already done", false},
+		{"waiting", "waiting", "unit U-abcdef waits for U-fedcba", false},
+		{"ready dependency", "U-fedcba", "", false},
+		{"recorded done unit", "U-abcdef", "unit U-abcdef is already done", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo, state := testutil.Repo(t), t.TempDir()
+			deps := "[]"
+			if tc.marker == "waiting" || tc.marker == "U-fedcba" {
+				deps = "[U-fedcba]"
+			}
+			for _, id := range []string{"U-abcdef", "U-fedcba"} {
+				unitDeps := "[]"
+				if id == "U-abcdef" {
+					unitDeps = deps
+				}
+				testutil.Put(t, repo, ".devkit/units/"+id+".md", "---\nid: "+id+"\ntitle: Unit\ndecisions: []\ndepends_on: "+unitDeps+"\n---\nGoal\n")
+			}
+			if tc.marker != "" && tc.marker != "waiting" {
+				testutil.Put(t, repo, ".devkit/units/"+tc.marker+".done.json", `{}`)
+			}
+			testutil.Git(t, repo, "add", ".")
+			testutil.Git(t, repo, "commit", "-qm", "units")
+			dir := RecordDir(state, "feature/x")
+			input := "U-abcdef"
+			if tc.recorded {
+				testutil.Put(t, dir, "request/1.json", `{"unit":"U-abcdef"}`)
+				input = ""
+			}
+			var out, stderr bytes.Buffer
+			env := commandEnv(repo, map[string]string{"STATE_DIR": state, "WORKFLOW_ID": "r1", "INPUTS_UNIT": input}, &out, &stderr)
+			testutil.Equal(t, cli.New("test", Commands()).Execute([]string{"record", "start", "requirements"}, env), 0)
+			var got StartOutput
+			testutil.OK(t, json.Unmarshal(out.Bytes(), &got))
+			testutil.Equal(t, got.Stopped, tc.reason != "")
+			if tc.reason != "" {
+				testutil.Equal(t, got.Remaining, []string{tc.reason})
+				testutil.Equal(t, len(must(List(dir, "run"))), 0)
+				testutil.Equal(t, len(must(ListKeyed(dir, "answer"))), 0)
+			}
+		})
+	}
+}

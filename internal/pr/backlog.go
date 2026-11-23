@@ -1,11 +1,14 @@
 package pr
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/record"
+	"github.com/ildjenty/dev-kit/internal/unitdone"
 )
 
 func backlog(judgments, results []doc) doc {
@@ -59,15 +62,48 @@ func commitBacklog(ctx record.ContextData, judgments, results []doc) (string, er
 	if err := save(filepath.Join(ctx.Cwd, file), backlog(judgments, results)); err != nil {
 		return "", err
 	}
-	if _, err := gitx.Run(ctx.Cwd, "add", "--", file); err != nil {
+	files := []string{file}
+	unit, err := unitdone.RequestUnit(ctx.Dir)
+	if err != nil {
 		return "", err
 	}
-	staged, err := gitx.Run(ctx.Cwd, "diff", "--cached", "--name-only", "--", file)
+	if unit != "" {
+		c, err := config.Load(ctx.Cwd)
+		if err != nil {
+			return "", err
+		}
+		marker := unitdone.Marker{Unit: unit, Branch: ctx.Branch}
+		data, err := json.Marshal(marker)
+		if err != nil {
+			return "", err
+		}
+		if _, err = unitdone.Parse(data); err != nil {
+			return "", err
+		}
+		path := filepath.Join(c.Units, unit+".done.json")
+		exists, err := unitdone.Exists(ctx.Cwd, c.Units, unit)
+		if err != nil {
+			return "", err
+		}
+		if !exists {
+			if err = os.MkdirAll(filepath.Join(ctx.Cwd, c.Units), 0755); err != nil {
+				return "", err
+			}
+			if err = os.WriteFile(filepath.Join(ctx.Cwd, path), append(data, '\n'), 0644); err != nil {
+				return "", err
+			}
+		}
+		files = append(files, path)
+	}
+	if _, err := gitx.Run(ctx.Cwd, append([]string{"add", "--"}, files...)...); err != nil {
+		return "", err
+	}
+	staged, err := gitx.Run(ctx.Cwd, append([]string{"diff", "--cached", "--name-only", "--"}, files...)...)
 	if err != nil {
 		return "", err
 	}
 	if staged != "" {
-		if _, err = gitx.Run(ctx.Cwd, "commit", "-q", "-m", "chore: record review backlog\n\nArchon-Run: "+ctx.RunID, "--", file); err != nil {
+		if _, err = gitx.Run(ctx.Cwd, append([]string{"commit", "-q", "-m", "chore: record review backlog\n\nArchon-Run: " + ctx.RunID, "--"}, files...)...); err != nil {
 			return "", err
 		}
 	}

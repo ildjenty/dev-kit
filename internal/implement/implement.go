@@ -294,7 +294,7 @@ func prepare(ctx record.ContextData, artifacts string) (record.Document, error) 
 		return nil, fmt.Errorf("the latest plan (version %v) was made from requirements %v, not the latest %v", plan["version"], plan["requirements_version"], requirements["version"])
 	}
 	key := inputsKey(requirements["version"], plan["version"])
-	repo, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	repo, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return nil, err
 	}
@@ -696,7 +696,7 @@ func finish(ctx record.ContextData, artifacts string, back *stepBack) (record.Do
 	if err := writeJSON(filepath.Join(dir, "outcome.json"), doc); err != nil {
 		return nil, err
 	}
-	repo, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	repo, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return nil, err
 	}

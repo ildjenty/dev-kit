@@ -16,7 +16,7 @@ import (
 )
 
 func collectChanges(ctx record.ContextData, base, commit string, c config.Config) (document, error) {
-	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func collectChanges(ctx record.ContextData, base, commit string, c config.Config
 		items = append(items, row)
 	}
 	for _, f := range changes.Files {
-		if config.Covers(c.Decisions, f.Path) || f.Path == changes.Backlog {
+		if config.Covers(c.Decisions, f.Path) || slices.Contains(changes.Excluded, f.Path) {
 			continue
 		}
 		if f.Status == "" || !strings.ContainsRune("ADRC", rune(f.Status[0])) {
@@ -106,7 +106,7 @@ func checkCommand(ctx record.ContextData, artifacts string, env []string, displa
 	if err != nil {
 		return nil, err
 	}
-	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return nil, err
 	}

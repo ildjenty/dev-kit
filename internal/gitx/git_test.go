@@ -3,6 +3,7 @@ package gitx
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/ildjenty/dev-kit/internal/testutil"
@@ -132,4 +133,57 @@ func TestF9ArchiveKeepsIgnoredAndSubstitutedBlobsAndRemovesStaleFiles(t *testing
 	testutil.Equal(t, string(testutil.Must(os.ReadFile(filepath.Join(out, "substituted.ext")))), "$Format:%H$\n")
 	_, err := os.Stat(filepath.Join(out, "stale.ext"))
 	testutil.Equal(t, os.IsNotExist(err), true)
+}
+
+func TestOnlyValidRequestUnitMarkerForThisBranchIsExcluded(t *testing.T) {
+	for _, tc := range []struct {
+		path, body string
+		excluded   bool
+	}{
+		{"U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/x"}`, true},
+		{"U-abcdef.done.json", `{}`, false},
+		{"U-abcdef.done.json", `{"unit":"U-abcdef","branch":"other"}`, false},
+		{"U-abcdef.done.json", `{"unit":"U-fedcba","branch":"feature/x"}`, false},
+		{"U-fedcba.done.json", `{"unit":"U-fedcba","branch":"feature/x"}`, false},
+		{"U-abcdef.md", "Changed unit\n", false},
+		{"runtime.sh", "echo changed\n", false},
+	} {
+		t.Run(tc.path+tc.body, func(t *testing.T) {
+			repo, records := testutil.Repo(t), t.TempDir()
+			testutil.Put(t, records, "request/1.json", `{"unit":"U-abcdef"}`)
+			testutil.Put(t, repo, ".devkit/config.json", `{"units":"work/units"}`)
+			testutil.Git(t, repo, "add", ".")
+			testutil.Git(t, repo, "commit", "-qm", "configuration")
+			g := testutil.Must(New(repo, "main", records))
+			before := *testutil.Must(g.ChangeID("HEAD"))
+			path := "work/units/" + tc.path
+			testutil.Put(t, repo, path, tc.body)
+			testutil.Git(t, repo, "add", ".")
+			testutil.Git(t, repo, "commit", "-qm", "marker or other unit file")
+			testutil.Equal(t, before == *testutil.Must(g.ChangeID("HEAD")), tc.excluded)
+			changes := testutil.Must(g.Changes("", "HEAD"))
+			testutil.Equal(t, slices.Contains(changes.Excluded, path), tc.excluded)
+			if tc.excluded {
+				g.RecordDir = ""
+				t.Setenv("STATE_DIR", "")
+				testutil.Equal(t, before == *testutil.Must(g.ChangeID("HEAD")), false)
+				testutil.Put(t, repo, path, `{"unit":"U-abcdef","branch":"feature/x","extra":true}`)
+				g.RecordDir = records
+				working := testutil.Must(g.WorkingChanges(""))
+				testutil.Equal(t, slices.Contains(working.Excluded, path), false)
+			}
+		})
+	}
+}
+
+func TestUnitMarkerExclusionReadsWorkflowState(t *testing.T) {
+	repo, state := testutil.Repo(t), t.TempDir()
+	testutil.Put(t, state, "records/feature%2Fx/request/1.json", `{"unit":"U-abcdef"}`)
+	t.Setenv("STATE_DIR", state)
+	g := testutil.Must(New(repo, "main"))
+	before := testutil.Must(g.ChangeID("HEAD"))
+	testutil.Put(t, repo, ".devkit/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/x"}`)
+	testutil.Git(t, repo, "add", ".")
+	testutil.Git(t, repo, "commit", "-qm", "done marker")
+	testutil.Equal(t, testutil.Must(g.ChangeID("HEAD")), before)
 }

@@ -7,7 +7,9 @@ import (
 
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
+	"github.com/ildjenty/dev-kit/internal/decisions"
 	"github.com/ildjenty/dev-kit/internal/gitx"
+	"github.com/ildjenty/dev-kit/internal/unitdone"
 )
 
 func Commands() []cli.Command {
@@ -153,7 +155,7 @@ func runStart(args []string, env cli.Env) error {
 	if err != nil {
 		return err
 	}
-	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, env.Path(ctx.Dir))
 	if err != nil {
 		return err
 	}
@@ -173,8 +175,25 @@ func runStart(args []string, env cli.Env) error {
 	if err != nil {
 		return err
 	}
-	out, err := Start(env.Path(ctx.Dir), args[0], StartOptions{RunID: ctx.RunID, Commit: commit, ChangeID: func() (*string, error) {
-		g, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	unitReasons := []string{}
+	if args[0] == "requirements" {
+		unit := env.Getenv("INPUTS_UNIT")
+		if unit == "" {
+			unit, err = unitdone.RequestUnit(env.Path(ctx.Dir))
+			if err != nil {
+				return err
+			}
+		}
+		if unit != "" {
+			data, err := decisions.List(ctx.Cwd)
+			if err != nil {
+				return err
+			}
+			unitReasons = decisions.UnitStartReasons(data, unit)
+		}
+	}
+	out, err := Start(env.Path(ctx.Dir), args[0], StartOptions{UnitReasons: unitReasons, RunID: ctx.RunID, Commit: commit, ChangeID: func() (*string, error) {
+		g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, env.Path(ctx.Dir))
 		if err != nil {
 			return nil, err
 		}

@@ -189,3 +189,38 @@ func TestAffectedPropagatesThroughMultipleDecisionEdgesToDocumentsAndUnits(t *te
 	testutil.Equal(t, impact.Documents[0].Path, "docs/indirect.md")
 	testutil.Equal(t, impact.Units[0]["id"], "U-aaaaaa")
 }
+
+func TestUnitsListingAndReadinessAndMarkerChecks(t *testing.T) {
+	repo := testutil.Repo(t)
+	unit(t, repo, "U-a00001", []string{}, []string{})
+	unit(t, repo, "U-a00002", []string{}, []string{"U-a00001"})
+	unit(t, repo, "U-a00003", []string{}, []string{"U-a00001", "U-a00002"})
+	registry := cli.New("test", Commands())
+	var out, stderr bytes.Buffer
+	env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr}
+	testutil.Equal(t, registry.Execute([]string{"decisions", "units"}, env), 0)
+	testutil.Contains(t, out.String(), "U-a00001: Unit (open) [ready]")
+	if strings.Contains(out.String(), "U-a00002: Unit (open) [ready]") {
+		t.Fatal(out.String())
+	}
+	testutil.Put(t, repo, ".devkit/units/U-a00001.done.json", `{"unit":"U-a00001","branch":"feature/one"}`)
+	data := testutil.Must(List(repo))
+	testutil.Equal(t, Check(data), []string{})
+	expected := []Item{
+		{"id": "U-a00001", "title": "Unit", "depends_on": []string{}, "state": "done", "ready": false},
+		{"id": "U-a00002", "title": "Unit", "depends_on": []string{"U-a00001"}, "state": "open", "ready": true},
+		{"id": "U-a00003", "title": "Unit", "depends_on": []string{"U-a00001", "U-a00002"}, "state": "open", "ready": false},
+	}
+	testutil.Equal(t, Units(data), expected)
+	out.Reset()
+	testutil.Equal(t, registry.Execute([]string{"decisions", "units", "--json"}, env), 0)
+	testutil.Equal(t, out.String(), string(testutil.Must(json.Marshal(expected)))+"\n")
+	testutil.Put(t, repo, ".devkit/units/U-a00002.done.json", `{}`)
+	testutil.Put(t, repo, ".devkit/units/U-ffffff.done.json", `{"unit":"U-ffffff","branch":"feature/missing"}`)
+	problems := strings.Join(Check(testutil.Must(List(repo))), "\n")
+	testutil.Contains(t, problems, "U-a00002.done.json: invalid unit done marker")
+	testutil.Contains(t, problems, "unit U-ffffff does not exist")
+	out.Reset()
+	testutil.Equal(t, registry.Execute([]string{"decisions", "check"}, env), 1)
+	testutil.Contains(t, out.String(), "invalid unit done marker")
+}

@@ -52,7 +52,7 @@ func prepare(ctx record.ContextData, artifacts, shownArtifacts string) (doc, err
 	if err := os.MkdirAll(filepath.Join(out, "materials"), 0755); err != nil {
 		return nil, err
 	}
-	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return nil, err
 	}

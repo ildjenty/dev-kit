@@ -122,3 +122,23 @@ func TestCommandPrintsAndRejectsBadArguments(t *testing.T) {
 	testutil.Equal(t, parsed.Branches[0].Next, "Start implement on feature/x.")
 	testutil.Equal(t, cli.New("", Commands()).Execute([]string{"status", "a", "b"}, env) != 0, true)
 }
+
+func TestStatusShowsRequestUnitInTextAndJSON(t *testing.T) {
+	repo, state := testutil.Repo(t), t.TempDir()
+	dir := branch(t, filepath.Join(state, "records"), "feature/x")
+	run1(t, dir, "requirements", 1, map[string]any{"outcome": "pass"})
+	write(t, dir, "request", 1, map[string]any{"unit": "U-abcdef"})
+	write(t, dir, "request", 2, map[string]any{"unit": ""})
+	var out bytes.Buffer
+	env := cli.Env{Cwd: repo, Stdout: &out, LookupEnv: func(k string) (string, bool) {
+		if k == "STATE_DIR" {
+			return state, true
+		}
+		return "", false
+	}}
+	testutil.OK(t, run(nil, env))
+	testutil.Contains(t, out.String(), "unit: U-abcdef")
+	out.Reset()
+	testutil.OK(t, run([]string{"--json"}, env))
+	testutil.Contains(t, out.String(), `"unit":"U-abcdef"`)
+}

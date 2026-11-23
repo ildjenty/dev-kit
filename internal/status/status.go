@@ -15,6 +15,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/record"
+	"github.com/ildjenty/dev-kit/internal/unitdone"
 )
 
 const usage = "devkit status [--json] [branch]"
@@ -27,6 +28,7 @@ func Commands() []cli.Command {
 
 type Branch struct {
 	Branch    string     `json:"branch"`
+	Unit      string     `json:"unit"`
 	Workflow  string     `json:"workflow"`
 	Outcome   string     `json:"outcome"`
 	At        string     `json:"recorded_at"`
@@ -184,6 +186,10 @@ func readBranch(dir, name string, limit int) (Branch, bool, error) {
 		return Branch{}, false, nil
 	}
 	b := Branch{Branch: name, Questions: []Question{}, Restarts: record.RestartsOf(h), Limit: limit}
+	b.Unit, err = unitdone.RequestUnit(dir)
+	if err != nil {
+		return Branch{}, false, err
+	}
 	last := h.Runs[len(h.Runs)-1]
 	var result record.Document
 	for _, r := range h.Results {
@@ -308,6 +314,9 @@ func show(env cli.Env, state, only string, branches []Branch) error {
 			fmt.Fprintln(w)
 		}
 		fmt.Fprintf(w, "%s: %s %s (%s)\n", b.Branch, b.Workflow, b.Outcome, b.At)
+		if b.Unit != "" {
+			fmt.Fprintf(w, "  unit: %s\n", b.Unit)
+		}
 		for _, q := range b.Questions {
 			fmt.Fprintf(w, "  %s: %s\n", q.ID, indent(q.Text))
 		}

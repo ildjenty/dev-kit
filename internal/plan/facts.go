@@ -189,7 +189,7 @@ func factsCommand(ctx record.ContextData, artifacts, display string) (document, 
 	if err != nil {
 		return nil, err
 	}
-	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch)
+	g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 	if err != nil {
 		return nil, err
 	}

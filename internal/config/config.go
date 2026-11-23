@@ -415,7 +415,7 @@ type DecisionChange struct {
 func DecisionChanges(c Config, changes gitx.Changes) []DecisionChange {
 	result := []DecisionChange{}
 	for _, file := range changes.Files {
-		if file.Path == changes.Backlog && (file.OldPath == "" || file.OldPath == changes.Backlog) {
+		if slices.Contains(changes.Excluded, file.Path) && (file.OldPath == "" || slices.Contains(changes.Excluded, file.OldPath)) {
 			continue
 		}
 		for _, rule := range c.DecisionPaths {
@@ -440,7 +440,7 @@ func DecisionChanges(c Config, changes gitx.Changes) []DecisionChange {
 					continue
 				}
 				found = true
-				if !Covers(c.Decisions, changedPath) && !Covers(c.Units, changedPath) && !Covers(c.Topics, changedPath) && changedPath != changes.Backlog {
+				if !Covers(c.Decisions, changedPath) && !Covers(c.Units, changedPath) && !Covers(c.Topics, changedPath) && !slices.Contains(changes.Excluded, changedPath) {
 					return false
 				}
 			}

@@ -42,6 +42,11 @@ func scopeErrors(ctx record.ContextData, input doc, backlog bool) ([]string, err
 	}
 	folders := obj(input["folders"])
 	errors := []string{}
+	for _, u := range items(input["units"]) {
+		if u["state"] == "done" && slices.Contains(paths, str(u["path"])) {
+			errors = append(errors, "done unit may not be edited or removed: "+str(u["id"]))
+		}
+	}
 	for _, p := range paths {
 		allowed := safePath(p) && (inside(p, str(folders["units"])) || inside(p, str(folders["standards"])) || p == ".devkit/config.json")
 		if backlog && obj(input["backlog"])[p] != nil {

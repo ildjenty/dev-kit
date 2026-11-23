@@ -139,3 +139,32 @@ func TestSkillNamesDefaultsMergeAndValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestUnitDoneExclusionAlsoAppliesToDecisionDetection(t *testing.T) {
+	repo, records := testutil.Repo(t), t.TempDir()
+	testutil.Put(t, records, "request/1.json", `{"unit":"U-abcdef"}`)
+	g := testutil.Must(gitx.New(repo, "main", records))
+	c := Defaults("")
+	c.DecisionPaths = []DecisionRule{{Paths: []string{"**"}, Quality: "structure", Ask: true}}
+	testutil.Put(t, repo, ".devkit/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/x"}`)
+	testutil.Git(t, repo, "add", ".")
+	testutil.Git(t, repo, "commit", "-qm", "done")
+	testutil.Equal(t, DecisionChanges(c, testutil.Must(g.Changes("", "HEAD"))), []DecisionChange{})
+	testutil.Put(t, repo, ".devkit/units/U-fedcba.md", "another unit")
+	testutil.Git(t, repo, "add", ".")
+	testutil.Git(t, repo, "commit", "-qm", "another unit")
+	changed := DecisionChanges(c, testutil.Must(g.Changes("", "HEAD")))
+	if len(changed) == 0 {
+		t.Fatal("other unit file was excluded")
+	}
+	testutil.Put(t, repo, ".devkit/units/U-abcdef.done.json", `{}`)
+	testutil.Git(t, repo, "commit", "-qam", "invalid marker")
+	changed = DecisionChanges(c, testutil.Must(g.Changes("", "HEAD")))
+	found := false
+	for _, item := range changed {
+		if item.Path == ".devkit/units/U-abcdef.done.json" {
+			found = true
+		}
+	}
+	testutil.Equal(t, found, true)
+}
