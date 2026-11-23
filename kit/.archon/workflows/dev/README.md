@@ -52,7 +52,7 @@ Shared commands include `devkit config`, `devkit criteria`, `devkit concerns che
 
 ## Records and judged identity
 
-Runtime records stay outside Git at `$STATE_DIR/records/<encoded-branch>/`; `feature/filter` encodes as `feature%2Ffilter`. Resolve the path with `devkit record dir` in the run environment. AI nodes receive selected artifacts rather than this directory.
+Runtime records stay outside Git at `$STATE_DIR/records/<encoded-branch>/`; `feature/filter` encodes as `feature%2Ffilter`. Resolve the path with `devkit record dir` in the run environment. AI nodes receive selected artifacts rather than this directory. `devkit status [--json] [branch]` reads them from a session: it finds the state folder through `archon project list --json` (or `STATE_DIR`), and prints each branch's last outcome, unanswered questions, stop or back details, and the next workflow to start.
 
 `request/` preserves owner words, supplement and the initial criteria commit. `proposals/`, `requirements/` and `plans/` hold immutable versions; `judgments/` holds targets, findings and evidence. `runs/` records successful starts and restart accounting; `results/` records outcomes and input versions. `questions/` and `answers/` use question IDs, `allowed/` holds PR permissions, and `continuations/` holds owner authorization past restart limits. Every write validates against embedded schemas in `internal/record/schemas/`. Failed starts save no answers; starting an earlier stage invalidates later results.
 

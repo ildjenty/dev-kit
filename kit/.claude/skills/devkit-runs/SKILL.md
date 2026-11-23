@@ -62,17 +62,23 @@ that created it has merged and its prerequisite units are complete.
 
 ## Find and relay results
 
-Use the record folder printed by the run or start node. When `STATE_DIR` and `WORKFLOW_ID` from the run
-are available, run this in its branch checkout to resolve the branch's record folder:
+Read where every request stands with:
 
 ```sh
-devkit record dir
+devkit status                # every branch with a recorded run, newest first
+devkit status <branch>       # one branch
+devkit status --json         # the same, for reading fields
 ```
 
-The command uses `STATE_DIR/records/<encoded-branch>/`; it needs `WORKFLOW_ID` even though it only prints
-the folder. Use the run's real values, not a guessed installation path. Read the highest numbered JSON
-in `results/`, alongside its referenced proposal or requirements/plan and any needed findings. Do not
-pass the record directory directly to AI nodes. If no result exists, inspect `start` and failure logs.
+For each branch it shows the last workflow and its outcome, the questions still unanswered (ID and
+full text), the unresolved items of a stop, the premise and observation of a `back`, and `next`: the
+workflow to start and the input it needs. Use it after a watched run ends, at the start of a session
+to pick up requests left open, and whenever the owner asks where things are. A run with
+`no result` is still running or failed: check it with `archon workflow get <run-id>`. A run whose
+start conditions did not hold records nothing, so `devkit status` still shows the previous state: when a
+run you started is missing there, read why it did not start with `archon workflow get <run-id>`. Do not read or
+pass the record folder to AI nodes; when `devkit status` cannot find the records (it names why), say
+so instead of guessing a path.
 
 A `question` result ends that run. Relay every question and its candidates verbatim to the owner,
 including its ID. Relay a choice recommendation and reason only when supplied, and never add one to a

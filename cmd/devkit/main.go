@@ -21,6 +21,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/refine"
 	"github.com/ildjenty/dev-kit/internal/requirements"
 	"github.com/ildjenty/dev-kit/internal/retro"
+	"github.com/ildjenty/dev-kit/internal/status"
 	"github.com/ildjenty/dev-kit/internal/sync"
 )
 
@@ -37,5 +38,5 @@ func main() {
 }
 
 func newRegistry() *cli.Registry {
-	return cli.New(version, config.Commands(), record.Commands(), checks.Commands(), criteria.Commands(), decisions.Commands(), initialize.Commands(), doctor.Commands(), requirements.Commands(), plan.Commands(), implement.Commands(), fix.Commands(), judge.Commands(), pr.Commands(), sync.Commands(), refine.Commands(), concerns.Commands(), retro.Commands())
+	return cli.New(version, config.Commands(), record.Commands(), checks.Commands(), criteria.Commands(), decisions.Commands(), initialize.Commands(), doctor.Commands(), requirements.Commands(), plan.Commands(), implement.Commands(), fix.Commands(), judge.Commands(), pr.Commands(), sync.Commands(), refine.Commands(), concerns.Commands(), retro.Commands(), status.Commands())
 }
