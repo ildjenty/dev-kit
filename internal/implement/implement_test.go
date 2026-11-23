@@ -205,6 +205,43 @@ func TestDoesNotCommitFailedChecksOwnerDecisionsOrInvalidDecisionRows(t *testing
 	testutil.Equal(t, testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{}))["committed"], false)
 	testutil.Equal(t, testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD"), head)
 }
+func TestEachReleaseStepHasItsOwnPassLimit(t *testing.T) {
+	ctx, artifacts := setup(t, true)
+	testutil.Must(prepare(ctx, artifacts))
+	failing := func(name string) *checks.Gate {
+		gate := gateFixture()
+		gate.Passed = false
+		gate.Failing = []string{name}
+		return gate
+	}
+	first := testutil.Must(end(ctx, artifacts, failing("lint"), &codeOutput{}))
+	testutil.Equal(t, first["finished"], false)
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing("types"), &codeOutput{}))["finished"], false)
+	third := testutil.Must(end(ctx, artifacts, failing("tests"), &codeOutput{}))
+	testutil.Equal(t, third["finished"], true)
+	s := testutil.Must(readJSON[state](filepath.Join(artifacts, "implement/state.json")))
+	testutil.Equal(t, s.Exhausted, first["unit"])
+	result, _, err := outcome(s, planFixture(), nil, nil)
+	testutil.OK(t, err)
+	testutil.Equal(t, result["outcome"], "stop")
+	testutil.Contains(t, result["stop"].(record.Document)["state"].(string), "did not pass its checks within its pass limit")
+	testutil.Contains(t, strings.Join(stringsOf(result["stop"].(record.Document)["unresolved"]), "\n"), "failing check: tests")
+}
+
+func TestPassingStepsDoNotUseUpTheNextStepsPasses(t *testing.T) {
+	ctx, artifacts := setup(t, true)
+	testutil.Must(prepare(ctx, artifacts))
+	failing := gateFixture()
+	failing.Passed = false
+	failing.Failing = []string{"lint"}
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing, &codeOutput{}))["finished"], false)
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing, &codeOutput{}))["finished"], false)
+	passed := testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "feat: first step"}))
+	testutil.Equal(t, passed["committed"], true)
+	s := testutil.Must(readJSON[state](filepath.Join(artifacts, "implement/state.json")))
+	testutil.Equal(t, s.Exhausted, "")
+}
+
 func TestWritesImplementationDecisionsIntoNewPlanVersionAndResultUsesIt(t *testing.T) {
 	ctx, artifacts := setup(t, true)
 	testutil.Must(prepare(ctx, artifacts))

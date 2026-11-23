@@ -45,7 +45,7 @@ func TestConfigDefaultsAndCheckout(t *testing.T) {
 	c := testutil.Must(Load(filepath.Join(repo, "nested")))
 	testutil.Equal(t, c.Language, "fr")
 	testutil.Equal(t, c.Standards, "policy")
-	testutil.Equal(t, c.Limits, Limits{1, 3})
+	testutil.Equal(t, c.Limits, Limits{1, 3, 3})
 	testutil.Equal(t, c.Qualities["ui"].Paths, []string{})
 	has := func(path string) bool {
 		for _, rule := range c.DecisionPaths {

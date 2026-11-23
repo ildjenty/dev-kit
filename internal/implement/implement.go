@@ -25,6 +25,7 @@ type unit struct {
 	Criteria     []string `json:"criteria"`
 	Done         bool     `json:"done"`
 	TestsWritten bool     `json:"tests_written"`
+	Passes       int      `json:"passes"`
 	Commit       string   `json:"commit,omitempty"`
 }
 
@@ -48,6 +49,8 @@ type state struct {
 	Stuck               *stuckChecks    `json:"stuck"`
 	OwnerDecisions      []ownerDecision `json:"owner_decisions"`
 	DecisionErrors      []string        `json:"decision_errors"`
+	Exhausted           string          `json:"exhausted,omitempty"`
+	LastFailing         []string        `json:"last_failing,omitempty"`
 }
 
 type codeOutput struct {
@@ -504,6 +507,9 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 	}
 	u := current(&s)
 	s.Round++
+	if u != nil {
+		u.Passes++
+	}
 	plan, err := readJSON[record.Document](filepath.Join(dir, "plan.json"))
 	if err != nil {
 		return nil, err
@@ -564,6 +570,18 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 		}
 		committed = true
 	}
+	if gate != nil && !gate.Passed {
+		s.LastFailing = gate.Failing
+	}
+	if !committed && u != nil && s.Stuck == nil && len(s.OwnerDecisions) == 0 {
+		passes := 3
+		if c, err := config.Load(ctx.Cwd); err == nil && c.Limits.Passes > 0 {
+			passes = c.Limits.Passes
+		}
+		if u.Passes >= passes {
+			s.Exhausted = u.ID
+		}
+	}
 	if err := writeJSON(file, s); err != nil {
 		return nil, err
 	}
@@ -571,7 +589,7 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 	if u == nil {
 		return nil, fmt.Errorf("Cannot read properties of undefined (reading 'id')")
 	}
-	return record.Document{"unit": u.ID, "committed": committed, "all_done": allDone, "finished": allDone || s.Stuck != nil || len(s.OwnerDecisions) > 0, "needs_owner": len(s.OwnerDecisions), "stuck": s.Stuck != nil, "decision_errors": len(errors)}, nil
+	return record.Document{"unit": u.ID, "committed": committed, "all_done": allDone, "finished": allDone || s.Stuck != nil || len(s.OwnerDecisions) > 0 || s.Exhausted != "", "needs_owner": len(s.OwnerDecisions), "stuck": s.Stuck != nil, "decision_errors": len(errors)}, nil
 }
 
 func outcome(s state, plan record.Document, written json.RawMessage, back *stepBack) (record.Document, []record.Document, error) {
@@ -610,6 +628,18 @@ func outcome(s state, plan record.Document, written json.RawMessage, back *stepB
 			unresolved = s.Stuck.Failing
 		}
 		return stop(message, unresolved, premise), nil, nil
+	}
+	if s.Exhausted != "" {
+		unresolved := []string{}
+		for _, u := range s.Units {
+			if u.ID == s.Exhausted {
+				unresolved = append(unresolved, fmt.Sprintf("%s: %s (passes: %d)", u.ID, u.Summary, u.Passes))
+			}
+		}
+		for _, f := range s.LastFailing {
+			unresolved = append(unresolved, "failing check: "+f)
+		}
+		return stop(fmt.Sprintf("Release step %s did not pass its checks within its pass limit (limits.passes)", s.Exhausted), append(unresolved, s.DecisionErrors...), ""), nil, nil
 	}
 	remaining := []string{}
 	for _, u := range s.Units {

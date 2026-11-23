@@ -240,7 +240,8 @@
   ],
   "limits": {
     "restarts": 3,
-    "fixes": 3
+    "fixes": 3,
+    "passes": 3
   },
   "topics": ".devkit/topics"
 }

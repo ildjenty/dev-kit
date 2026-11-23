@@ -5,7 +5,8 @@ description: |
   Makes the plan's increments one by one in order: for each unit a fresh session first writes the tests of its completion conditions, then another writes
   the code, and the checks the change needs run. A unit whose checks pass is committed with the run, the unit and the
   versions it was made from as trailers, so a later run on the same versions goes on from the next unit. The loop
-  runs at most 5 times over all the units.
+  gives each release step at most `limits.passes` passes (default 3) and stops when one step uses them
+  up; the loop itself is bounded at 50 passes as a safety limit.
   Decisions the implementation made or settled (rows decided later) go into a new version of the plan's decision
   list; a decision the owner has to make is not implemented: the run returns back to plan with the pending owner row. When the same check
   fails twice, a fresh judge names the premise that broke and where to go back.
@@ -60,7 +61,7 @@ nodes:
     depends_on: [prepare]
     when: "$prepare.output.remaining > 0"
     loop_group:
-      max_iterations: 5
+      max_iterations: 50
       on_exhausted: complete
       nodes:
         - id: unit

@@ -33,6 +33,7 @@ type DecisionRule struct {
 type Limits struct {
 	Restarts int `json:"restarts"`
 	Fixes    int `json:"fixes"`
+	Passes   int `json:"passes"`
 }
 type Config struct {
 	Provider      string             `json:"provider"`
@@ -318,10 +319,10 @@ func shape(c map[string]any) error {
 			return invalid("decision_paths entry must have paths, quality and ask")
 		}
 	}
-	if !keys(c["limits"], []string{"restarts", "fixes"}) {
+	if !keys(c["limits"], []string{"restarts", "fixes", "passes"}) {
 		return invalid("limits")
 	}
-	for _, key := range []string{"restarts", "fixes"} {
+	for _, key := range []string{"restarts", "fixes", "passes"} {
 		n, ok := c["limits"].(map[string]any)[key].(float64)
 		if !ok || n < 0 || math.Trunc(n) != n {
 			return invalid("limits." + key + " must be a non-negative integer")

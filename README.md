@@ -129,7 +129,7 @@ Edit `.devkit/config.json`; `devkit config` prints effective settings. The autho
 - `skeleton_check`: names of checks to run on the skeleton; empty by default.
 - `qualities`: path globs for the fixed qualities. Routing and plan rows also select judges; the concern map controls their plan/code phases.
 - `decision_paths`: `{paths, quality, ask}` detection rules. Defaults include dependencies, migrations, infrastructure, CI, environment examples, workflows, standards and `.devkit/config.json`. Before/after check configurations are combined so deleting a check does not bypass it.
-- `limits.restarts`, `limits.fixes`: default 3 each.
+- `limits.restarts`, `limits.fixes`: default 3 each. `limits.passes`: passes `implement` gives each release step, default 3; a step that uses them up stops the run with the step and its failing checks, independent of how many steps the plan has.
 
 Missing settings use defaults; quality and limit entries merge individually, while other supplied arrays replace defaults. Globs support `**`, `*` and `?`. Repository-specific facts and conventions belong in these settings and standards.
 
