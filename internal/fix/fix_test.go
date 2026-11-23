@@ -352,3 +352,37 @@ func TestOutsideReviewItemsReturnToRequirementsWithoutCommitOrDispute(t *testing
 		})
 	}
 }
+
+func TestBaseFailureStopsFixWithoutPassOrStepBack(t *testing.T) {
+	ctx, artifacts, _, head := setup(t, 3)
+	testutil.Must(prepare(ctx, artifacts))
+	testutil.Must(takeObjections(artifacts))
+	testutil.Put(t, artifacts, "checks.jsonl", `{"name":"unit","status":"fail","base":"failed","log":"/checks/unit.log"}`+"\n")
+	gate := &checks.Gate{Failing: []string{"unit"}, Preexisting: []string{"unit"}, Results: filepath.Join(artifacts, "checks.jsonl")}
+	ended := testutil.Must(roundEnd(ctx, artifacts, gate, nil))
+	testutil.Equal(t, ended["finished"], true)
+	testutil.Equal(t, ended["stuck"], false)
+	testutil.Equal(t, ended["round"], 0)
+	testutil.Equal(t, testutil.Must(judgeBack(artifacts))["judge_back"], false)
+	result := testutil.Must(finish(ctx, artifacts, nil))
+	testutil.Equal(t, result["outcome"], "stop")
+	stop := result["stop"].(record.Document)
+	testutil.Equal(t, stop["base_failed"], true)
+	testutil.Equal(t, stop["state"], checks.BaseMessage([]string{"unit"}))
+	testutil.Equal(t, stop["unresolved"], []string{"unit: /checks/unit.log"})
+	testutil.Equal(t, testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD"), head)
+	history := testutil.Must(record.History(ctx.Dir))
+	testutil.Equal(t, testutil.Must(record.LimitState(history, "fix", nil, 0)).Start, "retry_after_base")
+	testutil.Equal(t, testutil.Must(record.LimitState(history, "fix", nil, 0)).Counted, false)
+}
+
+func TestRegressedChecksStillSendFixToStepBack(t *testing.T) {
+	ctx, artifacts, _, _ := setup(t, 3)
+	testutil.Must(prepare(ctx, artifacts))
+	testutil.Must(takeObjections(artifacts))
+	gate := &checks.Gate{Failing: []string{"unit"}, Regressed: []string{"unit"}, Stuck: true, StuckChecks: []string{"unit"}}
+	ended := testutil.Must(roundEnd(ctx, artifacts, gate, nil))
+	testutil.Equal(t, ended["round"], 1)
+	testutil.Equal(t, ended["stuck"], true)
+	testutil.Equal(t, testutil.Must(judgeBack(artifacts))["judge_back"], true)
+}

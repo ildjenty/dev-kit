@@ -235,3 +235,16 @@ func TestPullRequestLookupIsOptionalAndBounded(t *testing.T) {
 		testutil.Equal(t, os.IsNotExist(err), true)
 	})
 }
+
+func TestBaseFailureNextExplainsRepairAndUncountedRestartAtLimit(t *testing.T) {
+	for _, workflow := range []string{"implement", "fix", "judge"} {
+		b := Branch{Branch: "feature/x", Workflow: workflow, Outcome: "stop", Restarts: 3, Limit: 3, Stop: map[string]any{"state": "the base branch fails unit already: fix the base branch first, then start this workflow again", "base_failed": true}}
+		advice := next(b, nil)
+		testutil.Contains(t, advice, "Fix the base branch first")
+		testutil.Contains(t, advice, "not counted against limits.restarts")
+		testutil.Contains(t, advice, "log paths")
+		if strings.Contains(advice, "Start fix") || strings.Contains(advice, "continue=...") {
+			t.Fatal(advice)
+		}
+	}
+}

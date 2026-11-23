@@ -204,10 +204,14 @@ func TestSkeletonCheckSelection(t *testing.T) {
 	ctx, a = repository(t, document{"checks": []document{{"name": "skeleton", "command": "exit 1", "timeout_seconds": 5}}, "skeleton_check": []string{"skeleton"}})
 	inputFiles(t, a)
 	testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), structureDraft()))
+	marker := filepath.Join(t.TempDir(), "prepared")
+	testutil.Put(t, ctx.Cwd, ".archon/config.yaml", "worktree:\n  postCreate:\n    - touch '"+marker+"'\n")
 	blocked := must(checkCommand(ctx, a, nil, "", "structure"))
 	testutil.Equal(t, blocked["valid"], false)
 	testutil.Equal(t, blocked["structure"], false)
 	testutil.Contains(t, strings.Join(stringsOf(blocked["errors"]), ","), "Skeleton checks did not pass")
+	_, err = os.Stat(marker)
+	testutil.Equal(t, os.IsNotExist(err), true)
 	testutil.Equal(t, must(read(filepath.Join(text(blocked["materials"]), "state.json")))["judges"], []string{})
 }
 func TestChangeDetection(t *testing.T) {

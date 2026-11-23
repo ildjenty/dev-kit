@@ -147,6 +147,13 @@ blocking findings require fix. PR returns its URL for the owner's merge decision
 For other `back` results, start the workflow named by `back.to`. Its prepare loads every valid,
 unconsumed premise and observation into `returned`; the writer addresses those first.
 
+For a `stop` with `stop.base_failed: true`, tell the owner that the named checks already fail on the
+base branch. Relay the failing checks and their log paths from `stop.unresolved`. Fix the base branch
+first, then start the same workflow again; `devkit record limit` classifies this as `retry_after_base`,
+not counted against `limits.restarts`, even at the limit. Retrying before the base is fixed is pointless.
+Do not send this stop to fix or step-back. Implement/fix do not consume a pass for this failure;
+judge records that the check fails on the base too.
+
 For `stop`, explain the state and unresolved items. Restarts are counted per branch; the configured
 `limits.restarts` default is 3. On reaching it, relay that fact and obtain the owner's words allowing
 continuation. Pass those words verbatim as `--input continue=<owner words>`. Do not supply `continue`

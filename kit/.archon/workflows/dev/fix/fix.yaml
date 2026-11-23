@@ -175,7 +175,7 @@ nodes:
             required: [pending]
         - id: checks
           depends_on: [dispute-end]
-          bash: devkit checks
+          bash: devkit checks --base-on-repeat
           output_format:
             type: object
             properties:
@@ -183,6 +183,8 @@ nodes:
               passed: { type: boolean }
               stuck: { type: boolean }
               failing: { type: array, items: { type: string } }
+              preexisting: { type: array, items: { type: string } }
+              regressed: { type: array, items: { type: string } }
               stuck_checks: { type: array, items: { type: string } }
               skipped: { type: array, items: { type: string } }
               results: { type: string }

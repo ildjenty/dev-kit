@@ -24,8 +24,12 @@ type Result struct {
 	Command string  `json:"command"`
 	Log     string  `json:"log"`
 	Reason  *string `json:"reason,omitempty"`
+	Base    string  `json:"base,omitempty"`
+	BaseLog string  `json:"base_log,omitempty"`
 }
 type Gate struct {
+	Preexisting []string `json:"preexisting"`
+	Regressed   []string `json:"regressed"`
 	Round       int      `json:"round"`
 	Passed      bool     `json:"passed"`
 	Stuck       bool     `json:"stuck"`
@@ -60,9 +64,16 @@ func Judge(round int, now, before []Result, required []string) Gate {
 	failing := []string{}
 	stuck := []string{}
 	skipped := []string{}
+	preexisting, regressed := []string{}, []string{}
 	for _, r := range now {
 		if r.Status == "fail" {
 			failing = append(failing, r.Name)
+			if r.Base == "failed" {
+				preexisting = append(preexisting, r.Name)
+			}
+			if r.Base == "passed" {
+				regressed = append(regressed, r.Name)
+			}
 		}
 		if r.Status == "skip" {
 			reason := ""
@@ -73,7 +84,11 @@ func Judge(round int, now, before []Result, required []string) Gate {
 		}
 	}
 	failing = append(failing, environment...)
-	for _, name := range failing {
+	for _, current := range now {
+		if current.Status != "fail" || current.Base == "failed" {
+			continue
+		}
+		name := current.Name
 		for _, r := range before {
 			if r.Name == name && r.Status == "fail" {
 				stuck = append(stuck, name)
@@ -82,7 +97,7 @@ func Judge(round int, now, before []Result, required []string) Gate {
 		}
 	}
 	stuck = append(stuck, environment...)
-	return Gate{Round: round, Passed: len(failing) == 0, Stuck: len(stuck) > 0, Failing: failing, StuckChecks: stuck, Skipped: skipped}
+	return Gate{Preexisting: preexisting, Regressed: regressed, Round: round, Passed: len(failing) == 0, Stuck: len(stuck) > 0, Failing: failing, StuckChecks: stuck, Skipped: skipped}
 }
 func encode(value string) string {
 	var b strings.Builder
@@ -116,6 +131,10 @@ type CheckOptions struct {
 }
 
 func RunCheck(check config.Check, o CheckOptions) (Result, error) {
+	return runCheck(check, o, true)
+}
+
+func runCheck(check config.Check, o CheckOptions, retry bool) (Result, error) {
 	log := filepath.Join(o.Dir, fmt.Sprintf("%d-%s.log", o.Round, encode(check.Name)))
 	if err := os.WriteFile(log, []byte("$ "+check.Command+"\n"), 0644); err != nil {
 		return Result{}, err
@@ -185,7 +204,7 @@ func RunCheck(check config.Check, o CheckOptions) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
-	if code == 75 {
+	if code == 75 && retry {
 		if err := appendFile(log, "\n--- retried after an environment failure ---\n"); err != nil {
 			return Result{}, err
 		}
@@ -224,6 +243,8 @@ func RunCheck(check config.Check, o CheckOptions) (Result, error) {
 }
 
 type Options struct {
+	NoBase       bool
+	BaseOnRepeat bool
 	Cwd          string
 	ArtifactsDir string
 	BaseBranch   string
@@ -347,18 +368,58 @@ func RunChecks(o Options) (Gate, error) {
 		results = append(results, r)
 		names = append(names, check.Name)
 	}
+	if !o.NoBase {
+		compare := func(r Result) bool { return true }
+		if o.BaseOnRepeat {
+			compare = func(r Result) bool {
+				return slices.ContainsFunc(before, func(b Result) bool { return b.Name == r.Name && b.Status == "fail" })
+			}
+		}
+		if err := compareBase(g, selected, results, dir, round, o.Env, compare); err != nil {
+			return Gate{}, err
+		}
+	} else {
+		for i := range results {
+			if results[i].Status == "fail" {
+				results[i].Base = "unavailable"
+			}
+		}
+	}
+	if err := os.WriteFile(resultsPath, nil, 0644); err != nil {
+		return Gate{}, err
+	}
+	for _, result := range results {
+		data, err := json.Marshal(result)
+		if err != nil {
+			return Gate{}, err
+		}
+		if err := appendFile(resultsPath, string(data)+"\n"); err != nil {
+			return Gate{}, err
+		}
+	}
 	gate := Judge(round, results, before, names)
 	gate.Results = resultsPath
 	return gate, nil
 }
 func Commands() []cli.Command {
-	return []cli.Command{{Area: "checks", Usage: "devkit checks [--only a,b]", Run: func(args []string, env cli.Env) error {
+	return []cli.Command{{Area: "checks", Usage: "devkit checks [--only a,b] [--no-base | --base-on-repeat]", Run: func(args []string, env cli.Env) error {
 		var only []string
-		if len(args) > 0 {
-			if len(args) != 2 || args[0] != "--only" || args[1] == "" {
-				return cli.Usage("devkit checks [--only name1,name2]")
+		noBase, onRepeat := false, false
+		for i := 0; i < len(args); i++ {
+			switch args[i] {
+			case "--no-base":
+				noBase = true
+			case "--base-on-repeat":
+				onRepeat = true
+			case "--only":
+				if only != nil || i+1 >= len(args) || args[i+1] == "" || strings.HasPrefix(args[i+1], "--") {
+					return cli.Usage("devkit checks [--only name1,name2] [--no-base | --base-on-repeat]")
+				}
+				i++
+				only = strings.Split(args[i], ",")
+			default:
+				return cli.Usage("devkit checks [--only name1,name2] [--no-base | --base-on-repeat]")
 			}
-			only = strings.Split(args[1], ",")
 		}
 		artifacts := env.Getenv("ARTIFACTS_DIR")
 		if artifacts == "" {
@@ -368,7 +429,10 @@ func Commands() []cli.Command {
 			}
 			artifacts = dir
 		}
-		gate, err := RunChecks(Options{Cwd: env.Cwd, ArtifactsDir: artifacts, BaseBranch: env.Getenv("BASE_BRANCH"), Only: only, Env: env.Environ})
+		if noBase && onRepeat {
+			return cli.Usage("devkit checks [--only name1,name2] [--no-base | --base-on-repeat]")
+		}
+		gate, err := RunChecks(Options{NoBase: noBase, BaseOnRepeat: onRepeat, Cwd: env.Cwd, ArtifactsDir: artifacts, BaseBranch: env.Getenv("BASE_BRANCH"), Only: only, Env: env.Environ})
 		if err != nil {
 			return err
 		}

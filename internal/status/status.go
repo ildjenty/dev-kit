@@ -256,6 +256,9 @@ func next(b Branch, result record.Document) string {
 	case "stop":
 		s := asMap(b.Stop)
 		state := text(s["state"])
+		if s["base_failed"] == true {
+			return state + ". Explain the failing checks and their log paths to the owner. Fix the base branch first; restarting this workflow afterward is not counted against limits.restarts. Retrying before the base is fixed is pointless."
+		}
 		if b.Workflow == "judge" && strings.HasPrefix(state, "Blocking findings remain") {
 			return fmt.Sprintf("Start fix on %s.", b.Branch)
 		}

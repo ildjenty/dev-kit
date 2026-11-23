@@ -219,6 +219,8 @@ nodes:
         type: array
         items: &3
           type: string
+      preexisting: *2
+      regressed: *2
       stuck_checks: *2
       skipped: *2
       results: *3

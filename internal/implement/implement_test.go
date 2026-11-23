@@ -347,3 +347,53 @@ func TestF7ImplementPrepareReceivesReturnedEvidence(t *testing.T) {
 	testutil.Equal(t, len(returned), 1)
 	testutil.Equal(t, returned[0]["observation"], "The check log shows reordered entries")
 }
+
+func TestBaseFailureStopsImmediatelyWithoutPassOrStepBack(t *testing.T) {
+	ctx, artifacts := setup(t, true)
+	testutil.Must(prepare(ctx, artifacts))
+	file := filepath.Join(artifacts, "implement/state.json")
+	s := testutil.Must(readJSON[state](file))
+	s.Round, s.Units[0].Passes = 2, 2
+	putJSON(t, file, s)
+	results := filepath.Join(artifacts, "checks.jsonl")
+	testutil.Put(t, artifacts, "checks.jsonl", `{"name":"unit","status":"fail","base":"failed","log":"/checks/unit.log"}`+"\n")
+	gate := &checks.Gate{Failing: []string{"unit"}, Preexisting: []string{"unit"}, Results: results}
+	before := testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD")
+	ended := testutil.Must(end(ctx, artifacts, gate, nil))
+	testutil.Equal(t, ended["finished"], true)
+	testutil.Equal(t, ended["stuck"], false)
+	testutil.Equal(t, ended["committed"], false)
+	s = testutil.Must(readJSON[state](file))
+	testutil.Equal(t, s.Round, 2)
+	testutil.Equal(t, s.Units[0].Passes, 2)
+	testutil.Equal(t, s.Stuck == nil, true)
+	testutil.Equal(t, s.Exhausted, "")
+	result := testutil.Must(finish(ctx, artifacts, nil))
+	testutil.Equal(t, result["outcome"], "stop")
+	stop := result["stop"].(record.Document)
+	testutil.Equal(t, stop["base_failed"], true)
+	testutil.Equal(t, stop["state"], checks.BaseMessage([]string{"unit"}))
+	testutil.Equal(t, stop["unresolved"], []string{"unit: /checks/unit.log"})
+	testutil.Equal(t, testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD"), before)
+	history := testutil.Must(record.History(ctx.Dir))
+	testutil.Equal(t, testutil.Must(record.LimitState(history, "implement", nil, 0)).Start, "retry_after_base")
+	testutil.Equal(t, testutil.Must(record.LimitState(history, "implement", nil, 0)).Counted, false)
+}
+
+func TestRegressedOrUnavailableChecksStillConsumeImplementationPass(t *testing.T) {
+	for _, base := range []string{"passed", "unavailable"} {
+		t.Run(base, func(t *testing.T) {
+			ctx, artifacts := setup(t, true)
+			testutil.Must(prepare(ctx, artifacts))
+			gate := &checks.Gate{Failing: []string{"unit"}, Stuck: true, StuckChecks: []string{"unit"}}
+			if base == "passed" {
+				gate.Regressed = []string{"unit"}
+			}
+			ended := testutil.Must(end(ctx, artifacts, gate, nil))
+			testutil.Equal(t, ended["stuck"], true)
+			s := testutil.Must(readJSON[state](filepath.Join(artifacts, "implement/state.json")))
+			testutil.Equal(t, s.Round, 1)
+			testutil.Equal(t, s.Units[0].Passes, 1)
+		})
+	}
+}

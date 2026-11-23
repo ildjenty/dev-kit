@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
+	"github.com/ildjenty/dev-kit/internal/checks"
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
@@ -92,7 +94,11 @@ func decide(inputs doc) ([]doc, doc) {
 	}
 	machine := []doc{}
 	for _, name := range stringsOf(gate["failing"]) {
-		machine = append(machine, doc{"id": "check-" + name, "blocking": true, "needs_decision": false, "text": "Check " + name + " did not pass at the judged commit", "evidence": gate["results"]})
+		message := "Check " + name + " did not pass at the judged commit"
+		if slices.Contains(stringsOf(gate["preexisting"]), name) {
+			message += "; it fails on the base branch too"
+		}
+		machine = append(machine, doc{"id": "check-" + name, "blocking": true, "needs_decision": false, "text": message, "evidence": gate["results"]})
 	}
 	for i, m := range docs(completion["missing"]) {
 		machine = append(machine, doc{"id": fmt.Sprintf("completion-%d", i+1), "blocking": true, "needs_decision": false, "text": fmt.Sprintf("%s: %s does not contain the planned test %s (%s)", text(m["criterion"]), text(m["file"]), text(m["name"]), text(m["status"])), "evidence": "judge/completion.json"})
@@ -132,6 +138,9 @@ func decide(inputs doc) ([]doc, doc) {
 	observations := []string{}
 	for _, check := range docs(gate["checks"]) {
 		s := fmt.Sprintf("%s: %s / %s / %s", text(check["name"]), text(check["status"]), text(check["command"]), text(check["log"]))
+		if text(check["base"]) != "" {
+			s += " / base: " + text(check["base"]) + " / " + text(check["base_log"])
+		}
 		if text(check["reason"]) != "" {
 			s += " / " + text(check["reason"])
 		}
@@ -163,6 +172,17 @@ func decide(inputs doc) ([]doc, doc) {
 		if j["verdict"] != "pass" {
 			incomplete = append(incomplete, stringsOf(j["observations"])...)
 		}
+	}
+	if names := stringsOf(gate["preexisting"]); len(names) > 0 {
+		logs := []string{}
+		for _, check := range docs(gate["checks"]) {
+			if slices.Contains(names, text(check["name"])) {
+				logs = append(logs, text(check["name"])+": "+text(check["log"]))
+			}
+		}
+		result := stop(checks.BaseMessage(names), logs)
+		result["stop"].(doc)["base_failed"] = true
+		return judgments, result
 	}
 	if p["has_requirements"] == false && needsPlan {
 		return judgments, stop("this change needs requirements and a plan: start `requirements` describing it", blocking)

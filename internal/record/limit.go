@@ -31,6 +31,9 @@ func ClassifyStart(h HistoryData, workflow string, answered []string) (string, e
 		return "step_back", nil
 	}
 	if latest["outcome"] == "stop" && latest["workflow"] == workflow {
+		if object(latest["stop"])["base_failed"] == true {
+			return "retry_after_base", nil
+		}
 		return "continue_after_stop", nil
 	}
 	if latest["outcome"] == "pass" || latest["outcome"] == "carry" {

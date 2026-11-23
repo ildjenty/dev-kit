@@ -15,7 +15,7 @@ import (
 )
 
 func TestEmptyGateAndSkips(t *testing.T) {
-	testutil.Equal(t, Judge(1, nil, nil, nil), Gate{Round: 1, Passed: true, Failing: []string{}, StuckChecks: []string{}, Skipped: []string{}})
+	testutil.Equal(t, Judge(1, nil, nil, nil), Gate{Preexisting: []string{}, Regressed: []string{}, Round: 1, Passed: true, Failing: []string{}, StuckChecks: []string{}, Skipped: []string{}})
 	reason := "not applicable"
 	gate := Judge(1, []Result{{Name: "optional", Status: "skip", Reason: &reason}}, nil, nil)
 	testutil.Equal(t, gate.Passed, true)
@@ -91,7 +91,8 @@ func TestSnapshotsAndRounds(t *testing.T) {
 	testutil.Equal(t, names, []string{"always", "source"})
 	second := testutil.Must(RunChecks(o))
 	testutil.Equal(t, second.Round, 2)
-	testutil.Equal(t, second.StuckChecks, []string{"always"})
+	testutil.Equal(t, second.StuckChecks, []string{})
+	testutil.Equal(t, second.Preexisting, []string{"always"})
 	o.Only = []string{"source"}
 	third := testutil.Must(RunChecks(o))
 	testutil.Equal(t, third.Passed, true)

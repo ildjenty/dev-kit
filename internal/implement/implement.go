@@ -50,6 +50,8 @@ type state struct {
 	OwnerDecisions      []ownerDecision `json:"owner_decisions"`
 	DecisionErrors      []string        `json:"decision_errors"`
 	Exhausted           string          `json:"exhausted,omitempty"`
+	BaseFailed          []string        `json:"base_failed,omitempty"`
+	FailingLogs         []string        `json:"failing_logs,omitempty"`
 	LastFailing         []string        `json:"last_failing,omitempty"`
 }
 
@@ -506,6 +508,17 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 		return nil, err
 	}
 	u := current(&s)
+	if gate != nil && gate.OnlyPreexisting() {
+		s.BaseFailed = gate.Preexisting
+		s.FailingLogs, err = gate.FailingLogs()
+		if err != nil {
+			return nil, err
+		}
+		if err := writeJSON(file, s); err != nil {
+			return nil, err
+		}
+		return record.Document{"unit": u.ID, "committed": false, "all_done": false, "finished": true, "needs_owner": 0, "stuck": false, "decision_errors": 0}, nil
+	}
 	s.Round++
 	if u != nil {
 		u.Passes++
@@ -596,12 +609,19 @@ func outcome(s state, plan record.Document, written json.RawMessage, back *stepB
 	ended := "max_iterations"
 	if current(&s) == nil {
 		ended = "cleared"
+	} else if len(s.BaseFailed) > 0 {
+		ended = "base_failed"
 	} else if s.Stuck != nil {
 		ended = "stuck"
 	}
 	loops := []record.Document{{"name": "implement", "ended": ended, "rounds": s.Round}}
 	stop := func(message string, unresolved any, premise string) record.Document {
 		return record.Document{"outcome": "stop", "loops": loops, "stop": record.Document{"state": message, "unresolved": unresolved, "premise": premise}}
+	}
+	if len(s.BaseFailed) > 0 {
+		result := stop(checks.BaseMessage(s.BaseFailed), s.FailingLogs, "")
+		result["stop"].(record.Document)["base_failed"] = true
+		return result, nil, nil
 	}
 	if len(s.OwnerDecisions) > 0 {
 		rows := []record.Document{}

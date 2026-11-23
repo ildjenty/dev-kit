@@ -170,7 +170,7 @@ func checkCommand(ctx record.ContextData, artifacts string, env []string, displa
 			childEnv = os.Environ()
 		}
 		childEnv = append(slices.Clone(childEnv), "ARTIFACTS_DIR="+display, "BASE_BRANCH="+ctx.BaseBranch)
-		gate, e := checks.RunChecks(checks.Options{Cwd: ctx.Cwd, ArtifactsDir: artifacts, BaseBranch: ctx.BaseBranch, Only: c.SkeletonCheck, Env: childEnv})
+		gate, e := checks.RunChecks(checks.Options{NoBase: true, Cwd: ctx.Cwd, ArtifactsDir: artifacts, BaseBranch: ctx.BaseBranch, Only: c.SkeletonCheck, Env: childEnv})
 		if e != nil {
 			message := e.Error()
 			if len(message) > 4000 {

@@ -272,3 +272,26 @@ func TestPrepareRejectsInvalidFixedConcernMap(t *testing.T) {
 	_, err := prepare(ctx, t.TempDir(), "artifacts")
 	testutil.Fails(t, err, "missing quality: scope")
 }
+
+func TestPreexistingCheckIsReportedAndStopsInsteadOfFix(t *testing.T) {
+	for _, mixed := range []bool{false, true} {
+		failing := []string{"unit"}
+		if mixed {
+			failing = append(failing, "regressed")
+		}
+		judgments, out := decide(inputs(doc{"gate": doc{"passed": false, "failing": failing, "preexisting": []string{"unit"}, "results": "checks/1.jsonl", "checks": []doc{{"name": "unit", "status": "fail", "base": "failed", "log": "/checks/unit.log", "base_log": "/checks/base/unit.log"}}}}))
+		testutil.Equal(t, out["outcome"], "stop")
+		stop := object(out["stop"])
+		testutil.Equal(t, stop["base_failed"], true)
+		testutil.Contains(t, text(stop["state"]), "the base branch fails unit already")
+		testutil.Equal(t, stop["unresolved"], []string{"unit: /checks/unit.log"})
+		for _, j := range judgments {
+			if j["judge"] != "test" {
+				continue
+			}
+			testutil.Equal(t, j["verdict"], "fail")
+			testutil.Contains(t, text(docs(j["findings"])[0]["text"]), "fails on the base branch too")
+			testutil.Contains(t, strings.Join(stringsOf(j["observations"]), "\n"), "base: failed / /checks/base/unit.log")
+		}
+	}
+}

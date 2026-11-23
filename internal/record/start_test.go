@@ -565,3 +565,19 @@ func TestReviewFixRequiresNewJudgeEvenWhenChangeIdentityIsUnchanged(t *testing.T
 	end(dir, "judge", "j2", Document{"outcome": "pass"})
 	testutil.Equal(t, begin(dir, "pr", "pr2").Stopped, false)
 }
+
+func TestStartAfterBaseFailureRecordsUncountedRetryAtLimit(t *testing.T) {
+	dir := afterPlan(t)
+	for _, id := range []string{"old1", "old2", "old3"} {
+		run(dir, id, "implement", Document{"start": "retry_after_error", "counted": true})
+	}
+	run(dir, "base-failure", "implement", nil)
+	end(dir, "implement", "base-failure", Document{"outcome": "stop", "stop": Document{"state": "base failed", "unresolved": []string{"unit: /checks/unit.log"}, "premise": "", "base_failed": true}})
+	started := begin(dir, "implement", "retry")
+	testutil.Equal(t, started.Stopped, false)
+	testutil.Equal(t, started.Start, "retry_after_base")
+	testutil.Equal(t, started.Counted, false)
+	h := must(History(dir))
+	testutil.Equal(t, h.Runs[len(h.Runs)-1]["start"], "retry_after_base")
+	testutil.Equal(t, RestartsOf(h), 3)
+}

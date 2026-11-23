@@ -108,6 +108,7 @@
             "type": "string",
             "enum": [
               "cleared",
+              "base_failed",
               "stuck",
               "max_iterations"
             ]
@@ -222,6 +223,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "base_failed": {"const": true},
         "state": {
           "$ref": "common.json#/$defs/text"
         },

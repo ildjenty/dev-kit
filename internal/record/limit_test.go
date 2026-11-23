@@ -104,3 +104,19 @@ func TestLatestContinuationResetsCount(t *testing.T) {
 	}
 	testutil.Equal(t, RestartsOf(h), 1)
 }
+
+func TestRetryAfterBaseFailureDoesNotConsumeRestartAtLimit(t *testing.T) {
+	for _, workflow := range []string{"implement", "fix", "judge"} {
+		t.Run(workflow, func(t *testing.T) {
+			h := recordOf(t, []step{{id: "b1", workflow: workflow, outcome: "stop", result: Document{"stop": Document{"state": "base failed", "unresolved": []string{"unit: /checks/unit.log"}, "premise": "", "base_failed": true}}}})
+			for i := 0; i < 3; i++ {
+				h.Runs = append([]Document{{"run_id": fmt.Sprint(i), "counted": true}}, h.Runs...)
+			}
+			limit := must(LimitState(h, workflow, nil, 3))
+			testutil.Equal(t, limit, LimitStatus{Start: "retry_after_base", Counted: false, Restarts: 3, Limit: 3, Reached: false})
+			run(newRecord(t), "retry", workflow, Document{"start": limit.Start, "counted": limit.Counted})
+			other := must(LimitState(h, "requirements", nil, 3))
+			testutil.Equal(t, other.Start, "other")
+		})
+	}
+}

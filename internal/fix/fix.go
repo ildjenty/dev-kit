@@ -45,6 +45,7 @@ type disputeRound struct {
 }
 
 type state struct {
+	FailingLogs         []string          `json:"failing_logs,omitempty"`
 	Review              string            `json:"review,omitempty"`
 	OutsideRequirements []record.Document `json:"outside_requirements,omitempty"`
 	Start               string            `json:"start"`
@@ -246,6 +247,12 @@ func outcome(p preparedFile, s state, back *stepBack) record.Document {
 			unresolved = append(unresolved, text(f["id"])+": "+text(f["text"]))
 		}
 		return stop(fmt.Sprintf("Fixes since the last implementation reached the configured limit (%d)", p.Limit), unresolved, "")
+	}
+	if s.Gate != nil && s.Gate.OnlyPreexisting() {
+		loops = append(loops, record.Document{"name": "fix-checks", "ended": "base_failed", "rounds": s.Round})
+		result := stop(checks.BaseMessage(s.Gate.Preexisting), s.FailingLogs, "")
+		result["stop"].(record.Document)["base_failed"] = true
+		return result
 	}
 	ended := "max_iterations"
 	if s.Gate != nil && s.Gate.Passed && s.Pending == 0 {
@@ -589,6 +596,17 @@ func roundEnd(ctx record.ContextData, artifacts string, gate *checks.Gate, code 
 		return nil, err
 	}
 	s.Gate = gate
+	if gate != nil && gate.OnlyPreexisting() {
+		s.Round--
+		s.FailingLogs, err = gate.FailingLogs()
+		if err != nil {
+			return nil, err
+		}
+		if err := writeJSON(file, s); err != nil {
+			return nil, err
+		}
+		return record.Document{"round": s.Round, "finished": true, "passed": false, "stuck": false, "pending": s.Pending, "needs_owner": 0, "broken": 0}, nil
+	}
 	s.OwnerDecisions = []record.Document{}
 	s.BrokenDecisions = []record.Document{}
 	if code != nil {
@@ -630,7 +648,7 @@ func judgeBack(artifacts string) (record.Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	return record.Document{"judge_back": len(s.OutsideRequirements) == 0 && len(s.OwnerDecisions) == 0 && ((s.Gate != nil && s.Gate.Stuck) || len(s.BrokenDecisions) > 0)}, nil
+	return record.Document{"judge_back": (s.Gate == nil || !s.Gate.OnlyPreexisting()) && len(s.OutsideRequirements) == 0 && len(s.OwnerDecisions) == 0 && ((s.Gate != nil && s.Gate.Stuck) || len(s.BrokenDecisions) > 0)}, nil
 }
 
 func disputeTarget(s state, base string) record.Document {
