@@ -338,7 +338,7 @@ func run(args []string, env cli.Env, interactive bool) error {
 	if _, err = fmt.Fprint(env.Stdout, summary.String()); err != nil {
 		return err
 	}
-	doctor.Report(cli.Env{Cwd: root, Stdout: env.Stdout, Stderr: env.Stderr, LookupEnv: env.LookupEnv, Environ: env.Environ})
+	doctor.Report(cli.Env{Registry: env.Registry, Cwd: root, Stdout: env.Stdout, Stderr: env.Stderr, LookupEnv: env.LookupEnv, Environ: env.Environ})
 	if original != nil {
 		return nil
 	}
@@ -394,7 +394,7 @@ func compare(root string, o options, language string) ([]*group, []byte, []byte,
 		validObject = decodeErr == nil && stored != nil
 		if validObject {
 			destinations := map[string]json.RawMessage{}
-			for _, key := range []string{"standards", "skills", "provider", "sessions", "language"} {
+			for _, key := range []string{"standards", "decisions", "units", "topics", "eval", "skills", "provider", "sessions", "language"} {
 				if value, ok := stored[key]; ok {
 					destinations[key] = value
 				}
@@ -448,6 +448,8 @@ func compare(root string, o options, language string) ([]*group, []byte, []byte,
 		}
 	}
 	replaceNames := strings.NewReplacer(pairs...)
+	reserved := append([]string{}, paths...)
+	reserved = append(reserved, ".devkit/config.json", ".archon/config.yaml", settings.Decisions, settings.Units, settings.Topics, settings.Eval)
 	paths = append(paths, settings.Standards, ".devkit/config.json", ".archon/config.yaml")
 	wanted := map[string]*tree{}
 	for _, path := range paths {
@@ -456,9 +458,17 @@ func compare(root string, o options, language string) ([]*group, []byte, []byte,
 	for _, session := range oldSessions {
 		for _, key := range config.SkillKeys {
 			path := skillFolder(session) + old[key]
+			reserved = append(reserved, path)
 			if !slices.Contains(paths, path) {
 				paths = append(paths, path)
 			}
+		}
+	}
+	standards := filepath.ToSlash(filepath.Clean(settings.Standards))
+	for _, path := range reserved {
+		path = filepath.ToSlash(filepath.Clean(path))
+		if within(standards, path) || within(path, standards) {
+			return nil, nil, nil, fmt.Errorf("standards %s conflicts with %s", settings.Standards, path)
 		}
 	}
 	put := func(dest string, data []byte) error {

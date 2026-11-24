@@ -16,6 +16,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/kitinfo"
 	"github.com/ildjenty/dev-kit/kit"
+	"gopkg.in/yaml.v3"
 )
 
 const timeout = 3 * time.Second
@@ -144,7 +145,11 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 	version, archon := command(env, limit, "archon", "--version")
 	version = strings.Join(strings.Fields(version), " ")
 	finding("required", "archon", archon, version, "Workflows cannot run; install Archon from https://archon.diy and run archon provider add "+settings.Provider+".")
-	for _, provider := range usedProviders(env.Cwd, settings.Provider) {
+	providers, providersErr := usedProviders(env.Cwd, settings.Provider)
+	if providersErr != nil {
+		finding("required", "workflow providers", false, "", "Cannot read workflow providers: "+providersErr.Error())
+	}
+	for _, provider := range providers {
 		providerOK, providerDetail := providerInstalled(env, providerLimit, provider)
 		finding("required", "Archon provider "+provider, providerOK, providerDetail, "Provider is not installed; run archon provider add "+provider+", then archon doctor.")
 	}
@@ -170,23 +175,52 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 	return valid
 }
 
-func usedProviders(root, configured string) []string {
+func usedProviders(root, configured string) ([]string, error) {
 	providers := []string{configured}
-	files, _ := filepath.Glob(filepath.Join(root, ".archon/workflows/dev/*/*.yaml"))
-	for _, file := range files {
-		data, err := os.ReadFile(file)
-		if err != nil {
-			continue
+	type workflow struct {
+		Provider  string     `yaml:"provider"`
+		Nodes     []workflow `yaml:"nodes"`
+		LoopGroup *workflow  `yaml:"loop_group"`
+	}
+	var visit func(workflow)
+	visit = func(node workflow) {
+		if node.Provider != "" && !slices.Contains(providers, node.Provider) {
+			providers = append(providers, node.Provider)
 		}
-		for _, line := range strings.Split(string(data), "\n") {
-			name, ok := strings.CutPrefix(strings.TrimSpace(line), "provider:")
-			name = strings.TrimSpace(name)
-			if ok && name != "" && !slices.Contains(providers, name) {
-				providers = append(providers, name)
-			}
+		for _, child := range node.Nodes {
+			visit(child)
+		}
+		if node.LoopGroup != nil {
+			visit(*node.LoopGroup)
 		}
 	}
-	return providers
+	err := filepath.WalkDir(filepath.Join(root, kitinfo.Workflows), func(file string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == "fixtures" {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(file) != ".yaml" && filepath.Ext(file) != ".yml" {
+			return nil
+		}
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		var document workflow
+		if err := yaml.Unmarshal(data, &document); err != nil {
+			return fmt.Errorf("%s: %w", file, err)
+		}
+		for _, node := range document.Nodes {
+			visit(node)
+		}
+		return nil
+	})
+	return providers, err
 }
 
 func providerInstalled(env cli.Env, limit time.Duration, provider string) (bool, string) {

@@ -128,7 +128,7 @@ func TestInitDoctorReportIsSharedAndNeverFailsInit(t *testing.T) {
 	root := installed(t)
 	out := invoke(t, root)
 	var report bytes.Buffer
-	testutil.Equal(t, doctor.Report(cli.Env{Cwd: root, Stdout: &report}), false)
+	testutil.Equal(t, doctor.Report(cli.Env{Registry: cli.New("test", Commands()), Cwd: root, Stdout: &report}), false)
 	testutil.Equal(t, out, report.String())
 }
 
