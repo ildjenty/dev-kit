@@ -105,12 +105,14 @@ func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, display 
 		if err != nil {
 			return nil, err
 		}
+		selected.Body = issues.StripDraftMarker(selected.Body)
 		issue = &selected
 		if issue.Parent != nil {
 			topic, err := client.Read(issue.Parent.Number)
 			if err != nil {
 				return nil, fmt.Errorf("parent topic #%d of issue #%d could not be read: %w", issue.Parent.Number, issueNumber, err)
 			}
+			topic.Body = issues.StripDraftMarker(topic.Body)
 			parent = &topic
 		}
 	}

@@ -3,6 +3,7 @@ package requirements
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
@@ -17,7 +18,12 @@ func TestPrepareCarriesIssueAndParentRequestTextAndSurvivesAnswers(t *testing.T)
 	testutil.Git(t, repo, "add", ".")
 	testutil.Git(t, repo, "commit", "-qm", "criteria and log")
 	testutil.Git(t, repo, "branch", "-f", "main", "HEAD")
-	testutil.IssueCLI(t, "OPEN", "devkit:unit", "closed")
+	gh := testutil.IssueCLI(t, "OPEN", "devkit:unit", "closed")
+	marker := `\n\n<!-- devkit:draft ` + strings.Repeat("a", 64) + ` -->`
+	script := string(testutil.Must(os.ReadFile(gh)))
+	script = strings.ReplaceAll(script, "Keep the submitted request text.", "Keep the submitted request text."+marker)
+	script = strings.ReplaceAll(script, "Employees only.", "Employees only."+marker)
+	testutil.OK(t, os.WriteFile(gh, []byte(script), 0755))
 	ctx := record.ContextData{Cwd: repo, BaseBranch: "main", Dir: t.TempDir(), RunID: "r1"}
 	run(ctx.Dir, ctx.RunID)
 	a := t.TempDir()

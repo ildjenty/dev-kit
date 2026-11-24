@@ -211,6 +211,13 @@ func (c Client) addRelation(number, related int, relation, field string) error {
 	if err != nil {
 		return err
 	}
+	exists := func() (bool, error) {
+		references, err := c.references(path + "/" + relation)
+		return slices.ContainsFunc(references, func(r Reference) bool { return r.Number == related }), err
+	}
+	if found, err := exists(); err != nil || found {
+		return err
+	}
 	data, err := c.run(nil, apiArgs(other)...)
 	if err != nil {
 		return err
@@ -225,6 +232,11 @@ func (c Client) addRelation(number, related int, relation, field string) error {
 		return fmt.Errorf("gh api returned no issue ID for #%d", related)
 	}
 	_, err = c.run(nil, append(apiArgs(path+"/"+relation), "--method", "POST", "--field", field+"="+strconv.FormatInt(issue.ID, 10))...)
+	if err != nil {
+		if found, readErr := exists(); readErr == nil && found {
+			return nil
+		}
+	}
 	return err
 }
 

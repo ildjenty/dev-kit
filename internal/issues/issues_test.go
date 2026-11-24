@@ -18,11 +18,12 @@ import (
 )
 
 type ghStep struct {
-	Args   []string
-	Input  string
-	Output string
-	Stderr string
-	Code   int
+	Args      []string
+	Input     string
+	Output    string
+	Stderr    string
+	Code      int
+	BlockSave string
 }
 
 type ghScript struct {
@@ -59,6 +60,16 @@ func TestMain(m *testing.M) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(98)
 		}
+		if step.BlockSave != "" {
+			if err := os.Rename(step.BlockSave, step.BlockSave+".saved"); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(98)
+			}
+			if err := os.Mkdir(step.BlockSave, 0755); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(98)
+			}
+		}
 		fmt.Fprint(os.Stdout, step.Output)
 		fmt.Fprint(os.Stderr, step.Stderr)
 		os.Exit(step.Code)
@@ -86,6 +97,10 @@ func fake(t *testing.T, steps ...ghStep) Client {
 
 func restArgs(path string) []string {
 	return []string{"api", "repos/{owner}/{repo}/issues/" + path, "--header", "Accept: application/vnd.github+json", "--header", "X-GitHub-Api-Version: 2026-03-10"}
+}
+
+func relationStep(number int, relation, output string) ghStep {
+	return ghStep{Args: append(restArgs(strconv.Itoa(number)+"/"+relation+"?per_page=100"), "--paginate", "--slurp"), Output: output}
 }
 
 func TestCreatePreservesIssueTextAsData(t *testing.T) {
@@ -141,7 +156,7 @@ func TestAddRelationshipsUsesDatabaseID(t *testing.T) {
 		{"blocked-by", "dependencies/blocked_by", "issue_id", func(c Client) error { return c.AddBlockedBy(7, 42) }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c := fake(t, ghStep{Args: restArgs("42"), Output: `{"id":5000000042,"number":42}`}, ghStep{Args: append(restArgs("7/"+tc.path), "--method", "POST", "--field", tc.field+"=5000000042"), Output: `{}`})
+			c := fake(t, relationStep(7, tc.path, `[[]]`), ghStep{Args: restArgs("42"), Output: `{"id":5000000042,"number":42}`}, ghStep{Args: append(restArgs("7/"+tc.path), "--method", "POST", "--field", tc.field+"=5000000042"), Output: `{}`})
 			testutil.OK(t, tc.run(c))
 		})
 	}
@@ -242,9 +257,10 @@ func TestEveryGhFailurePreservesStderr(t *testing.T) {
 		{"sub-issues", readSteps(42, `{}`, `[[]]`, `[[]]`, `[[]]`)[:2], func(c Client) error { _, err := c.Read(42); return err }},
 		{"blocked-by", readSteps(42, `{}`, `[[]]`, `[[]]`, `[[]]`)[:3], func(c Client) error { _, err := c.Read(42); return err }},
 		{"blocking", readSteps(42, `{}`, `[[]]`, `[[]]`, `[[]]`), func(c Client) error { _, err := c.Read(42); return err }},
-		{"ID lookup", []ghStep{{Args: restArgs("42")}}, func(c Client) error { return c.AddSubIssue(7, 42) }},
-		{"add child", []ghStep{{Args: restArgs("42"), Output: `{"id":123}`}, {Args: append(restArgs("7/sub_issues"), "--method", "POST", "--field", "sub_issue_id=123")}}, func(c Client) error { return c.AddSubIssue(7, 42) }},
-		{"add blocker", []ghStep{{Args: restArgs("42"), Output: `{"id":123}`}, {Args: append(restArgs("7/dependencies/blocked_by"), "--method", "POST", "--field", "issue_id=123")}}, func(c Client) error { return c.AddBlockedBy(7, 42) }},
+		{"relation lookup", []ghStep{relationStep(7, "sub_issues", `[[]]`)}, func(c Client) error { return c.AddSubIssue(7, 42) }},
+		{"ID lookup", []ghStep{relationStep(7, "sub_issues", `[[]]`), {Args: restArgs("42")}}, func(c Client) error { return c.AddSubIssue(7, 42) }},
+		{"add child", []ghStep{relationStep(7, "sub_issues", `[[]]`), {Args: restArgs("42"), Output: `{"id":123}`}, {Args: append(restArgs("7/sub_issues"), "--method", "POST", "--field", "sub_issue_id=123")}}, func(c Client) error { return c.AddSubIssue(7, 42) }},
+		{"add blocker", []ghStep{relationStep(7, "dependencies/blocked_by", `[[]]`), {Args: restArgs("42"), Output: `{"id":123}`}, {Args: append(restArgs("7/dependencies/blocked_by"), "--method", "POST", "--field", "issue_id=123")}}, func(c Client) error { return c.AddBlockedBy(7, 42) }},
 		{"close", []ghStep{{Args: []string{"issue", "close", "42", "--comment", "done"}}}, func(c Client) error { return c.Close(42, "done") }},
 		{"list", []ghStep{listStep("work", `[]`)}, func(c Client) error { _, err := c.ListOpen("work"); return err }},
 		{"ready", []ghStep{listStep("work", `[]`)}, func(c Client) error {
@@ -255,6 +271,12 @@ func TestEveryGhFailurePreservesStderr(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.steps[len(tc.steps)-1].Code = 4
 			tc.steps[len(tc.steps)-1].Stderr = "not logged into any GitHub hosts\noriginal diagnostic"
+			if tc.name == "add child" {
+				tc.steps = append(tc.steps, relationStep(7, "sub_issues", `[[]]`))
+			}
+			if tc.name == "add blocker" {
+				tc.steps = append(tc.steps, relationStep(7, "dependencies/blocked_by", `[[]]`))
+			}
 			err := tc.run(fake(t, tc.steps...))
 			testutil.Fails(t, err, "not logged into any GitHub hosts\noriginal diagnostic")
 			testutil.Fails(t, err, "devkit doctor")
@@ -306,11 +328,11 @@ func TestInvalidGhResponses(t *testing.T) {
 		{[]ghStep{{Args: []string{"issue", "view", "42", "--json", "number,title,body,state,labels,url,parent"}, Output: "invalid"}}, func(c Client) error { _, err := c.Read(42); return err }},
 		{readSteps(42, `{}`, `invalid`, `[[]]`, `[[]]`)[:2], func(c Client) error { _, err := c.Read(42); return err }},
 		{[]ghStep{listStep("work", `invalid`)}, func(c Client) error { _, err := c.ListOpen("work"); return err }},
-		{[]ghStep{{Args: restArgs("42"), Output: `invalid`}}, func(c Client) error { return c.AddSubIssue(7, 42) }},
+		{[]ghStep{relationStep(7, "sub_issues", `[[]]`), {Args: restArgs("42"), Output: `invalid`}}, func(c Client) error { return c.AddSubIssue(7, 42) }},
 	} {
 		testutil.Fails(t, tc.run(fake(t, tc.steps...)), "parse gh")
 	}
-	c := fake(t, ghStep{Args: restArgs("42"), Output: `{}`})
+	c := fake(t, relationStep(7, "dependencies/blocked_by", `[[]]`), ghStep{Args: restArgs("42"), Output: `{}`})
 	testutil.Fails(t, c.AddBlockedBy(7, 42), "no issue ID")
 }
 

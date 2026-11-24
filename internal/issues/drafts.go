@@ -1,15 +1,60 @@
 package issues
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/config"
 )
+
+var draftMarkerPattern = regexp.MustCompile(`\n\n<!-- devkit:draft [a-f0-9]{64} -->$`)
+
+func StripDraftMarker(body string) string {
+	return draftMarkerPattern.ReplaceAllString(body, "")
+}
+
+func (c Client) createDraft(commit, version, kind string, draft TopicDraft, label string) (Created, error) {
+	key, err := json.Marshal([]string{commit, version, kind, draft.Key})
+	if err != nil {
+		return Created{}, err
+	}
+	marker := fmt.Sprintf("<!-- devkit:draft %x -->", sha256.Sum256(key))
+	created, found, err := c.findDraft(marker, label)
+	if err != nil || found {
+		return created, err
+	}
+	return c.Create(draft.Title, draft.Body+"\n\n"+marker, []string{label})
+}
+
+func (c Client) findDraft(marker, label string) (Created, bool, error) {
+	path := "repos/{owner}/{repo}/issues?state=all&per_page=100"
+	data, err := c.run(nil, append(apiArgs(path), "--paginate", "--slurp")...)
+	if err != nil {
+		return Created{}, false, err
+	}
+	var pages [][]struct {
+		issueJSON
+		HTMLURL     string          `json:"html_url"`
+		PullRequest json.RawMessage `json:"pull_request"`
+	}
+	if err := json.Unmarshal(data, &pages); err != nil {
+		return Created{}, false, fmt.Errorf("parse gh api issue drafts: %w", err)
+	}
+	for _, page := range pages {
+		for _, item := range page {
+			if len(item.PullRequest) == 0 && slices.Contains(item.issue().Labels, label) && strings.Contains(item.Body, marker) {
+				return Created{item.Number, item.HTMLURL}, true, nil
+			}
+		}
+	}
+	return Created{}, false, nil
+}
 
 type UnitDraft struct {
 	Key                  string   `json:"key"`
@@ -145,12 +190,15 @@ func (c Client) CreateDrafts(path string, drafts Drafts, labels config.IssueLabe
 	if errors := drafts.Errors(); len(errors) > 0 {
 		return progress, fmt.Errorf("invalid issue drafts: %s", strings.Join(errors, "; "))
 	}
+	if progress.Commit == "" {
+		return progress, fmt.Errorf("issue creation requires a recorded proposal commit")
+	}
 	save := func() error { return SaveCreation(path, progress) }
 	if parent != nil && progress.Parent == nil {
 		if number > 0 {
 			progress.Parent = &Created{Number: number}
 		} else {
-			created, err := c.Create(parent.Title, parent.Body, []string{labels.Topic})
+			created, err := c.createDraft(progress.Commit, filepath.Base(path), "parent", *parent, labels.Topic)
 			if err != nil {
 				return progress, err
 			}
@@ -168,7 +216,7 @@ func (c Client) CreateDrafts(path string, drafts Drafts, labels config.IssueLabe
 		if slices.ContainsFunc(drafts.Topics, func(t TopicDraft) bool { return t.Key == issue.Key }) {
 			label = labels.Topic
 		}
-		created, err := c.Create(issue.Title, issue.Body, []string{label})
+		created, err := c.createDraft(progress.Commit, filepath.Base(path), "draft", issue, label)
 		if err != nil {
 			return progress, err
 		}
