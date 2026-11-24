@@ -561,7 +561,15 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 	known := map[string]bool{}
 	graph := append([]doc{}, data.Decisions...)
 	pending := obj(obj(input["pending_proposal"])["content"])
-	for _, old := range stringsOf(pending["decision_ids"]) {
+	current, err := record.Latest(ctx.Dir, "proposal")
+	if err != nil {
+		return nil, err
+	}
+	proposedIDs := stringsOf(pending["decision_ids"])
+	if current["run_id"] == ctx.RunID {
+		proposedIDs = append(proposedIDs, stringsOf(obj(current["content"])["decision_ids"])...)
+	}
+	for _, old := range proposedIDs {
 		graph = slices.DeleteFunc(graph, func(d doc) bool { return d["id"] == old && d["status"] == "proposed" })
 	}
 	for _, d := range graph {
@@ -641,10 +649,6 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 	machinePaths := []string{}
 	for _, id := range stringsOf(pending["decision_ids"]) {
 		machinePaths = append(machinePaths, str(obj(input["folders"])["decisions"])+"/"+id+".md")
-	}
-	current, err := record.Latest(ctx.Dir, "proposal")
-	if err != nil {
-		return nil, err
 	}
 	if current["run_id"] == ctx.RunID {
 		for _, id := range stringsOf(obj(current["content"])["decision_ids"]) {
