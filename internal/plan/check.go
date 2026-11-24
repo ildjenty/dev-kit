@@ -77,6 +77,20 @@ func commitSkeleton(ctx record.ContextData, goal string) (string, error) {
 	}
 	return gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
 }
+func verifySkeleton(ctx record.ContextData, commit string) error {
+	head, err := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
+	if err != nil {
+		return err
+	}
+	status, err := gitx.Run(ctx.Cwd, "--no-optional-locks", "status", "--porcelain", "--untracked-files=all", "--ignore-submodules=none")
+	if err != nil {
+		return err
+	}
+	if head != commit || status != "" {
+		return fmt.Errorf("the skeleton changed after it was committed; rerun plan check before judging or finishing")
+	}
+	return nil
+}
 func checkCommand(ctx record.ContextData, artifacts string, env []string, display string, phases ...string) (document, error) {
 	if len(phases) != 1 || phases[0] != "structure" && phases[0] != "detail" {
 		return nil, fmt.Errorf("plan phase must be structure or detail")
@@ -180,6 +194,9 @@ func checkCommand(ctx record.ContextData, artifacts string, env []string, displa
 		} else if !gate.Passed {
 			errors = append(errors, fmt.Sprintf("Skeleton checks did not pass: %s; results: %s", strings.Join(gate.Failing, ", "), filepath.Join(display, "checks", filepath.Base(gate.Results))))
 		}
+	}
+	if err = verifySkeleton(ctx, commit); err != nil {
+		errors = append(errors, err.Error())
 	}
 	selected := []string{}
 	if len(errors) == 0 {

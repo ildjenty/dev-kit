@@ -51,7 +51,7 @@ func agreeRows(ctx record.ContextData, draft document, states ...document) (stri
 			return "", fmt.Errorf("owner row %s has no bound answer", text(row["id"]))
 		}
 	}
-	created := false
+	created := []string{}
 	for _, row := range entries(draft["decisions"]) {
 		if row["when"] != "now" || text(row["ref"]) != "" || row["decided_by"] != "owner" && row["decided_by"] != "principle" {
 			continue
@@ -80,11 +80,11 @@ func agreeRows(ctx record.ContextData, draft document, states ...document) (stri
 		if err := os.WriteFile(path, []byte(fmt.Sprintf("---\n%s---\n%s\n\n```json\n%s\n```\n", front, text(row["chosen"]), body)), 0644); err != nil {
 			return "", err
 		}
-		created = true
+		created = append(created, path)
 		row["ref"] = id
 		data.Decisions = append(data.Decisions, document{"id": id})
 	}
-	if !created {
+	if len(created) == 0 {
 		return gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
 	}
 	materialized, err := decisions.List(ctx.Cwd)
@@ -107,14 +107,20 @@ func agreeRows(ctx record.ContextData, draft document, states ...document) (stri
 			if run["workflow"] != "plan" || !strings.Contains("\n"+message+"\n", "\nArchon-Run: "+text(run["run_id"])+"\n") {
 				continue
 			}
-			if _, err := gitx.Run(ctx.Cwd, "add", "-A"); err != nil {
+			if _, err := gitx.Run(ctx.Cwd, append([]string{"add", "--"}, created...)...); err != nil {
 				return "", err
 			}
-			if _, err := gitx.Run(ctx.Cwd, "commit", "--amend", "--no-edit", "-q"); err != nil {
+			if _, err := gitx.Run(ctx.Cwd, append([]string{"commit", "--amend", "--no-edit", "-q", "--only", "--"}, created...)...); err != nil {
 				return "", err
 			}
 			return gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
 		}
 	}
-	return commitSkeleton(ctx, "agreed decisions")
+	if _, err = gitx.Run(ctx.Cwd, append([]string{"add", "--"}, created...)...); err != nil {
+		return "", err
+	}
+	if _, err = gitx.Run(ctx.Cwd, append([]string{"commit", "-q", "-m", "feat: skeleton: agreed decisions\n\nArchon-Run: " + ctx.RunID, "--only", "--"}, created...)...); err != nil {
+		return "", err
+	}
+	return gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
 }

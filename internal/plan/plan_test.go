@@ -603,6 +603,9 @@ func finishTestPlan(t *testing.T, ctx record.ContextData, artifacts string, opti
 	t.Helper()
 	state := must(read(filepath.Join(rounds(artifacts), "latest.json")))
 	state["phase"], state["run_id"] = "detail", ctx.RunID
+	if ctx.Cwd != "" && state["skeleton_commit"] == sha("a") {
+		state["skeleton_commit"] = testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD")
+	}
 	object(state["judgments"])["delivery"] = judgment(nil)
 	fixed := settled()
 	fixed["phase"], fixed["run_id"] = "structure", ctx.RunID

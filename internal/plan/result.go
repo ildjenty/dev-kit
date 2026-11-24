@@ -320,6 +320,9 @@ func finish(ctx record.ContextData, artifacts string, o record.ResultOptions) (d
 		return nil, fmt.Errorf("a completed detail phase is required")
 	}
 	if outcome["outcome"] == "pass" {
+		if err = verifySkeleton(ctx, text(state["skeleton_commit"])); err != nil {
+			return nil, err
+		}
 		commit, err := agreeRows(ctx, object(state["draft"]), state)
 		if err != nil {
 			return nil, err
