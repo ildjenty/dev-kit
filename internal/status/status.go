@@ -80,8 +80,9 @@ func run(args []string, env cli.Env) error {
 		_, err := fmt.Fprintln(env.Stdout, why)
 		return err
 	}
-	limit := 3
-	if c, err := config.Load(env.Cwd); err == nil && c.Limits.Restarts > 0 {
+	limit := -1
+	c, configErr := config.Load(env.Cwd)
+	if configErr == nil {
 		limit = c.Limits.Restarts
 	}
 	branches, err := Read(filepath.Join(state, "records"), branch, limit)
@@ -119,6 +120,10 @@ func run(args []string, env cli.Env) error {
 		b.DecisionCheck = &check
 		if check.Target != "" && len(b.Errors) == 0 {
 			b.Next = fmt.Sprintf("Run sync on %s, then start %s on the same branch.", b.Branch, check.Target)
+		}
+		if configErr != nil {
+			b.Errors = append(b.Errors, fmt.Sprintf("config (.devkit/config.json): %v; restart limit is unknown", configErr))
+			b.Next = "Resolve the unreadable configuration first, then check status again."
 		}
 	}
 
