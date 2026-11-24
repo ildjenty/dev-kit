@@ -39,6 +39,7 @@ type Branch struct {
 	At               string               `json:"recorded_at"`
 	RunID            string               `json:"run_id"`
 	Questions        []Question           `json:"questions"`
+	Errors           []string             `json:"errors"`
 	Back             any                  `json:"back,omitempty"`
 	Stop             any                  `json:"stop,omitempty"`
 	Carried          any                  `json:"carried,omitempty"`
@@ -116,7 +117,7 @@ func run(args []string, env cli.Env) error {
 			return err
 		}
 		b.DecisionCheck = &check
-		if check.Target != "" {
+		if check.Target != "" && len(b.Errors) == 0 {
 			b.Next = fmt.Sprintf("Run sync on %s, then start %s on the same branch.", b.Branch, check.Target)
 		}
 	}
@@ -224,7 +225,7 @@ func readBranch(dir, name string, limit int) (Branch, bool, error) {
 	if len(h.Runs) == 0 {
 		return Branch{}, false, nil
 	}
-	b := Branch{Branch: name, Questions: []Question{}, Restarts: record.RestartsOf(h), Limit: limit}
+	b := Branch{Branch: name, Questions: []Question{}, Errors: []string{}, Restarts: record.RestartsOf(h), Limit: limit}
 	b.Unit, err = unitdone.RequestUnit(dir)
 	if err != nil {
 		return Branch{}, false, err
@@ -248,7 +249,12 @@ func readBranch(dir, name string, limit int) (Branch, bool, error) {
 		for _, raw := range qs {
 			q, _ := raw.(map[string]any)
 			id := text(q["id"])
-			if answer, err := record.ReadKeyed(dir, "answer", id); err == nil && answer != nil {
+			answer, err := record.ReadKeyed(dir, "answer", id)
+			if err != nil {
+				b.Errors = append(b.Errors, fmt.Sprintf("answer %s (%s): %v", id, record.QuestionPath(dir, "answer", id), err))
+				continue
+			}
+			if answer != nil {
 				continue
 			}
 			next := []string{}
@@ -265,6 +271,9 @@ func readBranch(dir, name string, limit int) (Branch, bool, error) {
 }
 
 func next(b Branch, result record.Document) string {
+	if len(b.Errors) > 0 {
+		return "Resolve the unreadable answers first, then check status again."
+	}
 	switch b.Outcome {
 	case "question":
 		if len(b.Questions) == 0 {
@@ -312,6 +321,9 @@ func next(b Branch, result record.Document) string {
 	case "implement", "fix":
 		return "Start judge on " + b.Branch + "."
 	case "judge":
+		if b.Outcome == "pass" && asMap(result["inputs"])["requirements_version"] == nil {
+			return "The review is complete. Relay the report to the owner."
+		}
 		return "Start pr on " + b.Branch + "."
 	case "pr":
 		return "The pull request is open (`gh pr view " + b.Branch + "`). The owner reviews and merges it."
@@ -358,6 +370,9 @@ func show(env cli.Env, state, only string, branches []Branch) error {
 		fmt.Fprintf(w, "%s: %s %s (%s)\n", b.Branch, b.Workflow, b.Outcome, b.At)
 		if b.Unit != "" {
 			fmt.Fprintf(w, "  unit: %s\n", b.Unit)
+		}
+		for _, err := range b.Errors {
+			fmt.Fprintf(w, "  unreadable: %s\n", err)
 		}
 		if pr := b.PullRequest; pr != nil {
 			fmt.Fprintf(w, "  pull request: %s %s\n", pr.State, pr.URL)
