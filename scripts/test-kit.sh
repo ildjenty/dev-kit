@@ -26,6 +26,12 @@ else
   printf 'WARN: no Archon provider plugins at %s; validation of AI nodes may fail\n' "$plugins"
 fi
 mkdir -p "$temp/fixture-bin"
+export DEVKIT_GH="$temp/fixture-bin/gh-issues"
+cat > "$DEVKIT_GH" <<'SH'
+#!/bin/sh
+exec devkit-fixture github "$@"
+SH
+chmod +x "$DEVKIT_GH"
 export DEVKIT_FIXTURE_BINARY="$temp/bin/devkit"
 export DEVKIT_CODEX="$temp/fixture-bin/codex"
 cat > "$DEVKIT_CODEX" <<'SH'
