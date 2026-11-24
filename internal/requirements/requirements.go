@@ -246,15 +246,36 @@ func schemaErrors(d document) ([]string, error) {
 	return record.Validate("requirements", v)
 }
 func round(artifacts string, d, j document) (document, error) {
-	previous, _ := read(filepath.Join(rounds(artifacts), "latest.json"))
+	previous, err := read(filepath.Join(rounds(artifacts), "latest.json"))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
 	n := number(previous["round"]) + 1
 	errors, err := schemaErrors(d)
 	if err != nil {
 		return nil, err
 	}
 	entry := document{"round": n, "requirements": d, "judgment": j, "schema_errors": errors, "verdict": verdictOf(j)}
-	if err = write(filepath.Join(rounds(artifacts), fmt.Sprintf("%d.json", n)), entry); err != nil {
+	data, err := json.MarshalIndent(entry, "", "  ")
+	if err != nil {
 		return nil, err
+	}
+	if err = os.MkdirAll(rounds(artifacts), 0755); err != nil {
+		return nil, err
+	}
+	file := filepath.Join(rounds(artifacts), fmt.Sprintf("%d.json", n))
+	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		return nil, err
+	}
+	_, err = f.Write(append(data, '\n'))
+	closeErr := f.Close()
+	if err != nil || closeErr != nil {
+		os.Remove(file)
+		if err != nil {
+			return nil, err
+		}
+		return nil, closeErr
 	}
 	if err = write(filepath.Join(rounds(artifacts), "latest.json"), entry); err != nil {
 		return nil, err

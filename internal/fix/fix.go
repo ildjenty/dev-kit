@@ -516,7 +516,10 @@ func takeObjections(artifacts string) (record.Document, error) {
 	source := filepath.Join(artifacts, "objections.json")
 	var written record.Document
 	if _, err := os.Stat(source); err == nil {
-		written, _ = readJSON[record.Document](source)
+		written, err = readJSON[record.Document](source)
+		if err != nil {
+			return nil, err
+		}
 		if err := os.MkdirAll(filepath.Join(dir, "objections"), 0755); err != nil {
 			return nil, err
 		}

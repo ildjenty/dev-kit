@@ -83,6 +83,16 @@ func Parse(text string) (Item, error) {
 			}
 		}
 	}
+	id, _ := result["id"].(string)
+	if strings.HasPrefix(id, "U-") && len(node.Content) > 0 {
+		mapping := node.Content[0]
+		for i := 0; i < len(mapping.Content); i += 2 {
+			key, value := mapping.Content[i], mapping.Content[i+1]
+			if (key.Value == "decisions" || key.Value == "depends_on") && value.Kind == yaml.ScalarNode {
+				result[key.Value] = value.Value
+			}
+		}
+	}
 	result["body"] = strings.TrimSpace(parts[2])
 	return result, nil
 }

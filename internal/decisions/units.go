@@ -35,7 +35,10 @@ func UnitStartReasons(data Data, id string) []string {
 			return []string{fmt.Sprintf("unit %s is already done", id)}
 		}
 		reasons := []string{}
-		deps, _ := list(u["depends_on"])
+		deps, ok := list(u["depends_on"])
+		if !ok {
+			return []string{fmt.Sprintf("unit %s: depends_on must be a list", id)}
+		}
 		for _, dep := range deps {
 			done := false
 			for _, other := range data.Units {
@@ -57,8 +60,14 @@ func UnitDecisions(data Data, id string) ([]Item, error) {
 		if unit["id"] != id {
 			continue
 		}
+		if _, ok := list(unit["depends_on"]); !ok {
+			return nil, fmt.Errorf("unit %s: depends_on must be a list", id)
+		}
 		agreed := []Item{}
-		refs, _ := list(unit["decisions"])
+		refs, ok := list(unit["decisions"])
+		if !ok {
+			return nil, fmt.Errorf("unit %s: decisions must be a list", id)
+		}
 		for _, ref := range refs {
 			var found Item
 			for _, d := range data.Decisions {
