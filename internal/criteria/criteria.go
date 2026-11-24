@@ -39,11 +39,22 @@ func CopyCriteria(o Options) (Source, error) {
 	if !os.IsNotExist(err) {
 		return Source{}, err
 	}
-	c, err := config.Load(o.Root)
+	files, err := gitx.Run(o.Root, "ls-tree", "-r", "--name-only", "-z", o.Base, "--", ":(literal).devkit/config.json")
 	if err != nil {
 		return Source{}, err
 	}
-	files, err := gitx.Run(o.Root, "ls-tree", "-r", "--name-only", "-z", o.Base, "--", ":(literal)"+c.Standards)
+	c := config.Defaults("")
+	if files != "" {
+		data, err := gitx.Run(o.Root, "show", o.Base+":.devkit/config.json")
+		if err != nil {
+			return Source{}, err
+		}
+		c, err = config.Parse([]byte(data))
+		if err != nil {
+			return Source{}, err
+		}
+	}
+	files, err = gitx.Run(o.Root, "ls-tree", "-r", "--name-only", "-z", o.Base, "--", ":(literal)"+c.Standards)
 	if err != nil {
 		return Source{}, err
 	}

@@ -35,6 +35,8 @@ func TestCriteriaPinnedToCommitAndReused(t *testing.T) {
 func TestCriteriaConfiguredStandardsAndMissing(t *testing.T) {
 	repo := testutil.Repo(t)
 	testutil.Put(t, repo, ".devkit/config.json", `{"standards":"policy"}`)
+	testutil.Git(t, repo, "add", ".devkit/config.json")
+	testutil.Git(t, repo, "commit", "-qm", "configure policy")
 	dir := t.TempDir()
 	_, err := CopyCriteria(Options{repo, "HEAD", dir})
 	testutil.Fails(t, err, "policy does not exist at HEAD")
