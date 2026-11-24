@@ -60,10 +60,17 @@ archon validate workflows
 
 Run `devkit doctor` for required tools and partial capabilities: it checks each configured session
 CLI and the configured provider's CLI fallback, gh authentication and origin, and key presence.
-Do not print the key. Setting it sends changed files' diffs, and new decisions plus their citing
-documents, to TypeSafe; that is the owner's choice, so only report the state. This session
+Do not print the key. Setting it sends changed files' diffs to TypeSafe for judge routing;
+that is the owner's choice, so only report the state. This session
 reads skills under `.claude/skills/`. `provider` chooses workflow AI and fallback;
 `sessions` chooses skill installation locations. Keep both settings unless the owner asks to change them.
+
+Issue-based refine and delivery require GitHub Issues, sub-issues and issue dependencies to be
+available in this repository, an authenticated `gh` supporting `gh issue view --json parent`, and
+the configured unit and topic labels to exist. Doctor checks gh availability and authentication;
+inspect the repository's Issue capabilities and labels as well. If unavailable, report the missing
+capability and ask the owner to enable it, update gh or create the labels before using that flow.
+Do not substitute local files or task-list links for Issue relationships.
 
 ## 2. Read the repository
 
@@ -101,8 +108,7 @@ Start from the current files and keep what already fits. For each change, keep t
 - `issues.labels.unit` and `issues.labels.topic`: GitHub Issue labels for work units and open
   questions. Defaults are `devkit:unit` and `devkit:topic`; keep them unless the repository uses
   different labels. Each must be a non-empty string; omitted labels retain their defaults.
-- `docs`: the folder where the repository's product and design documents live. Keep `standards`,
-  `decisions`, `units`, `topics` and `eval` unless a path collides with something that exists.
+- Keep `standards`, `decisions` and `eval` unless a path collides with something that exists.
   `eval` defaults to `.devkit/eval`; judge evaluation cases live in its `judge/` subfolder. Keep
   repository-owned cases there; init does not install the kit source's `eval/judge/` cases.
 - `checks`: one entry per verification the repository relies on, with `name`, `command`, `paths` and
@@ -123,9 +129,12 @@ Start from the current files and keep what already fits. For each change, keep t
 - `skeleton_check`: the names of the checks that can verify signatures without function bodies (a
   compile or type check), when the language has one. Otherwise leave it empty.
 - `qualities.<quality>.paths`: the globs whose change means that quality's judge should look, from the
-  layout you observed, for `data`, `contract`, `security`, `ui`, `cost` and `test` (source and test
-  files). Remove default globs that match nothing here and add the repository's real folders. A broad
-  glob launches a judge on every change; a missing one leaves the choice to routing alone.
+  layout you observed, for `data`, `contract`, `security`, `ui`, `cost`, `test` (source and test
+  files) and `document` (delivered documents). Document defaults are `**/*.md`, `docs/**`,
+  `!.devkit/**` and `!.archon/**`; matching `!` exclusions take precedence over positive patterns.
+  Fit them to the repository's actual document paths. Remove default globs that match nothing here
+  and add the repository's real folders. A broad glob launches a judge on every change; a missing
+  one leaves the choice to routing alone.
 - `decision_paths`: the paths whose change is itself a decision that the plan must record: the
   dependency manifests and lockfiles that exist here, the migration folders, infrastructure and deploy
   definitions, CI definitions, env examples, and the kit's own files (`.archon/**`, the standards
@@ -286,9 +295,9 @@ commit them to the base branch (do not commit or push yourself unless asked).
 Two things this skill does not do, and what to do instead:
 
 - **Decisions the repository already made** (in design documents, decision records, or people's
-  heads) are not in the kit's decision records yet, so the workflows cannot cite or protect them.
-  Suggest recording them with the `refine` workflow, one topic at a time, starting from the documents
-  that state them.
+  heads) do not bind delivery through the decision log. Suggest `devkit-discuss` and `refine`, one
+  topic at a time, to record them for people, propose any needed standards, agent instructions,
+  skills or checks, and put settled work and open questions into Issues for approval.
 - **Structural defects that already exist** are reported by the structure judge when a change passes
   through them, and block that change. Tell the owner to expect this on the first requests in old
   areas; they are fixed as part of those requests or collected through the backlog and `retro`.

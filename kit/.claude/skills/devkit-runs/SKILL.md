@@ -84,9 +84,10 @@ the command. Write each value to a file outside the checkout with your file-writ
 `answers`, valid JSON), then pass it as `--input "<name>=$(cat <file>)"`. Text read this way is not
 interpreted again by the shell. Never edit the text to make it fit a command.
 
-For refine, use a `refine/<name>` branch. One run settles one topic in decide and document phases,
-each with a three-round limit. Read the configured topic files and pass the selected file ID as `topic`; leave it empty for the initial request topic. Pass the owner's words verbatim as `owner_words`, your
-research separately as `supplement`, and the owner-confirmed discussion memo verbatim as `memo`.
+For refine, use a `refine/<name>` branch. One run handles one topic in a single phase with at most
+three rounds. Pass the number of an open Issue with the configured topic label as `topic`; leave
+it empty for a new request. Pass the owner's words verbatim as `owner_words`, your research
+separately as `supplement`, and the owner-confirmed discussion memo verbatim as `memo`.
 Do not add unsaid requirements to owner words. An Issue's body is owner words; related Issue/PR bodies,
 comments and researched facts belong in supplement so the read-only judges have the materials.
 
@@ -96,7 +97,7 @@ requirements' `issue`, for example `--input issue=42`. Prepare supplies its titl
 parent topic's title and body as request data alongside owner words and supplement. Use `owner_words`
 for direct requests. The PR body ends with `Closes #42`; merging the PR closes the unit issue.
 Keep the branch and PR for later corrections unless the owner asks for another. After refine passes,
-publish its branch through the repository's PR process; refine itself only commits. Continue with the
+publish its branch through the repository's PR process; refine does not publish a PR. Continue with the
 next topic, using `devkit-discuss` when choices need discussion. Run `devkit issues ready` again after
 merging a unit PR to find work whose blockers are now closed.
 
@@ -136,14 +137,31 @@ when the owner approves that version, start that workflow again on the same bran
 `--input approve=<version>`. To request changes, restart it with the owner's words in `answers` for the
 approval question's ID. Never synthesize approval or use `approve` for an open-point question.
 
+Refine commits proposed decision records and binding edits to standards, agent instructions, skills
+or checks before fresh read-only judgment. It reads the full decision log; delivery never consumes
+it. On approval, refine marks records agreed, commits that change, then creates unit issues under
+the selected topic (creating a parent topic if absent), new topic issues and blocked-by links.
+It closes the parent with a comment when no new topics remain, otherwise comments without closing.
+Relay `decision_ids` and `issue_numbers`; keep `devkit-discuss` active until the discussion is in Issues.
+
 Run retro on a `retro/<name>` branch created from the base. It reads that branch's backlog, proposes
-units, check additions and standard edits, commits the real files and consumed backlog deletions,
-then asks one approval question showing the version and commit after machine checks, fresh read-only
+unit Issue drafts, check additions and standard edits, commits the real files and consumed backlog
+deletions, then asks one approval question showing the version and commit after machine checks, fresh read-only
 judgment and escape verification. Approval requires that version's commit to remain the clean branch
-head and only records the result. Requested changes create the next proposal commit on that history;
-withdrawn edits are undone by a new commit. Old snapshot proposals must be restarted on a new retro branch.
+head; it creates unit issues without a parent topic, connects blocked-by links and records
+`issue_numbers`, without editing files or creating another commit. Requested changes create the
+next proposal commit on that history; withdrawn edits are undone by a new commit. Old snapshot
+proposals must be restarted on a new retro branch.
 An empty backlog passes without an approval question. Publish and merge the correction PR through
 the repository's PR process before starting its units.
+
+Both workflows keep Issue drafts in the proposal record and create Issues only on approval. If an
+approval fails during Issue creation, inspect the failure and restart the same workflow, branch and
+approved version when the cause is resolved. Creation progress is saved; stable hidden body markers
+let a retry adopt even an Issue whose creation response or local save was lost, including closed
+issues, and complete missing sub-issue and blocked-by links. Do not manually recreate the drafts or
+reopen adopted issues. This does not prevent concurrent creation or duplicate parent comments after
+a lost response; do not run approval concurrently. Normal restart limits still apply.
 
 Owner questions about the delivery belong in refine, requirements and plan. PR asks only about
 configured `ask` changes not covered by an owner-decided row's `touches`; do not ask again for covered

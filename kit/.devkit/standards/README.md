@@ -44,6 +44,7 @@ Keep mechanically decidable rules in checks rather than principles. Put workflow
 - [review/delivery.md](review/delivery.md): How ordered release units and verification cover the request end to end.
 - [review/scope.md](review/scope.md): Which changes fulfill the agreed request and preserve affected uses within authority.
 - [review/readability.md](review/readability.md): Which names, comments, conventions and shared rule definitions make the changed code understandable and keep rules that must change together consistent.
+- [review/document.md](review/document.md): How delivered documents support their readers with context, actionable instructions, consistent sources and appropriate disclosure.
 
 ## Principle format
 
@@ -62,7 +63,7 @@ In responses, state which principle changed which decision. Naming a principle w
 
 ## When principles conflict
 
-- **Design reasons and code comments**: Under principle 1 of `structure/principles.md` and principle 4 of `engineering.md`, keep design reasons that structure cannot express in decision records or documents in the repository's docs or decision folder. Reference them from where needed rather than adding code comments.
+- **Design reasons and code comments**: Under principle 1 of `structure/principles.md` and principle 4 of `engineering.md`, keep design reasons that structure cannot express in plan evidence or repository documents. Reference them from where needed rather than adding code comments.
 - **Abstraction and external types**: Apply principle 5 of `structure/principles.md` as the exemption to principle 2 of `designing.md`. Convert external types at boundaries before a second concrete example when necessary to isolate public contracts, stored data, and domain types from external details. Do not force conversion where principle 5 exempts general-purpose value types or other qualifying uses. Show that hidden knowledge and the reach of changes justify conversion and maintenance costs. Do not extend this into substitution interfaces.
 - **Sources of truth and information hiding**: Prioritize principle 1 of `data.md` over principle 6 of `structure/principles.md`. Preserve facts from past points in time. Performance-driven duplication requires a source of truth, synchronization ownership, update methods, permitted inconsistency, and a response when that scope is exceeded. Information hiding determines what is public; keep storage methods inside their responsible module.
 - **Universal guarantees and consumer independence**: Prioritize principle 3 over principle 4 of `structure/principles.md`. Cross-cutting processing must not know consumer names; use generic middleware. Put consumer-specific branches in the consumers rather than the shared passage point.

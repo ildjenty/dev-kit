@@ -1,12 +1,19 @@
 ---
 name: devkit-discuss
-description: Discuss an unsettled product or development topic with its owner, compare existing decisions, and prepare a confirmed memo for refine without editing documents or decision records.
+description: Enter a discussion mode for an unsettled product or development topic. Keep an owner-confirmed memo, compare decision records, and relay refine through approval until settled work and open questions have become GitHub Issues.
 ---
 
 # Discuss with the owner
 
 Read the companion `.claude/skills/devkit-runs/SKILL.md` for starting runs. The installer places
 these skills under the session tool selected by `sessions`, independently of the workflow `provider`.
+
+Enter this mode when invoked. Stay in it until the discussion has become Issues: settled work as
+unit issues under its topic, and remaining questions as topic issues. Starting refine, relaying its
+questions and obtaining approval of its proposal are part of this mode. A confirmed memo alone does
+not finish it. If the owner makes an unrelated request, handle it, then resume the discussion where
+it was, restating the current memo. Preserve the memo and pending handoff when the conversation is
+summarised; do not treat an interruption or summarisation as completion.
 
 Let the owner lead the conversation. Start with open questions about their situation, difficulty and
 intention. Ask one useful question at a time; do not begin by forcing a list of solutions. Restate what
@@ -18,27 +25,41 @@ Read the current decisions with:
 devkit decisions list
 ```
 
-This reads configured decision, document, unit and topic folders. Read the relevant prose documents as needed.
+This reads the configured decision log, kept for people and this discussion mode.
 Compare the discussion with existing agreed decisions. When they conflict, name the decision ID and
 explain the conflict so the owner can say whether to overturn it. Do not silently reinterpret agreement.
+
+Find ready open topics with `devkit issues ready` and read a selected topic and its relationships
+with `devkit issues show <number>`. Read another known topic by number when investigating a blocker.
 
 Offer candidates, a recommendation and the reason only when there is a choice to make. A factual
 question about the owner's situation has no recommendation. Keep what the owner said separate from
 your suggestions; do not answer your own questions for them or guess a fact that changes the outcome.
 Do not turn a reversible implementation suggestion into an owner's decision.
 
-Never edit repository documents or decision records during this skill. Keep the discussion in the
-session. When the owner is ready to finish, write a memo in the conversation, in the configured language,
-with three parts: decided, overturned (include existing decision IDs), and still open. Distinguish the
-owner's choices from your suggestions. Ask the owner to confirm or correct the memo.
+Do not edit repository files during the discussion. Keep a running memo in the conversation, in the
+configured language, with three parts: decided, overturned (include existing decision IDs), and still
+open. Update it whenever a point is settled or revised, keeping the owner's words separate from your
+suggestions. Include the selected topic number and any pending refine branch, question or proposal
+version so the next session can resume. Restate the memo on resuming and ask the owner to confirm or
+correct it before passing it to refine.
 
 After confirmation, use `devkit-runs` to start `refine` on a `refine/<name>` branch with the confirmed memo
-verbatim as `memo`. A run settles one topic: use the selected pickable topic ID as `topic`, or leave it
-empty for the first request topic. Read the topic entries from `devkit decisions list` and select an open topic whose decision dependencies are agreed. Refine decides, documents, and asks approval of an exact proposal version.
-The discussion memo does not approve that proposal.
+verbatim as `memo`. A run handles one topic: pass its Issue number as `topic`, or leave it empty for
+a new request whose parent topic refine will create on approval. Refine proposes decision records,
+changes to mechanisms that must bind agents, and Issue drafts. Its workflow makes the proposal
+edits; do not make them yourself in the conversation. Decision records are a log, not delivery
+instructions: the Issue drafts must contain everything delivery needs.
 
-After approval, publish and merge the refine pull request through the repository's PR process before
-starting any unit it created. Continue topic by topic, discussing unresolved choices when needed.
-For each settled unit, `devkit-runs` passes `unit=<id>` to requirements and follows plan → implement →
-judge ⇄ fix → pr, with sync when needed and retro for the merged backlog. Relay recorded questions
-and `back` results through that skill; do not supply approval, answers or `continue` for the owner.
+Relay refine's questions and the owner's answers verbatim through `devkit-runs`, updating the memo
+as choices change. Show the full approval question and exact proposal version; the discussion memo
+does not approve that proposal. Only the owner's approval of that version permits the approval run.
+Never supply answers, approval or `continue` for the owner.
+
+On approval, refine creates unit issues as sub-issues of the topic and open questions as topic
+issues, with blocked-by relationships expressing unit order and topics waiting for other topics.
+Check the returned `issue_numbers` with `devkit issues show`; an approval failure leaves the mode
+active, and `devkit-runs` handles retrying the same approved version. If part of the discussion is
+still unrepresented, resume from the memo and refine that part. Once all parts are represented,
+report the Issue numbers and end this mode. Use `devkit-runs` to publish and merge the refine PR
+through the repository's PR process before starting the ready unit issues it created.
