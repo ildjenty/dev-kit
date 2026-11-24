@@ -34,8 +34,7 @@ owner's choices from your suggestions. Ask the owner to confirm or correct the m
 
 After confirmation, use `devkit-runs` to start `refine` on a `refine/<name>` branch with the confirmed memo
 verbatim as `memo`. A run settles one topic: use the selected pickable topic ID as `topic`, or leave it
-empty for the first request topic. `devkit decisions topics` lists open topics whose decision
-dependencies are agreed. Refine decides, documents, and asks approval of an exact proposal version.
+empty for the first request topic. Read the topic entries from `devkit decisions list` and select an open topic whose decision dependencies are agreed. Refine decides, documents, and asks approval of an exact proposal version.
 The discussion memo does not approve that proposal.
 
 After approval, publish and merge the refine pull request through the repository's PR process before

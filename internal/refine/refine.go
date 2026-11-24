@@ -1135,7 +1135,7 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 		writes[p] = replaceKeys(memo, mapping) + "\n"
 		add(p)
 	}
-	materialized := decisions.Data{MarkerErrors: data.MarkerErrors}
+	materialized := decisions.Data{}
 	for _, group := range []struct {
 		kind    string
 		before  []doc

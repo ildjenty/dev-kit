@@ -202,15 +202,6 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 		return nil, err
 	}
 	reasons := []string{}
-	if options.Cwd != "" {
-		check, err := CheckBranchDecisions(dir, options.Cwd, "", options.BaseBranch)
-		if err != nil {
-			return nil, err
-		}
-		if check.Refuses(workflow) {
-			reasons = append(reasons, check.Reasons()...)
-		}
-	}
 	if workflow != "refine" && workflow != "retro" && workflow != "requirements" && workflow != "sync" {
 		req, err := requirementsInput(dir, valid, workflow == "plan" || workflow == "implement" || workflow == "fix" && options.Review != "")
 		if err != nil {
@@ -321,7 +312,7 @@ type StartOptions struct {
 	Review           string
 	Cwd              string
 	BaseBranch       string
-	UnitReasons      []string
+	IssueReasons     []string
 	RunID            string
 	Commit           string
 	ChangeID         func() (*string, error)
@@ -404,7 +395,7 @@ func Start(dir, workflow string, o StartOptions) (StartOutput, error) {
 		return StartOutput{}, err
 	}
 
-	reasons = append(reasons, o.UnitReasons...)
+	reasons = append(reasons, o.IssueReasons...)
 	if state.Reached && o.Continuation == "" {
 		reasons = append(reasons, fmt.Sprintf("the branch already restarted %d times (limit %d) and this start (%s) would be another; it starts when the owner's words that let it go on are passed as continue", state.Restarts, limit, state.Start))
 	}

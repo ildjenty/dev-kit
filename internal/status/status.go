@@ -14,10 +14,8 @@ import (
 
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
-	"github.com/ildjenty/dev-kit/internal/decisions"
+	"github.com/ildjenty/dev-kit/internal/issues"
 	"github.com/ildjenty/dev-kit/internal/record"
-	"github.com/ildjenty/dev-kit/internal/unitdone"
-	"gopkg.in/yaml.v3"
 )
 
 const usage = "devkit status [--json] [branch]"
@@ -29,23 +27,23 @@ func Commands() []cli.Command {
 }
 
 type Branch struct {
-	DecisionCheck    *decisions.BaseCheck `json:"decision_check,omitempty"`
-	PullRequest      *PullRequest         `json:"pull_request,omitempty"`
-	PullRequestError string               `json:"pull_request_error,omitempty"`
-	Branch           string               `json:"branch"`
-	Unit             string               `json:"unit"`
-	Workflow         string               `json:"workflow"`
-	Outcome          string               `json:"outcome"`
-	At               string               `json:"recorded_at"`
-	RunID            string               `json:"run_id"`
-	Questions        []Question           `json:"questions"`
-	Errors           []string             `json:"errors"`
-	Back             any                  `json:"back,omitempty"`
-	Stop             any                  `json:"stop,omitempty"`
-	Carried          any                  `json:"carried,omitempty"`
-	Restarts         int                  `json:"restarts"`
-	Limit            int                  `json:"restart_limit"`
-	Next             string               `json:"next"`
+	PullRequest      *PullRequest `json:"pull_request,omitempty"`
+	PullRequestError string       `json:"pull_request_error,omitempty"`
+	Branch           string       `json:"branch"`
+	Issue            int          `json:"issue"`
+	IssueURL         string       `json:"issue_url"`
+	Workflow         string       `json:"workflow"`
+	Outcome          string       `json:"outcome"`
+	At               string       `json:"recorded_at"`
+	RunID            string       `json:"run_id"`
+	Questions        []Question   `json:"questions"`
+	Errors           []string     `json:"errors"`
+	Back             any          `json:"back,omitempty"`
+	Stop             any          `json:"stop,omitempty"`
+	Carried          any          `json:"carried,omitempty"`
+	Restarts         int          `json:"restarts"`
+	Limit            int          `json:"restart_limit"`
+	Next             string       `json:"next"`
 }
 
 type Question struct {
@@ -90,36 +88,18 @@ func run(args []string, env cli.Env) error {
 		return err
 	}
 
-	base := env.Getenv("BASE_BRANCH")
-	if base == "" {
-		settings := struct {
-			Worktree struct {
-				BaseBranch string `yaml:"baseBranch"`
-			} `yaml:"worktree"`
-		}{}
-		data, err := os.ReadFile(filepath.Join(root, ".archon/config.yaml"))
-		if err != nil && !os.IsNotExist(err) {
-			return err
-		}
-		if err == nil {
-			if err = yaml.Unmarshal(data, &settings); err != nil {
-				return err
-			}
-		}
-		base = settings.Worktree.BaseBranch
-	}
 	for i := range branches {
 		b := &branches[i]
 		if b.Workflow == "pr" && b.Outcome == "pass" {
 			readPullRequest(env, b)
 		}
-		check, err := record.CheckBranchDecisions(record.RecordDir(state, b.Branch), root, b.Branch, base)
-		if err != nil {
-			return err
-		}
-		b.DecisionCheck = &check
-		if check.Target != "" && len(b.Errors) == 0 {
-			b.Next = fmt.Sprintf("Run sync on %s, then start %s on the same branch.", b.Branch, check.Target)
+		if b.Issue != 0 {
+			issue, err := (issues.Client{Env: env}).Read(b.Issue)
+			if err != nil {
+				b.Errors = append(b.Errors, fmt.Sprintf("issue #%d: %v", b.Issue, err))
+			} else {
+				b.IssueURL = issue.URL
+			}
 		}
 		if configErr != nil {
 			b.Errors = append(b.Errors, fmt.Sprintf("config (.devkit/config.json): %v; restart limit is unknown", configErr))
@@ -231,7 +211,7 @@ func readBranch(dir, name string, limit int) (Branch, bool, error) {
 		return Branch{}, false, nil
 	}
 	b := Branch{Branch: name, Questions: []Question{}, Errors: []string{}, Restarts: record.RestartsOf(h), Limit: limit}
-	b.Unit, err = unitdone.RequestUnit(dir)
+	b.Issue, err = record.RequestIssue(dir)
 	if err != nil {
 		return Branch{}, false, err
 	}
@@ -316,7 +296,7 @@ func next(b Branch, result record.Document) string {
 	}
 	switch b.Workflow {
 	case "refine":
-		return "The proposal is approved and committed. Publish " + b.Branch + " as a pull request; after it merges, start the units it created, or the next topic (`devkit decisions topics`)."
+		return "The proposal is approved and committed. Publish " + b.Branch + " as a pull request; after it merges, start the units it created, or the next topic (`devkit issues ready`)."
 	case "retro":
 		return "The corrections are approved and committed. Publish " + b.Branch + " as a pull request; start its units after it merges."
 	case "requirements":
@@ -373,8 +353,8 @@ func show(env cli.Env, state, only string, branches []Branch) error {
 			fmt.Fprintln(w)
 		}
 		fmt.Fprintf(w, "%s: %s %s (%s)\n", b.Branch, b.Workflow, b.Outcome, b.At)
-		if b.Unit != "" {
-			fmt.Fprintf(w, "  unit: %s\n", b.Unit)
+		if b.Issue != 0 {
+			fmt.Fprintf(w, "  issue: #%d %s\n", b.Issue, b.IssueURL)
 		}
 		for _, err := range b.Errors {
 			fmt.Fprintf(w, "  unreadable: %s\n", err)
@@ -390,14 +370,6 @@ func show(env cli.Env, state, only string, branches []Branch) error {
 		}
 		if b.PullRequestError != "" {
 			fmt.Fprintf(w, "  pull request: %s\n", b.PullRequestError)
-		}
-		if b.DecisionCheck != nil {
-			for _, reason := range b.DecisionCheck.Reasons() {
-				fmt.Fprintf(w, "  %s\n", reason)
-			}
-			if b.DecisionCheck.Note != "" {
-				fmt.Fprintf(w, "  %s\n", b.DecisionCheck.Note)
-			}
 		}
 		for _, q := range b.Questions {
 			fmt.Fprintf(w, "  %s: %s\n", q.ID, indent(q.Text))
@@ -493,7 +465,7 @@ func readPullRequest(env cli.Env, b *Branch) {
 			b.Next = "Pass the review comments to fix as `review`, or to requirements when they change what is asked."
 		}
 	case "merged":
-		b.Next = "Clean up with `archon complete " + b.Branch + "`."
+		b.Next = "Clean up with `archon complete " + b.Branch + "`, then find ready work with `devkit issues ready`."
 	case "closed":
 		b.Next = "Closed without merging."
 	default:

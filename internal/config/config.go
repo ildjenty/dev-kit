@@ -369,7 +369,10 @@ func shape(c map[string]any) error {
 
 func Matches(globs []string, path string) bool {
 	path = strings.TrimPrefix(path, "./")
+	matched := false
 	for _, glob := range globs {
+		excluded := strings.HasPrefix(glob, "!")
+		glob = strings.TrimPrefix(glob, "!")
 		var source strings.Builder
 		source.WriteString("^")
 		chars := []rune(glob)
@@ -395,10 +398,13 @@ func Matches(globs []string, path string) bool {
 		}
 		source.WriteString("$")
 		if regexp.MustCompile(source.String()).MatchString(path) {
-			return true
+			if excluded {
+				return false
+			}
+			matched = true
 		}
 	}
-	return false
+	return matched
 }
 func pathsOf(file gitx.File) []string {
 	if file.OldPath != "" {

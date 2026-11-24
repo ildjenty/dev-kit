@@ -1,29 +1,15 @@
 package plan
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 
-	"github.com/ildjenty/dev-kit/internal/config"
-	"github.com/ildjenty/dev-kit/internal/decisions"
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/record"
-	"gopkg.in/yaml.v3"
 )
 
 func agreeRows(ctx record.ContextData, draft document, states ...document) (string, error) {
-	c, err := config.Load(ctx.Cwd)
-	if err != nil {
-		return "", err
-	}
-	data, err := decisions.List(ctx.Cwd)
-	if err != nil {
-		return "", err
-	}
 	requirements, err := record.Latest(ctx.Dir, "requirements")
 	if err != nil {
 		return "", err
@@ -33,7 +19,7 @@ func agreeRows(ctx record.ContextData, draft document, states ...document) (stri
 		return "", err
 	}
 	for _, row := range entries(draft["decisions"]) {
-		if row["decided_by"] != "owner" || row["when"] != "now" || text(row["ref"]) != "" {
+		if row["decided_by"] != "owner" || row["when"] != "now" {
 			continue
 		}
 		state := document{}
@@ -50,77 +36,6 @@ func agreeRows(ctx record.ContextData, draft document, states ...document) (stri
 		if !bound {
 			return "", fmt.Errorf("owner row %s has no bound answer", text(row["id"]))
 		}
-	}
-	created := []string{}
-	for _, row := range entries(draft["decisions"]) {
-		if row["when"] != "now" || text(row["ref"]) != "" || row["decided_by"] != "owner" && row["decided_by"] != "principle" {
-			continue
-		}
-		id, err := decisions.NextID("decision", ctx.Branch, "plan:"+text(row["id"]), data)
-		if err != nil {
-			return "", err
-		}
-		raw, err := json.Marshal(row)
-		if err != nil {
-			return "", err
-		}
-		deps := decisions.Citations(string(raw))
-		front, err := yaml.Marshal(document{"id": id, "title": row["what"], "status": "agreed", "decided_by": row["decided_by"], "request": ctx.Branch, "depends_on": deps, "supersedes": []string{}})
-		if err != nil {
-			return "", err
-		}
-		body, err := json.MarshalIndent(row, "", "  ")
-		if err != nil {
-			return "", err
-		}
-		path := filepath.Join(ctx.Cwd, c.Decisions, id+".md")
-		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-			return "", err
-		}
-		if err := os.WriteFile(path, []byte(fmt.Sprintf("---\n%s---\n%s\n\n```json\n%s\n```\n", front, text(row["chosen"]), body)), 0644); err != nil {
-			return "", err
-		}
-		created = append(created, path)
-		row["ref"] = id
-		data.Decisions = append(data.Decisions, document{"id": id})
-	}
-	if len(created) == 0 {
-		return gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
-	}
-	materialized, err := decisions.List(ctx.Cwd)
-	if err != nil {
-		return "", err
-	}
-	if problems := decisions.Check(materialized); len(problems) > 0 {
-		return "", &record.RecordError{Message: "agreed decisions are invalid", Errors: problems}
-	}
-	message, err := gitx.Run(ctx.Cwd, "log", "-1", "--format=%B")
-	if err != nil {
-		return "", err
-	}
-	runs, err := record.List(ctx.Dir, "run")
-	if err != nil {
-		return "", err
-	}
-	if strings.HasPrefix(message, "feat: skeleton: ") {
-		for _, run := range runs {
-			if run["workflow"] != "plan" || !strings.Contains("\n"+message+"\n", "\nArchon-Run: "+text(run["run_id"])+"\n") {
-				continue
-			}
-			if _, err := gitx.Run(ctx.Cwd, append([]string{"add", "--"}, created...)...); err != nil {
-				return "", err
-			}
-			if _, err := gitx.Run(ctx.Cwd, append([]string{"commit", "--amend", "--no-edit", "-q", "--only", "--"}, created...)...); err != nil {
-				return "", err
-			}
-			return gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
-		}
-	}
-	if _, err = gitx.Run(ctx.Cwd, append([]string{"add", "--"}, created...)...); err != nil {
-		return "", err
-	}
-	if _, err = gitx.Run(ctx.Cwd, append([]string{"commit", "-q", "-m", "feat: skeleton: agreed decisions\n\nArchon-Run: " + ctx.RunID, "--only", "--"}, created...)...); err != nil {
-		return "", err
 	}
 	return gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
 }

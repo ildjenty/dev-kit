@@ -34,6 +34,23 @@ func TestShippedOwnershipAndQualitySections(t *testing.T) {
 		}
 	}
 }
+
+func TestDocumentOwnsDeliveredWritingPrinciplesAndRefineStillReceivesThem(t *testing.T) {
+	dir, m := standards(t)
+	q := m.Qualities["document"]
+	testutil.Equal(t, q.Principles, []string{"writing.md#2", "writing.md#3", "writing.md#4", "writing.md#5", "writing.md#6", "writing.md#8", "writing.md#9"})
+	testutil.Equal(t, q.RoutingThreshold, 0.6)
+	testutil.Equal(t, q.Plan, []string{})
+	testutil.Equal(t, q.Code, []string{"review/document.md"})
+	testutil.Equal(t, slices.Contains(m.Judged("code"), "document"), true)
+	testutil.Equal(t, slices.Contains(m.Judged("plan"), "document"), false)
+	for _, ref := range q.Principles {
+		testutil.Equal(t, slices.Contains(m.Materials(dir, "judge:refine", "code").Principles, filepath.Join(dir, ref)), true)
+		testutil.Equal(t, slices.Contains(m.Others["judge:refine"], ref), false)
+	}
+	testutil.Equal(t, slices.Contains(m.Others["judge:refine"], "writing.md#7"), true)
+	testutil.Equal(t, slices.Contains(m.Others["judge:pr-body"], "writing.md#1"), true)
+}
 func TestOwnershipRejectsMissingDuplicateAndUnknownPrinciples(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

@@ -461,7 +461,7 @@ func TestPlanFailWithoutFindingsAndMissingJudgeNeverPass(t *testing.T) {
 	}
 }
 
-func TestPassingPlanCommitsAgreedRecordsAndReferencesTheirSources(t *testing.T) {
+func TestPassingPlanKeepsDecisionRecordsUnchanged(t *testing.T) {
 	ctx, a := repository(t, document{})
 	ctx.Branch = "feature/x"
 	ctx.Dir = t.TempDir()
@@ -479,7 +479,6 @@ func TestPassingPlanCommitsAgreedRecordsAndReferencesTheirSources(t *testing.T) 
 	row["evidence"] = []document{{"source": "author", "text": "D-abcdef"}}
 	reused := strip(row)
 	reused["id"] = "D2"
-	reused["ref"] = "D-abcdef"
 	provisional := strip(row)
 	provisional["id"] = "D3"
 	provisional["decided_by"] = "provisional"
@@ -488,20 +487,13 @@ func TestPassingPlanCommitsAgreedRecordsAndReferencesTheirSources(t *testing.T) 
 	result := must(finishTestPlan(t, ctx, a, record.ResultOptions{Base: sha("b"), Commit: sha("c"), Now: "t"}))
 	testutil.Equal(t, result["outcome"], "pass")
 	data := must(decisions.List(ctx.Cwd))
-	testutil.Equal(t, len(data.Decisions), 2)
-	for _, d := range data.Decisions {
-		if d["id"] != "D-abcdef" {
-			testutil.Equal(t, d["status"], "agreed")
-			testutil.Equal(t, d["request"], "feature/x")
-			testutil.Equal(t, stringsOf(d["depends_on"]), []string{"D-abcdef"})
-		}
-	}
+	testutil.Equal(t, len(data.Decisions), 1)
 	testutil.Equal(t, testutil.Git(t, ctx.Cwd, "status", "--porcelain"), "")
 	testutil.Equal(t, must(record.Latest(ctx.Dir, "plan"))["skeleton_commit"], testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD"))
 	testutil.Equal(t, must(os.ReadFile(filepath.Join(ctx.Cwd, ".devkit/decisions/D-abcdef.md"))), []byte(source))
 }
 
-func TestOwnerRowBecomesAgreedOnlyAfterItsBoundAnswer(t *testing.T) {
+func TestOwnerRowPassesOnlyAfterItsBoundAnswer(t *testing.T) {
 	ctx, a := repository(t, document{})
 	ctx.Branch = "feature/x"
 	ctx.Dir = t.TempDir()
@@ -524,11 +516,10 @@ func TestOwnerRowBecomesAgreedOnlyAfterItsBoundAnswer(t *testing.T) {
 	second := must(finishTestPlan(t, ctx, a, o))
 	testutil.Equal(t, second["outcome"], "pass")
 	records := must(decisions.List(ctx.Cwd)).Decisions
-	testutil.Equal(t, len(records), 1)
-	testutil.Equal(t, records[0]["decided_by"], "owner")
+	testutil.Equal(t, len(records), 0)
 }
 
-func TestPlanChecksRequirePendingRowsAndAgreedReferences(t *testing.T) {
+func TestPlanChecksRequirePendingRowsAndRejectDecisionReferences(t *testing.T) {
 	ctx, a := repository(t, document{})
 	inputFiles(t, a)
 	completeStructure(t, ctx, a)
@@ -546,14 +537,9 @@ func TestPlanChecksRequirePendingRowsAndAgreedReferences(t *testing.T) {
 	row["ref"] = "D-abcdef"
 	testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), d))
 	testutil.Equal(t, must(checkCommand(ctx, a, nil, "", "detail"))["valid"], false)
-	input["agreed_decisions"] = []document{{"id": "D-abcdef", "status": "agreed"}}
-	testutil.OK(t, write(filepath.Join(a, "plan/input.json"), input))
-	testutil.Equal(t, must(checkCommand(ctx, a, nil, "", "detail"))["valid"], true)
-	state := must(read(filepath.Join(rounds(a), "latest.json")))
-	testutil.Equal(t, len(ownerQuestions(state, nil)), 0)
 }
 
-func TestAgreedRecordsAreInTheSkeletonCommit(t *testing.T) {
+func TestSkeletonCommitContainsOnlyTheSkeleton(t *testing.T) {
 	ctx, a := repository(t, document{})
 	ctx.Branch = "feature/x"
 	ctx.Dir = t.TempDir()
@@ -572,19 +558,7 @@ func TestAgreedRecordsAreInTheSkeletonCommit(t *testing.T) {
 	testutil.Equal(t, testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD^"), parent)
 	files := testutil.Git(t, ctx.Cwd, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
 	testutil.Contains(t, files, "src/entry.ext")
-	testutil.Contains(t, files, ".devkit/decisions/D-")
-}
-
-func TestAgreedStructureReferencesDoNotAskTheSameChoiceAgain(t *testing.T) {
-	state := settled()
-	row := entries(object(state["draft"])["decisions"])[0]
-	row["ref"] = "D-abcdef"
-	row["decided_by"] = "owner"
-	row["touches"] = []string{"src"}
-	state["changes"] = []document{{"quality": "structure", "file": "src/new.ext", "change": "A file"}}
-	testutil.Equal(t, len(ownerQuestions(state, nil)), 0)
-	state["changes"] = append(entries(state["changes"]), document{"quality": "structure", "file": "other/new.ext", "change": "A file"})
-	testutil.Equal(t, len(ownerQuestions(state, nil)), 1)
+	testutil.Equal(t, files, "src/entry.ext")
 }
 
 func completeStructure(t *testing.T, ctx record.ContextData, artifacts string) {

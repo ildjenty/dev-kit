@@ -14,7 +14,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/cli"
 )
 
-const Qualities = "structure data contract security ui cost test delivery scope readability"
+const Qualities = "structure data contract security ui cost test delivery scope readability document"
 
 const Consumers = "writer:implement writer:requirements writer:plan writer:refine writer:tests writer:fix writer:pr-body writer:sync writer:retro judge:requirements judge:pr-body judge:refine judge:retro judge:step-back judge:dispute"
 
@@ -95,6 +95,9 @@ func (m Map) Materials(dir, subject, phase string) Material {
 				material.Criteria = append(material.Criteria, filepath.Join(dir, ref))
 			}
 		}
+	}
+	if subject == "judge:refine" {
+		material.Principles = append(material.Principles, paths(m.Qualities["document"].Principles)...)
 	}
 	if strings.HasPrefix(subject, "writer:") || subject == "judge:dispute" {
 		name := strings.TrimPrefix(subject, "writer:")

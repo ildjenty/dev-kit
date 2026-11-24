@@ -15,6 +15,5 @@ schema and coverage references; judge the semantic evidence in your assigned con
 
 Return the node's JSON shape: `verdict`, `checked`, `not_checked`, `findings` (each with `row`, `blocking`, `needs_decision`, `deferred`, `mechanical`, `failure_scenario`, `evidence`, `fix`) and `back` (`needed`, `premise`, `observation`; empty strings when false). Write human-readable text in `language`. Write no files.
 
-Rows with `ref` apply the supplied agreed decisions; check conformance without judging their choices again.
 
 Return every property in the output schema. Use `false` for `mechanical` when no mechanical check is proposed and for `deferred` when the finding is on the change’s path. Use empty strings or empty arrays for inapplicable text or lists.

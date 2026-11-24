@@ -621,34 +621,6 @@ func TestF12RetroKeepsEveryRoundAndResolution(t *testing.T) {
 	testutil.Equal(t, items(judgments[0]["findings"])[0]["mechanical"], true)
 }
 
-func TestRetroPreservesDoneUnitsAndCutsNewWork(t *testing.T) {
-	r := setup(t, backlog())
-	path := ".devkit/units/U-abcdef.md"
-	original := "---\nid: U-abcdef\ntitle: Finished\ndecisions: []\ndepends_on: []\n---\nCompleted work.\n"
-	r.put(path, original)
-	r.put(".devkit/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/done"}`)
-	r.commit()
-	r.begin()
-	input := testutil.Must(readJSON(file(r.artifacts, "input.json")))
-	testutil.Equal(t, items(input["units"])[0]["state"], "done")
-	d := r.draft()
-	r.write(d)
-	testutil.Equal(t, r.errors(d), "")
-	edits, ids, e := materializedUnits(r.ctx, input, d)
-	testutil.OK(t, e)
-	testutil.Equal(t, len(ids), 1)
-	if ids[0] == "U-abcdef" || edits[path] != nil {
-		t.Fatal("overwrites finished work")
-	}
-	r.put(path, original+"Changed\n")
-	r.git("add", path)
-	r.put(path, original)
-	testutil.Contains(t, r.errors(d), "done unit may not be edited or removed: U-abcdef")
-	r.git("restore", "--staged", path)
-	testutil.OK(t, os.Remove(filepath.Join(r.cwd, path)))
-	testutil.Contains(t, r.errors(d), "done unit may not be edited or removed: U-abcdef")
-}
-
 func TestReviewBacklogRequiresRunProvenance(t *testing.T) {
 	for _, review := range []any{nil, "text", []doc{{"finding": doc{"id": "review-1", "text": "Review text"}, "source": doc{"run_id": "fix1", "kind": "code", "target": doc{"commit": strings.Repeat("a", 40)}}}}, []doc{{"finding": doc{"id": "review-1", "text": "Review text"}, "source": doc{"run_id": "fix1", "kind": "review", "target": doc{}}}}} {
 		b := backlog()

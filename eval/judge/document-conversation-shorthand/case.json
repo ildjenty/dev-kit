@@ -1,0 +1,12 @@
+{
+  "description": "An export guide replaces actionable steps with unexplained conversation shorthand.",
+  "requirements": "Shorten the CSV export guide while keeping it usable by a new user who did not take part in the discussion.",
+  "expected": [
+    {
+      "id": "unexplained-export-steps",
+      "quality": "document",
+      "file": "docs/export.md",
+      "summary": "The guide replaces the Settings, Account and Export steps with undefined gate, D2 and usual scope references from a discussion. A new reader cannot determine what to open or select to export CSV; this breaks writing principles 2 and 3."
+    }
+  ]
+}

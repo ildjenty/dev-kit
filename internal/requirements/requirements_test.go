@@ -181,33 +181,6 @@ func TestRequiredAspectsCannotPassWithoutFindings(t *testing.T) {
 	}
 }
 
-func TestUnitInputLoadsAgreedDecisionsAsConstraintsAndSurvivesAnswers(t *testing.T) {
-	repo := testutil.Repo(t)
-	testutil.Standards(t, repo, ".devkit/standards")
-	testutil.Put(t, repo, ".devkit/decisions/D-abcdef.md", "---\nid: D-abcdef\ntitle: Audience\nstatus: agreed\ndecided_by: owner\nrequest: refine/a\ndepends_on: []\nsupersedes: []\n---\nEmployees only.\n")
-	testutil.Put(t, repo, ".devkit/units/U-abcdef.md", "---\nid: U-abcdef\ntitle: Sign in\ndecisions: [D-abcdef]\ndepends_on: []\n---\nAllow employee sign-in.\n")
-	testutil.Git(t, repo, "add", ".")
-	testutil.Git(t, repo, "commit", "-qm", "refined unit")
-	testutil.Git(t, repo, "branch", "-f", "main", "HEAD")
-	ctx := record.ContextData{Cwd: repo, BaseBranch: "main", Dir: t.TempDir(), RunID: "r1"}
-	run(ctx.Dir, ctx.RunID)
-	a := t.TempDir()
-	must(prepare(ctx, a, "", "", "", "U-abcdef"))
-	input := must(read(filepath.Join(a, "requirements/input.json")))
-	testutil.Equal(t, object(input["unit"])["id"], "U-abcdef")
-	testutil.Equal(t, entries(input["agreed_decisions"])[0]["body"], "Employees only.")
-	must(prepare(ctx, a, "", "", ""))
-	testutil.Equal(t, object(must(read(filepath.Join(a, "requirements/input.json")))["unit"])["id"], "U-abcdef")
-	_, err := prepare(ctx, a, "", "", "", "U-123456")
-	testutil.Fails(t, err, "does not exist")
-	for _, status := range []string{"proposed", "superseded"} {
-		testutil.Put(t, repo, ".devkit/decisions/D-abcdef.md", "---\nid: D-abcdef\nstatus: "+status+"\n---\nNot agreed\n")
-		testutil.Put(t, repo, ".devkit/decisions/D-fedcba.md", "---\nid: D-fedcba\nstatus: agreed\nsupersedes: [D-abcdef]\n---\nSuccessor\n")
-		_, err = prepare(ctx, a, "", "", "", "U-abcdef")
-		testutil.Fails(t, err, "unit U-abcdef cites decision D-abcdef which is not agreed")
-	}
-}
-
 func TestF7PrepareIncludesReturnedPremiseAndObservation(t *testing.T) {
 	repo := testutil.Repo(t)
 	testutil.Standards(t, repo, ".devkit/standards")

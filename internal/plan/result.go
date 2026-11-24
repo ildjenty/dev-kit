@@ -161,7 +161,7 @@ func ownerQuestions(state document, answers []document) []document {
 	}
 	draft := object(state["draft"])
 	for _, d := range entries(draft["decisions"]) {
-		if d["decided_by"] != "owner" || d["when"] != "now" || text(d["ref"]) != "" || answered("decision", text(d["id"]), ownerRowHash(state, d)) {
+		if d["decided_by"] != "owner" || d["when"] != "now" || answered("decision", text(d["id"]), ownerRowHash(state, d)) {
 			continue
 		}
 		parts := []string{text(d["id"]), text(d["what"]), text(d["chosen"])}
@@ -194,7 +194,7 @@ func ownerQuestions(state document, answers []document) []document {
 			return false
 		}
 		for _, row := range entries(draft["decisions"]) {
-			if text(row["ref"]) == "" && (row["decided_by"] != "owner" || row["when"] != "now") {
+			if row["decided_by"] != "owner" || row["when"] != "now" {
 				continue
 			}
 			for _, touch := range stringsOf(row["touches"]) {

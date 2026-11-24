@@ -4,6 +4,7 @@ changes:
     launch_cost: false
     launch_data: false
     launch_readability: false
+    launch_document: false
     launch_scope: true
     launch_security: false
     launch_structure: false
@@ -65,6 +66,7 @@ launch:
     launch_cost: false
     launch_data: false
     launch_readability: false
+    launch_document: false
     launch_scope: true
     launch_security: false
     launch_structure: false

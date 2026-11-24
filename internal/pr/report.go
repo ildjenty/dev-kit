@@ -155,6 +155,14 @@ func report(mode string, env cli.Env) error {
 		if err != nil {
 			return err
 		}
+		ctx, err := context(env)
+		if err != nil {
+			return err
+		}
+		issue, err := record.RequestIssue(ctx.Dir)
+		if err != nil {
+			return err
+		}
 		previous, err := optional(stateFile)
 		if err != nil {
 			return err
@@ -165,7 +173,11 @@ func report(mode string, env cli.Env) error {
 				return err
 			}
 		}
-		if err = os.WriteFile(env.Path(filepath.Join(out, "pr.md")), []byte(body(d, lists)), 0644); err != nil {
+		content := body(d, lists)
+		if issue != 0 {
+			content = strings.TrimRight(content, "\n") + fmt.Sprintf("\n\nCloses #%d\n", issue)
+		}
+		if err = os.WriteFile(env.Path(filepath.Join(out, "pr.md")), []byte(content), 0644); err != nil {
 			return err
 		}
 		if err = os.WriteFile(env.Path(filepath.Join(out, "pr-title.txt")), []byte(strings.TrimSpace(text(d["title"]))+"\n"), 0644); err != nil {

@@ -14,8 +14,8 @@ import (
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/criteria"
-	"github.com/ildjenty/dev-kit/internal/decisions"
 	"github.com/ildjenty/dev-kit/internal/gitx"
+	"github.com/ildjenty/dev-kit/internal/issues"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
@@ -78,7 +78,7 @@ func write(file string, v any) error {
 }
 func rounds(artifacts string) string { return filepath.Join(artifacts, "requirements", "rounds") }
 
-func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, display string, unitIDs ...string) (document, error) {
+func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, display string, envs ...cli.Env) (document, error) {
 	if display == "" {
 		display = artifacts
 	}
@@ -86,35 +86,32 @@ func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, display 
 	if err != nil {
 		return nil, err
 	}
-	unitID := ""
-	if len(unitIDs) > 0 {
-		unitID = unitIDs[0]
+	env := cli.Env{Cwd: ctx.Cwd}
+	if len(envs) > 0 {
+		env = envs[0]
 	}
-	if unitID == "" {
-		for _, r := range requests {
-			if text(r["unit"]) != "" {
-				unitID = text(r["unit"])
-			}
-		}
+	issueNumber, err := record.InputIssue(env, ctx.Dir)
+	if err != nil {
+		return nil, err
 	}
-	var unit document
-	agreed := []document{}
-	if unitID != "" {
-		data, err := decisions.List(ctx.Cwd)
+	var issue, parent *issues.Issue
+	if issueNumber != 0 {
+		settings, err := config.Load(ctx.Cwd)
 		if err != nil {
 			return nil, err
 		}
-		for _, u := range data.Units {
-			if u["id"] == unitID {
-				unit = u
-			}
-		}
-		if unit == nil {
-			return nil, fmt.Errorf("unit %s does not exist", unitID)
-		}
-		agreed, err = decisions.UnitDecisions(data, unitID)
+		client := issues.Client{Env: env}
+		selected, err := client.ReadyUnit(issueNumber, settings.Issues.Labels.Unit)
 		if err != nil {
 			return nil, err
+		}
+		issue = &selected
+		if issue.Parent != nil {
+			topic, err := client.Read(issue.Parent.Number)
+			if err != nil {
+				return nil, fmt.Errorf("parent topic #%d of issue #%d could not be read: %w", issue.Parent.Number, issueNumber, err)
+			}
+			parent = &topic
 		}
 	}
 	asked := false
@@ -123,11 +120,11 @@ func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, display 
 			asked = true
 		}
 	}
-	if strings.TrimSpace(ownerWords) == "" && strings.TrimSpace(supplement) != "" && !asked && unit == nil {
+	if strings.TrimSpace(ownerWords) == "" && strings.TrimSpace(supplement) != "" && !asked && issue == nil {
 		return nil, fmt.Errorf("a supplement needs the owner's words with it when no request is recorded yet")
 	}
-	if strings.TrimSpace(ownerWords) != "" || strings.TrimSpace(supplement) != "" || unit != nil && !slices.ContainsFunc(requests, func(r document) bool { return r["unit"] == unitID }) {
-		if _, err = record.Write(ctx, "request", document{"owner_words": ownerWords, "supplement": supplement, "unit": unitID}, ""); err != nil {
+	if strings.TrimSpace(ownerWords) != "" || strings.TrimSpace(supplement) != "" || issue != nil && !slices.ContainsFunc(requests, func(r document) bool { return number(r["issue"]) == issueNumber }) {
+		if _, err = record.Write(ctx, "request", document{"owner_words": ownerWords, "supplement": supplement, "issue": issueNumber}, ""); err != nil {
 			return nil, err
 		}
 	}
@@ -141,7 +138,7 @@ func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, display 
 			asked = true
 		}
 	}
-	if !asked && unit == nil {
+	if !asked && issue == nil {
 		return nil, fmt.Errorf("no request is recorded yet and the run got none (owner_words)")
 	}
 	source, err := criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: text(requests[0]["criteria_commit"]), Dir: filepath.Join(artifacts, "criteria")})
@@ -192,7 +189,7 @@ func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, display 
 	if err != nil {
 		return nil, err
 	}
-	input := document{"returned": returned, "unit": unit, "agreed_decisions": agreed, "language": c.Language, "standards": source.Paths[0], "criteria_folder": filepath.Join(display, "criteria", source.Paths[0]), "requests": rs, "previous": strip(previous, "version", "request", "run_id", "recorded_at"), "answers": answers, "criteria": paths, "judge_materials": selected, "writer_materials": mapping.Materials(filepath.Join(display, "criteria", source.Paths[0]), "writer:requirements", "plan")}
+	input := document{"returned": returned, "issue": issue, "parent_topic": parent, "language": c.Language, "standards": source.Paths[0], "criteria_folder": filepath.Join(display, "criteria", source.Paths[0]), "requests": rs, "previous": strip(previous, "version", "request", "run_id", "recorded_at"), "answers": answers, "criteria": paths, "judge_materials": selected, "writer_materials": mapping.Materials(filepath.Join(display, "criteria", source.Paths[0]), "writer:requirements", "plan")}
 	input["input_id"] = rand.Text()
 	input["run_id"] = ctx.RunID
 	input["request"] = len(requests)
@@ -484,7 +481,7 @@ func Commands() []cli.Command {
 				}
 				ctx.Dir = env.Path(ctx.Dir)
 				if mode == "prepare" {
-					out, err = prepare(ctx, artifacts, env.Getenv("INPUTS_OWNER_WORDS"), env.Getenv("INPUTS_SUPPLEMENT"), env.Getenv("ARTIFACTS_DIR"), env.Getenv("INPUTS_UNIT"))
+					out, err = prepare(ctx, artifacts, env.Getenv("INPUTS_OWNER_WORDS"), env.Getenv("INPUTS_SUPPLEMENT"), env.Getenv("ARTIFACTS_DIR"), env)
 				} else {
 					g, e := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 					if e != nil {

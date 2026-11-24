@@ -2,4 +2,4 @@ exec-code: true
 fixture:
   expect: completed
   reached: ["start", "not-started", "result"]
-  inputs: {unit: U-d00002}
+  inputs: {issue: "46"}

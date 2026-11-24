@@ -1,0 +1,12 @@
+--- a/docs/export.md
++++ b/docs/export.md
+@@ -2,4 +2,7 @@
+ 
+ For account owners exporting a copy of their data.
+ 
+-Open Settings, choose Account, then select Export. Choose CSV and select Download to save a CSV file containing your account data.
++1. Open Settings and choose Account.
++2. Select Export and choose CSV.
++3. Select Download.
++
++The downloaded CSV file contains your account data.

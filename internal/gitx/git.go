@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ildjenty/dev-kit/internal/backlog"
-	"github.com/ildjenty/dev-kit/internal/unitdone"
 	"io"
 	"os"
 	"os/exec"
@@ -239,44 +238,6 @@ func (g *Git) excludedPaths(commit string) ([]string, error) {
 		}
 		if strings.HasPrefix(mode, "100644 blob ") || strings.HasPrefix(mode, "100755 blob ") {
 			paths = append(paths, path)
-		}
-	}
-	dir := g.RecordDir
-	if dir == "" && os.Getenv("STATE_DIR") != "" {
-		dir = filepath.Join(os.Getenv("STATE_DIR"), "records", slug.String())
-		if !filepath.IsAbs(dir) {
-			dir = filepath.Join(g.Cwd, dir)
-		}
-	}
-	if dir == "" {
-		return paths, nil
-	}
-	unit, err := unitdone.RequestUnit(dir)
-	if err != nil {
-		return nil, err
-	}
-	if unit == "" {
-		return paths, nil
-	}
-	settings := struct {
-		Units string `json:"units"`
-	}{Units: ".devkit/units"}
-	if data, e := g.Bytes("show", commit+":.devkit/config.json"); e == nil {
-		if err = json.Unmarshal(data, &settings); err != nil {
-			return nil, err
-		}
-	}
-	path = filepath.ToSlash(filepath.Join(settings.Units, unit+".done.json"))
-	if data, e := g.Bytes("show", commit+":"+path); e == nil {
-		marker, e := unitdone.Parse(data)
-		if e == nil && marker.Unit == unit && marker.Branch == branch {
-			mode, e := g.Run("ls-tree", commit, "--", path)
-			if e != nil {
-				return nil, e
-			}
-			if strings.HasPrefix(mode, "100644 blob ") || strings.HasPrefix(mode, "100755 blob ") {
-				paths = append(paths, path)
-			}
 		}
 	}
 	return paths, nil

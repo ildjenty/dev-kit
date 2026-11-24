@@ -222,7 +222,7 @@ func TestF12PlanRecordsEarlierJudgmentsAfterFinalMachineFailure(t *testing.T) {
 	testutil.Equal(t, entries(judgments[0]["findings"])[0]["resolved"], false)
 }
 
-func TestPlanPrepareReceivesSupersededRowAndSuccessorText(t *testing.T) {
+func TestPlanPrepareDoesNotReceiveDecisionRecords(t *testing.T) {
 	ctx, a := repository(t, document{})
 	testutil.Standards(t, ctx.Cwd, ".devkit/standards")
 	testutil.Put(t, ctx.Cwd, ".devkit/decisions/D-abcdef.md", "---\nid: D-abcdef\ntitle: Old\nstatus: superseded\n---\nOld body\n")
@@ -234,14 +234,15 @@ func TestPlanPrepareReceivesSupersededRowAndSuccessorText(t *testing.T) {
 	must(record.Append(ctx.Dir, "request", document{"owner_words": "Request", "supplement": "", "criteria_commit": testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD"), "run_id": "r1", "recorded_at": "t"}))
 	requirements(ctx.Dir, "r1")
 	previous := draft()
-	entries(previous["decisions"])[0]["ref"] = "D-abcdef"
 	previous["requirements_version"], previous["run_id"], previous["recorded_at"], previous["skeleton_commit"] = 1, "p0", "t", sha("a")
 	must(record.Append(ctx.Dir, "plan", previous))
 	run(ctx.Dir, ctx.RunID)
 	must(prepare(ctx, a, ""))
-	returned := entries(must(read(filepath.Join(a, "plan/input.json")))["returned"])
-	testutil.Equal(t, len(returned), 1)
-	testutil.Equal(t, object(returned[0]["decision"])["body"], "Old body")
-	testutil.Equal(t, entries(returned[0]["successors"])[0]["body"], "New body")
-	testutil.Equal(t, entries(returned[0]["citations"])[0]["items"], []string{"D1"})
+	input := must(read(filepath.Join(a, "plan/input.json")))
+	testutil.Equal(t, input["returned"], []document{})
+	_, present := input["agreed_decisions"]
+	testutil.Equal(t, present, false)
+	material := materials("structure", input, previous, nil, nil, nil)
+	_, present = material["agreed_decisions"]
+	testutil.Equal(t, present, false)
 }

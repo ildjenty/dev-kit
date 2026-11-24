@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
@@ -136,7 +137,7 @@ func TestConfigRejectsInvalidShapes(t *testing.T) {
 }
 func TestStructuralChanges(t *testing.T) {
 	c := Defaults("")
-	testutil.Equal(t, QualitiesFor(c, gitx.Changes{Files: []gitx.File{{Path: "readme.md"}}}), []string{})
+	testutil.Equal(t, QualitiesFor(c, gitx.Changes{Files: []gitx.File{{Path: "readme.md"}}}), []string{"document"})
 	for _, status := range []string{"A", "D", "R100"} {
 		testutil.Equal(t, QualitiesFor(c, gitx.Changes{Files: []gitx.File{{Status: status, Path: "arbitrary/file.txt"}}}), []string{"structure"})
 	}
@@ -147,6 +148,17 @@ func TestStructuralChanges(t *testing.T) {
 func TestUnicodeGlobLiterals(t *testing.T) {
 	testutil.Equal(t, Matches([]string{"docs/設計/**"}, "docs/設計/方針.md"), true)
 	testutil.Equal(t, Matches([]string{"docs/設計/**"}, "docs/別/方針.md"), false)
+}
+
+func TestDocumentQualityDefaultPathsAndExclusions(t *testing.T) {
+	c := Defaults("")
+	for _, path := range []string{"README.md", "guide/setup.md", "docs/specification.txt", "design/behavior.md"} {
+		testutil.Equal(t, slices.Contains(QualitiesFor(c, gitx.Changes{Files: []gitx.File{{Path: path}}}), "document"), true)
+	}
+	for _, path := range []string{".devkit/standards/writing.md", ".devkit/decisions/D-abcdef.md", ".archon/workflows/commands/write.md", "src/main.go"} {
+		testutil.Equal(t, slices.Contains(QualitiesFor(c, gitx.Changes{Files: []gitx.File{{Path: path}}}), "document"), false)
+	}
+	testutil.Equal(t, Matches([]string{"!.devkit/**", "**/*.md"}, ".devkit/standards/writing.md"), false)
 }
 
 func TestConfigIsAnOwnerDecisionAndGeneratedRecordsDoNotInventStructureDecisions(t *testing.T) {
@@ -182,7 +194,7 @@ func TestSkillNamesDefaultsMergeAndValidation(t *testing.T) {
 	}
 }
 
-func TestUnitDoneExclusionAlsoAppliesToDecisionDetection(t *testing.T) {
+func TestFormerUnitMarkersRemainInDecisionDetection(t *testing.T) {
 	repo, records := testutil.Repo(t), t.TempDir()
 	testutil.Put(t, records, "request/1.json", `{"unit":"U-abcdef"}`)
 	g := testutil.Must(gitx.New(repo, "main", records))
@@ -191,7 +203,7 @@ func TestUnitDoneExclusionAlsoAppliesToDecisionDetection(t *testing.T) {
 	testutil.Put(t, repo, ".devkit/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/x"}`)
 	testutil.Git(t, repo, "add", ".")
 	testutil.Git(t, repo, "commit", "-qm", "done")
-	testutil.Equal(t, DecisionChanges(c, testutil.Must(g.Changes("", "HEAD"))), []DecisionChange{})
+	testutil.Equal(t, len(DecisionChanges(c, testutil.Must(g.Changes("", "HEAD")))), 1)
 	testutil.Put(t, repo, ".devkit/units/U-fedcba.md", "another unit")
 	testutil.Git(t, repo, "add", ".")
 	testutil.Git(t, repo, "commit", "-qm", "another unit")

@@ -224,16 +224,13 @@ func TestOpenPointsRecordOneQuestionEachPreserveDraftDocumentsAndAllowCleanAnswe
 	testutil.Equal(t, items(next["answers"])[0]["question"], "How many employees?")
 	testutil.Equal(t, next["memo"], "Confirmed memo")
 }
-func TestMaterializesProposalIDsThenApprovalAgreesSuccessorsAndReportsAffectedUnits(t *testing.T) {
+func TestMaterializesProposalIDsThenApprovalAgreesSuccessors(t *testing.T) {
 	r := setup(t, nil)
 	r.decision("D-000001", nil)
-	r.put(".devkit/units/U-000001.md", "---\nid: U-000001\ntitle: Old unit\ndecisions: [D-000001]\ndepends_on: []\n---\nOld goal\n\n- Old completion condition\n")
-	r.put(".devkit/units/U-000001.done.json", `{"unit":"U-000001","branch":"feature/previous"}`)
 	r.commit()
 	r.begin("Serve employees", "", "Confirmed memo")
 	d := draft()
 	items(d["decisions"])[0]["supersedes"] = []string{"D-000001"}
-	d["kept_units"] = []doc{{"id": "U-000001", "reason": "The historical unit will be replaced by UN1"}}
 	r.writeDraft(d)
 	r.put("docs/topic.md", "# Topic\nN1\n")
 	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts)), doc{"valid": true, "errors": []string{}})
@@ -261,13 +258,13 @@ func TestMaterializesProposalIDsThenApprovalAgreesSuccessorsAndReportsAffectedUn
 	testutil.OK(t, e)
 	testutil.Equal(t, agreed["outcome"], "pass")
 	testutil.Equal(t, agreed["decision_ids"], []string{testutil.Must(decisions.NextID("decision", r.ctx.Branch, "N1", decisions.Data{}))})
-	testutil.Equal(t, agreed["affected"].(decisions.Data).Units[0]["id"], "U-000001")
+	testutil.Equal(t, len(agreed["affected"].(decisions.Data).Units), 0)
 	testutil.Equal(t, find(r.data().Decisions, "D-000001")["status"], "superseded")
 	testutil.Equal(t, find(r.data().Decisions, testutil.Must(decisions.NextID("decision", r.ctx.Branch, "N1", decisions.Data{})))["status"], "agreed")
 	testutil.Equal(t, len(testutil.Must(record.List(r.ctx.Dir, "proposal"))), 1)
 	testutil.Equal(t, r.latest("result")["outcome"], "pass")
 	testutil.Equal(t, r.latest("result")["decision_ids"], []string{testutil.Must(decisions.NextID("decision", r.ctx.Branch, "N1", decisions.Data{}))})
-	testutil.Equal(t, items(obj(r.latest("result")["affected"])["units"])[0]["id"], "U-000001")
+	testutil.Equal(t, len(items(obj(r.latest("result")["affected"])["units"])), 0)
 	testutil.Equal(t, r.latest("judgment")["judge"], "refine")
 	testutil.Equal(t, r.latest("judgment")["target"], doc{"proposal_version": 1})
 	rejectsApproval(t, r.ctx, "1")
@@ -560,64 +557,6 @@ func TestPrepareRejectsInvalidFixedConcernMap(t *testing.T) {
 	testutil.Fails(t, err, "missing quality: scope")
 }
 
-func TestDoneUnitCannotBeEditedOrRemovedByDocumentWriter(t *testing.T) {
-	for _, operation := range []string{"edit", "delete", "index"} {
-		t.Run(operation, func(t *testing.T) {
-			r := setup(t, nil)
-			path := ".devkit/units/U-abcdef.md"
-			original := "---\nid: U-abcdef\ntitle: Finished\ndecisions: []\ndepends_on: []\n---\nCompleted goal.\n"
-			r.put(path, original)
-			r.put(".devkit/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/done"}`)
-			r.commit()
-			r.begin()
-			r.writeDraft()
-			testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts))["valid"], true)
-			if operation == "delete" {
-				testutil.OK(t, os.Remove(filepath.Join(r.cwd, path)))
-			} else {
-				r.put(path, original+"Changed\n")
-				if operation == "index" {
-					r.git("add", path)
-					r.put(path, original)
-				}
-			}
-			testutil.OK(t, os.Remove(filepath.Join(r.cwd, ".devkit/units/U-abcdef.done.json")))
-			errors := testutil.Must(draftErrors(r.ctx, r.artifacts, draft()))
-			testutil.Contains(t, strings.Join(errors, "\n"), "done unit may not be edited or removed: U-abcdef")
-		})
-	}
-}
-
-func TestReproposalPreservesDoneUnitAndAllocatesFollowUp(t *testing.T) {
-	for _, retained := range []bool{false, true} {
-		t.Run(fmt.Sprint(retained), func(t *testing.T) {
-			r := setup(t, doc{"units": "docs/units"})
-			path := "docs/units/U-abcdef.md"
-			original := "---\nid: U-abcdef\ntitle: Finished\ndecisions: []\ndepends_on: []\n---\nCompleted N1 goal.\n"
-			r.put(path, original)
-			r.put("docs/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/done"}`)
-			r.commit()
-			r.begin()
-			input := testutil.Must(readJSON(file(r.artifacts, "input.json")))
-			input["previous_unapproved"] = true
-			input["pending_proposal"] = doc{"content": doc{"mapping": doc{"UN1": "U-abcdef"}, "unit_ids": []string{"U-abcdef"}}}
-			d := draft()
-			if !retained {
-				d["units"] = []doc{}
-			} else {
-				items(d["units"])[0]["decisions"] = []string{}
-			}
-			result := testutil.Must(materialize(r.ctx, r.artifacts, d, input))
-			testutil.Equal(t, string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, path)))), original)
-			if retained {
-				if obj(result["mapping"])["UN1"] == "U-abcdef" {
-					t.Fatal("reused a done unit")
-				}
-			}
-		})
-	}
-}
-
 func TestSupersedingDecisionRequiresOpenUnitSuccessorCitations(t *testing.T) {
 	for _, tc := range []struct {
 		name, key string
@@ -631,8 +570,6 @@ func TestSupersedingDecisionRequiresOpenUnitSuccessorCitations(t *testing.T) {
 		{name: "retained unrelated citation", key: "U-abcdef", refs: []string{"D-000002"}},
 		{name: "retained successor and stale citation", key: "U-abcdef", refs: []string{"N1", "D-000001"}},
 		{name: "retained successor", key: "U-abcdef", refs: []string{"N1"}, valid: true},
-		{name: "unchanged done unit", done: true, valid: true},
-		{name: "retained done unit", key: "U-abcdef", refs: []string{"N1"}, done: true},
 		{name: "retained pending unit", key: "UN1", refs: []string{"N1"}, pending: true, valid: true},
 		{name: "stale pending unit", key: "UN1", refs: []string{"D-000001"}, pending: true},
 		{name: "withdrawn pending unit", pending: true, valid: true},

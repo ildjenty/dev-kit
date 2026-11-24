@@ -158,11 +158,6 @@ func checkCommand(ctx record.ContextData, artifacts string, env []string, displa
 		}
 	}
 	if len(errors) == 0 {
-		for _, row := range entries(draft["decisions"]) {
-			if ref := text(row["ref"]); ref != "" && !slices.ContainsFunc(entries(input["agreed_decisions"]), func(d document) bool { return d["id"] == ref }) {
-				errors = append(errors, "Unknown agreed decision: "+ref)
-			}
-		}
 		for _, pending := range entries(input["pending_owner_rows"]) {
 			if phase == "structure" && pending["quality"] != "structure" {
 				continue

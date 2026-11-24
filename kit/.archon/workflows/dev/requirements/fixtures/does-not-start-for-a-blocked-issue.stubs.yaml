@@ -6,7 +6,7 @@
       "result"
     ],
     "inputs": {
-      "unit": "U-abcdef"
+      "issue": "42"
     }
   },
   "start": {
@@ -15,7 +15,7 @@
     "reason": "the start conditions of requirements do not hold, so it did not start",
     "details": "/tmp/record",
     "remaining": [
-      "unit U-abcdef waits for U-fedcba"
+      "issue #42 is blocked by issue #8 (open)"
     ],
     "start": "first",
     "counted": false,
@@ -27,7 +27,7 @@
     "questions": [],
     "reasons": [
       "the start conditions of requirements do not hold, so it did not start",
-      "unit U-abcdef waits for U-fedcba"
+      "issue #42 is blocked by issue #8 (open)"
     ]
   },
   "result": {
@@ -36,7 +36,7 @@
     "questions": [],
     "reasons": [
       "the start conditions of requirements do not hold, so it did not start",
-      "unit U-abcdef waits for U-fedcba"
+      "issue #42 is blocked by issue #8 (open)"
     ]
   }
 }

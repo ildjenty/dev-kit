@@ -4,7 +4,7 @@ Compare the request with requirements for coverage and unresolved requirements. 
 
 ## What to check
 
-- **Request coverage**: Compare the fixed original owner request, when observed, and the supplied starting task with completion conditions and open questions. Preserve every requested requirement and the supplied unit's agreed decisions, citing the decision IDs as sources. Do not drop requirements or invent requirements absent from the request. Record ambiguities as open questions rather than guesses. When the original request was not observed, state that limitation and use the supplied task without treating it as the original.
+- **Request coverage**: Compare the fixed original owner request, when observed, and the supplied issue and parent topic text with completion conditions and open questions. Preserve every requested requirement. Do not drop requirements or invent requirements absent from the request. Record ambiguities as open questions rather than guesses. When the original request was not observed, state that limitation and use the supplied task without treating it as the original.
 - **Unresolved requirements**: Check that the author records requirements they lack authority to decide as open questions rather than filling them by assumption.
 
 ## Topic proposals
@@ -18,7 +18,7 @@ including the simplest alternative, against the decision's evidence and reasons.
 For the document phase, apply the wording criteria mapped to refine to documents and approval text.
 The machine checks dispositions of affected documents and units and cuts into work units only for settled areas.
 
-Agreed decisions supplied with a unit are constraints cited by D-ID. Session supplement supplies
+Issue and parent topic titles and bodies are request data. Session supplement supplies
 facts and candidates; it does not by itself authorize additional requirements or owner choices.
 
 ## Blocking

@@ -40,6 +40,31 @@ func TestLocalityIncludesUnplannedPathsFolderCountsAndAllAncestors(t *testing.T)
 		testutil.Equal(t, folders[folder], true)
 	}
 }
+
+func TestDocumentChangeLaunchesJudgeWithDocumentMaterials(t *testing.T) {
+	repo := testutil.Repo(t)
+	testutil.Standards(t, repo, ".devkit/standards")
+	testutil.Put(t, repo, "docs/guide.md", "# Export\nOpen Settings.\n")
+	testutil.Git(t, repo, "add", ".")
+	testutil.Git(t, repo, "commit", "-qm", "base")
+	testutil.Git(t, repo, "branch", "-f", "main", "HEAD")
+	base := testutil.Git(t, repo, "rev-parse", "HEAD")
+	testutil.Put(t, repo, "docs/guide.md", "# Export\nOpen Settings, then choose Export.\n")
+	testutil.Git(t, repo, "commit", "-qam", "guide")
+	ctx := record.ContextData{Cwd: repo, Dir: t.TempDir(), Branch: "feature/x", RunID: "judge-document", BaseBranch: "main"}
+	must(record.Start(ctx.Dir, "judge", record.StartOptions{RunID: ctx.RunID, Commit: testutil.Git(t, repo, "rev-parse", "HEAD"), BaseCommit: base}))
+	a := t.TempDir()
+	must(prepare(ctx, a, a))
+	must(writeChanges(repo, a))
+	launch := must(routeChanges(repo, a, doc{"qualities": []doc{}}))
+	testutil.Equal(t, launch["launch_document"], true)
+	testutil.Equal(t, must(read(filepath.Join(a, "judge/launched.json")))["launched"], []string{"scope", "document"})
+	material := must(read(filepath.Join(a, "judge/materials/document.json")))
+	testutil.Equal(t, material["criteria"], []string{filepath.Join(a, "criteria/.devkit/standards/review/document.md")})
+	testutil.Equal(t, docs(material["files"])[0]["path"], "docs/guide.md")
+	testutil.Equal(t, slices.Contains(stringsOf(material["principles"]), filepath.Join(a, "criteria/.devkit/standards/writing.md#2")), true)
+	testutil.Equal(t, material["every_quality"], []string{})
+}
 func TestRouteUnionsPathsPlanRowsAndInferredQualitiesWithFiles(t *testing.T) {
 	repo := testutil.Repo(t)
 	testutil.Standards(t, repo, ".devkit/standards")

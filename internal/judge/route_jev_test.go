@@ -70,18 +70,18 @@ func TestJevSelectionThresholdAndFixedQuestions(t *testing.T) {
 	request := <-seen
 	testutil.Equal(t, request["model"], "jev-latest")
 	questions := object(request["questions"])
-	testutil.Equal(t, len(questions), 7)
+	testutil.Equal(t, len(questions), 8)
 	for _, id := range []string{"scope", "delivery", "test", "readability"} {
 		if questions[id] != nil {
 			t.Fatalf("unexpected question %s", id)
 		}
 	}
-	for _, q := range []string{"structure", "data", "contract", "security", "ui", "cost"} {
+	for _, q := range []string{"structure", "data", "contract", "security", "ui", "cost", "document"} {
 		question := object(questions[q])
 		testutil.Equal(t, question["type"], "noul")
 		testutil.Contains(t, text(question["instructions"]), mapping.Qualities[q].Routing)
 	}
-	testutil.Equal(t, len(docs(out["probabilities"])), 7)
+	testutil.Equal(t, len(docs(out["probabilities"])), 8)
 }
 func TestJevUsesEachQualitysOwnRoutingThreshold(t *testing.T) {
 	a := jevInput(t)
@@ -136,7 +136,7 @@ func TestJevChunksPreserveDiffAndMergeSelection(t *testing.T) {
 	out := routeJev(a, "secret", s.URL, s.Client(), 0)
 	testutil.Equal(t, out["available"], true)
 	probabilities := docs(out["probabilities"])
-	testutil.Equal(t, len(probabilities), len(parts)*7)
+	testutil.Equal(t, len(probabilities), len(parts)*8)
 	testutil.Equal(t, len(docs(out["qualities"])), 2)
 	testutil.Equal(t, docs(out["qualities"])[0]["quality"], "cost")
 	testutil.Contains(t, text(docs(out["qualities"])[1]["reason"]), "probability 0.9")
@@ -157,7 +157,7 @@ func TestJevChunksPreserveDiffAndMergeSelection(t *testing.T) {
 	}
 	testutil.Equal(t, reconstructed, patch)
 	for i, p := range probabilities {
-		testutil.Equal(t, p["chunk"], i/7)
+		testutil.Equal(t, p["chunk"], i/8)
 	}
 }
 func TestJevConcurrencyLimit(t *testing.T) {
@@ -191,7 +191,7 @@ func TestJevConcurrencyLimit(t *testing.T) {
 	out := routeJev(a, "secret", s.URL, s.Client(), 0)
 	testutil.Equal(t, out["available"], true)
 	testutil.Equal(t, peak.Load(), int32(jevConcurrency))
-	testutil.Equal(t, len(docs(out["probabilities"])), 20*7)
+	testutil.Equal(t, len(docs(out["probabilities"])), 20*8)
 }
 func TestJevFailuresAndRetries(t *testing.T) {
 	a := jevInput(t)
@@ -297,7 +297,7 @@ func TestJevMalformedAnswersAndPartialFailure(t *testing.T) {
 	out := routeJev(a, "secret", s.URL, s.Client(), 0)
 	testutil.Equal(t, out["available"], false)
 	testutil.Equal(t, out["qualities"], []doc{})
-	testutil.Equal(t, len(docs(out["probabilities"])), 7)
+	testutil.Equal(t, len(docs(out["probabilities"])), 8)
 }
 func TestJevCommandNoKeyAndSecretRedaction(t *testing.T) {
 	a := jevInput(t)

@@ -4,6 +4,7 @@ changes:
     launch_cost: true
     launch_data: true
     launch_readability: true
+    launch_document: true
     launch_scope: true
     launch_security: true
     launch_structure: true
@@ -22,7 +23,7 @@ checks:
 collect:
     blocking_count: 0
     findings_count: 0
-    judges_count: 9
+    judges_count: 10
 completion:
     checked_count: 1
     missing_count: 0
@@ -51,6 +52,7 @@ fixture:
         - judge-test
         - judge-scope
         - judge-readability
+        - judge-document
 judge-contract:
     criteria:
         - aspect: contract
@@ -120,6 +122,7 @@ launch:
     launch_cost: true
     launch_data: true
     launch_readability: true
+    launch_document: true
     launch_scope: true
     launch_security: true
     launch_structure: true
@@ -177,3 +180,10 @@ start:
     stage: start
     start: next
     stopped: false
+judge-document:
+    criteria:
+        - aspect: document
+          checked: Delivered documents
+          not_checked: ""
+          verdict: pass
+    findings: []

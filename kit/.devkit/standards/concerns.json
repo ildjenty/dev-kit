@@ -181,6 +181,25 @@
       "code": [
         "review/readability.md"
       ]
+    },
+    "document": {
+      "title": "Document",
+      "decides": "How delivered documents let their intended readers understand, decide and perform the described work.",
+      "routing": "changes to documents people read: READMEs, guides, specifications, design documents, diagrams, or user-facing text files",
+      "routing_threshold": 0.6,
+      "principles": [
+        "writing.md#2",
+        "writing.md#3",
+        "writing.md#4",
+        "writing.md#5",
+        "writing.md#6",
+        "writing.md#8",
+        "writing.md#9"
+      ],
+      "plan": [],
+      "code": [
+        "review/document.md"
+      ]
     }
   },
   "every_quality": [
@@ -210,14 +229,7 @@
     "judge:refine": [
       "review/wording.md",
       "review/purpose.md",
-      "writing.md#2",
-      "writing.md#3",
-      "writing.md#4",
-      "writing.md#5",
-      "writing.md#6",
-      "writing.md#7",
-      "writing.md#8",
-      "writing.md#9"
+      "writing.md#7"
     ],
     "judge:retro": [
       "review/harness.md",

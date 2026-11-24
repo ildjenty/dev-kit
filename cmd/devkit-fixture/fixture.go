@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +19,7 @@ type doc = map[string]any
 
 func Commands() []cli.Command {
 	return []cli.Command{
+		{Area: "fixture", Name: "github", Usage: "devkit-fixture github <args>", Run: fixtureGitHub},
 		{Area: "fixture", Name: "before", Usage: "devkit-fixture before <area> <subcommand> [args]", Run: before},
 		{Area: "fixture", Name: "after", Usage: "devkit-fixture after <area> <subcommand> [args]", Run: after},
 	}
@@ -167,39 +170,21 @@ func setup(workflow string, env cli.Env) error {
 	if err := os.WriteFile(filepath.Join(env.Cwd, "fixture.txt"), []byte("fixture result\n"), 0644); err != nil {
 		return err
 	}
-	if workflow == "requirements" && env.Getenv("INPUTS_UNIT") != "" || workflow == "pr" || workflow == "fix" && env.Getenv("INPUTS_REVIEW") != "" {
-		for path, body := range map[string]string{
-			".devkit/decisions/D-abcdef.md": "---\nid: D-abcdef\ntitle: Fixture constraint\nstatus: agreed\ndecided_by: owner\nrequest: refine/fixture\ndepends_on: []\nsupersedes: []\n---\nKeep the fixture result.\n",
-			".devkit/units/U-abcdef.md":     "---\nid: U-abcdef\ntitle: Fixture unit\ndecisions: [D-abcdef]\ndepends_on: []\n---\nUpdate fixture.txt.\n",
-		} {
-			file := filepath.Join(env.Cwd, path)
-			if err := os.MkdirAll(filepath.Dir(file), 0755); err != nil {
-				return err
-			}
-			if err := os.WriteFile(file, []byte(body), 0644); err != nil {
-				return err
-			}
-		}
-	}
-	if workflow == "requirements" && env.Getenv("INPUTS_UNIT") == "U-d00001" {
-		if err := os.WriteFile(filepath.Join(env.Cwd, ".devkit/units/U-d00001.md"), []byte("---\nid: U-d00001\ntitle: Done fixture unit\ndecisions: []\ndepends_on: []\n---\nDone work.\n"), 0644); err != nil {
-			return err
-		}
-		if err := save(filepath.Join(env.Cwd, ".devkit/units/U-d00001.done.json"), doc{"unit": "U-d00001", "branch": "fixture/done"}); err != nil {
-			return err
-		}
-	}
-	if workflow == "requirements" && env.Getenv("INPUTS_UNIT") == "U-d00002" {
-		if err := os.WriteFile(filepath.Join(env.Cwd, ".devkit/units/U-d00002.md"), []byte("---\nid: U-d00002\ntitle: Waiting fixture unit\ndecisions: []\ndepends_on: [U-abcdef]\n---\nFollow-up work.\n"), 0644); err != nil {
-			return err
-		}
-	}
 	if workflow == "refine" {
 		path := filepath.Join(env.Cwd, ".devkit/decisions/D-abcdef.md")
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 			return err
 		}
 		if err := os.WriteFile(path, []byte("---\nid: D-abcdef\ntitle: Fixture constraint\nstatus: agreed\ndecided_by: owner\nrequest: refine/fixture\ndepends_on: []\nsupersedes: []\n---\nKeep the fixture result.\n"), 0644); err != nil {
+			return err
+		}
+	}
+	if workflow != "refine" && workflow != "retro" {
+		path := filepath.Join(env.Cwd, ".devkit/decisions/D-abcdef.md")
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, []byte("invalid frontmatter\nDELIVERY_MUST_NOT_RECEIVE_THIS_LOG\n"), 0644); err != nil {
 			return err
 		}
 	}
@@ -257,7 +242,7 @@ func setup(workflow string, env cli.Env) error {
 		return err
 	}
 	if workflow == "pr" || workflow == "fix" && env.Getenv("INPUTS_REVIEW") != "" {
-		if _, err = record.Write(ctx, "request", doc{"owner_words": "", "supplement": "", "unit": "U-abcdef"}, ""); err != nil {
+		if _, err = record.Write(ctx, "request", doc{"owner_words": "", "supplement": "", "issue": 42}, ""); err != nil {
 			return err
 		}
 	}
@@ -348,9 +333,6 @@ func setup(workflow string, env cli.Env) error {
 		if err = save(filepath.Join(env.Cwd, ".devkit/backlog", record.EncodeURIComponent(ctx.Branch)+".json"), doc{"deferred": []doc{}, "carried": []doc{}, "mechanical": []doc{}, "accepted_objections": []doc{}}); err != nil {
 			return err
 		}
-		if err = save(filepath.Join(env.Cwd, ".devkit/units/U-abcdef.done.json"), doc{"unit": "U-abcdef", "branch": ctx.Branch}); err != nil {
-			return err
-		}
 		if err = run("add", "."); err != nil {
 			return err
 		}
@@ -371,6 +353,23 @@ func setup(workflow string, env cli.Env) error {
 func after(args []string, env cli.Env) error {
 	if err := guard(env); err != nil {
 		return err
+	}
+	if len(args) > 0 && args[0] != "refine" && args[0] != "retro" {
+		if err := filepath.WalkDir(env.Getenv("ARTIFACTS_DIR"), func(path string, entry fs.DirEntry, err error) error {
+			if err != nil || entry.IsDir() || filepath.Ext(path) != ".json" {
+				return err
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if bytes.Contains(data, []byte("DELIVERY_MUST_NOT_RECEIVE_THIS_LOG")) || bytes.Contains(data, []byte(`"agreed_decisions"`)) {
+				return fmt.Errorf("decision material reached delivery input: %s", path)
+			}
+			return nil
+		}); err != nil {
+			return err
+		}
 	}
 	if len(args) < 2 || args[1] != "finish" {
 		return nil
@@ -399,18 +398,21 @@ func after(args []string, env cli.Env) error {
 			expected = "back"
 		}
 	}
-	if args[0] == "requirements" && env.Getenv("INPUTS_UNIT") != "" {
+	if args[0] == "requirements" && env.Getenv("INPUTS_ISSUE") != "" {
 		input, err := read(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "requirements/input.json"))
 		if err != nil {
 			return err
 		}
-		unit, ok := input["unit"].(map[string]any)
-		if !ok || unit["id"] != env.Getenv("INPUTS_UNIT") {
-			return fmt.Errorf("unit input was not loaded: %v", input)
+		issue, ok := input["issue"].(map[string]any)
+		if !ok || fmt.Sprint(issue["number"]) != env.Getenv("INPUTS_ISSUE") {
+			return fmt.Errorf("issue input was not loaded: %v", input)
 		}
-		agreed, ok := input["agreed_decisions"].([]any)
-		if !ok || len(agreed) != 1 {
-			return fmt.Errorf("agreed constraints were not loaded: %v", input)
+		if _, exists := input["agreed_decisions"]; exists {
+			return fmt.Errorf("decision records reached delivery input")
+		}
+		parent, ok := input["parent_topic"].(map[string]any)
+		if !ok || parent["body"] != "Who can use the result?" {
+			return fmt.Errorf("parent topic text was not loaded: %v", input)
 		}
 	}
 	if args[0] == "refine" {

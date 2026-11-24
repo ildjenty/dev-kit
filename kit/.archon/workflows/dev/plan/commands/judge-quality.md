@@ -4,7 +4,7 @@ Judge one quality's decision rows and skeleton before function bodies are writte
 
 Read `$INPUTS.materials/$INPUTS.quality.json`. It contains `quality`, `language`, `criteria_folder`, `criteria`, `principles`, `every_quality`, `common`, `authority`, `requirements`, `owner_answers`, your `decisions` and `changes`, `skeleton` (`base`, `commit`, `diff`), `facts` for structure and `previous_findings`.
 
-Read the documents named by `criteria`, `common` and `authority`. Read the numbered sections in `principles` and `every_quality` using the document path before `#`. Rows with `ref` apply `agreed_decisions`: check their conformance without judging the agreed choice again. Apply Decisions in your quality's criteria to your rows and the skeleton, including choices of this quality absent from its rows. Verify author evidence claims against their sources. Use the fixed skeleton and supplied before/after facts for structure.
+Read the documents named by `criteria`, `common` and `authority`. Read the numbered sections in `principles` and `every_quality` using the document path before `#`. Apply Decisions in your quality's criteria to your rows and the skeleton, including choices of this quality absent from its rows. Verify author evidence claims against their sources. Use the fixed skeleton and supplied before/after facts for structure.
 
 The checkout is the skeleton under judgment. Compare its supplied diff and named evidence with
 what you read yourself. Judge only what rows, files, exports and signatures settle; do not report

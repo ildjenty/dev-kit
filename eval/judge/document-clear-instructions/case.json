@@ -1,0 +1,13 @@
+{
+  "description": "An export guide makes the existing download steps easier to follow without changing their meaning.",
+  "requirements": "Make the CSV export guide easier to follow for a new account owner. Keep the same steps and describe the downloaded result.",
+  "expected": [],
+  "not_expected": [
+    {
+      "id": "clear-export-needs-more-detail",
+      "quality": "document",
+      "file": "docs/export.md",
+      "summary": "The guide identifies its reader, names every control, and describes the CSV result. Requiring conversation history, a diagram, or implementation details is a false positive."
+    }
+  ]
+}

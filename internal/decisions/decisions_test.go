@@ -147,7 +147,7 @@ func TestIDsUseBranchAndKeyAndExtendCollisionsForEveryKind(t *testing.T) {
 	testutil.Equal(t, Citations("D-abcdef D-1234567 D-abcdef"), []string{"D-abcdef", "D-1234567"})
 }
 
-func TestTopicsReadCheckAndCLIOnlyListsOpenTopicsWithAgreedDependencies(t *testing.T) {
+func TestTopicsReadCheckAndPickableTopicsForRefine(t *testing.T) {
 	repo := testutil.Repo(t)
 	decision(t, repo, "D-abcdef", nil)
 	decision(t, repo, "D-bcdefa", Item{"status": "proposed"})
@@ -162,10 +162,7 @@ func TestTopicsReadCheckAndCLIOnlyListsOpenTopicsWithAgreedDependencies(t *testi
 	data := testutil.Must(List(repo))
 	testutil.Equal(t, len(data.Topics), 4)
 	testutil.Equal(t, Check(data), []string{})
-	var out, stderr bytes.Buffer
-	testutil.Equal(t, cli.New("test", Commands()).Execute([]string{"decisions", "topics"}, cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr}), 0)
-	var topics []Item
-	testutil.OK(t, json.Unmarshal(out.Bytes(), &topics))
+	topics := PickableTopics(data)
 	testutil.Equal(t, len(topics), 2)
 	testutil.Equal(t, topics[0]["id"], "T-aaaaaa")
 	testutil.Equal(t, topics[1]["id"], "T-dddddd")
@@ -188,39 +185,4 @@ func TestAffectedPropagatesThroughMultipleDecisionEdgesToDocumentsAndUnits(t *te
 	testutil.Equal(t, len(impact.Units), 1)
 	testutil.Equal(t, impact.Documents[0].Path, "docs/indirect.md")
 	testutil.Equal(t, impact.Units[0]["id"], "U-aaaaaa")
-}
-
-func TestUnitsListingAndReadinessAndMarkerChecks(t *testing.T) {
-	repo := testutil.Repo(t)
-	unit(t, repo, "U-a00001", []string{}, []string{})
-	unit(t, repo, "U-a00002", []string{}, []string{"U-a00001"})
-	unit(t, repo, "U-a00003", []string{}, []string{"U-a00001", "U-a00002"})
-	registry := cli.New("test", Commands())
-	var out, stderr bytes.Buffer
-	env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr}
-	testutil.Equal(t, registry.Execute([]string{"decisions", "units"}, env), 0)
-	testutil.Contains(t, out.String(), "U-a00001: Unit (open) [ready]")
-	if strings.Contains(out.String(), "U-a00002: Unit (open) [ready]") {
-		t.Fatal(out.String())
-	}
-	testutil.Put(t, repo, ".devkit/units/U-a00001.done.json", `{"unit":"U-a00001","branch":"feature/one"}`)
-	data := testutil.Must(List(repo))
-	testutil.Equal(t, Check(data), []string{})
-	expected := []Item{
-		{"id": "U-a00001", "title": "Unit", "depends_on": []string{}, "state": "done", "ready": false},
-		{"id": "U-a00002", "title": "Unit", "depends_on": []string{"U-a00001"}, "state": "open", "ready": true},
-		{"id": "U-a00003", "title": "Unit", "depends_on": []string{"U-a00001", "U-a00002"}, "state": "open", "ready": false},
-	}
-	testutil.Equal(t, Units(data), expected)
-	out.Reset()
-	testutil.Equal(t, registry.Execute([]string{"decisions", "units", "--json"}, env), 0)
-	testutil.Equal(t, out.String(), string(testutil.Must(json.Marshal(expected)))+"\n")
-	testutil.Put(t, repo, ".devkit/units/U-a00002.done.json", `{}`)
-	testutil.Put(t, repo, ".devkit/units/U-ffffff.done.json", `{"unit":"U-ffffff","branch":"feature/missing"}`)
-	problems := strings.Join(Check(testutil.Must(List(repo))), "\n")
-	testutil.Contains(t, problems, "U-a00002.done.json: invalid unit done marker")
-	testutil.Contains(t, problems, "unit U-ffffff does not exist")
-	out.Reset()
-	testutil.Equal(t, registry.Execute([]string{"decisions", "check"}, env), 1)
-	testutil.Contains(t, out.String(), "invalid unit done marker")
 }

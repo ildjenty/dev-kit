@@ -183,6 +183,25 @@ func (c Client) Read(number int) (Issue, error) {
 	return issue, nil
 }
 
+func (c Client) ReadyUnit(number int, label string) (Issue, error) {
+	issue, err := c.Read(number)
+	if err != nil {
+		return Issue{}, fmt.Errorf("issue #%d could not be read: %w", number, err)
+	}
+	if issue.State != "open" {
+		return Issue{}, fmt.Errorf("issue #%d is not open (%s)", number, issue.State)
+	}
+	if !slices.Contains(issue.Labels, label) {
+		return Issue{}, fmt.Errorf("issue #%d does not carry unit label %q", number, label)
+	}
+	for _, blocker := range issue.BlockedBy {
+		if blocker.State != "closed" {
+			return Issue{}, fmt.Errorf("issue #%d is blocked by issue #%d (%s)", number, blocker.Number, blocker.State)
+		}
+	}
+	return issue, nil
+}
+
 func (c Client) addRelation(number, related int, relation, field string) error {
 	path, err := endpoint(number)
 	if err != nil {

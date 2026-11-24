@@ -130,10 +130,6 @@
               "$ref": "common.json#/$defs/text"
             }
           },
-          "ref": {
-            "type": "string",
-            "pattern": "^D-[0-9a-f]{6,64}$"
-          },
           "nature": {
             "type": "object",
             "additionalProperties": false,
@@ -274,11 +270,6 @@
                 "quality": {
                   "const": "structure"
                 }
-              },
-              "not": {
-                "required": [
-                  "ref"
-                ]
               }
             },
             "then": {

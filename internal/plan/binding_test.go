@@ -192,7 +192,7 @@ func TestPlanFinishBindsPassToJudgedSkeleton(t *testing.T) {
 	}
 }
 
-func TestAgreeRowsCommitsOnlyGeneratedDecisions(t *testing.T) {
+func TestAgreeRowsPreservesCheckoutIndexAndHead(t *testing.T) {
 	for _, amend := range []bool{false, true} {
 		t.Run(fmt.Sprint(amend), func(t *testing.T) {
 			ctx, _ := repository(t, document{})
@@ -211,8 +211,8 @@ func TestAgreeRowsCommitsOnlyGeneratedDecisions(t *testing.T) {
 			testutil.Equal(t, testutil.Git(t, ctx.Cwd, "diff", base, commit, "--", "src"), "")
 			testutil.Equal(t, testutil.Git(t, ctx.Cwd, "diff", "--cached"), index)
 			testutil.Equal(t, testutil.Git(t, ctx.Cwd, "ls-files", "--others", "--exclude-standard"), "src/generated.ext")
-			testutil.Equal(t, len(must(decisions.List(ctx.Cwd)).Decisions), 1)
-			testutil.Contains(t, testutil.Git(t, ctx.Cwd, "ls-tree", "-r", "--name-only", commit), ".devkit/decisions/D-")
+			testutil.Equal(t, len(must(decisions.List(ctx.Cwd)).Decisions), 0)
+			testutil.Equal(t, commit, base)
 		})
 	}
 }

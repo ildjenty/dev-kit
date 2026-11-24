@@ -135,12 +135,12 @@ func TestF9ArchiveKeepsIgnoredAndSubstitutedBlobsAndRemovesStaleFiles(t *testing
 	testutil.Equal(t, os.IsNotExist(err), true)
 }
 
-func TestOnlyValidRequestUnitMarkerForThisBranchIsExcluded(t *testing.T) {
+func TestUnitMarkersAreOrdinaryJudgedChanges(t *testing.T) {
 	for _, tc := range []struct {
 		path, body string
 		excluded   bool
 	}{
-		{"U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/x"}`, true},
+		{"U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/x"}`, false},
 		{"U-abcdef.done.json", `{}`, false},
 		{"U-abcdef.done.json", `{"unit":"U-abcdef","branch":"other"}`, false},
 		{"U-abcdef.done.json", `{"unit":"U-fedcba","branch":"feature/x"}`, false},
@@ -174,16 +174,4 @@ func TestOnlyValidRequestUnitMarkerForThisBranchIsExcluded(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestUnitMarkerExclusionReadsWorkflowState(t *testing.T) {
-	repo, state := testutil.Repo(t), t.TempDir()
-	testutil.Put(t, state, "records/feature%2Fx/request/1.json", `{"unit":"U-abcdef"}`)
-	t.Setenv("STATE_DIR", state)
-	g := testutil.Must(New(repo, "main"))
-	before := testutil.Must(g.ChangeID("HEAD"))
-	testutil.Put(t, repo, ".devkit/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/x"}`)
-	testutil.Git(t, repo, "add", ".")
-	testutil.Git(t, repo, "commit", "-qm", "done marker")
-	testutil.Equal(t, testutil.Must(g.ChangeID("HEAD")), before)
 }

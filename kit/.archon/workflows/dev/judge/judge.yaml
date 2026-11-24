@@ -121,6 +121,8 @@ nodes:
         type: boolean
       launch_readability:
         type: boolean
+      launch_document:
+        type: boolean
     required:
     - proceed
     - changes_count
@@ -134,6 +136,7 @@ nodes:
     - launch_test
     - launch_scope
     - launch_readability
+    - launch_document
 - id: route
   depends_on: [changes]
   when: "$changes.output.proceed == true"
@@ -189,6 +192,8 @@ nodes:
         type: boolean
       launch_readability:
         type: boolean
+      launch_document:
+        type: boolean
     required:
     - proceed
     - changes_count
@@ -202,6 +207,7 @@ nodes:
     - launch_test
     - launch_scope
     - launch_readability
+    - launch_document
 - id: checks
   depends_on:
   - changes
@@ -473,6 +479,23 @@ nodes:
     quality: readability
   settingSources:
   - user
+- id: judge-document
+  depends_on:
+  - launch
+  when: "$changes.output.proceed == true && $launch.output.launch_document == true"
+  provider: claude
+  command: quality
+  context: fresh
+  mutates_checkout: false
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
+  output_format: *4
+  with:
+    quality: document
+  settingSources:
+  - user
 - id: collect
   depends_on:
   - launch
@@ -485,6 +508,7 @@ nodes:
   - judge-test
   - judge-scope
   - judge-readability
+  - judge-document
   trigger_rule: none_failed_min_one_success
   when: "$changes.output.proceed == true"
   bash: |
@@ -497,8 +521,9 @@ nodes:
     cost=$judge-cost.output
     test=$judge-test.output
     readability=$judge-readability.output
+    document=$judge-document.output
     scope=$judge-scope.output
-    CHANGES="$changes" JUDGE_STRUCTURE="$structure" JUDGE_DATA="$data" JUDGE_CONTRACT="$contract" JUDGE_SECURITY="$security" JUDGE_UI="$ui" JUDGE_COST="$cost" JUDGE_TEST="$test" JUDGE_READABILITY="$readability" JUDGE_SCOPE="$scope" devkit judge collect
+    CHANGES="$changes" JUDGE_STRUCTURE="$structure" JUDGE_DATA="$data" JUDGE_CONTRACT="$contract" JUDGE_SECURITY="$security" JUDGE_UI="$ui" JUDGE_COST="$cost" JUDGE_TEST="$test" JUDGE_READABILITY="$readability" JUDGE_DOCUMENT="$document" JUDGE_SCOPE="$scope" devkit judge collect
   output_format:
     type: object
     properties:

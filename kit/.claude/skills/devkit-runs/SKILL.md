@@ -65,7 +65,7 @@ Use a branch for each topic or work unit, and start workflows with `--branch <na
 
 - Unsettled request: `devkit-discuss` → `refine` one topic at a time → exact-version approval →
   publish and merge the refine pull request → for each settled work unit, on its own branch:
-  `requirements` (`unit=<id>`) → `plan` → `implement` → `judge` ⇄ `fix` → `pr`.
+  `requirements` (`issue=<n>`) → `plan` → `implement` → `judge` ⇄ `fix` → `pr`.
 - A settled request that needs the workflows: `requirements` → `plan` → `implement` → `judge` → `pr`.
   Once a request is in this flow it goes through `plan`; small requests are not put in it at all.
 - Review only, without requirements: `judge` produces a report only. If the change needs an owner
@@ -85,22 +85,20 @@ the command. Write each value to a file outside the checkout with your file-writ
 interpreted again by the shell. Never edit the text to make it fit a command.
 
 For refine, use a `refine/<name>` branch. One run settles one topic in decide and document phases,
-each with a three-round limit. Use `devkit decisions topics` to find open topics with agreed decision
-dependencies and pass the selected ID as `topic`; leave it empty for the initial request topic. Pass the owner's words verbatim as `owner_words`, your
+each with a three-round limit. Read the configured topic files and pass the selected file ID as `topic`; leave it empty for the initial request topic. Pass the owner's words verbatim as `owner_words`, your
 research separately as `supplement`, and the owner-confirmed discussion memo verbatim as `memo`.
 Do not add unsaid requirements to owner words. An Issue's body is owner words; related Issue/PR bodies,
 comments and researched facts belong in supplement so the read-only judges have the materials.
 
-Start a unit only after the refine pull request that created it has merged.
-Run `devkit decisions units` (or `--json`) in the base checkout, updated from the remote, to find open units marked ready,
-and start ready units. Read the selected unit's complete file from the configured units folder.
-PR records its done marker; the unit becomes done on the base branch when its pull request merges. Make a
-separate branch for the unit and pass its ID as requirements' `unit`, for example `--input unit=U-a1b2c3`.
-Prepare loads the unit and its agreed decisions as constraints. Use `owner_words` for direct requests.
+Run `devkit issues ready` (or `--json`) to find open unit and topic issues whose blockers are all closed.
+Read a selected issue with `devkit issues show <n>` and start a ready unit on its own branch with
+requirements' `issue`, for example `--input issue=42`. Prepare supplies its title and body and the
+parent topic's title and body as request data alongside owner words and supplement. Use `owner_words`
+for direct requests. The PR body ends with `Closes #42`; merging the PR closes the unit issue.
 Keep the branch and PR for later corrections unless the owner asks for another. After refine passes,
 publish its branch through the repository's PR process; refine itself only commits. Continue with the
-next pickable topic, using `devkit-discuss` when choices need discussion. Use `devkit decisions units`
-again after merging a unit PR to find units that are now ready.
+next topic, using `devkit-discuss` when choices need discussion. Run `devkit issues ready` again after
+merging a unit PR to find work whose blockers are now closed.
 
 ## Find and relay results
 
@@ -112,7 +110,7 @@ devkit status <branch>       # one branch
 devkit status --json         # the same, for reading fields
 ```
 
-For each branch it shows its unit ID from the request record, the last workflow and its outcome,
+For each branch it shows its issue number and URL from the request record, the last workflow and its outcome,
 the questions still unanswered (ID and full text), the unresolved items of a stop, the premise and observation of a `back`, and `next`: the
 workflow to start and the input it needs. Use it after a watched run ends, at the start of a session
 to pick up requests left open, and whenever the owner asks where things are. A run with
@@ -163,14 +161,6 @@ blocking findings require fix. PR returns its URL for the owner's merge decision
 For other `back` results, start the workflow named by `back.to`. Its prepare loads every valid,
 unconsumed premise and observation into `returned`; the writer addresses those first.
 
-When a start refuses because a cited decision was superseded on the base branch, tell the owner
-which old decision changed and which decisions supersede it. Run `sync` on the same branch, then
-start the named target (`requirements` or `plan`), before resuming delivery. The target receives the
-old and new decision text and the citing items in `returned`; later stages refuse until those
-citations are updated. The target and earlier stages can start. `devkit status` shows the same
-supersession and sync-then-target instruction. The check uses locally available remote base refs,
-falling back to the local base branch; it does not fetch, and reports a note if neither ref exists.
-
 For a `stop` with `stop.base_failed: true`, tell the owner that the named checks already fail on the
 base branch. Relay the failing checks and their log paths from `stop.unresolved`. Fix the base branch
 first, then start the same workflow again; `devkit record limit` classifies this as `retry_after_base`,
@@ -205,7 +195,7 @@ inline comments or the failure cause. Preserve the text verbatim with provenance
 
 - A comment that repairs the change within what was asked goes to `fix` on the same branch with
   the sourced text as `review` (`--input review=<text>`). A passing review fix needs `judge` again,
-  then `pr` updates the existing pull request. The backlog/done-marker commit does not invalidate
+  then `pr` updates the existing pull request. The backlog commit does not invalidate
   the judged change for this start.
 - A comment that changes or adds to what was asked goes to `requirements` on the same branch with
   the comment as `owner_words`, then the usual plan → implement → judge → pr flow. An item the fix
@@ -218,7 +208,7 @@ Pass review and owner text through files as described above. Never answer or res
 review comments on the reviewer's behalf. The owner decides whether to merge.
 
 After the merge, run `archon complete <branch>`: it removes the worktree and local branch and keeps
-the remote branch. From time to time, run `archon isolation cleanup --merged` for merged worktrees.
+the remote branch. Run `devkit issues ready` to find the next work. From time to time, run `archon isolation cleanup --merged` for merged worktrees.
 
 ## Watch runs
 

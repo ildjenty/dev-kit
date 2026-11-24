@@ -42,7 +42,7 @@ func TestStructureNatureSchemaAndPhaseCoverage(t *testing.T) {
 	delete(row, "nature")
 	testutil.Contains(t, strings.Join(must(draftErrors(d, condition(), "", "structure")), "\n"), "nature")
 	row["ref"] = "D-abcdef"
-	testutil.Equal(t, must(draftErrors(d, condition(), "", "structure")), []string{})
+	testutil.Contains(t, strings.Join(must(draftErrors(d, condition(), "", "structure")), "\n"), "ref")
 	delete(row, "ref")
 	row["nature"] = document{"kind": document{"value": "module", "evidence": "src/entry.ext"}, "reasons_for_change": "unknown", "volatility": "unknown", "callers": "unknown"}
 	testutil.Equal(t, must(draftErrors(d, condition(), "", "structure")), []string{})

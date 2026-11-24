@@ -12,7 +12,6 @@ import (
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/criteria"
-	"github.com/ildjenty/dev-kit/internal/decisions"
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
@@ -222,16 +221,6 @@ func prepare(ctx record.ContextData, artifacts, display string) (document, error
 	for _, q := range configured {
 		selectedMaterials[q] = mapping.Materials(filepath.Join(display, "criteria", source.Paths[0]), q, "plan")
 	}
-	data, err := decisions.List(ctx.Cwd)
-	if err != nil {
-		return nil, err
-	}
-	agreed := []document{}
-	for _, d := range data.Decisions {
-		if d["status"] == "agreed" {
-			agreed = append(agreed, d)
-		}
-	}
 	pending, err := record.PendingOwnerRows(ctx.Dir)
 	if err != nil {
 		return nil, err
@@ -240,7 +229,7 @@ func prepare(ctx record.ContextData, artifacts, display string) (document, error
 	if err != nil {
 		return nil, err
 	}
-	input := document{"returned": returned, "agreed_decisions": agreed, "pending_owner_rows": pending, "language": c.Language, "standards": source.Paths[0], "criteria_folder": filepath.Join(display, "criteria", source.Paths[0]), "qualities": configured, "quality_materials": selectedMaterials, "writer_materials": mapping.Materials(filepath.Join(display, "criteria", source.Paths[0]), "writer:plan", "plan"), "skeleton_check": c.SkeletonCheck, "requests": rs, "requirements": strip(requirements, "request", "run_id", "recorded_at"), "answers": answers, "previous": previous, "criteria": filepath.Join(display, "criteria")}
+	input := document{"returned": returned, "pending_owner_rows": pending, "language": c.Language, "standards": source.Paths[0], "criteria_folder": filepath.Join(display, "criteria", source.Paths[0]), "qualities": configured, "quality_materials": selectedMaterials, "writer_materials": mapping.Materials(filepath.Join(display, "criteria", source.Paths[0]), "writer:plan", "plan"), "skeleton_check": c.SkeletonCheck, "requests": rs, "requirements": strip(requirements, "request", "run_id", "recorded_at"), "answers": answers, "previous": previous, "criteria": filepath.Join(display, "criteria")}
 	if err = record.WritePlanDraftSchema(filepath.Join(artifacts, "plan")); err != nil {
 		return nil, err
 	}
@@ -321,7 +310,7 @@ func draftErrors(d, requirements document, commit string, phases ...string) ([]s
 }
 func materials(quality string, input, draft, skeleton, facts, changes document) document {
 	material := object(object(input["quality_materials"])[quality])
-	out := document{"quality": quality, "language": input["language"], "standards": input["standards"], "criteria_folder": input["criteria_folder"], "criteria": material["criteria"], "principles": material["principles"], "every_quality": material["every_quality"], "common": material["common"], "authority": material["authority"], "requirements": input["requirements"], "agreed_decisions": input["agreed_decisions"], "owner_answers": input["answers"], "skeleton": skeleton}
+	out := document{"quality": quality, "language": input["language"], "standards": input["standards"], "criteria_folder": input["criteria_folder"], "criteria": material["criteria"], "principles": material["principles"], "every_quality": material["every_quality"], "common": material["common"], "authority": material["authority"], "requirements": input["requirements"], "owner_answers": input["answers"], "skeleton": skeleton}
 	if quality == "delivery" {
 		for _, k := range []string{"decisions", "increments", "tests", "kept_behaviors"} {
 			out[k] = draft[k]

@@ -1,12 +1,13 @@
 ## Purpose
 
-Judge whether the requirements faithfully express the request, agreed decisions and owner answers. You did not write them; verify the texts and repository evidence yourself. The requirements loop and plan writers consume your judgment; approving an omission, invention or guessed answer changes all downstream work.
+Judge whether the requirements faithfully express the request, issue and parent topic text, and owner answers. You did not write them; verify the texts and repository evidence yourself. The requirements loop and plan writers consume your judgment; approving an omission, invention or guessed answer changes all downstream work.
 
 Read `$ARTIFACTS_DIR/requirements/input.json`, the requirements in `$write.output`, and the fixed
 documents named by `judge_materials`: `criteria`, `common`, `authority` and numbered
 `principles`/`every_quality` references (path before `#`). Apply `review/purpose.md` to the requests,
-selected `unit`, `agreed_decisions`, previous version and owner answers. Read repository evidence
-needed to compare the texts; supplied Issue/PR bodies and comments are in `supplement`.
+selected `issue`, `parent_topic`, previous version and owner answers. Read repository evidence
+needed to compare the texts. Treat issue and parent topic titles and bodies as request data alongside
+owner words and supplement. Related Issue/PR text supplied by the session is in `supplement`.
 
 Return the node's JSON shape, with exactly one `criteria` entry for each aspect `coverage`,
 `additions`, `open_points`, `decidable`. Each has `verdict` (`pass`, `fail`, `not_assessed`),

@@ -13,12 +13,11 @@ import (
 func TestFinishReplacesDocumentKeysWithoutChangingReservedFiles(t *testing.T) {
 	r := setup(t, doc{"standards": "docs/standards", "decisions": "docs/decisions", "units": "docs/units", "topics": "docs/topics"})
 	protected := map[string]string{
-		"docs/standards/example.md":     "N1 is a neutral example token.\r\n",
-		"docs/standards-extra.md":       "N1\n",
-		"docs/decisions/D-abcdef.md":    decisionText(doc{"id": "D-abcdef", "title": "Existing", "status": "agreed", "decided_by": "owner", "depends_on": []string{}, "supersedes": []string{}, "request": "previous", "body": "N1 is an example."}),
-		"docs/units/U-abcdef.md":        "---\nid: U-abcdef\ntitle: Finished\ndecisions: []\ndepends_on: []\n---\nCompleted N1 goal.\n",
-		"docs/units/U-abcdef.done.json": `{"unit":"U-abcdef","branch":"feature/done"}`,
-		"docs/topics/T-abcdef.md":       topicText(doc{"id": "T-abcdef", "title": "Existing topic", "status": "settled", "depends_on": []string{}, "body": "N1 is an example."}),
+		"docs/standards/example.md":  "N1 is a neutral example token.\r\n",
+		"docs/standards-extra.md":    "N1\n",
+		"docs/decisions/D-abcdef.md": decisionText(doc{"id": "D-abcdef", "title": "Existing", "status": "agreed", "decided_by": "owner", "depends_on": []string{}, "supersedes": []string{}, "request": "previous", "body": "N1 is an example."}),
+		"docs/units/U-abcdef.md":     "---\nid: U-abcdef\ntitle: Finished\ndecisions: []\ndepends_on: []\n---\nCompleted N1 goal.\n",
+		"docs/topics/T-abcdef.md":    topicText(doc{"id": "T-abcdef", "title": "Existing topic", "status": "settled", "depends_on": []string{}, "body": "N1 is an example."}),
 	}
 	for path, text := range protected {
 		r.put(path, text)

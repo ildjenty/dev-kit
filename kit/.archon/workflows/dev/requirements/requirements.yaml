@@ -7,13 +7,13 @@ description: |
   node checks the start conditions on the record of the request ($STATE_DIR/records/<branch>/) and records the
   owner's answers; the last writes the requirements, the judgment and the result there. Ends with pass, question
   (one question per open point, answered by starting this workflow again with the answers) or stop.
-  Inputs: unit (a unit ID, or empty for a direct request), owner_words (the owner's words of a new request; empty when only answering), supplement (what the
+  Inputs: issue (an issue number, or empty for a direct request), owner_words (the owner's words of a new request; empty when only answering), supplement (what the
   session added, kept apart), answers (a JSON array of {question_id, answer}, or empty), continue (the owner's
   words that let the branch start past the limit of restarts, or empty).
 inputs:
-  unit:
+  issue:
     default: ""
-    description: A unit ID from the configured units folder; its agreed decisions are constraints.
+    description: An open, ready GitHub Issue carrying the configured unit label.
   owner_words:
     default: ""
     description: The owner's words of the request, as written. Empty when the run only passes answers.

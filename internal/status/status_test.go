@@ -123,26 +123,6 @@ func TestCommandPrintsAndRejectsBadArguments(t *testing.T) {
 	testutil.Equal(t, cli.New("", Commands()).Execute([]string{"status", "a", "b"}, env) != 0, true)
 }
 
-func TestStatusShowsRequestUnitInTextAndJSON(t *testing.T) {
-	repo, state := testutil.Repo(t), t.TempDir()
-	dir := branch(t, filepath.Join(state, "records"), "feature/x")
-	run1(t, dir, "requirements", 1, map[string]any{"outcome": "pass"})
-	write(t, dir, "request", 1, map[string]any{"unit": "U-abcdef"})
-	write(t, dir, "request", 2, map[string]any{"unit": ""})
-	var out bytes.Buffer
-	env := cli.Env{Cwd: repo, Stdout: &out, LookupEnv: func(k string) (string, bool) {
-		if k == "STATE_DIR" {
-			return state, true
-		}
-		return "", false
-	}}
-	testutil.OK(t, run(nil, env))
-	testutil.Contains(t, out.String(), "unit: U-abcdef")
-	out.Reset()
-	testutil.OK(t, run([]string{"--json"}, env))
-	testutil.Contains(t, out.String(), `"unit":"U-abcdef"`)
-}
-
 func TestStatusReadsPullRequestStatesAndReportsNonfatalFailures(t *testing.T) {
 	for _, tc := range []struct {
 		name, response, next, state string
@@ -151,7 +131,7 @@ func TestStatusReadsPullRequestStatesAndReportsNonfatalFailures(t *testing.T) {
 		{"open", `{"state":"OPEN","url":"https://example.invalid/pr/1","reviewDecision":"APPROVED","statusCheckRollup":[]}`, "owner reviews", "open", false},
 		{"checks", `{"state":"OPEN","url":"https://example.invalid/pr/1","reviewDecision":"CHANGES_REQUESTED","statusCheckRollup":[{"name":"tests","conclusion":"FAILURE"},{"context":"legacy","state":"ERROR"},{"name":"ok","conclusion":"SUCCESS"},{"name":"pending","state":"PENDING"}]}`, "failing check's log", "open", false},
 		{"changes requested", `{"state":"OPEN","url":"https://example.invalid/pr/1","reviewDecision":"CHANGES_REQUESTED","statusCheckRollup":null}`, "review comments to fix", "open", false},
-		{"merged", `{"state":"MERGED","url":"https://example.invalid/pr/1","reviewDecision":"APPROVED","statusCheckRollup":[]}`, "archon complete feature/x", "merged", false},
+		{"merged", `{"state":"MERGED","url":"https://example.invalid/pr/1","reviewDecision":"APPROVED","statusCheckRollup":[]}`, "devkit issues ready", "merged", false},
 		{"closed", `{"state":"CLOSED","url":"https://example.invalid/pr/1","reviewDecision":"","statusCheckRollup":[]}`, "Closed without merging", "closed", false},
 		{"failed", "", "gh pr view failed", "", true},
 		{"malformed", "{broken", "could not read gh pr view", "", true},
@@ -247,53 +227,4 @@ func TestBaseFailureNextExplainsRepairAndUncountedRestartAtLimit(t *testing.T) {
 			t.Fatal(advice)
 		}
 	}
-}
-
-func TestStatusSupersessionUsesEachBranchAndConfiguredBase(t *testing.T) {
-	repo, state := testutil.Repo(t), t.TempDir()
-	testutil.Put(t, repo, ".archon/config.yaml", "worktree:\n  baseBranch: trunk\n")
-	testutil.Put(t, repo, ".devkit/decisions/D-abcdef.md", "---\nid: D-abcdef\ntitle: Old\nstatus: superseded\n---\nOld body\n")
-	testutil.Put(t, repo, ".devkit/decisions/D-fedcba.md", "---\nid: D-fedcba\ntitle: New\nstatus: agreed\nsupersedes: [D-abcdef]\n---\nNew body\n")
-	testutil.Git(t, repo, "add", ".")
-	testutil.Git(t, repo, "commit", "-qm", "decisions")
-	testutil.Git(t, repo, "branch", "trunk")
-	testutil.Git(t, repo, "branch", "feature/plan")
-	testutil.Put(t, repo, ".devkit/units/U-abcdef.md", "---\ndecisions: [D-abcdef]\n---\nUnit\n")
-	testutil.Git(t, repo, "add", ".")
-	testutil.Git(t, repo, "commit", "-qm", "branch unit")
-	testutil.Git(t, repo, "branch", "feature/unit")
-	testutil.Git(t, repo, "checkout", "-q", "feature/plan")
-	for _, name := range []string{"feature/unit", "feature/plan"} {
-		dir := branch(t, filepath.Join(state, "records"), name)
-		run1(t, dir, "implement", 1, map[string]any{"outcome": "pass"})
-		write(t, dir, "request", 1, map[string]any{"unit": "U-abcdef"})
-		write(t, dir, "plans", 1, map[string]any{"decisions": []any{map[string]any{"id": "P1", "ref": "D-abcdef"}}})
-	}
-	var out bytes.Buffer
-	values := map[string]string{"STATE_DIR": state}
-	env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &bytes.Buffer{}, Environ: os.Environ(), LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
-	registry := cli.New("", Commands())
-	testutil.Equal(t, registry.Execute([]string{"status"}, env), 0)
-	for _, text := range []string{"decision D-abcdef was superseded on trunk by D-fedcba", "Run sync on feature/unit, then start requirements", "Run sync on feature/plan, then start plan"} {
-		testutil.Contains(t, out.String(), text)
-	}
-	out.Reset()
-	testutil.Equal(t, registry.Execute([]string{"status", "--json"}, env), 0)
-	var parsed struct {
-		Branches []Branch `json:"branches"`
-	}
-	testutil.OK(t, json.Unmarshal(out.Bytes(), &parsed))
-	testutil.Equal(t, len(parsed.Branches), 2)
-	for _, b := range parsed.Branches {
-		target := "plan"
-		if b.Branch == "feature/unit" {
-			target = "requirements"
-		}
-		testutil.Equal(t, b.DecisionCheck.Target, target)
-		testutil.Equal(t, b.DecisionCheck.Superseded[0].SupersededBy, []string{"D-fedcba"})
-	}
-	values["BASE_BRANCH"] = "absent"
-	out.Reset()
-	testutil.Equal(t, registry.Execute([]string{"status"}, env), 0)
-	testutil.Contains(t, out.String(), "decision check skipped")
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
-	"github.com/ildjenty/dev-kit/internal/unitdone"
 	"gopkg.in/yaml.v3"
 )
 
@@ -23,11 +22,10 @@ type Document struct {
 	Decisions []string `json:"decisions"`
 }
 type Data struct {
-	Decisions    []Item     `json:"decisions"`
-	Units        []Item     `json:"units"`
-	Topics       []Item     `json:"topics,omitempty"`
-	Documents    []Document `json:"documents"`
-	MarkerErrors []string   `json:"-"`
+	Decisions []Item     `json:"decisions"`
+	Units     []Item     `json:"units"`
+	Topics    []Item     `json:"topics,omitempty"`
+	Documents []Document `json:"documents"`
 }
 
 func Citations(text string) []string {
@@ -161,41 +159,13 @@ func List(cwd string) (Data, error) {
 		return Data{}, err
 	}
 	for _, u := range data.Units {
-		done, err := unitdone.Exists(cwd, c.Units, text(u["id"]))
-		if err != nil {
-			return Data{}, err
-		}
 		u["state"] = "open"
-		if done {
-			u["state"] = "done"
-		}
-	}
-	paths, err := filepath.Glob(filepath.Join(cwd, c.Units, "*.done.json"))
-	if err != nil {
-		return Data{}, err
-	}
-	for _, path := range paths {
-		bytes, err := os.ReadFile(path)
-		if err != nil {
-			return Data{}, err
-		}
-		marker, err := unitdone.Parse(bytes)
-		id := strings.TrimSuffix(filepath.Base(path), ".done.json")
-		if err != nil || marker.Unit != id {
-			data.MarkerErrors = append(data.MarkerErrors, path+": invalid unit done marker")
-		}
-		if err == nil {
-			id = marker.Unit
-		}
-		if !slices.ContainsFunc(data.Units, func(u Item) bool { return u["id"] == id }) {
-			data.MarkerErrors = append(data.MarkerErrors, path+": unit "+id+" does not exist")
-		}
 	}
 	data.Topics, err = read(c.Topics, `^T-[0-9a-f]{6,64}\.md$`)
 	if err != nil {
 		return Data{}, err
 	}
-	paths, err = MarkdownFiles(filepath.Join(cwd, c.Docs))
+	paths, err := MarkdownFiles(filepath.Join(cwd, c.Docs))
 	if err != nil {
 		return Data{}, err
 	}
@@ -274,7 +244,7 @@ func GraphErrors(items []Item) []string {
 	return errors
 }
 func Check(data Data) []string {
-	errors := append([]string{}, data.MarkerErrors...)
+	errors := []string{}
 	ids := map[string]bool{}
 	decisions := map[string]bool{}
 	for _, d := range data.Decisions {
@@ -497,11 +467,8 @@ func NextID(kind, branch, key string, data Data) (string, error) {
 }
 func Commands() []cli.Command {
 	commands := []cli.Command{}
-	for _, name := range []string{"list", "check", "affected", "dependents", "next-id", "topics", "units"} {
+	for _, name := range []string{"list", "check", "affected", "dependents", "next-id"} {
 		usage := "devkit decisions " + name
-		if name == "units" {
-			usage += " [--json]"
-		}
 		if name == "dependents" {
 			usage += " <id>"
 		}
@@ -510,7 +477,7 @@ func Commands() []cli.Command {
 		}
 		commands = append(commands, cli.Command{Area: "decisions", Name: name, Usage: usage, Run: func(args []string, env cli.Env) error {
 			if name == "dependents" && len(args) == 0 || name == "next-id" && len(args) != 2 {
-				return &cli.ExitError{Code: 1, Message: "Usage: devkit decisions list | topics | units [--json] | check | affected | dependents <id> | next-id <decision|unit|topic> <draft-key>"}
+				return &cli.ExitError{Code: 1, Message: "Usage: devkit decisions list | check | affected | dependents <id> | next-id <decision|unit|topic> <draft-key>"}
 			}
 			data, err := List(env.Cwd)
 			if err != nil {
@@ -518,27 +485,6 @@ func Commands() []cli.Command {
 			}
 			var output any
 			switch name {
-			case "units":
-				if len(args) > 1 || len(args) == 1 && args[0] != "--json" {
-					return cli.Usage("devkit decisions units [--json]")
-				}
-				units := Units(data)
-				if len(args) == 1 {
-					return env.JSON(units)
-				}
-				for _, u := range units {
-					ready := ""
-					if u["ready"] == true {
-						ready = " [ready]"
-					}
-					deps, _ := list(u["depends_on"])
-					if _, err := fmt.Fprintf(env.Stdout, "%s: %s (%s)%s depends_on: %s\n", u["id"], u["title"], u["state"], ready, strings.Join(deps, ", ")); err != nil {
-						return err
-					}
-				}
-				return nil
-			case "topics":
-				output = PickableTopics(data)
 			case "list":
 				output = data
 			case "check":
@@ -571,8 +517,8 @@ func Commands() []cli.Command {
 			return env.JSON(output)
 		}})
 	}
-	commands = append(commands, cli.Command{Area: "decisions", Usage: "devkit decisions list | topics | units [--json] | check | affected | dependents <id> | next-id <decision|unit|topic> <draft-key>", Run: func(args []string, env cli.Env) error {
-		return &cli.ExitError{Code: 1, Message: "Usage: devkit decisions list | topics | units [--json] | check | affected | dependents <id> | next-id <decision|unit|topic> <draft-key>"}
+	commands = append(commands, cli.Command{Area: "decisions", Usage: "devkit decisions list | check | affected | dependents <id> | next-id <decision|unit|topic> <draft-key>", Run: func(args []string, env cli.Env) error {
+		return &cli.ExitError{Code: 1, Message: "Usage: devkit decisions list | check | affected | dependents <id> | next-id <decision|unit|topic> <draft-key>"}
 	}})
 	return commands
 }
