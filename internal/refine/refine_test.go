@@ -95,7 +95,7 @@ func (r *fixture) begin(input ...string) doc {
 	if len(input) > 2 {
 		memo = input[2]
 	}
-	return testutil.Must(prepare(r.ctx, r.artifacts, owner, supplement, memo))
+	return testutil.Must(prepare(r.ctx, envVars(nil), r.artifacts, owner, supplement, memo))
 }
 func (r *fixture) writeDraft(ds ...doc) {
 	r.t.Helper()
@@ -185,7 +185,7 @@ func TestPrepareSeparatesRequestsIncludesMemoAllDecisionsFoldersAndPinnedCriteri
 	testutil.Equal(t, request["owner_words"], "Owner words")
 	testutil.Equal(t, request["supplement"], "Session candidate")
 	testutil.Equal(t, input["memo"], "Confirmed discussion")
-	testutil.Equal(t, items(input["decisions"])[0]["body"], "Existing decision body")
+	testutil.Equal(t, items(input["relevant_decisions"])[0]["body"], "Existing decision body")
 	testutil.Equal(t, input["language"], "en")
 	testutil.Equal(t, obj(input["folders"])["docs"], "notes")
 	if !strings.HasSuffix(str(input["criteria"]), "/standards") {
@@ -219,7 +219,7 @@ func TestOpenPointsRecordOneQuestionEachPreserveDraftDocumentsAndAllowCleanAnswe
 	testutil.OK(t, e)
 	testutil.Equal(t, s.Stopped, false)
 	nextArtifacts := filepath.Join(r.root, "next")
-	testutil.Must(prepare(r.ctx, nextArtifacts, "", "", ""))
+	testutil.Must(prepare(r.ctx, envVars(nil), nextArtifacts, "", "", ""))
 	next := testutil.Must(readJSON(file(nextArtifacts, "input.json")))
 	testutil.Equal(t, items(next["answers"])[0]["question"], "How many employees?")
 	testutil.Equal(t, next["memo"], "Confirmed memo")
@@ -433,7 +433,7 @@ func TestApprovalRefusesChangedHEADAndCorrectionsReuseProposedIDsWithoutEditingA
 	testutil.OK(t, e)
 	testutil.Equal(t, s.Stopped, false)
 	r.artifacts = filepath.Join(r.root, "correction")
-	testutil.Must(prepare(r.ctx, r.artifacts, "", "", ""))
+	testutil.Must(prepare(r.ctx, envVars(nil), r.artifacts, "", "", ""))
 	d := draft()
 	items(d["decisions"])[0]["title"] = "Corrected staff scope"
 	if len(array(d["open_points"])) == 0 {
@@ -556,7 +556,7 @@ func TestPrepareRejectsInvalidFixedConcernMap(t *testing.T) {
 	s, err := start(r.ctx, envVars(nil))
 	testutil.OK(t, err)
 	testutil.Equal(t, s.Stopped, false)
-	_, err = prepare(r.ctx, r.artifacts, "A request", "", "")
+	_, err = prepare(r.ctx, envVars(nil), r.artifacts, "A request", "", "")
 	testutil.Fails(t, err, "missing quality: scope")
 }
 

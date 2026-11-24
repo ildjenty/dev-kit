@@ -194,6 +194,15 @@ func setup(workflow string, env cli.Env) error {
 			return err
 		}
 	}
+	if workflow == "refine" {
+		path := filepath.Join(env.Cwd, ".devkit/decisions/D-abcdef.md")
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(path, []byte("---\nid: D-abcdef\ntitle: Fixture constraint\nstatus: agreed\ndecided_by: owner\nrequest: refine/fixture\ndepends_on: []\nsupersedes: []\n---\nKeep the fixture result.\n"), 0644); err != nil {
+			return err
+		}
+	}
 	if workflow == "retro" {
 		data, err := os.ReadFile(filepath.Join(env.Cwd, ".archon/workflows/dev/retro/fixtures/executed/backlog.json"))
 		if err != nil {
@@ -402,6 +411,32 @@ func after(args []string, env cli.Env) error {
 		agreed, ok := input["agreed_decisions"].([]any)
 		if !ok || len(agreed) != 1 {
 			return fmt.Errorf("agreed constraints were not loaded: %v", input)
+		}
+	}
+	if args[0] == "refine" {
+		input, err := read(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "refine/input.json"))
+		if err != nil {
+			return err
+		}
+		index, ok := input["decisions"].([]any)
+		relevant, relevantOK := input["relevant_decisions"].([]any)
+		if !ok || len(index) != 1 || !relevantOK || len(relevant) != 0 {
+			return fmt.Errorf("unexpected refine relevance input: %v", input)
+		}
+		entry, ok := index[0].(map[string]any)
+		if !ok || len(entry) != 6 || entry["id"] != "D-abcdef" {
+			return fmt.Errorf("unexpected refine decision index: %v", index)
+		}
+		relevance, err := read(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "refine/relevance.json"))
+		if err != nil {
+			return err
+		}
+		settings, err := config.Load(env.Cwd)
+		if err != nil {
+			return err
+		}
+		if relevance["source"] != settings.Provider {
+			return fmt.Errorf("refine did not use configured relevance fallback: %v", relevance)
 		}
 	}
 	head, err := gitx.Run(env.Cwd, "rev-parse", "HEAD")

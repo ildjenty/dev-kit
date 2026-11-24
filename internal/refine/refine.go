@@ -312,7 +312,7 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 		return g.ChangeID("HEAD")
 	}, Answers: answers, Continuation: env.Getenv("INPUTS_CONTINUE"), Limit: &c.Limits.Restarts, WorkflowsChanged: lines(workflows), WorktreeChanged: lines(worktree)})
 }
-func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, memo string, topicID ...string) (doc, error) {
+func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplement, memo string, topicID ...string) (doc, error) {
 	displayArtifacts := artifacts
 	artifacts = resolve(ctx.Cwd, artifacts)
 	c, e := config.Load(ctx.Cwd)
@@ -416,7 +416,14 @@ func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, memo str
 	if pending != nil && obj(obj(pending["content"])["topic"])["id"] != topic["id"] {
 		pending = nil
 	}
-	input := doc{"pending_proposal": pending, "previous_unapproved": pending != nil, "topic": topic, "topics": data.Topics, "requests": rs, "memo": memo, "answers": as, "previous": previous, "decisions": data.Decisions, "units": data.Units, "documents": data.Documents, "affected": decisions.Affected(data), "language": c.Language, "criteria": filepath.Join(displayArtifacts, "criteria", c.Standards), "folders": doc{"docs": c.Docs, "decisions": c.Decisions, "units": c.Units, "topics": c.Topics, "standards": c.Standards}, "next_proposal_version": num(previous["version"]) + 1, "judge_materials": mapping.Materials(filepath.Join(displayArtifacts, "criteria", c.Standards), "judge:refine", "plan"), "writer_materials": mapping.Materials(filepath.Join(displayArtifacts, "criteria", c.Standards), "writer:refine", "plan")}
+	affected := decisions.Affected(data)
+	affected.Decisions = decisionIndex(affected.Decisions)
+	input := doc{"pending_proposal": pending, "previous_unapproved": pending != nil, "topic": topic, "topics": data.Topics, "requests": rs, "memo": memo, "answers": as, "previous": previous, "decisions": decisionIndex(data.Decisions), "units": data.Units, "documents": data.Documents, "affected": affected, "language": c.Language, "criteria": filepath.Join(displayArtifacts, "criteria", c.Standards), "folders": doc{"docs": c.Docs, "decisions": c.Decisions, "units": c.Units, "topics": c.Topics, "standards": c.Standards}, "next_proposal_version": num(previous["version"]) + 1, "judge_materials": mapping.Materials(filepath.Join(displayArtifacts, "criteria", c.Standards), "judge:refine", "plan"), "writer_materials": mapping.Materials(filepath.Join(displayArtifacts, "criteria", c.Standards), "writer:refine", "plan")}
+	relevant, e := relevance(env, ctx.Cwd, artifacts, input, data, c)
+	if e != nil {
+		return nil, e
+	}
+	input["relevant_decisions"] = relevant
 	for _, name := range []string{"draft", "judgment"} {
 		b, err := schemas.ReadFile("schemas/" + name + ".schema.json")
 		if err != nil {
@@ -437,7 +444,7 @@ func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, memo str
 	if e != nil {
 		return nil, e
 	}
-	if e = writeJSON(file(artifacts, "baseline.json"), doc{"commit": head, "docs": docs}); e != nil {
+	if e = writeJSON(file(artifacts, "baseline.json"), doc{"commit": head, "docs": docs, "decisions_hash": decisionHash(data.Decisions)}); e != nil {
 		return nil, e
 	}
 	return doc{"input": file(displayArtifacts, "input.json"), "criteria": input["criteria"]}, nil
@@ -472,7 +479,7 @@ func draftErrors(ctx record.ContextData, artifacts string, value any, phases ...
 	if e != nil {
 		return nil, e
 	}
-	existing := items(input["decisions"])
+	existing := data.Decisions
 	newIDs := []string{}
 	known := []string{}
 	for _, d := range existing {
@@ -638,7 +645,7 @@ func draftErrors(ctx record.ContextData, artifacts string, value any, phases ...
 	for _, pair := range []struct {
 		kind          string
 		before, after any
-	}{{"decision", input["decisions"], data.Decisions}, {"unit", input["units"], data.Units}} {
+	}{{"decision", baseline["decisions_hash"], decisionHash(data.Decisions)}, {"unit", input["units"], data.Units}} {
 		b, _ := json.Marshal(pair.before)
 		a, _ := json.Marshal(pair.after)
 		if string(b) != string(a) {
@@ -769,7 +776,7 @@ func draftErrors(ctx record.ContextData, artifacts string, value any, phases ...
 			}
 		}
 	}
-	errors = append(errors, topicErrors(input, draft)...)
+	errors = append(errors, topicErrors(input, draft, data.Decisions)...)
 	errors = append(errors, phaseErrors(ctx, artifacts, phase, draft, input)...)
 	return errors, nil
 }
@@ -1481,7 +1488,7 @@ func Commands() []cli.Command {
 				}
 				switch mode {
 				case "prepare":
-					out, e = prepare(ctx, artifacts, env.Getenv("INPUTS_OWNER_WORDS"), env.Getenv("INPUTS_SUPPLEMENT"), env.Getenv("INPUTS_MEMO"), env.Getenv("INPUTS_TOPIC"))
+					out, e = prepare(ctx, env, artifacts, env.Getenv("INPUTS_OWNER_WORDS"), env.Getenv("INPUTS_SUPPLEMENT"), env.Getenv("INPUTS_MEMO"), env.Getenv("INPUTS_TOPIC"))
 				case "check":
 					out, e = check(ctx, artifacts, env.Getenv("INPUTS_PHASE"))
 				case "round":

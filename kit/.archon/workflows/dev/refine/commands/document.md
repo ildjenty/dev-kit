@@ -12,6 +12,10 @@ common rules, authority and numbered principles). Read documents, units and affe
 Read `$ARTIFACTS_DIR/refine/document/rounds/latest.json` when present for corrections.
 Write owner-facing text in the input's `language`.
 
+Read `relevant_decisions` in full. The `decisions` field is the index of every decision.
+Read any other decision file by its indexed `path` when its title suggests it matters.
+Any decision the draft supersedes, depends on or cites must be read in full.
+
 ## Writes
 
 Update ordinary prose only under `folders.docs`, citing the settled decision IDs or `N1`, `N2`, ...

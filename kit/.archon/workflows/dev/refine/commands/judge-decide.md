@@ -7,7 +7,10 @@ Judge the selected topic's decision proposal independently. You did not write it
 Judge the topic's decisions independently. Read `$ARTIFACTS_DIR/refine/input.json`,
 `$ARTIFACTS_DIR/refine/draft.json`, `$ARTIFACTS_DIR/refine/check.json` and the input's
 `judge_materials`: named criteria, common rules, authority and numbered principles.
-Read all agreed decisions in full. Use Read, Grep and Glob to verify evidence.
+Use Read, Grep and Glob to verify evidence.
+Read `relevant_decisions` in full. The `decisions` field is the index of every decision.
+Read any other decision file by its indexed `path` when its title suggests it matters.
+Any decision the draft supersedes, depends on or cites must be read in full.
 The machine owns schema, dependency, reference and checkout-scope checks.
 
 Apply `review/purpose.md` Topic proposals. Return exactly one criterion for each aspect

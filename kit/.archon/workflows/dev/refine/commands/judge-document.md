@@ -9,6 +9,9 @@ Judge the documents independently. Read `$ARTIFACTS_DIR/refine/input.json`,
 `$ARTIFACTS_DIR/refine/check.json`, `$ARTIFACTS_DIR/refine/approval.txt`, the edited documents,
 and the input's `judge_materials`: named criteria, common rules, authority and numbered principles.
 Read the affected documents and units, including reasons for keeping them.
+Read `relevant_decisions` in full. The `decisions` field is the index of every decision.
+Read any other decision file by its indexed `path` when its title suggests it matters.
+Any decision the draft supersedes, depends on or cites must be read in full.
 The machine owns reference, frozen-decision, unit-area and checkout-scope checks. The reflect step owns decision reflection.
 
 Apply the named wording criteria to documents and approval text. Return exactly one

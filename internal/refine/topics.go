@@ -46,9 +46,8 @@ func topicText(topic doc) string {
 	return recordText(topic, []string{"id", "title", "status", "depends_on"}, str(topic["body"]))
 }
 
-func topicErrors(input, draft doc) []string {
+func topicErrors(input, draft doc, known []doc) []string {
 	errors := []string{}
-	known := items(input["decisions"])
 	graph := append([]doc{}, known...)
 	for _, d := range items(draft["decisions"]) {
 		d = clone(d)

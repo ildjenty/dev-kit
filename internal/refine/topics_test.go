@@ -19,7 +19,7 @@ func (r *fixture) restart(out doc) {
 	started := testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_ANSWERS": string(testutil.Must(json.Marshal(answers)))})))
 	testutil.Equal(r.t, started.Stopped, false)
 	r.artifacts = filepath.Join(r.root, r.ctx.RunID)
-	testutil.Must(prepare(r.ctx, r.artifacts, "", "", ""))
+	testutil.Must(prepare(r.ctx, envVars(nil), r.artifacts, "", "", ""))
 }
 
 func TestApprovalRequiresSuccessfulStartAndItsRecordedAnswerBeforeAnyWrite(t *testing.T) {
@@ -130,7 +130,7 @@ func TestTopicDependencyGateAndApprovalSettlesOnlySelectedTopic(t *testing.T) {
 	r.put(".devkit/topics/T-bcdefa.md", topicText(doc{"id": "T-bcdefa", "title": "Another area", "status": "open", "depends_on": []string{"D-000001"}, "body": "Which reporting channel? Name it."}))
 	r.commit()
 	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_TOPIC": "T-abcdef"}))).Stopped, false)
-	prepared := testutil.Must(prepare(r.ctx, r.artifacts, "", "", "", "T-abcdef"))
+	prepared := testutil.Must(prepare(r.ctx, envVars(nil), r.artifacts, "", "", "", "T-abcdef"))
 	input := testutil.Must(readJSON(str(prepared["input"])))
 	testutil.Equal(t, obj(input["topic"])["id"], "T-abcdef")
 	d := draft()
@@ -308,7 +308,7 @@ func TestApprovedOpenTopicsRemainAreaConstraintsOnTheNextRun(t *testing.T) {
 	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(nil))).Stopped, true)
 	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_TOPIC": str(mapping["TN1"])}))).Stopped, false)
 	r.artifacts = filepath.Join(r.root, "next-topic")
-	testutil.Must(prepare(r.ctx, r.artifacts, "", "", "", str(mapping["TN1"])))
+	testutil.Must(prepare(r.ctx, envVars(nil), r.artifacts, "", "", "", str(mapping["TN1"])))
 	next := draft()
 	items(next["decisions"])[0]["depends_on"] = []string{str(mapping["N1"])}
 	r.writeDraft(next)
@@ -349,7 +349,7 @@ func TestStoppedReproposalKeepsOwnershipOfUnapprovedFiles(t *testing.T) {
 	r.ctx.RunID = "retry-stopped"
 	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(nil))).Stopped, false)
 	r.artifacts = filepath.Join(r.root, "retry-stopped")
-	testutil.Must(prepare(r.ctx, r.artifacts, "", "", ""))
+	testutil.Must(prepare(r.ctx, envVars(nil), r.artifacts, "", "", ""))
 	r.writeDraft()
 	r.artifact("approval.txt", "N1 UN1 approve=3 or answers")
 	r.round(judgment())

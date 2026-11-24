@@ -51,6 +51,10 @@ case "$prompt" in
     test "$PWD" = "$tree"
     printf '{"qualities":[]}' > "$9"
     ;;
+  *"$ARTIFACTS_DIR/refine/relevance-input.json"*)
+    test -s "$ARTIFACTS_DIR/refine/relevance-input.json"
+    printf '{"relevant_ids":[]}' > "$9"
+    ;;
   *"$ARTIFACTS_DIR/refine/reflect-input.json"*)
     test -s "$ARTIFACTS_DIR/refine/reflect-input.json"
     printf '{"not_reflected":[]}' > "$9"
@@ -80,6 +84,10 @@ case "$prompt" in
     test "${12}" = --add-dir
     test "${13}" = "$tree"
     answer='{"qualities":[]}'
+    ;;
+  *"$ARTIFACTS_DIR/refine/relevance-input.json"*)
+    test -s "$ARTIFACTS_DIR/refine/relevance-input.json"
+    answer='{"relevant_ids":[]}'
     ;;
   *"$ARTIFACTS_DIR/refine/reflect-input.json"*)
     test -s "$ARTIFACTS_DIR/refine/reflect-input.json"
