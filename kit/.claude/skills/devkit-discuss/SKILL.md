@@ -15,6 +15,13 @@ not finish it. If the owner makes an unrelated request, handle it, then resume t
 it was, restating the current memo. Preserve the memo and pending handoff when the conversation is
 summarised; do not treat an interruption or summarisation as completion.
 
+The aim is not to settle everything before anything becomes an Issue. Ask only what the next unit of
+work needs: a goal and completion conditions someone can observe. Put every other question into the
+memo as still open instead of asking it now; open points become topic issues and are discussed later.
+As soon as one area is settled enough to cut at least one unit, propose handing the settled part to
+refine now, saying that the open points will remain as topic issues. Propose the same when a few
+questions in a row settle nothing new. Do not wait for the owner to declare the discussion finished.
+
 Let the owner lead the conversation. Start with open questions about their situation, difficulty and
 intention. Ask one useful question at a time; do not begin by forcing a list of solutions. Restate what
 you heard and ask the owner to confirm it. Surface contradictions and uncertain assumptions explicitly.

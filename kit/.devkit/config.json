@@ -8,10 +8,8 @@
     "devkit-optimize": "devkit-optimize"
   },
   "standards": ".devkit/standards",
-  "docs": "docs",
   "eval": ".devkit/eval",
   "decisions": ".devkit/decisions",
-  "units": ".devkit/units",
   "issues": {
     "labels": {
       "unit": "devkit:unit",
@@ -249,6 +247,5 @@
     "restarts": 3,
     "fixes": 3,
     "passes": 3
-  },
-  "topics": ".devkit/topics"
+  }
 }
