@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
@@ -58,6 +59,18 @@ func TestRouteUnionsPathsPlanRowsAndInferredQualitiesWithFiles(t *testing.T) {
 	testutil.OK(t, save(filepath.Join(a, "judge/plan.json"), doc{"decisions": []doc{row("data", "unusual")}}))
 	routed := doc{"qualities": []doc{{"quality": "security", "file": "unusual/source", "reason": "Access check changed"}, {"quality": "readability", "file": "unusual/source", "reason": "Source changed"}}}
 	result := must(routeChanges(repo, a, routed))
+	assertLaunched := func(result doc, want []string) {
+		t.Helper()
+		manifest := must(read(filepath.Join(a, "judge/launched.json")))
+		testutil.Equal(t, len(manifest), 1)
+		launched := stringsOf(manifest["launched"])
+		testutil.Equal(t, launched, want)
+		for _, q := range qualities() {
+			testutil.Equal(t, truth(result["launch_"+q]), slices.Contains(launched, q))
+		}
+	}
+	selected := []string{"data", "security", "test", "scope", "readability"}
+	assertLaunched(result, selected)
 	for _, q := range []string{"security", "test", "readability", "scope", "data"} {
 		testutil.Equal(t, result["launch_"+q], true)
 	}
@@ -65,11 +78,15 @@ func TestRouteUnionsPathsPlanRowsAndInferredQualitiesWithFiles(t *testing.T) {
 	testutil.Equal(t, docs(m["files"])[0]["path"], "unusual/source")
 	testutil.Equal(t, len(docs(m["routes"])), 1)
 	testutil.Equal(t, must(read(filepath.Join(a, "judge/route.json"))), routed)
-	for _, source := range []string{"jev", "codex", "all"} {
+	for _, source := range []string{"jev", "claude", "codex", "all"} {
 		routed["source"] = source
 		values := map[string]string{"ARTIFACTS_DIR": a, "ROUTE": string(must(json.Marshal(routed)))}
-		env := cli.Env{Cwd: repo, Stdout: &bytes.Buffer{}, LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
+		var output bytes.Buffer
+		env := cli.Env{Cwd: repo, Stdout: &output, LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
 		testutil.OK(t, cli.New("", Commands()).Run([]string{"judge", "launch"}, env))
+		var launch doc
+		testutil.OK(t, json.Unmarshal(output.Bytes(), &launch))
+		assertLaunched(launch, selected)
 		testutil.Equal(t, must(read(filepath.Join(a, "judge/route.json"))), routed)
 	}
 	var routedOutput bytes.Buffer
@@ -81,9 +98,21 @@ func TestRouteUnionsPathsPlanRowsAndInferredQualitiesWithFiles(t *testing.T) {
 	testutil.Equal(t, conservative["source"], "all")
 	result = must(routeChanges(repo, a, conservative))
 	mapping := must(concerns.Load(filepath.Join(a, "criteria/.devkit/standards")))
+	assertLaunched(result, mapping.Judged("code"))
 	for _, q := range mapping.Judged("code") {
 		testutil.Equal(t, result["launch_"+q], true)
 	}
+	result = must(routeChanges(repo, a, doc{"qualities": []doc{}}))
+	assertLaunched(result, []string{"data", "scope"})
+	testutil.OK(t, save(filepath.Join(a, "judge/plan.json"), doc{"decisions": []doc{}}))
+	result = must(routeChanges(repo, a, doc{"qualities": []doc{}}))
+	assertLaunched(result, []string{"scope"})
+	testutil.Put(t, repo, ".devkit/config.json", `{"qualities":{"ui":{"paths":["unusual/**"]}}}`)
+	result = must(routeChanges(repo, a, doc{"qualities": []doc{}}))
+	assertLaunched(result, []string{"ui", "scope"})
+	testutil.Put(t, repo, ".devkit/config.json", `{"qualities":{"test":{"paths":["unusual/**"]}}}`)
+	result = must(routeChanges(repo, a, doc{"qualities": []doc{}}))
+	assertLaunched(result, []string{"test", "scope", "readability"})
 	for _, item := range []doc{{"quality": "imaginary", "file": "unusual/source", "reason": "Reason"}, {"quality": "delivery", "file": "unusual/source", "reason": "Plan-only quality"}, {"quality": "security", "file": "unchanged", "reason": "Reason"}, {"quality": "security", "file": "unusual/source", "reason": ""}} {
 		_, err := routeChanges(repo, a, doc{"qualities": []doc{item}})
 		if err == nil {

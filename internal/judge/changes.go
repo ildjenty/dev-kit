@@ -361,6 +361,15 @@ func routeChanges(root, artifacts string, routed doc) (doc, error) {
 	if err = save(filepath.Join(dir, "route.json"), routed); err != nil {
 		return nil, err
 	}
+	launched := []string{}
+	for _, q := range mapping.Judged("code") {
+		if truth(launch["launch_"+q]) {
+			launched = append(launched, q)
+		}
+	}
+	if err = save(filepath.Join(dir, "launched.json"), doc{"launched": launched}); err != nil {
+		return nil, err
+	}
 	delete(launch, "decisions")
 	delete(launch, "unlisted")
 	return launch, nil

@@ -234,6 +234,11 @@ func TestEvalWithFakeProviders(t *testing.T) {
 					_, err := os.Stat(filepath.Join(result.Cases[0].Artifacts, "judge", name))
 					testutil.OK(t, err)
 				}
+				var launched struct {
+					Launched []string `json:"launched"`
+				}
+				testutil.OK(t, json.Unmarshal(testutil.Must(os.ReadFile(filepath.Join(result.Cases[0].Artifacts, "judge/launched.json"))), &launched))
+				testutil.Equal(t, launched.Launched, result.Cases[0].LaunchedQualities)
 				testutil.Equal(t, testutil.Git(t, root, "rev-list", "--count", "HEAD"), "2")
 			})
 		}
@@ -434,6 +439,7 @@ func TestEvalCLIHelper(t *testing.T) {
 			answer = document{"qualities": []document{{"quality": "contract", "file": "src/change.py", "reason": "Changed response"}, {"quality": "test", "file": "src/change.py", "reason": "Source code"}, {"quality": "readability", "file": "src/change.py", "reason": "Source code"}}}
 		} else {
 			kind = os.Getenv("QUALITY")
+			testutil.Equal(t, readDoc("judge/launched.json"), document{"launched": []any{"contract", "test", "scope", "readability"}})
 			testutil.Contains(t, prompt, "Installed quality prompt marker.")
 			testutil.Contains(t, prompt, filepath.Join(artifacts, "judge/materials/"+kind+".json"))
 			if schema["properties"].(map[string]any)["eval_probe"] == nil {

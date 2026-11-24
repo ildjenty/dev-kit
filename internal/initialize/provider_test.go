@@ -24,6 +24,19 @@ func TestProviderRenderingAndSessions(t *testing.T) {
 			settings := testutil.Must(config.Parse(testutil.Must(os.ReadFile(filepath.Join(root, ".devkit/config.json")))))
 			testutil.Equal(t, settings.Provider, provider)
 			testutil.Equal(t, settings.Sessions, []string{"claude", "codex"})
+			judging := string(testutil.Must(os.ReadFile(filepath.Join(root, ".archon/workflows/dev/.shared/judge/judging.md"))))
+			for _, text := range []string{
+				"Read `$ARTIFACTS_DIR/judge/launched.json` and `concerns.json` in `criteria_folder`",
+				"only when the violated principle belongs to your quality (including `every_quality`), or its owning quality is absent from `launched`",
+				"When the owner was launched, leave that failure to its judge.",
+				"A consequence that violates your own quality's principle remains yours",
+				"a missing test for the behaviour belongs to test",
+				"a changed caller contract belongs to contract",
+			} {
+				testutil.Contains(t, judging, text)
+			}
+			quality := string(testutil.Must(os.ReadFile(filepath.Join(root, ".archon/workflows/dev/judge/commands/quality.md"))))
+			testutil.Contains(t, quality, "$PACK_DIR/.shared/judge/judging.md")
 			for _, session := range settings.Sessions {
 				folder := skillFolder(session)
 				skill := string(testutil.Must(os.ReadFile(filepath.Join(root, folder, "run-it/SKILL.md"))))

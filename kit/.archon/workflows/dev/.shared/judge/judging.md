@@ -37,6 +37,8 @@ The completion machine separately verifies that every test-plan entry with metho
 
 Follow the common rules named by `common` and the authority document named by `authority`. Apply Code in the selected quality criteria; assess conformance to passed choices and Decisions only for `without_plan` entries. For `owner_check` or `screen_record`, the owner's verification alone does not require `not_assessed`.
 
+Read `$ARTIFACTS_DIR/judge/launched.json` and `concerns.json` in `criteria_folder` to identify launched qualities and principle ownership. Report a failure under your quality only when the violated principle belongs to your quality (including `every_quality`), or its owning quality is absent from `launched`. When the owner was launched, leave that failure to its judge. A consequence that violates your own quality's principle remains yours: a missing test for the behaviour belongs to test, and a changed caller contract belongs to contract, even when another judge reports the defect itself.
+
 Report an owner decision using the named authority document and the finding output shape.
 With requirements, the machine returns it to plan. Without requirements, this is a review report:
 the machine stops with "this change needs requirements and a plan: start `requirements` describing it".
