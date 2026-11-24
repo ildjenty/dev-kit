@@ -1,0 +1,17 @@
+{
+  "description": "A new submitting state leaves a failed checkout disabled without failure-path tests.",
+  "expected": [
+    {
+      "id": "checkout-recovery",
+      "quality": "ui",
+      "file": "app/ui/checkout.mjs",
+      "summary": "On rejection submitting remains true, so submitDisabled prevents the promised retry. Users cannot recover from a temporary order error."
+    },
+    {
+      "id": "checkout-failure-test",
+      "quality": "test",
+      "file": "app/tests/checkout.test.mjs",
+      "summary": "The new submitting state and failure recovery have no executable failure-path assertion. The only test covers success and cannot detect the permanently disabled retry button."
+    }
+  ]
+}

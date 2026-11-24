@@ -134,7 +134,7 @@ Edit `.devkit/config.json`; `devkit config` prints effective settings. The autho
 - `sessions`: distinct session tools (`claude`, `codex`); absent defaults to the provider alone; `[]` installs no session skills.
 - `language`: owner-facing prose; built-in default `en`. Fresh init selects it from `--language` or the environment locale.
 - `skills`: kit identifiers `devkit-runs`, `devkit-discuss` and `devkit-optimize` mapped to distinct installed names; defaults match those identifiers. Entries merge individually with defaults.
-- `standards`, `docs`, `decisions`, `units`, `topics`: default `.devkit/standards`, `docs`, `.devkit/decisions`, `.devkit/units`, `.devkit/topics`.
+- `standards`, `docs`, `decisions`, `units`, `topics`, `eval`: repository-relative folders; default `.devkit/standards`, `docs`, `.devkit/decisions`, `.devkit/units`, `.devkit/topics`, `.devkit/eval`.
 - `checks`: named shell commands with `command`, `timeout_seconds` and optional `paths`. No checks are installed by default; add the repository's real checks. Omitted paths run every time; an empty paths array selects none. Exit 0 passes, 75 retries once as an environment error, 77 means not run, and other exits fail. Timeouts are environment errors.
 - `skeleton_check`: names of checks to run on the skeleton; empty by default.
 - `qualities`: path globs for the fixed qualities. Routing and plan rows also select judges; the concern map controls their plan/code phases.
@@ -142,6 +142,71 @@ Edit `.devkit/config.json`; `devkit config` prints effective settings. The autho
 - `limits.restarts`, `limits.fixes`: default 3 each. `limits.passes`: passes `implement` gives each release step, default 3; a step that uses them up stops the run with the step and its failing checks, independent of how many steps the plan has.
 
 Missing settings use defaults; quality and limit entries merge individually, while other supplied arrays replace defaults. Globs support `**`, `*` and `?`. Repository-specific facts and conventions belong in these settings and standards.
+
+## Evaluate the real judge
+
+Fixtures test workflow execution with stubbed AI. Run this evaluation by hand after changing
+standards, routing or judge prompts to measure whether the real quality judges find known defects:
+
+```sh
+devkit eval judge
+devkit eval judge --case duplicate-price-helper --case clean-local-rename \
+  --dir eval/judge --out .local/judge-eval --standards kit/.devkit/standards
+```
+
+The first command uses `<eval>/judge/`, where `eval` defaults to `.devkit/eval` in
+`.devkit/config.json`. In this source checkout, use `--dir eval/judge` for the kit's own cases;
+`devkit init` does not install them. `--case` selects folder names and can repeat; omit it to run
+all cases. `--dir` names the folder containing case folders. `--out` defaults to a new temporary
+folder, whose path is printed. Standards come from `--standards`, then the repository's installed
+standards, then the binary's embedded standards. Relative flag paths are relative to the current
+directory. Installed workflow prompts and YAML take precedence over embedded ones.
+
+This costs real calls to the configured provider's signed-in CLI. Each case uses the real judge
+prepare, changes, route and launch steps on a temporary Git repository, then one read-only CLI call
+per launched quality using `judge/commands/quality.md` and the output schema read from its
+`judge-<quality>` YAML node. Routing uses Jev when `TYPESAFE_API_KEY` is set, with the workflow's
+same CLI and all-quality fallbacks. One additional read-only provider call matches all findings
+against the case's expected and not-expected lists. Checks are not run. Archon node wiring is not
+exercised; keep running the workflow fixtures for that.
+
+Each case folder contains `case.json`, `base/` and `change.patch` (a patch that `git apply` can apply
+to `base/`). Keep enough unchanged context to prove the defect, including existing helpers for
+duplication cases. Base files must be regular files, without Git metadata. For example:
+
+```json
+{
+  "description": "A settings read error becomes success",
+  "expected": [
+    {
+      "id": "settings-error",
+      "quality": "contract",
+      "file": "app/settings.py",
+      "summary": "Returning an empty object on a storage error hides an outage from callers."
+    }
+  ]
+}
+```
+
+`expected` is required and may be `[]` for a clean change. Optional `not_expected` has the same
+finding shape and describes a specific false positive a correct judge must avoid. IDs must be
+unique across both lists; qualities must have a code judge (`delivery` is plan-only), files must
+be repository-relative and exist in the base or changed repository, and summaries must explain
+what is wrong and why it matters. Unknown properties, missing fields and invalid types are errors.
+Optional non-empty `requirements` supplies the verbatim request when scope needs one; it becomes
+normal `requirements.json` goal and completion-condition material, without a plan. Other cases
+use review-only materials with neither requirements nor plan. Descriptions and expectations are
+not supplied to the quality judges.
+
+Stdout and `result.json` report expected findings found or missed with summaries, forbidden
+findings reported, launched versus expected qualities, and case/quality totals. A missed finding
+whose quality was not launched is marked as a routing miss. Unmatched reported findings are
+listed as `other`, not scored as wrong: they may be real defects beyond the case's known list.
+The output folder retains fixed standards, prompts, per-quality answers, matching input/output and
+CLI logs for inspection. A completed evaluation exits 0 regardless of scores. A provider timeout
+or malformed answer in one case does not stop the run: that case is recorded as not scored, listed
+at the end and left out of the totals, and the other cases continue. Each quality judge gets 30
+minutes. Only errors that prevent the run, such as invalid case files, exit non-zero. No real provider is called by the tests.
 
 ## Test the kit
 
@@ -154,7 +219,7 @@ mise exec -- go test ./...
 scripts/test-kit.sh
 ```
 
-`scripts/test-kit.sh [workflow ...]` builds both executables, initializes fresh Claude and Codex repositories under `.local/tmp/`, requires workflow validation without warnings, checks principle ownership, tests fresh installations, then copies source-only executed fixtures and tests them for both providers. Its isolated Archon home uses `$HOME/.archon/plugins`, overridable with `KIT_ARCHON_PLUGINS`. Every workflow has an executed main path: bash runs for real and AI is stubbed. PR publication is stubbed; sync exercises a real local rebase conflict. `cmd/devkit-fixture` supplies test-only setup and file writes and is absent from the shipped binary. The plumbing test rejects YAML/prompt calls to unregistered commands.
+`scripts/test-kit.sh [workflow ...]` builds both executables, initializes fresh Claude and Codex repositories under `.local/tmp/`, requires workflow validation without warnings, checks principle ownership, tests fresh installations, then copies source-only executed fixtures and tests them for both providers. Its isolated Archon home uses `$HOME/.archon/plugins`, overridable with `KIT_ARCHON_PLUGINS`. Every workflow has an executed main path: bash runs for real and AI is stubbed. PR publication is stubbed; sync exercises a real local rebase conflict. `cmd/devkit-fixture` supplies test-only setup and file writes and is absent from the shipped binary. The plumbing test rejects YAML/prompt calls to unregistered commands. Go tests cover the evaluation with fake CLIs; `node --test` runs the CLI smoke tests.
 
 See the [workflow guide](kit/.archon/workflows/dev/README.md) for artifacts and execution contracts, and [design rationale](docs/design.md) in Japanese. Update these explanations alongside their authoritative code, YAML, schemas and standards.
 

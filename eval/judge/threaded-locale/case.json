@@ -1,0 +1,11 @@
+{
+  "description": "A presentation setting is threaded through service and domain only for formatting.",
+  "expected": [
+    {
+      "id": "locale-reach",
+      "quality": "structure",
+      "file": "src/service.ts",
+      "summary": "Locale formatting now changes handler, service, domain and formatter, while the middle layers only forward it. A presentation rule leaks through domain boundaries and spreads future formatting changes across those layers."
+    }
+  ]
+}

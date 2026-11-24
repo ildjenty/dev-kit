@@ -1,0 +1,12 @@
+{
+  "description": "A local accumulator rename preserves the sum and its tests.",
+  "expected": [],
+  "not_expected": [
+    {
+      "id": "rename-needs-test",
+      "quality": "test",
+      "file": "internal/report/sum.go",
+      "summary": "Claiming the local accumulator rename changes behavior and needs a new test is a false positive: the same inputs, loop, arithmetic and return value remain covered by TestSum."
+    }
+  ]
+}

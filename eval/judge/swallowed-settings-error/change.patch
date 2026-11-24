@@ -1,0 +1,9 @@
+--- a/app/settings.py
++++ b/app/settings.py
+@@ -1,2 +1,5 @@
+ def load_settings(store):
+-    return store.read("settings")
++    try:
++        return store.read("settings")
++    except OSError:
++        return {}

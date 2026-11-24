@@ -23,6 +23,9 @@ func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration, re
 		return nil, fmt.Errorf("could not read Codex prompt")
 	}
 	text := strings.NewReplacer("$ARTIFACTS_DIR", env.Path(env.Getenv("ARTIFACTS_DIR")), "$PACK_DIR", env.Path(env.Getenv("PACK_DIR"))).Replace(string(prompt))
+	if quality := env.Getenv("QUALITY"); quality != "" {
+		text = strings.ReplaceAll(text, "$INPUTS.quality", quality)
+	}
 	var source any
 	if err = json.Unmarshal([]byte(schema), &source); err != nil {
 		return nil, fmt.Errorf("invalid Codex output schema")

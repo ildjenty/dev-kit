@@ -1,0 +1,16 @@
+--- a/app/src/main/kotlin/acme/invoice/InvoiceMapper.kt
++++ b/app/src/main/kotlin/acme/invoice/InvoiceMapper.kt
+@@ -1,8 +1,11 @@
+ package acme.invoice
+ 
+ import acme.customer.Customer
+-import acme.customer.CustomerNames
+ 
+ object InvoiceMapper {
+-  fun recipient(c: Customer): String = CustomerNames.display(c)
++  fun customerName(c: Customer): String {
++    val parts = listOfNotNull(c.familyName, c.givenName)
++    return if (parts.isEmpty()) c.companyName ?: "" else parts.joinToString(" ")
++  }
++  fun recipient(c: Customer): String = customerName(c)
+ }

@@ -1,0 +1,17 @@
+--- a/src/orders/checkout.ts
++++ b/src/orders/checkout.ts
+@@ -1,6 +1,12 @@
+-import { Cart, cartTotal } from "./pricing"
++import { Cart } from "./pricing"
+ import { charge } from "./gateway"
+ 
+ export function checkout(cart: Cart) {
+-  return charge(cart.user, cartTotal(cart))
++  let total = 0
++  for (const item of cart.items) {
++    let line = item.price * item.qty
++    if (item.discount) line = line * (1 - item.discount)
++    total += Math.round(line * 1.1)
++  }
++  return charge(cart.user, total)
+ }

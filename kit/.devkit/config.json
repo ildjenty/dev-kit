@@ -9,6 +9,7 @@
   },
   "standards": ".devkit/standards",
   "docs": "docs",
+  "eval": ".devkit/eval",
   "decisions": ".devkit/decisions",
   "units": ".devkit/units",
   "checks": [],

@@ -1,0 +1,11 @@
+{
+  "description": "Mutually exclusive payment states become optional fields without validation.",
+  "expected": [
+    {
+      "id": "payment-state",
+      "quality": "data",
+      "file": "src/payments/types.ts",
+      "summary": "Payment now accepts arbitrary statuses, paid without paidAt, or simultaneous paid and failed fields. The store accepts these inconsistent states without a boundary guarantee."
+    }
+  ]
+}

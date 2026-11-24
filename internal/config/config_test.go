@@ -76,6 +76,15 @@ func TestStandardsDefaults(t *testing.T) {
 	changes := DecisionChanges(c, gitx.Changes{Files: []gitx.File{{Path: ".devkit/standards/authority.md", Status: "M"}}})
 	testutil.Equal(t, changes, []DecisionChange{{Path: ".devkit/standards/authority.md", Status: "M", Kind: "file", Quality: "structure", Ask: true}})
 }
+
+func TestEvalFolderSetting(t *testing.T) {
+	testutil.Equal(t, Defaults("").Eval, ".devkit/eval")
+	testutil.Equal(t, testutil.Must(Parse([]byte(`{"eval":"evaluation"}`))).Eval, "evaluation")
+	for _, value := range []string{`null`, `0`, `""`, `" "`, `"/tmp/eval"`, `"../eval"`, `"./eval"`, `"a/../eval"`, `"a\\eval"`} {
+		_, err := Parse([]byte(`{"eval":` + value + `}`))
+		testutil.Fails(t, err, "eval must be a repository-relative folder")
+	}
+}
 func TestConfigRejectsRenamedKey(t *testing.T) {
 	for _, raw := range []string{`{"norms":"policy"}`, `{"norms":null}`, `{"norms":"policy","standards":"policy"}`} {
 		t.Run(raw, func(t *testing.T) {

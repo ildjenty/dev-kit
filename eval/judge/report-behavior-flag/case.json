@@ -1,0 +1,11 @@
+{
+  "description": "One report function gains a flag selecting unrelated preview and export behavior.",
+  "expected": [
+    {
+      "id": "report-flag",
+      "quality": "structure",
+      "file": "internal/report/build.go",
+      "summary": "Build now switches between preview rendering and redacted legal export by boolean. Separate reasons to change share one function and callers must remember what true means to preserve redaction and format."
+    }
+  ]
+}

@@ -139,3 +139,37 @@ citations or withdraws it where allowed; done units remain unchanged. Requiremen
 citations to decisions that are not agreed.
 Missing or done units still have their own start refusal. This check never fetches; a missing base
 ref is reported as a skipped check.
+
+## Evaluate quality judgments
+
+Run `devkit eval judge [--case <name>]... [--dir <cases folder>] [--out <folder>]
+[--standards <folder>]` by hand after editing standards, routing or judge prompts. This calls the
+real configured provider CLI and costs real provider calls. It measures prompts and standards;
+Archon node wiring is not exercised, and checks are not run.
+
+Cases live under `<eval>/judge/` (`eval` defaults to `.devkit/eval` in `.devkit/config.json`). The
+kit source keeps its own cases in `eval/judge/`; init does not install those cases. Each folder has
+strictly validated `case.json`, a small `base/` repository and `change.patch` applied with `git apply`.
+`case.json` requires `description` and `expected`; each finding has `id`, `quality`, `file`, and a
+`summary` explaining the defect and consequence. Optional `not_expected` uses the same shape for
+specific false positives. IDs are unique across lists, file paths are repository-relative, and
+`expected: []` represents a clean change. Optional `requirements` is verbatim request text passed
+as the normal requirements goal and completion condition; there is no plan. Without it the case
+uses review-only materials. Judges do not receive descriptions or expected findings.
+
+The evaluator builds a base commit plus a committed patch branch and runs the actual `judge prepare`,
+`changes`, `route` and `launch` command implementations. It uses the same configured path rules,
+Jev and read-only CLI routing fallback as the workflow. Every launched quality gets the installed
+`judge/commands/quality.md`, with `$INPUTS.quality` resolved, and the `output_format` read from its
+`judge-<quality>` YAML node. If no workflow pack is installed it uses the embedded pack. Standards
+come from the explicit flag, installed standards, or embedded standards, in that order. Both
+providers use their existing read-only CLI adapters, including schema validation and log files.
+
+One additional read-only CLI call per case matches every reported quality, file, line, failure
+scenario and evidence against both lists. Its strict schema requires a reported ID or no match
+for every expected and not-expected ID. Stdout and `<out>/result.json` contain found and missed
+expectations with summaries, not-expected findings reported, launched versus expected qualities,
+routing misses, and case/quality totals. Findings matching neither list are shown as `other` and
+are not scored as wrong. The output path defaults to a new printed temporary folder; materials,
+answers and logs remain there. Scores do not change exit status: a completed run exits 0, errors
+exit non-zero. Continue using `archon workflow test` to validate wiring with stubbed AI.

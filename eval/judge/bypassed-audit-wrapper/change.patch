@@ -1,0 +1,13 @@
+--- a/src/main/java/acme/admin/BulkExport.java
++++ b/src/main/java/acme/admin/BulkExport.java
+@@ -12,6 +12,10 @@
+     action.run();
+   }
+   public void run(Request req) {
++    if (req.fast()) {
++      exporter.export(req.filter());
++      return;
++    }
+     audited(req, () -> exporter.export(req.filter()));
+   }
+ }

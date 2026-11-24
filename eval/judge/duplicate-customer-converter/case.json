@@ -1,0 +1,11 @@
+{
+  "description": "Invoice mapping copies the existing shared customer-name converter.",
+  "expected": [
+    {
+      "id": "customer-name-rule",
+      "quality": "readability",
+      "file": "app/src/main/kotlin/acme/invoice/InvoiceMapper.kt",
+      "summary": "customerName reimplements CustomerNames.display including name order and company fallback. Updating naming policy now needs two coordinated edits or invoices show a different customer name."
+    }
+  ]
+}

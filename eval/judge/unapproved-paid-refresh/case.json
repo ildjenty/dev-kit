@@ -1,0 +1,18 @@
+{
+  "description": "Removing a cache and changing a paid summary schedule exceeds an explicit request.",
+  "expected": [
+    {
+      "id": "paid-refresh",
+      "quality": "cost",
+      "file": "app/schedule.py",
+      "summary": "Paid requests now run every second instead of hourly, and the unchanged-input cache was removed. At $0.02 per call this increases recurring per-feed calls from at most 24 to 86400 a day without authorization."
+    },
+    {
+      "id": "refresh-scope",
+      "quality": "scope",
+      "file": "app/schedule.py",
+      "summary": "The request authorized removing the summary cache while preserving hourly refreshes. Changing the interval to one second exceeds the explicitly preserved schedule and expands recurring paid usage."
+    }
+  ],
+  "requirements": "Remove the summary cache so each hourly refresh produces a fresh summary. Keep the existing hourly refresh schedule; do not introduce a faster schedule or additional paid call sources."
+}

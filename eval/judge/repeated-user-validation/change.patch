@@ -1,0 +1,17 @@
+--- a/internal/api/users.go
++++ b/internal/api/users.go
+@@ -20,6 +20,14 @@
+ 
+ func UpdateUser(w http.ResponseWriter, r *http.Request) {
+     id := r.PathValue("id")
++    if id == "" || len(id) != 26 {
++        http.Error(w, "bad id", 400)
++        return
++    }
++    if !strings.HasPrefix(id, "usr_") {
++        http.Error(w, "bad id", 400)
++        return
++    }
+     store.Update(id, r.Body)
+     w.WriteHeader(204)
+ }

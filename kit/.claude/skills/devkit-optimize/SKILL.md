@@ -99,7 +99,9 @@ Start from the current files and keep what already fits. For each change, keep t
 
 - `language`: as observed.
 - `docs`: the folder where the repository's product and design documents live. Keep `standards`,
-  `decisions`, `units` and `topics` unless a path collides with something that exists.
+  `decisions`, `units`, `topics` and `eval` unless a path collides with something that exists.
+  `eval` defaults to `.devkit/eval`; judge evaluation cases live in its `judge/` subfolder. Keep
+  repository-owned cases there; init does not install the kit source's `eval/judge/` cases.
 - `checks`: one entry per verification the repository relies on, with `name`, `command`, `paths` and
   `timeout_seconds`.
   - Take the commands CI runs. A check that CI does not run is added only when the owner asks.

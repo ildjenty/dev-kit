@@ -1,0 +1,11 @@
+{
+  "description": "Checkout reimplements the shared quote and charge total rule.",
+  "expected": [
+    {
+      "id": "price-rule",
+      "quality": "readability",
+      "file": "src/orders/checkout.ts",
+      "summary": "Checkout copies cartTotal tax, discount and rounding rules. A price-rule update must change both definitions or the quote and charged amount diverge."
+    }
+  ]
+}

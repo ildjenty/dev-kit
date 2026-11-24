@@ -1,0 +1,17 @@
+{
+  "description": "A fast export branch skips the wrapper that guarantees an audit record.",
+  "expected": [
+    {
+      "id": "audit-boundary",
+      "quality": "structure",
+      "file": "src/main/java/acme/admin/BulkExport.java",
+      "summary": "The fast path calls exporter directly, bypassing the universal audited wrapper. Future export guarantees in the wrapper no longer cover every export."
+    },
+    {
+      "id": "audit-record",
+      "quality": "security",
+      "file": "src/main/java/acme/admin/BulkExport.java",
+      "summary": "Fast exports no longer record who exported which data. The sensitive export loses the audit trail that the normal path preserves."
+    }
+  ]
+}

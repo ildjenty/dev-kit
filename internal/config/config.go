@@ -44,6 +44,7 @@ type Config struct {
 	Docs          string             `json:"docs"`
 	Decisions     string             `json:"decisions"`
 	Topics        string             `json:"topics"`
+	Eval          string             `json:"eval"`
 	Units         string             `json:"units"`
 	Checks        []Check            `json:"checks"`
 	SkeletonCheck []string           `json:"skeleton_check"`
@@ -223,7 +224,7 @@ func keys(value any, allowed []string) bool {
 var SkillKeys = []string{"devkit-runs", "devkit-discuss", "devkit-optimize"}
 
 func shape(c map[string]any) error {
-	if !keys(c, []string{"provider", "sessions", "language", "skills", "standards", "docs", "decisions", "units", "topics", "checks", "skeleton_check", "qualities", "decision_paths", "limits"}) {
+	if !keys(c, []string{"provider", "sessions", "language", "skills", "standards", "docs", "decisions", "units", "topics", "eval", "checks", "skeleton_check", "qualities", "decision_paths", "limits"}) {
 		return invalid("unknown setting")
 	}
 	if c["provider"] != "claude" && c["provider"] != "codex" {
@@ -259,7 +260,7 @@ func shape(c map[string]any) error {
 		}
 		used[name] = true
 	}
-	for _, key := range []string{"standards", "docs", "decisions", "units", "topics"} {
+	for _, key := range []string{"standards", "docs", "decisions", "units", "topics", "eval"} {
 		s, _ := c[key].(string)
 		if !text(c[key]) || strings.HasPrefix(s, "/") || strings.Contains(s, "\\") || slices.Contains(strings.Split(s, "/"), "..") || slices.Contains(strings.Split(s, "/"), ".") {
 			return invalid(key + " must be a repository-relative folder")

@@ -1,0 +1,14 @@
+--- a/app/schedule.py
++++ b/app/schedule.py
+@@ -1 +1 @@
+-SUMMARY_REFRESH_SECONDS = 3600
++SUMMARY_REFRESH_SECONDS = 1
+--- a/app/summary.py
++++ b/app/summary.py
+@@ -1,5 +1,2 @@
+ def summarize(items, client, cache):
+-    key = tuple(items)
+-    if key not in cache:
+-        cache[key] = client.summarize(items)
+-    return cache[key]
++    return client.summarize(items)

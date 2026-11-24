@@ -1,0 +1,11 @@
+{
+  "description": "A load failure is silently converted into a successful default.",
+  "expected": [
+    {
+      "id": "settings-error",
+      "quality": "contract",
+      "file": "app/settings.py",
+      "summary": "An OSError from storage used to reach the caller. Returning an empty dict makes service.start report disabled settings as success, hiding an outage and changing the failure contract."
+    }
+  ]
+}

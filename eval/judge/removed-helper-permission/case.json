@@ -1,0 +1,11 @@
+{
+  "description": "An authorization check is removed from a helper outside an auth folder.",
+  "expected": [
+    {
+      "id": "document-owner",
+      "quality": "security",
+      "file": "app/documents.py",
+      "summary": "Removing the ownership check lets any authenticated download caller read another user's document by its ID. The caller provides no replacement authorization boundary."
+    }
+  ]
+}

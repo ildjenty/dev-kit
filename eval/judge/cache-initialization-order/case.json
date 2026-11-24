@@ -1,0 +1,11 @@
+{
+  "description": "Cache consumers must now remember to initialize global state first.",
+  "expected": [
+    {
+      "id": "cache-order",
+      "quality": "structure",
+      "file": "lib/cache.py",
+      "summary": "get now depends on a prior init call, but catalog still calls get directly. Hidden initialization order can make the first product lookup fail on None instead of returning cached data."
+    }
+  ]
+}

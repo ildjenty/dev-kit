@@ -1,0 +1,11 @@
+{
+  "description": "Two modules independently enumerate the same premium eligibility rule.",
+  "expected": [
+    {
+      "id": "premium-rule",
+      "quality": "data",
+      "file": "app/limits.py",
+      "summary": "The same premium membership rule is enumerated in billing and limits instead of one structure. Adding a premium tier can update only one branch and give a plan inconsistent entitlements."
+    }
+  ]
+}

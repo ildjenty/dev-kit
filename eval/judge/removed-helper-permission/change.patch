@@ -1,0 +1,9 @@
+--- a/app/documents.py
++++ b/app/documents.py
+@@ -4,6 +4,4 @@
+ 
+ def read_document(actor, document_id, store):
+     document = store.load(document_id)
+-    if document.owner_id != actor.id:
+-        raise PermissionDenied("document belongs to another user")
+     return document.body

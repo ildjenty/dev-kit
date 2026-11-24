@@ -1,0 +1,11 @@
+{
+  "description": "A handler adds its own copy of the user-ID acceptance rule.",
+  "expected": [
+    {
+      "id": "user-id-rule",
+      "quality": "readability",
+      "file": "internal/api/users.go",
+      "summary": "UpdateUser duplicates the validUserID rule used by DeleteUser. Changing the accepted ID format now requires coordinated edits or handlers disagree on valid users."
+    }
+  ]
+}

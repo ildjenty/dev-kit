@@ -1,0 +1,16 @@
+--- a/lib/cache.py
++++ b/lib/cache.py
+@@ -1,7 +1,12 @@
+ from .redis_client import RedisClient
+ from .settings import REDIS_URL
+ 
+-_client = RedisClient(REDIS_URL)
++_client = None
++
++
++def init(url):
++    global _client
++    _client = RedisClient(url)
+ 
+ 
+ def get(key):

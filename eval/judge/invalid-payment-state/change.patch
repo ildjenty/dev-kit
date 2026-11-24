@@ -1,0 +1,17 @@
+--- a/src/payments/types.ts
++++ b/src/payments/types.ts
+@@ -1,7 +1,7 @@
+-export type PaymentState =
+-  | { status: "pending" }
+-  | { status: "paid"; paidAt: Date }
+-  | { status: "failed"; failedReason: string }
+-  | { status: "refunded"; refundedAt: Date }
+-
+-export type Payment = { id: string; state: PaymentState }
++export type Payment = {
++  id: string
++  status: string
++  paidAt?: Date
++  failedReason?: string
++  refundedAt?: Date
++}

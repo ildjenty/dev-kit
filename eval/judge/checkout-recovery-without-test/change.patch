@@ -1,0 +1,16 @@
+--- a/app/ui/checkout.mjs
++++ b/app/ui/checkout.mjs
+@@ -1,10 +1,12 @@
+ export async function submitOrder(api, state) {
+   state.error = ""
++  state.submitting = true
+   try {
+     state.order = await api.placeOrder()
++    state.submitting = false
+   } catch (error) {
+     state.error = "Order failed. Try again."
+   }
+ }
+ 
+-export function submitDisabled(state) { return false }
++export function submitDisabled(state) { return state.submitting }
