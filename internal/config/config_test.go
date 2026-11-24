@@ -36,6 +36,8 @@ func TestCheckSelection(t *testing.T) {
 }
 func TestConfigDefaultsAndCheckout(t *testing.T) {
 	repo := testutil.Repo(t)
+	testutil.Equal(t, Defaults("").Language, "en")
+	testutil.Equal(t, testutil.Must(Parse([]byte(`{}`))).Language, "en")
 	testutil.Equal(t, testutil.Must(Load(repo)), Defaults(""))
 	testutil.Put(t, repo, ".devkit/config.json", `{"standards":"policy","language":"en","limits":{"restarts":1},"qualities":{"ui":{"paths":[]}}}`)
 	testutil.Git(t, repo, "add", ".devkit")

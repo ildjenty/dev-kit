@@ -111,7 +111,9 @@ PR 作成後のコメントや CI 失敗は、出典を含む原文を `review` 
 
 ## 導入と設定
 
-`kit/` は対象リポジトリに配るワークフロー、規範、スキル、初期設定を持つ。`cmd/devkit/` が CLI を登録し、`internal/` が機械処理を実装する。`devkit init [--yes | --no] [--dry-run] [--provider claude|codex] [--sessions claude,codex] [dir]` はキットを展開するがコミットはしない。初めて導入したときは、最後に `devkit-optimize` の実行を促す。`devkit-optimize` はセッションで一度使うスキルで、リポジトリを読み、チェック、判定者と判断を選ぶパス、基点ブランチ、worktree の準備を提案し、配った規範とリポジトリの既存の決まりとの食い違いを洗い出し、人が承認したものだけを書く。
+`kit/` は対象リポジトリに配るワークフロー、規範、スキル、初期設定を持つ。`cmd/devkit/` が CLI を登録し、`internal/` が機械処理を実装する。`devkit init [--yes | --no] [--dry-run] [--provider claude|codex] [--sessions claude,codex] [--language <code>] [dir]` はキットを展開するがコミットはしない。初めて導入したときは、最後に `devkit-optimize` の実行を促す。`devkit-optimize` はセッションで一度使うスキルで、リポジトリを読み、チェック、判定者と判断を選ぶパス、基点ブランチ、worktree の準備を提案し、配った規範とリポジトリの既存の決まりとの食い違いを洗い出し、人が承認したものだけを書く。
+
+`--language <code>`（`--language=<code>` も可）は人が読む文章の言語を保存する。検証は設定と同じで、空文字列と空白だけの値を拒否する。新規導入で指定がなければ、`LC_ALL`、`LC_MESSAGES`、`LANG` の順で最初の空でない値を読み、`_`・`.`・`@` より前を小文字にする。`ja_JP.UTF-8` は `ja`、`pt_BR` は `pt` になる。`C`・`POSIX`・空なら `en` を使う。init は選んだ言語と出典、`devkit-optimize` でリポジトリに合わせられることを表示する。再導入では明示指定がなければ既存言語を保持し、指定があれば `--provider` と同じく設定全体の置換を断ってもその値だけ保存して他のキーと書式を保つ。
 
 書き込み前に全対象を比較する。ワークフローの `.archon/workflows/dev/` と各スキルフォルダーでは、内容の異なるファイルとキットが配布しなくなったファイルを示し、フォルダーごとに一度、上書き件数と削除件数を尋ねる。既定は No であり、既存ファイルは保持し、欠落ファイルだけを追加する。削除対象はキット所有フォルダー内だけで探す。規範は設定の `standards` フォルダー全体をリポジトリが所有する。差分・欠落・余分なものが一つでもあれば全体の置き換えを尋ね、No なら欠落ファイルも追加せず、完全に保持する。Yes の場合だけ余分なものを削除する。内容が異なる `.devkit/config.json` と `.archon/config.yaml` はそれぞれ確認する。同一ファイルは表示も書き込みもせず、新規ファイルは確認なしで作る。
 
@@ -137,7 +139,7 @@ Codex の workflow 判定者は full access で動き、ツール制限で書き
 
 リポジトリごとの差異は `.devkit/config.json` に置き、`devkit config` で有効値を確認する。設定の正本となる既定値と検証処理は `internal/config` にある。
 
-- `language` は人が読む文章の言語で、既定は `ja`。
+- `language` は人が読む文章の言語で、組み込みの既定は `en`。新規導入時は `--language` または環境のロケールから選ぶ。
 - `provider` は `claude`（既定）または `codex`。`sessions` は導入先のセッションツールで、未指定なら provider 一つ。
 - `skills` は `devkit-runs`、`devkit-discuss`、`devkit-optimize` を実際の配置名に対応させ、既定は同名。省略したスキルは個別に補完する。
 - `standards`、`docs`、`decisions`、`units`、`topics` は保存先で、既定は順に `.devkit/standards`、`docs`、`.devkit/decisions`、`.devkit/units`、`.devkit/topics`。

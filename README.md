@@ -16,7 +16,9 @@ cd /path/to/your-repository
 devkit init
 ```
 
-`scripts/install.sh --bin /your/bin` changes the binary destination. `devkit init [--yes | --no] [--dry-run] [--provider claude|codex] [--sessions claude,codex] [dir]` installs the embedded kit without committing: `.archon/workflows/dev/`, three skill folders for each session: `.claude/skills/` for Claude, `.agents/skills/` for Codex, initial standards at the configured `standards` path (default `.devkit/standards/`), `.devkit/config.json` and `.archon/config.yaml`.
+`scripts/install.sh --bin /your/bin` changes the binary destination. `devkit init [--yes | --no] [--dry-run] [--provider claude|codex] [--sessions claude,codex] [--language <code>] [dir]` installs the embedded kit without committing: `.archon/workflows/dev/`, three skill folders for each session: `.claude/skills/` for Claude, `.agents/skills/` for Codex, initial standards at the configured `standards` path (default `.devkit/standards/`), `.devkit/config.json` and `.archon/config.yaml`.
+
+Choose owner-facing prose with `devkit init --language en` (or `--language=pt-BR`). It uses the config's validation: a non-empty string, excluding whitespace-only values. On a fresh install without the flag, init reads the first non-empty locale from `LC_ALL`, `LC_MESSAGES`, then `LANG`, takes the part before `_`, `.` or `@` and lowercases it (`ja_JP.UTF-8` becomes `ja`, `pt_BR` becomes `pt`). `C`, `POSIX` and an empty locale use `en`, the built-in default. Init prints the selected language and its source; `devkit-optimize` can fit it to the repository. Reinstalling preserves the existing language unless `--language` is explicit. Like `--provider`, an explicit language is saved even when config replacement is declined, preserving unrelated keys and formatting.
 
 Init compares all destinations before writing. It lists differing and extra files and asks once per workflow/skill folder: `replace N files and delete M files? [y/N]`. No keeps those files; missing files are still added. Extra files are considered only within kit-owned workflow and skill folders, including a skill's previous folder after a rename. Existing standards are repository-owned: any difference, missing file or extra file prompts once for the whole folder; No leaves it completely untouched. Each differing configuration file has its own question. Identical files produce no file-change lines, and absent files are written without asking.
 
@@ -130,7 +132,7 @@ Edit `.devkit/config.json`; `devkit config` prints effective settings. The autho
 
 - `provider`: `claude` (default) or `codex`; selects installed workflow AI and the Jev fallback. Run init again to render changed workflows.
 - `sessions`: distinct session tools (`claude`, `codex`); absent defaults to the provider alone; `[]` installs no session skills.
-- `language`: owner-facing prose; default `ja`.
+- `language`: owner-facing prose; built-in default `en`. Fresh init selects it from `--language` or the environment locale.
 - `skills`: kit identifiers `devkit-runs`, `devkit-discuss` and `devkit-optimize` mapped to distinct installed names; defaults match those identifiers. Entries merge individually with defaults.
 - `standards`, `docs`, `decisions`, `units`, `topics`: default `.devkit/standards`, `docs`, `.devkit/decisions`, `.devkit/units`, `.devkit/topics`.
 - `checks`: named shell commands with `command`, `timeout_seconds` and optional `paths`. No checks are installed by default; add the repository's real checks. Omitted paths run every time; an empty paths array selects none. Exit 0 passes, 75 retries once as an environment error, 77 means not run, and other exits fail. Timeouts are environment errors.

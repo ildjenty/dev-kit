@@ -18,6 +18,7 @@ func TestMain(m *testing.M) {
 	}
 	os.Setenv("PATH", dir+":"+os.Getenv("PATH"))
 	os.Setenv("ARCHON_HOME", dir)
+	os.Setenv("LC_ALL", "C")
 	code := m.Run()
 	os.RemoveAll(dir)
 	os.Exit(code)

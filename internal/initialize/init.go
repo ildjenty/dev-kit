@@ -22,7 +22,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const usage = "devkit init [--yes | --no] [--dry-run] [--provider <claude|codex>] [--sessions <claude,codex>] [--skill <devkit-runs|devkit-discuss|devkit-optimize>=<name>]... [dir]"
+const usage = "devkit init [--yes | --no] [--dry-run] [--provider <claude|codex>] [--sessions <claude,codex>] [--language <code>] [--skill <devkit-runs|devkit-discuss|devkit-optimize>=<name>]... [dir]"
 
 type options struct {
 	yes, no, dry bool
@@ -31,6 +31,7 @@ type options struct {
 	skills       map[string]string
 	provider     string
 	sessions     []string
+	language     string
 }
 
 type tree struct {
@@ -85,7 +86,7 @@ func arguments(args []string) (options, error) {
 			o.no = true
 		case arg == "--dry-run":
 			o.dry = true
-		case arg == "--provider" || strings.HasPrefix(arg, "--provider=") || arg == "--sessions" || strings.HasPrefix(arg, "--sessions="):
+		case arg == "--provider" || strings.HasPrefix(arg, "--provider=") || arg == "--sessions" || strings.HasPrefix(arg, "--sessions=") || arg == "--language" || strings.HasPrefix(arg, "--language="):
 			key, value, hasValue := strings.Cut(arg, "=")
 			if !hasValue {
 				i++
@@ -99,6 +100,12 @@ func arguments(args []string) (options, error) {
 				if value != "claude" && value != "codex" {
 					return o, cli.Usage(usage)
 				}
+			} else if key == "--language" {
+				data, _ := json.Marshal(map[string]string{"language": value})
+				if _, err := config.Parse(data); err != nil {
+					return o, err
+				}
+				o.language = value
 			} else {
 				o.sessions = strings.Split(value, ",")
 			}
@@ -135,11 +142,18 @@ func run(args []string, env cli.Env, interactive bool) error {
 	}
 	o.version = env.Registry.Version()
 	root := filepath.Clean(env.Path(o.dir))
-	groups, original, skillsOnly, err := compare(root, o)
+	language, source := o.language, "--language"
+	if language == "" {
+		language, source = localeLanguage(env)
+	}
+	groups, original, skillsOnly, err := compare(root, o, language)
 	if err != nil {
 		return err
 	}
 	var output strings.Builder
+	if original == nil || o.language != "" {
+		fmt.Fprintf(&output, "Language: %s (from %s). devkit-optimize can fit it to this repository.\n", language, source)
+	}
 	links := []string{}
 	questions := false
 	for _, g := range groups {
@@ -229,7 +243,7 @@ func run(args []string, env cli.Env, interactive bool) error {
 	}
 	for _, g := range groups {
 		if g.path == ".devkit/config.json" && !g.answer && o.explicit() && skillsOnly == nil && !o.dry {
-			return fmt.Errorf("cannot update only skills/provider/sessions in invalid .devkit/config.json; approve replacing the config to repair it")
+			return fmt.Errorf("cannot update only skills/provider/sessions/language in invalid .devkit/config.json; approve replacing the config to repair it")
 		}
 		partial := g.path == ".devkit/config.json" && !g.answer && o.explicit() && !bytes.Equal(original, skillsOnly)
 		for _, c := range g.changes {
@@ -344,9 +358,29 @@ func within(path, folder string) bool {
 	return folder == "." || path == folder || strings.HasPrefix(path, folder+"/")
 }
 
-func (o options) explicit() bool { return len(o.skills) > 0 || o.provider != "" || o.sessions != nil }
+func localeLanguage(env cli.Env) (string, string) {
+	for _, key := range []string{"LC_ALL", "LC_MESSAGES", "LANG"} {
+		value := env.Getenv(key)
+		if value == "" {
+			continue
+		}
+		if end := strings.IndexAny(value, "_.@"); end >= 0 {
+			value = value[:end]
+		}
+		value = strings.ToLower(value)
+		if value == "" || value == "c" || value == "posix" {
+			value = "en"
+		}
+		return value, key
+	}
+	return "en", "default"
+}
 
-func compare(root string, o options) ([]*group, []byte, []byte, error) {
+func (o options) explicit() bool {
+	return len(o.skills) > 0 || o.provider != "" || o.sessions != nil || o.language != ""
+}
+
+func compare(root string, o options, language string) ([]*group, []byte, []byte, error) {
 	original, err := os.ReadFile(filepath.Join(root, ".devkit/config.json"))
 	if err != nil && !os.IsNotExist(err) {
 		return nil, nil, nil, err
@@ -360,7 +394,7 @@ func compare(root string, o options) ([]*group, []byte, []byte, error) {
 		validObject = decodeErr == nil && stored != nil
 		if validObject {
 			destinations := map[string]json.RawMessage{}
-			for _, key := range []string{"standards", "skills", "provider", "sessions"} {
+			for _, key := range []string{"standards", "skills", "provider", "sessions", "language"} {
 				if value, ok := stored[key]; ok {
 					destinations[key] = value
 				}
@@ -376,6 +410,9 @@ func compare(root string, o options) ([]*group, []byte, []byte, error) {
 		} else {
 			warning = "Warning: .devkit/config.json is not a valid JSON object; using default destinations for comparison."
 		}
+	}
+	if original == nil || o.language != "" {
+		settings.Language = language
 	}
 	old := map[string]string{}
 	for key, name := range settings.Skills {
@@ -461,7 +498,7 @@ func compare(root string, o options) ([]*group, []byte, []byte, error) {
 			dest = settings.Standards + strings.TrimPrefix(path, ".devkit/standards")
 		case path == ".devkit/config.json":
 			data = []byte(strings.ReplaceAll(string(data), ".devkit/standards", settings.Standards))
-			for _, key := range []string{"skills", "provider", "sessions"} {
+			for _, key := range []string{"skills", "provider", "sessions", "language"} {
 				var value any
 				switch key {
 				case "skills":
@@ -470,6 +507,8 @@ func compare(root string, o options) ([]*group, []byte, []byte, error) {
 					value = settings.Provider
 				case "sessions":
 					value = settings.Sessions
+				case "language":
+					value = settings.Language
 				}
 				encoded, _ := json.Marshal(value)
 				data, err = withSetting(data, key, encoded)
@@ -509,7 +548,7 @@ func compare(root string, o options) ([]*group, []byte, []byte, error) {
 	}
 	skillsOnly := original
 	if original != nil && o.explicit() && validObject {
-		for _, key := range []string{"skills", "provider", "sessions"} {
+		for _, key := range []string{"skills", "provider", "sessions", "language"} {
 			var value any
 			switch key {
 			case "skills":
@@ -527,6 +566,11 @@ func compare(root string, o options) ([]*group, []byte, []byte, error) {
 					continue
 				}
 				value = settings.Sessions
+			case "language":
+				if o.language == "" {
+					continue
+				}
+				value = settings.Language
 			}
 			encoded, _ := json.Marshal(value)
 			skillsOnly, err = withSetting(skillsOnly, key, encoded)

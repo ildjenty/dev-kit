@@ -93,7 +93,7 @@ func TestEveryGroupYesAndNo(t *testing.T) {
 				want := string(testutil.Must(os.ReadFile(filepath.Join(dir, path))))
 				custom := "custom"
 				if tc.root == ".devkit/config.json" {
-					custom = strings.Replace(want, `"language": "ja"`, `"language": "fr"`, 1)
+					custom = strings.Replace(want, `"docs": "docs"`, `"docs": "custom-docs"`, 1)
 				}
 				testutil.Put(t, dir, path, custom)
 				if tc.file != "" {
