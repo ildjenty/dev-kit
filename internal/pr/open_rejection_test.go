@@ -3,6 +3,8 @@ package pr
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,7 +26,28 @@ func TestMain(m *testing.M) {
 			}
 			err = json.NewEncoder(f).Encode(append([]string{name}, os.Args[1:]...))
 			f.Close()
-			if err != nil || name == "gh" || len(os.Args) > 1 && (os.Args[1] == "commit" || os.Args[1] == "push") {
+			if err != nil {
+				os.Exit(1)
+			}
+			if os.Getenv("DEVKIT_PR_TEST_PUBLISH") == "1" {
+				if name == "gh" {
+					if len(os.Args) > 2 && os.Args[2] == "list" {
+						fmt.Print(os.Getenv("DEVKIT_PR_TEST_URL"))
+					} else {
+						body, err := io.ReadAll(os.Stdin)
+						if err != nil || os.WriteFile(os.Getenv("DEVKIT_PR_TEST_BODY"), body, 0600) != nil {
+							os.Exit(1)
+						}
+						fmt.Print("https://example.invalid/pr/1")
+					}
+					os.Exit(0)
+				}
+				if len(os.Args) > 1 && os.Args[1] == "ls-remote" && os.Getenv("DEVKIT_PR_TEST_MUTATE_BODY") != "" {
+					if os.WriteFile(os.Getenv("DEVKIT_PR_TEST_MUTATE_BODY"), []byte("changed after validation\n"), 0644) != nil {
+						os.Exit(1)
+					}
+				}
+			} else if name == "gh" || len(os.Args) > 1 && (os.Args[1] == "commit" || os.Args[1] == "push") {
 				os.Exit(1)
 			}
 			cmd := exec.Command(os.Getenv("DEVKIT_PR_TEST_GIT"), os.Args[1:]...)
@@ -73,7 +96,7 @@ func TestPROpenRejectsUnsafeBacklogAndInvalidPublicationState(t *testing.T) {
 			testutil.Git(t, repo, "push", "-q", "origin", "HEAD:refs/heads/feature/x")
 			state, artifacts := t.TempDir(), t.TempDir()
 			dir := record.RecordDir(state, "feature/x")
-			report := judgment("pr1", "report", base, head, doc{"kind": "report", "criteria_commit": base})
+			report := judgment("pr1", "report", base, head, doc{"kind": "report", "criteria_commit": base, "materials": reportMaterials([]byte("Title\n"), []byte("Body\n"))})
 			if kind == "report-failed" {
 				report["verdict"] = "fail"
 			}
@@ -83,6 +106,7 @@ func TestPROpenRejectsUnsafeBacklogAndInvalidPublicationState(t *testing.T) {
 			testutil.Put(t, artifacts, "pr/facts.json", jsonText(doc{"head": head}))
 			testutil.Put(t, artifacts, "pr/pr-title.txt", "Title\n")
 			testutil.Put(t, artifacts, "pr/pr.md", "Body\n")
+			testutil.Put(t, artifacts, "pr/report-state.json", `{"passed":true}`)
 			if kind == "head-moved" {
 				testutil.Git(t, repo, "commit", "-q", "--allow-empty", "-m", "moved")
 				head = testutil.Git(t, repo, "rev-parse", "HEAD")

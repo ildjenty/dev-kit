@@ -1,10 +1,12 @@
 package pr
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
@@ -89,11 +91,32 @@ func openPR(args []string, env cli.Env) error {
 	if refused := refusals(ctx.Branch, ctx.BaseBranch, head, facts, clean, report); len(refused) > 0 {
 		return &record.RecordError{Message: "the pull request was not opened", Errors: refused}
 	}
+	state, err := optional(filepath.Join(out, "report-state.json"))
+	if err != nil {
+		return err
+	}
+	if !truth(state["passed"]) {
+		return &record.RecordError{Message: "the pull request was not opened: the report must be judged after assembly"}
+	}
+	titleBytes, err := os.ReadFile(filepath.Join(out, "pr-title.txt"))
+	if err != nil {
+		return err
+	}
+	bodyBytes, err := os.ReadFile(filepath.Join(out, "pr.md"))
+	if err != nil {
+		return err
+	}
+	if !slices.Equal(stringsOf(report["materials"]), reportMaterials(titleBytes, bodyBytes)) {
+		return &record.RecordError{Message: "the pull request was not opened: the title or body differs from the report judgment"}
+	}
 	run := func(name string, args ...string) (string, error) {
 		cmd := exec.Command(name, args...)
 		cmd.Dir = ctx.Cwd
 		cmd.Env = env.Environ
 		cmd.Stderr = env.Stderr
+		if name == "gh" && slices.Contains(args, "--body-file") {
+			cmd.Stdin = bytes.NewReader(bodyBytes)
+		}
 		b, err := cmd.Output()
 		if err != nil {
 			return "", fmt.Errorf("Command failed: %s %s", name, strings.Join(args, " "))
@@ -129,20 +152,15 @@ func openPR(args []string, env cli.Env) error {
 			return err
 		}
 	}
-	titleBytes, err := os.ReadFile(filepath.Join(out, "pr-title.txt"))
-	if err != nil {
-		return err
-	}
 	title := strings.TrimSpace(string(titleBytes))
-	body := filepath.Join(env.Getenv("ARTIFACTS_DIR"), "pr", "pr.md")
 	url, err := run("gh", "pr", "list", "--head", ctx.Branch, "--state", "open", "--json", "url", "--jq", ".[0].url // empty")
 	if err != nil {
 		return err
 	}
 	if url != "" {
-		_, err = run("gh", "pr", "edit", url, "--title", title, "--body-file", body)
+		_, err = run("gh", "pr", "edit", url, "--title", title, "--body-file", "-")
 	} else {
-		url, err = run("gh", "pr", "create", "--base", ctx.BaseBranch, "--head", ctx.Branch, "--title", title, "--body-file", body)
+		url, err = run("gh", "pr", "create", "--base", ctx.BaseBranch, "--head", ctx.Branch, "--title", title, "--body-file", "-")
 	}
 	if err != nil {
 		return err

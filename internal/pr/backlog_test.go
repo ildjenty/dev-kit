@@ -54,12 +54,13 @@ func TestPRCommitsBacklogBeforePushAndKeepsJudgedChangeIdentity(t *testing.T) {
 	ctx := record.ContextData{Cwd: repo, Dir: record.RecordDir(state, "feature/x"), Branch: "feature/x", BaseBranch: "main", RunID: "pr1"}
 	testutil.Put(t, ctx.Dir, "request/1.json", `{"unit":"U-abcdef"}`)
 	g.RecordDir = ctx.Dir
-	report := judgment("pr1", "report", base, head, doc{"kind": "report", "criteria_commit": base})
+	report := judgment("pr1", "report", base, head, doc{"kind": "report", "criteria_commit": base, "materials": reportMaterials([]byte("Title\n"), []byte("Body\n"))})
 	must(record.Append(ctx.Dir, "judgment", report))
 	testutil.OK(t, os.MkdirAll(filepath.Join(a, "pr"), 0755))
 	testutil.OK(t, save(filepath.Join(a, "pr/facts.json"), doc{"head": head}))
 	testutil.Put(t, a, "pr/pr-title.txt", "Title\n")
 	testutil.Put(t, a, "pr/pr.md", "Body\n")
+	testutil.Put(t, a, "pr/report-state.json", `{"passed":true}`)
 	bin := t.TempDir()
 	testutil.Put(t, bin, "gh", "#!/bin/sh\nif [ \"$2\" = create ]; then printf 'https://example.invalid/pr/1'; fi\n")
 	testutil.OK(t, os.Chmod(filepath.Join(bin, "gh"), 0755))

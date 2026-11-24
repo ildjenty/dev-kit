@@ -1,6 +1,7 @@
 package pr
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -136,6 +137,11 @@ func notConvergedDoc(j doc) doc {
 
 var materials = []string{"pr/pr.md", "pr/pr-title.txt", "pr/lists.json", "pr/diff.patch", "pr/requirements.json", "pr/judgments.json", "pr/criteria/"}
 
+func reportMaterials(title, body []byte) []string {
+	out := append([]string{}, materials...)
+	return append(out, fmt.Sprintf("pr/pr-title.txt#sha256=%x", sha256.Sum256(title)), fmt.Sprintf("pr/pr.md#sha256=%x", sha256.Sum256(body)))
+}
+
 func report(mode string, env cli.Env) error {
 	out := filepath.Join(env.Getenv("ARTIFACTS_DIR"), "pr")
 	stateFile := env.Path(filepath.Join(out, "report-state.json"))
@@ -148,6 +154,16 @@ func report(mode string, env cli.Env) error {
 		lists, err := read(env.Path(filepath.Join(out, "lists.json")))
 		if err != nil {
 			return err
+		}
+		previous, err := optional(stateFile)
+		if err != nil {
+			return err
+		}
+		if previous != nil {
+			previous["passed"] = false
+			if err = save(stateFile, previous); err != nil {
+				return err
+			}
 		}
 		if err = os.WriteFile(env.Path(filepath.Join(out, "pr.md")), []byte(body(d, lists)), 0644); err != nil {
 			return err
@@ -169,7 +185,15 @@ func report(mode string, env cli.Env) error {
 		if err = json.Unmarshal([]byte(env.Getenv("INPUTS_JUDGMENT")), &judged); err != nil {
 			return err
 		}
-		judgment := judgmentOf(judged, facts, materials)
+		title, err := os.ReadFile(env.Path(filepath.Join(out, "pr-title.txt")))
+		if err != nil {
+			return err
+		}
+		body, err := os.ReadFile(env.Path(filepath.Join(out, "pr.md")))
+		if err != nil {
+			return err
+		}
+		judgment := judgmentOf(judged, facts, reportMaterials(title, body))
 		entry, err := record.Write(ctx, "judgment", judgment, "")
 		if err != nil {
 			return err
