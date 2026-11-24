@@ -282,7 +282,7 @@ func TestEvalSelectionAndTemporaryOutput(t *testing.T) {
 
 func TestEvalProviderErrorsAreNotScores(t *testing.T) {
 	for _, provider := range []string{"claude", "codex"} {
-		for _, bad := range []string{"contract", "matching"} {
+		for _, bad := range []string{"contract", "matching", "provider exit"} {
 			t.Run(provider+"/"+bad, func(t *testing.T) {
 				root := testutil.Repo(t)
 				installTestPack(t, root)
@@ -290,11 +290,18 @@ func TestEvalProviderErrorsAreNotScores(t *testing.T) {
 				testutil.Put(t, root, ".devkit/config.json", fmt.Sprintf(`{"provider":%q,"language":"fr"}`, provider))
 				env, stdout, _, _ := fakeEnv(t, root, false)
 				env = withEnv(env, map[string]string{"DEVKIT_EVAL_BAD": bad})
+				if bad == "provider exit" {
+					env = withEnv(env, map[string]string{"DEVKIT_EVAL_EXIT": "contract"})
+				}
 				out := t.TempDir()
 				code := cli.New("test", Commands()).Execute([]string{"eval", "judge", "--dir", "cases", "--out", out}, env)
 				testutil.Equal(t, code, 0)
 				testutil.Contains(t, stdout.String(), "ERROR (not scored)")
-				testutil.Contains(t, stdout.String(), "answer does not match output schema")
+				if bad == "provider exit" {
+					testutil.Contains(t, stdout.String(), "exit status 1")
+				} else {
+					testutil.Contains(t, stdout.String(), "answer does not match output schema")
+				}
 				var result Result
 				testutil.OK(t, json.Unmarshal(testutil.Must(os.ReadFile(filepath.Join(out, "result.json"))), &result))
 				testutil.Equal(t, len(result.Errored), 1)
@@ -439,9 +446,16 @@ func TestEvalCLIHelper(t *testing.T) {
 			kind = "route"
 			testutil.Contains(t, prompt, filepath.Join(artifacts, "judge/diff.patch"))
 			answer = document{"qualities": []document{{"quality": "contract", "file": "src/change.py", "reason": "Changed response"}, {"quality": "test", "file": "src/change.py", "reason": "Source code"}, {"quality": "readability", "file": "src/change.py", "reason": "Source code"}}}
+			if strings.HasPrefix(os.Getenv("DEVKIT_EVAL_SEMANTIC"), "structure") {
+				answer["qualities"] = append(answer["qualities"].([]document), document{"quality": "structure", "file": "src/change.py", "reason": "Structure probe"})
+			}
 		} else {
 			kind = os.Getenv("QUALITY")
-			testutil.Equal(t, readDoc("judge/launched.json"), document{"launched": []any{"contract", "test", "scope", "readability"}})
+			launched := []any{"contract", "test", "scope", "readability"}
+			if strings.HasPrefix(os.Getenv("DEVKIT_EVAL_SEMANTIC"), "structure") {
+				launched = append([]any{"structure"}, launched...)
+			}
+			testutil.Equal(t, readDoc("judge/launched.json"), document{"launched": launched})
 			testutil.Contains(t, prompt, "Installed quality prompt marker.")
 			testutil.Contains(t, prompt, filepath.Join(artifacts, "judge/materials/"+kind+".json"))
 			if schema["properties"].(map[string]any)["eval_probe"] == nil {
@@ -470,6 +484,23 @@ func TestEvalCLIHelper(t *testing.T) {
 				findings = append(findings, document{"aspect": kind, "file": "src/change.py", "line": "1", "blocking": true, "needs_decision": false, "deferred": false, "mechanical": false, "failure_scenario": "Observed failure", "evidence": "return 2", "fix": "Preserve the contract"})
 			}
 			answer = document{"criteria": []document{{"aspect": kind, "verdict": "fail", "checked": "Read code", "not_checked": ""}}, "findings": findings, "eval_probe": "installed"}
+			mode := os.Getenv("DEVKIT_EVAL_SEMANTIC")
+			if kind == "scope" {
+				switch mode {
+				case "empty criteria":
+					answer["criteria"] = []document{}
+				case "missing aspect":
+					answer["criteria"].([]document)[0]["aspect"] = "other"
+				case "invalid deferred":
+					findings[0]["deferred"], findings[0]["blocking"] = true, false
+				}
+			}
+			if kind == "structure" {
+				findings[0]["deferred"] = true
+				if mode == "structure decision" {
+					findings[0]["blocking"], findings[0]["needs_decision"] = false, true
+				}
+			}
 		}
 	}
 	if kind == os.Getenv("DEVKIT_EVAL_BAD") {
@@ -480,6 +511,9 @@ func TestEvalCLIHelper(t *testing.T) {
 	file := testutil.Must(os.OpenFile(os.Getenv("DEVKIT_EVAL_CALLS"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600))
 	testutil.OK(t, json.NewEncoder(file).Encode(document{"kind": kind, "provider": provider}))
 	testutil.OK(t, file.Close())
+	if kind == os.Getenv("DEVKIT_EVAL_EXIT") {
+		os.Exit(1)
+	}
 	if provider == "codex" {
 		testutil.OK(t, os.WriteFile(answerPath, testutil.Must(json.Marshal(answer)), 0600))
 	} else {

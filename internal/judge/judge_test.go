@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -237,14 +238,19 @@ func TestPrepareAndChangesPinCustomCriteriaChecksLanguageAndGitFacts(t *testing.
 	_, err := os.Stat(filepath.Join(artifacts, "judge/source/commit/new/a.js"))
 	testutil.OK(t, err)
 	testutil.Equal(t, must(record.List(ctx.Dir, "request"))[0]["criteria_commit"], base)
-	testutil.OK(t, save(filepath.Join(artifacts, "judge/completion.json"), doc{"missing": []doc{}}))
-	testutil.OK(t, save(filepath.Join(artifacts, "judge/findings.json"), doc{"judges": []doc{{"judge": "scope", "criteria": []doc{criterion("pass")}, "findings": []doc{}}}}))
 	vars := map[string]string{"STATE_DIR": state, "WORKFLOW_ID": "judge-1", "ARTIFACTS_DIR": artifacts, "BASE_BRANCH": "trunk", "PREPARE": jsonText(must(prepare(ctx, artifacts, artifacts))), "CHANGES": jsonText(out), "GATE": `{"passed":true,"failing":[],"results":"checks/1.jsonl"}`, "COMPLETION": "{}", "COLLECT": "{}"}
+	vars["ROUTE"] = `{"qualities":[]}`
+	collectPassingJudges(t, repo, vars)
 	testutil.Equal(t, runCLI(t, repo, vars, "completion")["missing_count"], 0)
 	result := runCLI(t, repo, vars, "finish")
 	testutil.Equal(t, result["outcome"], "pass")
 	judgments := must(record.List(ctx.Dir, "judgment"))
-	testutil.Equal(t, len(judgments), 2)
+	launched := stringsOf(must(read(filepath.Join(artifacts, "judge/launched.json")))["launched"])
+	count := len(launched)
+	if !slices.Contains(launched, "test") {
+		count++
+	}
+	testutil.Equal(t, len(judgments), count)
 	testutil.Equal(t, object(judgments[0]["target"])["change_id"], *must(g.ChangeID(must(g.Head()))))
 	testutil.Put(t, repo, "dirty", "uncommitted")
 	dirty := t.TempDir()

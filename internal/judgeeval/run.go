@@ -270,6 +270,20 @@ func runCase(env cli.Env, c Case, settings config.Config, standards fs.FS, pack,
 		if err = save(filepath.Join(artifacts, "judge", q+"-output.json"), answer); err != nil {
 			return CaseResult{}, err
 		}
+		data, err := os.ReadFile(filepath.Join(artifacts, "judge/materials", q+".json"))
+		if err != nil {
+			return CaseResult{}, err
+		}
+		var material document
+		if err = json.Unmarshal(data, &material); err != nil {
+			return CaseResult{}, err
+		}
+		assessed := judge.AssessAnswer(q, answer, material)
+		for _, criterion := range assessed["criteria"].([]document) {
+			if criterion["verdict"] == "not_assessed" {
+				return CaseResult{Artifacts: artifacts}, fmt.Errorf("judge-%s: %s: %v", q, criterion["aspect"], criterion["not_checked"])
+			}
+		}
 		encoded, err := json.Marshal(answer["findings"])
 		if err != nil {
 			return CaseResult{}, err
@@ -344,6 +358,11 @@ func run(args []string, env cli.Env) error {
 			return err
 		}
 	}
+	for _, c := range cases {
+		if _, err = ValidateCase(c.Dir, settings, standards); err != nil {
+			return fmt.Errorf("case %s: %w", c.Name, err)
+		}
+	}
 	if out == "" {
 		out, err = os.MkdirTemp("", "devkit-eval-judge-*")
 	} else {
@@ -383,7 +402,7 @@ func run(args []string, env cli.Env) error {
 		fmt.Fprintln(env.Stdout, "\nCase:", c.Name, "-", c.Description)
 		item, err := runCase(env, c, settings, standards, pack, out, formats)
 		if err != nil {
-			item = CaseResult{Name: c.Name, Description: c.Description, Error: err.Error()}
+			item.Name, item.Description, item.Error = c.Name, c.Description, err.Error()
 			fmt.Fprintln(env.Stdout, "  ERROR (not scored):", err)
 		} else {
 			printCase(env.Stdout, item)

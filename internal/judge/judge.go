@@ -186,6 +186,37 @@ func runCompletion(args []string, env cli.Env) error {
 	result["path"] = path
 	return env.JSON(result)
 }
+func AssessAnswer(q string, output, material doc) doc {
+	criteria := docs(output["criteria"])
+	if len(criteria) == 0 {
+		criteria = []doc{{"aspect": q, "verdict": "not_assessed", "checked": "", "not_checked": "The launched judge returned empty criteria"}}
+	}
+	for _, path := range stringsOf(material["criteria"]) {
+		aspect := strings.TrimSuffix(filepath.Base(path), ".md")
+		found := false
+		for _, c := range criteria {
+			if c["aspect"] == aspect {
+				found = true
+			}
+		}
+		if !found {
+			criteria = append(criteria, doc{"aspect": aspect, "verdict": "not_assessed", "checked": "", "not_checked": "Missing required criterion: " + path})
+		}
+	}
+	output["criteria"] = criteria
+	findings := []doc{}
+	for i, f := range docs(output["findings"]) {
+		f = clone(f)
+		if truth(f["deferred"]) && (q != "structure" || truth(f["blocking"]) || truth(f["needs_decision"])) {
+			output["criteria"] = []doc{{"aspect": q, "verdict": "not_assessed", "checked": "", "not_checked": "Invalid deferred finding: only nonblocking structure findings without an owner decision may be deferred"}}
+			findings = []doc{}
+			break
+		}
+		f["id"] = fmt.Sprintf("%s-%d", q, i+1)
+		findings = append(findings, f)
+	}
+	return doc{"judge": q, "criteria": output["criteria"], "findings": findings}
+}
 func gather(outputs, launch doc, materials ...doc) ([]doc, error) {
 	judges := []doc{}
 	for _, q := range qualities() {
@@ -196,37 +227,11 @@ func gather(outputs, launch doc, materials ...doc) ([]doc, error) {
 		if output == nil {
 			return nil, fmt.Errorf("%s did not finish; no complete judgment can be recorded", q)
 		}
-		criteria := docs(output["criteria"])
-		if len(criteria) == 0 {
-			criteria = []doc{{"aspect": q, "verdict": "not_assessed", "checked": "", "not_checked": "The launched judge returned empty criteria"}}
-		}
+		var material doc
 		if len(materials) > 0 {
-			for _, path := range stringsOf(object(materials[0][q])["criteria"]) {
-				aspect := strings.TrimSuffix(filepath.Base(path), ".md")
-				found := false
-				for _, c := range criteria {
-					if c["aspect"] == aspect {
-						found = true
-					}
-				}
-				if !found {
-					criteria = append(criteria, doc{"aspect": aspect, "verdict": "not_assessed", "checked": "", "not_checked": "Missing required criterion: " + path})
-				}
-			}
+			material = object(materials[0][q])
 		}
-		output["criteria"] = criteria
-		findings := []doc{}
-		for i, f := range docs(output["findings"]) {
-			f = clone(f)
-			if truth(f["deferred"]) && (q != "structure" || truth(f["blocking"]) || truth(f["needs_decision"])) {
-				output["criteria"] = []doc{{"aspect": q, "verdict": "not_assessed", "checked": "", "not_checked": "Invalid deferred finding: only nonblocking structure findings without an owner decision may be deferred"}}
-				findings = []doc{}
-				break
-			}
-			f["id"] = fmt.Sprintf("%s-%d", q, i+1)
-			findings = append(findings, f)
-		}
-		judges = append(judges, doc{"judge": q, "criteria": output["criteria"], "findings": findings})
+		judges = append(judges, AssessAnswer(q, output, material))
 	}
 	return judges, nil
 }

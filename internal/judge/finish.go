@@ -240,12 +240,41 @@ func finish(args []string, env cli.Env) error {
 			return err
 		}
 	}
-	for key, name := range map[string]string{"changes": "changes.json", "completion": "completion.json", "findings": "findings.json"} {
-		d, err := optional(filepath.Join(dir, name))
+	if !truth(object(inputs["prepare"])["stopped"]) {
+		changes, err := read(filepath.Join(dir, "changes.json"))
 		if err != nil {
 			return err
 		}
-		inputs[key] = d
+		if changes == nil {
+			return fmt.Errorf("changes.json is missing changes; no result is written")
+		}
+		proceed := truth(object(inputs["changes"])["proceed"])
+		inputs["changes"] = changes
+		if proceed {
+			for _, key := range []string{"completion", "findings"} {
+				d, err := read(filepath.Join(dir, key+".json"))
+				if err != nil {
+					return err
+				}
+				inputs[key] = d
+			}
+			if object(inputs["completion"])["missing"] == nil {
+				return fmt.Errorf("completion.json is missing planned test results; no result is written")
+			}
+			launch, err := read(filepath.Join(dir, "launched.json"))
+			if err != nil {
+				return err
+			}
+			launched := stringsOf(launch["launched"])
+			if len(launched) == 0 {
+				return fmt.Errorf("launched.json is missing launched judges; no result is written")
+			}
+			for _, q := range launched {
+				if !slices.ContainsFunc(docs(object(inputs["findings"])["judges"]), func(j doc) bool { return j["judge"] == q }) {
+					return fmt.Errorf("%s did not finish; no result is written", q)
+				}
+			}
+		}
 	}
 	judgments, outcome := decide(inputs)
 	target, err := optional(filepath.Join(dir, "target.json"))
