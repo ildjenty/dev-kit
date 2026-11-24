@@ -19,14 +19,14 @@ func caseName(name string) bool {
 	return safePath(name) && name != "." && !strings.Contains(name, "/") && name != ".git"
 }
 
-func trackedCase(ctx record.ContextData, dir string) (bool, error) {
-	out, e := gitx.Run(ctx.Cwd, "ls-tree", "--name-only", "HEAD", "--", dir)
+func trackedCase(ctx record.ContextData, base, dir string) (bool, error) {
+	out, e := gitx.Run(ctx.Cwd, "ls-tree", "--name-only", base, "--", dir)
 	return out != "", e
 }
 
 func escapeDraftErrors(ctx record.ContextData, input, draft doc, used map[string]bool) ([]string, error) {
 	errors := []string{}
-	paths, e := changes(ctx.Cwd)
+	paths, e := proposalChanges(ctx, input)
 	if e != nil {
 		return nil, e
 	}
@@ -96,7 +96,7 @@ func escapeDraftErrors(ctx record.ContextData, input, draft doc, used map[string
 		if !baseFile {
 			errors = append(errors, "escape case base must contain a file to survive Git commits (use .gitkeep for an empty base): "+name)
 		}
-		tracked, e := trackedCase(ctx, dir)
+		tracked, e := trackedCase(ctx, str(input["proposal_base"]), dir)
 		if e != nil {
 			return nil, e
 		}

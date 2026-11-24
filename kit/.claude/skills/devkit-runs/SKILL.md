@@ -139,8 +139,11 @@ when the owner approves that version, start that workflow again on the same bran
 approval question's ID. Never synthesize approval or use `approve` for an open-point question.
 
 Run retro on a `retro/<name>` branch created from the base. It reads that branch's backlog, proposes
-units, check additions and standard edits, then asks one approval question after machine and fresh
-read-only judgment. Approval applies corrections and deletes consumed backlog files in one commit.
+units, check additions and standard edits, commits the real files and consumed backlog deletions,
+then asks one approval question showing the version and commit after machine checks, fresh read-only
+judgment and escape verification. Approval requires that version's commit to remain the clean branch
+head and only records the result. Requested changes create the next proposal commit on that history;
+withdrawn edits are undone by a new commit. Old snapshot proposals must be restarted on a new retro branch.
 An empty backlog passes without an approval question. Publish and merge the correction PR through
 the repository's PR process before starting its units.
 

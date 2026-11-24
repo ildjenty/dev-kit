@@ -1,0 +1,4 @@
+fixture: {"expect": "completed", "reached": ["start", "not-started", "result"], "inputs": {"approve": "1"}}
+start: {"stopped": true, "stage": "start", "reason": "old-format retro proposal cannot be used; start retro again on a new retro branch", "details": "/tmp/record", "remaining": [], "start": "", "counted": false, "restarts": 0}
+not-started: {"outcome": "not_started", "proposal_version": 0, "unit_ids": [], "questions": [], "reasons": ["old-format retro proposal cannot be used; start retro again on a new retro branch"]}
+result: {"outcome": "not_started", "proposal_version": 0, "unit_ids": [], "questions": [], "reasons": ["old-format retro proposal cannot be used; start retro again on a new retro branch"]}

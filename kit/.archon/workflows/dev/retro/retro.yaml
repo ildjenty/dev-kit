@@ -2,7 +2,8 @@ name: retro
 description: |
   Turn the checkout's review backlog into traced work units, mechanical checks and standard edits.
   Review up to three drafts, commit the proposal and ask one approval question.
-  Restart with approve=<version> to apply it and consume its backlog in one commit.
+  The proposal commit contains the edits and consumed backlog deletions.
+  Restart with approve=<version> to approve that clean branch head without further edits.
 worktree:
   enabled: true
 inputs:
@@ -108,6 +109,7 @@ nodes:
 
         - id: judge
           depends_on: [check]
+          when: "$check.output.valid == true"
           provider: claude
           settingSources: [user]
           command: judge
@@ -166,7 +168,8 @@ nodes:
             required: ["criteria","findings"]
 
         - id: round
-          depends_on: [judge]
+          depends_on: [check, judge]
+          trigger_rule: none_failed_min_one_success
           bash: |
             judgment=$judge.output
             INPUTS_JUDGMENT="$judgment" devkit retro round

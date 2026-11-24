@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/judgeeval"
@@ -18,27 +17,20 @@ func reviewHash(entry doc) string {
 	return fmt.Sprintf("%x", sha256.Sum256(b))
 }
 
-func reviewedErrors(ctx record.ContextData, artifacts string, entry doc) ([]string, doc, error) {
-	errors, e := draftErrors(ctx, artifacts, entry["draft"])
+func reviewedErrors(ctx record.ContextData, artifacts string, entry doc) ([]string, error) {
+	errors, e := reviewedDraftErrors(ctx, artifacts, entry)
 	if e != nil {
-		return nil, nil, e
+		return nil, e
 	}
 	errors = append(stringsOf(entry["errors"]), errors...)
-	edits, e := snapshot(ctx, artifacts)
-	if e != nil {
-		return nil, nil, e
-	}
 	approval, e := os.ReadFile(file(artifacts, "approval.txt"))
 	if e != nil && !os.IsNotExist(e) {
-		return nil, nil, e
+		return nil, e
 	}
 	if string(approval) != str(entry["approval_text"]) {
 		errors = append(errors, "approval question changed after the judgment")
 	}
-	if !reflect.DeepEqual(edits, obj(entry["edits"])) {
-		errors = append(errors, "checkout changed after the judgment")
-	}
-	return errors, edits, nil
+	return errors, nil
 }
 
 func verify(ctx record.ContextData, artifacts string, env cli.Env) (doc, error) {
@@ -47,7 +39,7 @@ func verify(ctx record.ContextData, artifacts string, env cli.Env) (doc, error) 
 	if e != nil {
 		return nil, e
 	}
-	errors, _, e := reviewedErrors(ctx, artifacts, entry)
+	errors, e := reviewedErrors(ctx, artifacts, entry)
 	if e != nil {
 		return nil, e
 	}

@@ -17,6 +17,11 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 	if e != nil {
 		return nil, e
 	}
+	committed, proposal, e := committedErrors(ctx, d)
+	if e != nil {
+		return nil, e
+	}
+	errors = append(errors, committed...)
 	je, e := schema("judgment", judgment)
 	if e != nil {
 		return nil, e
@@ -62,19 +67,23 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 			}
 		}
 	}
-	edits, e := snapshot(ctx, artifacts)
-	if e != nil {
-		return nil, e
-	}
 	approval, e := os.ReadFile(file(artifacts, "approval.txt"))
 	if e != nil && !os.IsNotExist(e) {
 		return nil, e
 	}
-	entry := doc{"approval_text": string(approval), "edits": edits, "round": n, "draft": d, "judgment": judgment, "errors": errors, "cleared": len(errors) == 0 && blocking == 0 && missing == 0}
+	entry := doc{"approval_text": string(approval), "commit": obj(proposal["content"])["commit"], "proposal_version": proposal["version"], "round": n, "draft": d, "judgment": judgment, "errors": errors, "cleared": len(errors) == 0 && blocking == 0 && missing == 0}
 	if e = writeJSON(file(artifacts, fmt.Sprintf("rounds/%d.json", n)), entry); e != nil {
 		return nil, e
 	}
 	if e = writeJSON(file(artifacts, "rounds/latest.json"), entry); e != nil {
+		return nil, e
+	}
+	input, e := readJSON(file(artifacts, "input.json"))
+	if e != nil {
+		return nil, e
+	}
+	input["next_proposal_version"] = num(proposal["version"]) + 1
+	if e = writeJSON(file(artifacts, "input.json"), input); e != nil {
 		return nil, e
 	}
 	return doc{"round": n, "valid": len(errors) == 0, "blocking_count": blocking, "not_assessed_count": missing}, nil

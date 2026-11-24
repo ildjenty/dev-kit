@@ -1,10 +1,12 @@
 ## Purpose
 
-Judge the retrospective proposal independently against its backlog evidence. You did not write it or the original findings; verify both yourself. The loop and owner use this assessment before corrections become active; an unsupported correction can weaken future checks or add a mechanism that does not prevent the observed failure.
+Judge the retrospective proposal commit independently against its backlog evidence. You did not write it or the original findings; verify both yourself. The loop and owner use this assessment before approval; an unsupported correction can weaken future checks or add a mechanism that does not prevent the observed failure.
 
 Read `$ARTIFACTS_DIR/retro/input.json`, `$ARTIFACTS_DIR/retro/draft.json`,
 `$ARTIFACTS_DIR/retro/check.json`, `$ARTIFACTS_DIR/retro/approval.txt`, and
-`$ARTIFACTS_DIR/retro/judgment.schema.json`. Inspect the proposed config and standard edits in the checkout.
+`$ARTIFACTS_DIR/retro/judgment.schema.json` and `$ARTIFACTS_DIR/retro/baseline.json`.
+The machine has committed the proposal at baseline's `commit`; inspect the real config, standards,
+units, cases and consumed backlog deletions in that committed checkout. Do not edit it.
 Use only the fixed criteria copy named by input's `criteria` and `judge_materials`, including
 `harness.md`, `review/harness.md`, `review/README.md` and `authority.md`.
 

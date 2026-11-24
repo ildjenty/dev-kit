@@ -7,7 +7,7 @@ Read `$ARTIFACTS_DIR/retro/input.json` and `$ARTIFACTS_DIR/retro/verification.js
 Return `{"text":"..."}` in the language named by `language` in your input, to append to the
 already reviewed approval question. Do not edit the checkout or change the proposal.
 
-Describe the evaluation against the proposed standards and `concerns.json`. For each case and
+Describe the evaluation against the committed proposal's standards and `concerns.json`. For each case and
 each expected finding, give its ID, quality, file, summary and whether it was found or missed.
 Identify routing misses. Explicitly report every case's provider failure or evaluation error as
 not scored, including its reason; do not describe errors as successful verification or as misses.

@@ -36,9 +36,18 @@ func changes(cwd string) ([]string, error) {
 	return paths, nil
 }
 func scopeErrors(ctx record.ContextData, input doc, backlog bool) ([]string, error) {
-	paths, e := changes(ctx.Cwd)
+	paths, e := proposalChanges(ctx, input)
 	if e != nil {
 		return nil, e
+	}
+	working, e := changes(ctx.Cwd)
+	if e != nil {
+		return nil, e
+	}
+	for _, p := range working {
+		if !slices.Contains(paths, p) {
+			paths = append(paths, p)
+		}
 	}
 	folders := obj(input["folders"])
 	errors := []string{}
@@ -77,7 +86,7 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		return nil, e
 	}
 	if head != baseline["commit"] {
-		errors = append(errors, "writer changed HEAD; only finish may commit")
+		errors = append(errors, "writer changed HEAD; only retro check may commit")
 	}
 	draft := obj(value)
 	known, used, dismissed := map[string]bool{}, map[string]bool{}, map[string]bool{}
@@ -124,12 +133,12 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		return nil, e
 	}
 	errors = append(errors, escapeErrors...)
-	se, e := scopeErrors(ctx, input, false)
+	se, e := scopeErrors(ctx, input, true)
 	if e != nil {
 		return nil, e
 	}
 	errors = append(errors, se...)
-	paths, e := changes(ctx.Cwd)
+	paths, e := proposalChanges(ctx, input)
 	if e != nil {
 		return nil, e
 	}
@@ -158,11 +167,15 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		}
 		named = append(named, p)
 	}
+	working, e := changes(ctx.Cwd)
+	if e != nil {
+		return nil, e
+	}
 	for _, p := range paths {
 		if inside(p, standards) && !slices.Contains(named, p) {
 			errors = append(errors, "standard edit has no backlog trace: "+p)
 		}
-		if inside(p, str(obj(input["folders"])["units"])) {
+		if inside(p, str(obj(input["folders"])["units"])) && slices.Contains(working, p) {
 			errors = append(errors, "write units in the draft, not directly: "+p)
 		}
 	}
@@ -227,6 +240,24 @@ func check(ctx record.ContextData, artifacts string) (doc, error) {
 	errors, e := draftErrors(ctx, artifacts, draft)
 	if e != nil {
 		return nil, e
+	}
+	if len(errors) == 0 {
+		input, e := readJSON(file(artifacts, "input.json"))
+		if e != nil {
+			return nil, e
+		}
+		if _, e = commitProposal(ctx, artifacts, input, obj(draft)); e != nil {
+			return nil, e
+		}
+		errors, e = draftErrors(ctx, artifacts, draft)
+		if e != nil {
+			return nil, e
+		}
+		committed, _, e := committedErrors(ctx, draft)
+		if e != nil {
+			return nil, e
+		}
+		errors = append(errors, committed...)
 	}
 	out := doc{"valid": len(errors) == 0, "errors": errors}
 	return out, writeJSON(file(artifacts, "check.json"), out)

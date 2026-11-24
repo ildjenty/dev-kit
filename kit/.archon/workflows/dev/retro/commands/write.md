@@ -1,6 +1,6 @@
 ## Purpose
 
-Turn backlog evidence into proposed work units, checks and standard corrections. Other sessions produced the findings and objections; verify their source judgments yourself. The retro judge and owner review this proposal before it is applied; ignoring resolved failures or weakening standards without evidence prevents learning from the work.
+Turn backlog evidence into proposed work units, checks and standard corrections. Other sessions produced the findings and objections; verify their source judgments yourself. The retro judge and owner review the proposal commit; ignoring resolved failures or weakening standards without evidence prevents learning from the work.
 
 Read `$ARTIFACTS_DIR/retro/input.json`, `$ARTIFACTS_DIR/retro/draft.schema.json`,
 `$ARTIFACTS_DIR/retro/check.json` and `$ARTIFACTS_DIR/retro/rounds/latest.json` when present.
@@ -44,14 +44,19 @@ The input also lists existing units with `state`. A unit with `state: done` is f
 preserve its file unchanged and propose a new unit for follow-up work; never edit or delete the done unit.
 
 Keep keys of retained units when revising a proposal and omit withdrawn ones. Use the exact entry IDs supplied in input. Cover every entry with a proposal or dismissal.
-Write units only in the draft; the machine materializes them on approval. Edit only the config,
+Each revision builds on the previous proposal commit. Describe the complete proposal relative to its original base, including retained checks, standards and cases; revert withdrawn edits in the checkout. Omit withdrawn units from the draft; the machine deletes them in the next proposal commit. Never reset, amend or rewrite proposal history.
+Write units only in the draft; the machine materializes them before judgment. Edit only the config,
 configured standards folder and the new cases named in the draft. Do not edit existing cases.
 Remove withdrawn draft cases when revising. Do not commit. Revisions must address the previous round and answers.
 
 Write `$ARTIFACTS_DIR/retro/approval.txt` in `language`: one approval question describing the entire
 proposal, including dismissals, source entries, failure prevented, evidence and ongoing burden.
 Include the exact `approve=<next_proposal_version>` and explain `answers` for requesting changes.
-The machine commits the proposal JSON and restores the proposed config, standards and cases until approval.
+After the machine checks pass, the machine commits the real config, standards, cases and units,
+together with consumed backlog deletions. Each proposal version names one commit; no file snapshots
+are stored in a proposal JSON in the units folder. Judgment and verification inspect that committed,
+clean checkout. The final approval question includes its version and commit. Approval only records
+the result and requires that commit to remain the clean branch head.
 After checks and independent judgment pass, it evaluates new escape cases against a temporary copy
 of the proposed standards and concern map. Evaluation misses and provider failures are reported to
 the owner before approval and do not block the proposal.

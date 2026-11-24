@@ -137,7 +137,7 @@ func TestDismissedEscapeNeedsTraceButDoesNotCallProvider(t *testing.T) {
 	d["escapes"] = []doc{{"entry": escapeID, "stage": "none", "quality": "", "reason": "No requirement covered this behavior", "evidence": "Neither local git nor gh can read the entering change", "judge_should_catch": false}}
 	r.write(d)
 	testutil.Equal(t, r.errors(d), "")
-	testutil.Must(round(r.ctx, r.artifacts, judgment()))
+	testutil.Must(r.review(judgment()))
 	testutil.Equal(t, testutil.Must(verify(r.ctx, r.artifacts, envVars(map[string]string{"DEVKIT_CLAUDE": "/missing/provider"})))["needed"], false)
 	testutil.Equal(t, testutil.Must(finish(r.ctx, r.artifacts))["outcome"], "question")
 }
@@ -184,7 +184,7 @@ func TestEscapeVerificationAndApprovalWithFakeProviders(t *testing.T) {
 				d["standards"] = append(items(d["standards"]), doc{"path": mapPath, "entries": []string{escapeID}, "reason": "Route the missed change", "evidence": "Entered diff"})
 				r.write(d)
 				testutil.Equal(t, r.errors(d), "")
-				testutil.Must(round(r.ctx, r.artifacts, judgment()))
+				testutil.Must(r.review(judgment()))
 				head := r.git("rev-parse", "HEAD")
 				env := fakeEscapeProvider(t, r, failure)
 				testutil.Equal(t, testutil.Must(verify(r.ctx, r.artifacts, env))["needed"], true)
@@ -204,10 +204,10 @@ func TestEscapeVerificationAndApprovalWithFakeProviders(t *testing.T) {
 				out := testutil.Must(finish(r.ctx, r.artifacts))
 				testutil.Equal(t, out["outcome"], "question")
 				testutil.Contains(t, str(items(out["questions"])[0]["text"]), text)
-				testutil.Equal(t, string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, path)))), original)
+				testutil.Contains(t, string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, path)))), "Proposed escape standard marker.")
 				testutil.Equal(t, r.git("status", "--porcelain"), "")
 				_, e := os.Stat(filepath.Join(r.cwd, casePath, "case.json"))
-				testutil.Equal(t, os.IsNotExist(e), true)
+				testutil.OK(t, e)
 				r.ctx.RunID = "r2"
 				s, e := start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))
 				testutil.OK(t, e)
@@ -229,7 +229,7 @@ func TestEscapeCannotSkipVerificationOrChangeReviewedCase(t *testing.T) {
 		t.Run(fmt.Sprint(changed), func(t *testing.T) {
 			r := escapeFixture(t)
 			r.write(r.escapeDraft())
-			testutil.Must(round(r.ctx, r.artifacts, judgment()))
+			testutil.Must(r.review(judgment()))
 			want := "must verify the reviewed draft"
 			if changed {
 				r.put(casePath+"/base/extra.go", "package value\n")
@@ -238,7 +238,11 @@ func TestEscapeCannotSkipVerificationOrChangeReviewedCase(t *testing.T) {
 			out := testutil.Must(finish(r.ctx, r.artifacts))
 			testutil.Equal(t, out["outcome"], "stop")
 			testutil.Contains(t, strings.Join(stringsOf(out["reasons"]), "\n"), want)
-			testutil.Equal(t, r.git("status", "--porcelain"), "")
+			if changed {
+				testutil.Contains(t, r.git("status", "--porcelain"), "extra.go")
+			} else {
+				testutil.Equal(t, r.git("status", "--porcelain"), "")
+			}
 		})
 	}
 }
@@ -300,9 +304,9 @@ func TestVerifyWithoutEscapesDoesNotCallProvider(t *testing.T) {
 	r := setup(t, backlog())
 	r.begin()
 	r.write(r.draft())
-	testutil.Must(round(r.ctx, r.artifacts, judgment()))
+	testutil.Must(r.review(judgment()))
 	testutil.Equal(t, testutil.Must(verify(r.ctx, r.artifacts, envVars(nil)))["needed"], false)
 	_, e := os.Stat(file(r.artifacts, "evaluation"))
 	testutil.Equal(t, os.IsNotExist(e), true)
-	testutil.Equal(t, len(testutil.Must(record.List(r.ctx.Dir, "proposal"))), 0)
+	testutil.Equal(t, len(testutil.Must(record.List(r.ctx.Dir, "proposal"))), 1)
 }

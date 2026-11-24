@@ -1,10 +1,8 @@
 package retro
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -30,60 +28,6 @@ func output(result doc, version int) doc {
 	}
 	ids := stringsOf(result["unit_ids"])
 	return doc{"outcome": result["outcome"], "proposal_version": version, "unit_ids": ids, "questions": qs, "reasons": stringsOf(obj(result["stop"])["unresolved"])}
-}
-func snapshot(ctx record.ContextData, artifacts string) (doc, error) {
-	input, e := readJSON(file(resolve(ctx.Cwd, artifacts), "input.json"))
-	if e != nil {
-		return nil, e
-	}
-	paths, e := changes(ctx.Cwd)
-	if e != nil {
-		return nil, e
-	}
-	out := doc{}
-	for _, p := range paths {
-		if !safePath(p) || !(inside(p, str(obj(input["folders"])["standards"])) || inside(p, caseFolder(input)) || p == ".devkit/config.json") {
-			continue
-		}
-		b, e := os.ReadFile(filepath.Join(ctx.Cwd, p))
-		if os.IsNotExist(e) {
-			out[p] = nil
-		} else if e != nil {
-			return nil, e
-		} else {
-			out[p] = string(b)
-		}
-	}
-	return out, nil
-}
-func restore(ctx record.ContextData, input doc) error {
-	paths, e := changes(ctx.Cwd)
-	if e != nil {
-		return e
-	}
-	folders := obj(input["folders"])
-	for _, p := range paths {
-		if !safePath(p) || !(inside(p, str(folders["units"])) || inside(p, str(folders["standards"])) || inside(p, caseFolder(input)) || p == ".devkit/config.json") {
-			continue
-		}
-		exists, e := gitx.Run(ctx.Cwd, "ls-tree", "--name-only", "HEAD", "--", p)
-		if e != nil {
-			return e
-		}
-		if exists != "" {
-			if _, e = gitx.Run(ctx.Cwd, "restore", "--source=HEAD", "--staged", "--worktree", "--", p); e != nil {
-				return e
-			}
-		} else {
-			if _, e = gitx.Run(ctx.Cwd, "reset", "-q", "HEAD", "--", p); e != nil {
-				return e
-			}
-			if e = os.Remove(filepath.Join(ctx.Cwd, p)); e != nil && !os.IsNotExist(e) {
-				return e
-			}
-		}
-	}
-	return nil
 }
 func preflight(ctx record.ContextData) error {
 	o, e := resultOptions(ctx)
@@ -124,10 +68,6 @@ func empty(ctx record.ContextData, artifacts string) (doc, error) {
 	}
 	return saveResult(ctx, doc{"outcome": "pass"}, num(p.Entry["version"]))
 }
-func proposalPath(input doc, branch string) string {
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(branch)))
-	return str(obj(input["folders"])["units"]) + "/retro-" + hash[:12] + ".json"
-}
 func materializedUnits(ctx record.ContextData, input, draft doc) (doc, []string, error) {
 	edits, ids := doc{}, []string{}
 	data := decisions.Data{}
@@ -139,9 +79,22 @@ func materializedUnits(ctx record.ContextData, input, draft doc) (doc, []string,
 		data.Units = append(data.Units, decisions.Item{"id": strings.TrimSuffix(filepath.Base(path), ".md")})
 	}
 	for _, u := range items(draft["units"]) {
-		id, e := decisions.NextID("unit", ctx.Branch, str(u["key"]), data)
+		id := ""
+		previous, e := record.Latest(ctx.Dir, "proposal")
 		if e != nil {
 			return nil, nil, e
+		}
+		content := obj(previous["content"])
+		for i, old := range items(obj(content["draft"])["units"]) {
+			if old["key"] == u["key"] && i < len(stringsOf(content["unit_ids"])) {
+				id = stringsOf(content["unit_ids"])[i]
+			}
+		}
+		if id == "" {
+			id, e = decisions.NextID("unit", ctx.Branch, str(u["key"]), data)
+			if e != nil {
+				return nil, nil, e
+			}
 		}
 		data.Units = append(data.Units, decisions.Item{"id": id})
 		path := str(obj(input["folders"])["units"]) + "/" + id + ".md"
@@ -172,7 +125,8 @@ func materializedUnits(ctx record.ContextData, input, draft doc) (doc, []string,
 }
 func commitPaths(ctx record.ContextData, paths []string, message string) error {
 	if len(paths) == 0 {
-		return nil
+		_, e := gitx.Run(ctx.Cwd, "commit", "--allow-empty", "--only", "-m", message)
+		return e
 	}
 	slices.Sort(paths)
 	if _, e := gitx.Run(ctx.Cwd, append([]string{"add", "-A", "--"}, paths...)...); e != nil {
@@ -194,11 +148,18 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	if e != nil {
 		return nil, e
 	}
-	errors, edits, e := reviewedErrors(ctx, artifacts, entry)
+	errors, e := reviewedErrors(ctx, artifacts, entry)
 	if e != nil {
 		return nil, e
 	}
-	content := doc{"draft": entry["draft"], "judgment": entry["judgment"], "ready": false}
+	p, e := record.Latest(ctx.Dir, "proposal")
+	if e != nil {
+		return nil, e
+	}
+	content := obj(p["content"])
+	if content != nil {
+		content["ready"] = false
+	}
 	approvalText := str(entry["approval_text"])
 	if entry["cleared"] == true && len(errors) == 0 && len(items(obj(entry["draft"])["cases"])) > 0 {
 		verification, e := readJSON(file(artifacts, "verification.json"))
@@ -220,52 +181,31 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 			errors = append(errors, "The retro draft did not clear review")
 		}
 		result = doc{"outcome": "stop", "stop": doc{"state": "The retro draft did not clear review", "unresolved": errors, "premise": ""}}
-		if e = restore(ctx, input); e != nil {
-			return nil, e
-		}
 	} else {
-		units, ids, e := materializedUnits(ctx, input, obj(entry["draft"]))
-		if e != nil {
-			return nil, e
-		}
-		for p, b := range units {
-			edits[p] = b
-		}
-		path := proposalPath(input, ctx.Branch)
-		if _, e = os.Stat(filepath.Join(ctx.Cwd, path)); e == nil && obj(obj(input["previous"])["content"])["proposal_path"] != path {
-			return nil, fmt.Errorf("proposal path already exists: %s", path)
-		} else if e != nil && !os.IsNotExist(e) {
-			return nil, e
-		}
-		content["edits"], content["backlog"], content["unit_ids"], content["proposal_path"], content["ready"] = edits, input["backlog"], ids, path, true
-		content["approval_text"] = strings.TrimSpace(approvalText)
-		if e = restore(ctx, input); e != nil {
-			return nil, e
-		}
-		if e = writeJSON(filepath.Join(ctx.Cwd, path), content); e != nil {
-			return nil, e
-		}
-		se, e := scopeErrors(ctx, input, false)
-		if e != nil {
-			return nil, e
-		}
-		if len(se) > 0 {
-			return nil, &record.RecordError{Message: "proposal scope changed", Errors: se}
-		}
-		if e = commitPaths(ctx, []string{path}, "chore: propose retro improvements"); e != nil {
-			return nil, e
-		}
-		result = doc{"outcome": "question", "unit_ids": ids, "questions": []doc{{"text": content["approval_text"], "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(input["next_proposal_version"]))}, "next_workflows": []string{"retro"}, "invalidates": []string{}}}}
+		approvalText = fmt.Sprintf("%s\n\nProposal version: %d\nCommit: %s", strings.TrimSpace(approvalText), num(p["version"]), str(obj(p["content"])["commit"]))
+		content["approval_text"], content["judgment"], content["ready"] = approvalText, entry["judgment"], true
+		result = doc{"outcome": "question", "unit_ids": obj(p["content"])["unit_ids"], "questions": []doc{{"text": approvalText, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"retro"}, "invalidates": []string{}}}}
 	}
-	p, e := record.Write(ctx, "proposal", doc{"content": content}, "")
-	if e != nil {
-		return nil, e
+	if p == nil || p["run_id"] != ctx.RunID && str(obj(p["content"])["commit"]) == "" {
+		written, e := record.Write(ctx, "proposal", doc{"content": doc{"draft": entry["draft"], "ready": false}}, "")
+		if e != nil {
+			return nil, e
+		}
+		p = written.Entry
+	} else if p["run_id"] == ctx.RunID {
+		if e = finishProposal(ctx, p, content); e != nil {
+			return nil, e
+		}
 	}
 	records := []doc{}
 	for n := 1; n <= num(entry["round"]); n++ {
 		roundEntry, e := readJSON(file(artifacts, fmt.Sprintf("rounds/%d.json", n)))
 		if e != nil {
 			return nil, e
+		}
+		version := roundEntry["proposal_version"]
+		if num(version) == 0 {
+			version = p["version"]
 		}
 		judgmentErrors, e := schema("judgment", roundEntry["judgment"])
 		if e != nil {
@@ -304,16 +244,16 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 				verdict = "not_assessed"
 				observations = append(observations, errors...)
 			}
-			records = append(records, doc{"judge": "retro", "phase": "retro", "round": n, "kind": "proposal", "target": doc{"proposal_version": p.Entry["version"]}, "materials": []string{file(artifacts, "input.json"), file(artifacts, fmt.Sprintf("rounds/%d.json", n)), str(input["criteria"])}, "observations": observations, "verdict": verdict, "findings": findings})
+			records = append(records, doc{"judge": "retro", "phase": "retro", "round": n, "kind": "proposal", "target": doc{"proposal_version": version}, "materials": []string{file(artifacts, "input.json"), file(artifacts, fmt.Sprintf("rounds/%d.json", n)), str(input["criteria"])}, "observations": observations, "verdict": verdict, "findings": findings})
 		} else {
-			records = append(records, doc{"judge": "retro", "phase": "retro", "round": n, "kind": "proposal", "target": doc{"proposal_version": p.Entry["version"]}, "materials": []string{file(artifacts, fmt.Sprintf("rounds/%d.json", n))}, "observations": judgmentErrors, "verdict": "not_assessed", "findings": []doc{}})
+			records = append(records, doc{"judge": "retro", "phase": "retro", "round": n, "kind": "proposal", "target": doc{"proposal_version": version}, "materials": []string{file(artifacts, fmt.Sprintf("rounds/%d.json", n))}, "observations": judgmentErrors, "verdict": "not_assessed", "findings": []doc{}})
 		}
 	}
 	if e = record.WriteLoopJudgments(ctx, records, ""); e != nil {
 		return nil, e
 	}
 
-	return saveResult(ctx, result, num(p.Entry["version"]))
+	return saveResult(ctx, result, num(p["version"]))
 }
 func approve(ctx record.ContextData, version string) (doc, error) {
 	if e := authorizedApproval(ctx, version); e != nil {
@@ -334,35 +274,5 @@ func approve(ctx record.ContextData, version string) (doc, error) {
 		return nil, e
 	}
 	content := obj(p["content"])
-	for path, body := range obj(content["backlog"]) {
-		b, e := os.ReadFile(filepath.Join(ctx.Cwd, path))
-		if e != nil {
-			return nil, e
-		}
-		if string(b) != str(body) {
-			return nil, fmt.Errorf("backlog changed since proposal: %s", path)
-		}
-	}
-	paths := []string{}
-	for path, body := range obj(content["edits"]) {
-		if body == nil {
-			e = os.Remove(filepath.Join(ctx.Cwd, path))
-		} else {
-			e = put(filepath.Join(ctx.Cwd, path), str(body))
-		}
-		if e != nil {
-			return nil, e
-		}
-		paths = append(paths, path)
-	}
-	for path := range obj(content["backlog"]) {
-		if e = os.Remove(filepath.Join(ctx.Cwd, path)); e != nil {
-			return nil, e
-		}
-		paths = append(paths, path)
-	}
-	if e = commitPaths(ctx, paths, "chore: apply retro proposal "+version); e != nil {
-		return nil, e
-	}
 	return saveResult(ctx, doc{"outcome": "pass", "unit_ids": content["unit_ids"]}, num(p["version"]))
 }

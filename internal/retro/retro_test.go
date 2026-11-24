@@ -87,17 +87,24 @@ func judgment() doc {
 	}
 	return doc{"criteria": cs, "findings": []doc{}}
 }
+func (r *fixture) review(j doc) (doc, error) {
+	r.t.Helper()
+	if _, e := check(r.ctx, r.artifacts); e != nil {
+		return nil, e
+	}
+	return round(r.ctx, r.artifacts, j)
+}
 func (r *fixture) propose() doc {
 	r.t.Helper()
 	r.write(r.draft())
-	testutil.Equal(r.t, testutil.Must(round(r.ctx, r.artifacts, judgment()))["valid"], true)
+	testutil.Equal(r.t, testutil.Must(r.review(judgment()))["valid"], true)
 	return testutil.Must(finish(r.ctx, r.artifacts))
 }
 func (r *fixture) errors(d doc) string {
 	r.t.Helper()
 	return strings.Join(testutil.Must(draftErrors(r.ctx, r.artifacts, d)), "\n")
 }
-func TestProposalAndApprovalApplyEverythingAndConsumeBacklogInOneCommit(t *testing.T) {
+func TestProposalCommitsEverythingAndApprovalOnlyRecordsResult(t *testing.T) {
 	b := backlog()
 	b["carried"] = []doc{finding()}
 	b["mechanical"] = []doc{finding()}
@@ -133,24 +140,29 @@ func TestProposalAndApprovalApplyEverythingAndConsumeBacklogInOneCommit(t *testi
 	r.json(".devkit/config.json", c)
 	r.write(d)
 	testutil.Equal(t, r.errors(d), "")
-	testutil.Equal(t, testutil.Must(round(r.ctx, r.artifacts, judgment()))["valid"], true)
+	testutil.Equal(t, testutil.Must(r.review(judgment()))["valid"], true)
 	out := testutil.Must(finish(r.ctx, r.artifacts))
 	testutil.Equal(t, out["outcome"], "question")
 	testutil.Equal(t, len(items(out["questions"])), 1)
-	testutil.Equal(t, string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, ".devkit/standards/harness.md")))), standard)
-	testutil.Equal(t, len(testutil.Must(config.Load(r.cwd)).Checks), len(c.Checks)-1)
-	testutil.Equal(t, len(testutil.Must(decisions.List(r.cwd)).Units), 0)
+	testutil.Contains(t, string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, ".devkit/standards/harness.md")))), "clarification supported")
+	testutil.Equal(t, len(testutil.Must(config.Load(r.cwd)).Checks), len(c.Checks))
+	testutil.Equal(t, len(testutil.Must(decisions.List(r.cwd)).Units), 1)
 	testutil.Equal(t, r.git("status", "--porcelain"), "")
 	proposal := testutil.Must(record.Latest(r.ctx.Dir, "proposal"))
 	content := obj(proposal["content"])
-	testutil.Equal(t, len(obj(content["backlog"])), 2)
-	testutil.Equal(t, len(obj(content["edits"])), 3)
+	testutil.Equal(t, content["backlog"], nil)
+	testutil.Equal(t, content["edits"], nil)
+	testutil.Equal(t, content["proposal_path"], nil)
+	head := r.git("rev-parse", "HEAD")
+	testutil.Equal(t, content["commit"], head)
+	testutil.Contains(t, str(items(out["questions"])[0]["text"]), head)
 	testutil.Equal(t, len(testutil.Must(record.List(r.ctx.Dir, "judgment"))), 1)
 	r.ctx.RunID = "r2"
 	s, e := start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))
 	testutil.OK(t, e)
 	testutil.Equal(t, s.Stopped, false)
 	testutil.Equal(t, testutil.Must(approve(r.ctx, "1"))["outcome"], "pass")
+	testutil.Equal(t, r.git("rev-parse", "HEAD"), head)
 	unitPath := filepath.Join(r.cwd, str(obj(input["folders"])["units"]), stringsOf(content["unit_ids"])[0]+".md")
 	unit := testutil.Must(decisions.Parse(string(testutil.Must(os.ReadFile(unitPath)))))
 	testutil.Equal(t, unit["id"], stringsOf(content["unit_ids"])[0])
@@ -272,7 +284,7 @@ func TestScopeChecksIndexAndWorktreeSeparately(t *testing.T) {
 			}
 			testutil.Contains(t, r.errors(d), "outside the allowed paths")
 			for i := 0; i < 3; i++ {
-				testutil.Equal(t, testutil.Must(round(r.ctx, r.artifacts, judgment()))["valid"], false)
+				testutil.Equal(t, testutil.Must(r.review(judgment()))["valid"], false)
 			}
 			head := r.git("rev-parse", "HEAD")
 			testutil.Equal(t, testutil.Must(finish(r.ctx, r.artifacts))["outcome"], "stop")
@@ -300,12 +312,12 @@ func TestJudgmentDecisionPointsAndRoundLimit(t *testing.T) {
 				items(j["criteria"])[0]["verdict"] = verdict
 			}
 			for i := 0; i < 3; i++ {
-				out := testutil.Must(round(r.ctx, r.artifacts, j))
+				out := testutil.Must(r.review(j))
 				if out["valid"] == true && num(out["blocking_count"]) == 0 && num(out["not_assessed_count"]) == 0 {
 					t.Fatal("bad judgment cleared")
 				}
 			}
-			_, e := round(r.ctx, r.artifacts, j)
+			_, e := r.review(j)
 			testutil.Fails(t, e, "three rounds")
 			testutil.Equal(t, testutil.Must(finish(r.ctx, r.artifacts))["outcome"], "stop")
 			if verdict != "schema" {
@@ -322,7 +334,7 @@ func TestFinishRechecksEditsAndMissingDraftStops(t *testing.T) {
 	r.begin()
 	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts))["valid"], false)
 	testutil.OK(t, put(file(r.artifacts, "draft.json"), "{broken"))
-	testutil.Must(round(r.ctx, r.artifacts, judgment()))
+	testutil.Must(r.review(judgment()))
 	testutil.Equal(t, testutil.Must(finish(r.ctx, r.artifacts))["outcome"], "stop")
 	r = setup(t, backlog())
 	r.begin()
@@ -332,12 +344,12 @@ func TestFinishRechecksEditsAndMissingDraftStops(t *testing.T) {
 	original := string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, ".devkit/standards/harness.md"))))
 	r.put(".devkit/standards/harness.md", original+"\nFirst clarification\n")
 	r.write(d)
-	testutil.Must(round(r.ctx, r.artifacts, judgment()))
+	testutil.Must(r.review(judgment()))
 	r.put(".devkit/standards/harness.md", original+"\nUnreviewed clarification\n")
 	out := testutil.Must(finish(r.ctx, r.artifacts))
 	testutil.Equal(t, out["outcome"], "stop")
 	testutil.Contains(t, strings.Join(stringsOf(out["reasons"]), "\n"), "after the judgment")
-	testutil.Equal(t, r.git("status", "--porcelain"), "")
+	testutil.Contains(t, r.git("status", "--porcelain"), ".devkit/standards/harness.md")
 }
 func TestApprovalRequiresStartAndExactRecordedAnswerBeforeWrites(t *testing.T) {
 	r := setup(t, backlog())
@@ -396,7 +408,7 @@ func TestCorrectionWithdrawsUnitsWithoutLeavingGeneratedRecords(t *testing.T) {
 	d["dismissed"] = []doc{{"entries": items(d["units"])[0]["entries"], "reason": "Fixed"}}
 	d["units"] = []doc{}
 	r.write(d)
-	testutil.Must(round(r.ctx, r.artifacts, judgment()))
+	testutil.Must(r.review(judgment()))
 	testutil.Equal(t, testutil.Must(finish(r.ctx, r.artifacts))["proposal_version"], 2)
 	r.ctx.RunID = "r3"
 	s, e = start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))
@@ -492,7 +504,7 @@ func TestApprovalQuestionCannotChangeAfterReview(t *testing.T) {
 	r := setup(t, backlog())
 	r.begin()
 	r.write(r.draft())
-	testutil.Must(round(r.ctx, r.artifacts, judgment()))
+	testutil.Must(r.review(judgment()))
 	testutil.OK(t, put(file(r.artifacts, "approval.txt"), "Unreviewed question approve=1 or answers?"))
 	out := testutil.Must(finish(r.ctx, r.artifacts))
 	testutil.Equal(t, out["outcome"], "stop")
@@ -512,7 +524,7 @@ func TestApprovalRefusesDirtyCheckoutBeforeApplying(t *testing.T) {
 	testutil.Fails(t, e, "clean worktree")
 	testutil.Equal(t, r.git("rev-parse", "HEAD"), head)
 	_, e = os.Stat(filepath.Join(r.cwd, ".devkit/backlog/topic.json"))
-	testutil.OK(t, e)
+	testutil.Equal(t, os.IsNotExist(e), true)
 }
 func TestStagedStandardCannotHideDifferentWorktreeContent(t *testing.T) {
 	r := setup(t, backlog())
@@ -526,7 +538,7 @@ func TestStagedStandardCannotHideDifferentWorktreeContent(t *testing.T) {
 	r.write(d)
 	testutil.Contains(t, r.errors(d), "index and worktree disagree")
 }
-func TestStopRestoresOnlyAllowedPathsIncludingStagedAndNewStandards(t *testing.T) {
+func TestStopPreservesCheckoutWithoutRestoringFiles(t *testing.T) {
 	r := setup(t, backlog())
 	r.begin()
 	d := r.draft()
@@ -535,17 +547,18 @@ func TestStopRestoresOnlyAllowedPathsIncludingStagedAndNewStandards(t *testing.T
 	r.git("add", ".devkit/standards/harness.md")
 	r.put(".devkit/standards/new.md", "New rule")
 	r.put("outside.txt", "Keep this")
-	testutil.Must(round(r.ctx, r.artifacts, judgment()))
+	before := r.git("status", "--porcelain")
+	testutil.Must(r.review(judgment()))
 	out := testutil.Must(finish(r.ctx, r.artifacts))
 	testutil.Equal(t, out["outcome"], "stop")
-	testutil.Equal(t, r.git("status", "--porcelain"), "?? outside.txt")
+	testutil.Equal(t, r.git("status", "--porcelain"), before)
 }
 func TestRestartLimitRequiresRecordedContinuation(t *testing.T) {
 	r := setup(t, backlog())
 	r.json(".devkit/config.json", doc{"language": "en", "limits": doc{"restarts": 0}})
 	r.commit()
 	r.begin()
-	testutil.Must(round(r.ctx, r.artifacts, judgment()))
+	testutil.Must(r.review(judgment()))
 	testutil.Equal(t, testutil.Must(finish(r.ctx, r.artifacts))["outcome"], "stop")
 	r.ctx.RunID = "r2"
 	s, e := start(r.ctx, envVars(nil))
@@ -598,8 +611,9 @@ func TestF12RetroKeepsEveryRoundAndResolution(t *testing.T) {
 	r.write(r.draft())
 	j := judgment()
 	j["findings"] = []doc{{"aspect": "evidence", "item": "repair", "blocking": true, "needs_decision": false, "mechanical": true, "failure_scenario": "The proposal lacks evidence", "evidence": "backlog", "fix": "Cite the source"}}
-	testutil.Must(round(r.ctx, r.artifacts, j))
-	testutil.Must(round(r.ctx, r.artifacts, judgment()))
+	testutil.Must(r.review(j))
+	r.write(r.draft())
+	testutil.Must(r.review(judgment()))
 	testutil.Must(finish(r.ctx, r.artifacts))
 	judgments := testutil.Must(record.List(r.ctx.Dir, "judgment"))
 	testutil.Equal(t, len(judgments), 2)

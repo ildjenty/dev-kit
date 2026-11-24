@@ -37,8 +37,10 @@ func Commands() []cli.Command {
 				case "check":
 					out, e = check(ctx, artifacts)
 				case "round":
-					var j any
-					e = json.Unmarshal([]byte(env.Getenv("INPUTS_JUDGMENT")), &j)
+					var j any = doc{}
+					if text := env.Getenv("INPUTS_JUDGMENT"); text != "" {
+						e = json.Unmarshal([]byte(text), &j)
+					}
 					if e == nil {
 						out, e = round(ctx, artifacts, j)
 					}

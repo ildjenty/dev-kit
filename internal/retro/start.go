@@ -28,6 +28,13 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 		return stopped("retro requires a retro/<name> branch"), nil
 	}
 	approve := env.Getenv("INPUTS_APPROVE")
+	previous, e := record.Latest(ctx.Dir, "proposal")
+	if e != nil {
+		return record.StartOutput{}, e
+	}
+	if oldProposal(previous) {
+		return stopped("old-format retro proposal cannot be used; start retro again on a new retro branch"), nil
+	}
 	answers, e := record.ParseAnswers(env.Getenv("INPUTS_ANSWERS"))
 	if e != nil {
 		return record.StartOutput{}, e
@@ -106,6 +113,9 @@ func approvalErrors(ctx record.ContextData, version string) ([]string, error) {
 	if e != nil {
 		return nil, e
 	}
+	if oldProposal(p) {
+		return []string{"old-format retro proposal cannot be approved; start retro again on a new retro branch"}, nil
+	}
 	r, e := record.Latest(ctx.Dir, "result")
 	if e != nil {
 		return nil, e
@@ -121,8 +131,15 @@ func approvalErrors(ctx record.ContextData, version string) ([]string, error) {
 	if e != nil {
 		return nil, e
 	}
-	if r["commit"] != head {
+	if r["commit"] != head || obj(p["content"])["commit"] != head {
 		return []string{"HEAD changed after the proposal asked for approval"}, nil
+	}
+	status, e := gitx.Run(ctx.Cwd, "status", "--porcelain", "--untracked-files=all")
+	if e != nil {
+		return nil, e
+	}
+	if status != "" {
+		return []string{"approval requires a clean worktree"}, nil
 	}
 	return []string{}, nil
 }

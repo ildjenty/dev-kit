@@ -27,6 +27,7 @@ func TestWorkflowJudgeMatchesMachineSchemaAndIsFreshReadOnly(t *testing.T) {
 			}
 			testutil.Equal(t, child["provider"], "claude")
 			testutil.Equal(t, child["context"], "fresh")
+			testutil.Equal(t, child["when"], "$check.output.valid == true")
 			testutil.Equal(t, child["mutates_checkout"], false)
 			testutil.Equal(t, child["allowed_tools"], []string{"Read", "Grep", "Glob"})
 			var schema doc

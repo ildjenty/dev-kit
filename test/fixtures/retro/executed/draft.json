@@ -4,9 +4,11 @@
     {
       "key": "repair",
       "title": "Repair defect",
-      "goal": "Remove the observed defect",
+      "goal": "Remove the observed defect with a correction carried by the retro proposal commit",
       "completion_conditions": [
-        "The defect no longer occurs"
+        "The defect no longer occurs",
+        "The proposal commit contains this unit and deletes its consumed backlog",
+        "Approval records the matching commit without changing files"
       ],
       "entries": [
         ".devkit/backlog/fixture.json#deferred/0"
