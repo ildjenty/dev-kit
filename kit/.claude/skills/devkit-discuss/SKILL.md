@@ -39,8 +39,8 @@ Do not turn a reversible implementation suggestion into an owner's decision.
 
 Do not edit repository files during the discussion. Keep a running memo in the conversation, in the
 configured language, with three parts: decided, overturned (include existing decision IDs), and still
-open. Update it whenever a point is settled or revised, keeping the owner's words separate from your
-suggestions. Include the selected topic number and any pending refine branch, question or proposal
+open. Update it whenever a point is settled or revised. Do not label items as the owner's words;
+mark only an item that is your suggestion the owner has not confirmed. Include the selected topic number and any pending refine branch, question or proposal
 version so the next session can resume. Restate the memo on resuming and ask the owner to confirm or
 correct it before passing it to refine.
 
