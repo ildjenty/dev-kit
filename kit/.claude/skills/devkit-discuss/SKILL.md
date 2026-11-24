@@ -5,7 +5,7 @@ description: Enter a discussion mode for an unsettled product or development top
 
 # Discuss with the owner
 
-Read the companion `.claude/skills/devkit-runs/SKILL.md` for starting runs. The installer places
+Before handing anything to refine, invoke the `devkit-runs` skill (the Skill tool, or `/devkit-runs`) and follow it to start refine, relay its questions and approval, and handle a stop. Do not work out workflow inputs or outcomes by reading workflow files or `devkit --help` instead. The installer places
 these skills under the session tool selected by `sessions`, independently of the workflow `provider`.
 
 Enter this mode when invoked. Stay in it until the discussion has become Issues: settled work as
