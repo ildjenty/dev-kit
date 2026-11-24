@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
@@ -74,16 +75,29 @@ func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration, re
 	}
 	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Dir = env.Cwd
-	cmd.Env = env.Environ
+	childEnv := env.Environ
+	if childEnv == nil {
+		childEnv = cmd.Environ()
+	}
+	cmd.Env = make([]string, 0, len(childEnv))
+	for _, entry := range childEnv {
+		if key, _, _ := strings.Cut(entry, "="); key != "TYPESAFE_API_KEY" {
+			cmd.Env = append(cmd.Env, entry)
+		}
+	}
 	cmd.Stdin = strings.NewReader(text)
 	answerFile, err := os.Create(answerPath)
 	if err != nil {
 		return nil, fmt.Errorf("could not create Claude answer file")
 	}
 	defer answerFile.Close()
-	cmd.Stdout, cmd.Stderr = io.MultiWriter(answerFile, log), log
+	logWriter := &redactedWriter{output: log, key: env.Getenv("TYPESAFE_API_KEY")}
+	cmd.Stdout, cmd.Stderr = io.MultiWriter(answerFile, logWriter), logWriter
 	cmd.WaitDelay = 100 * time.Millisecond
 	err = cmd.Run()
+	if flushErr := logWriter.flush(); err == nil {
+		err = flushErr
+	}
 	reason := ""
 	if ctx.Err() != nil {
 		reason = "Claude timed out"
@@ -105,6 +119,14 @@ func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration, re
 			reason = "Claude answer does not match output schema"
 		}
 	}
+	if reason == "" {
+		redacted, redactErr := redactJSON(answer, redact)
+		if redactErr != nil || compiled.Validate(redacted) != nil {
+			reason = "Claude answer does not match output schema"
+		} else {
+			answer = redacted.(map[string]any)
+		}
+	}
 	if reason != "" {
 		if size, statErr := log.Stat(); statErr == nil {
 			if _, seekErr := log.Seek(max(0, size.Size()-16000), io.SeekStart); seekErr == nil {
@@ -115,12 +137,82 @@ func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration, re
 		}
 		return nil, fmt.Errorf("%s", reason)
 	}
-	data, err := json.Marshal(answer)
-	if err != nil {
-		return nil, err
-	}
-	if err = json.Unmarshal([]byte(redact(string(data))), &answer); err != nil {
-		return nil, err
-	}
 	return answer, nil
+}
+
+type redactedWriter struct {
+	mu      sync.Mutex
+	output  io.Writer
+	key     string
+	pending string
+}
+
+func (w *redactedWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.key == "" {
+		return w.output.Write(p)
+	}
+	data := w.pending + string(p)
+	var safe strings.Builder
+	for {
+		index := strings.Index(data, w.key)
+		if index < 0 {
+			break
+		}
+		safe.WriteString(data[:index])
+		safe.WriteString("[redacted]")
+		data = data[index+len(w.key):]
+	}
+	keep := min(len(data), len(w.key)-1)
+	for keep > 0 && !strings.HasPrefix(w.key, data[len(data)-keep:]) {
+		keep--
+	}
+	safe.WriteString(data[:len(data)-keep])
+	w.pending = data[len(data)-keep:]
+	if _, err := io.WriteString(w.output, safe.String()); err != nil {
+		return 0, err
+	}
+	return len(p), nil
+}
+
+func (w *redactedWriter) flush() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	_, err := io.WriteString(w.output, w.pending)
+	w.pending = ""
+	return err
+}
+
+func redactJSON(value any, redact func(string) string) (any, error) {
+	switch value := value.(type) {
+	case string:
+		return redact(value), nil
+	case []any:
+		for i, item := range value {
+			redacted, err := redactJSON(item, redact)
+			if err != nil {
+				return nil, err
+			}
+			value[i] = redacted
+		}
+	case map[string]any:
+		if value == nil {
+			return value, nil
+		}
+		result := make(map[string]any, len(value))
+		for key, item := range value {
+			key = redact(key)
+			if _, exists := result[key]; exists {
+				return nil, fmt.Errorf("redacted property names collide")
+			}
+			redacted, err := redactJSON(item, redact)
+			if err != nil {
+				return nil, err
+			}
+			result[key] = redacted
+		}
+		return result, nil
+	}
+	return value, nil
 }

@@ -75,7 +75,9 @@ printf '{"answer":"secret accepted"}' > "$9"
 			testutil.Equal(t, os.IsNotExist(err), true)
 			logs := testutil.Must(filepath.Glob(filepath.Join(root, "artifacts/judge/codex-*.log")))
 			testutil.Equal(t, len(logs), 1)
-			testutil.Contains(t, string(testutil.Must(os.ReadFile(logs[0]))), "Codex stdout secret\nCodex stderr secret")
+			log := string(testutil.Must(os.ReadFile(logs[0])))
+			testutil.Equal(t, strings.Contains(log, "secret"), false)
+			testutil.Contains(t, log, "Codex stdout [redacted]\nCodex stderr [redacted]")
 		})
 	}
 }

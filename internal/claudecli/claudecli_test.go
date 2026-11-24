@@ -68,6 +68,9 @@ printf '%s' '{"type":"result","subtype":"success","is_error":false,"result":"pla
 			testutil.Equal(t, strings.Contains(stderr.String(), "secret"), false)
 			logs := testutil.Must(filepath.Glob(filepath.Join(root, "artifacts/judge/claude-*.log")))
 			testutil.Equal(t, len(logs), 1)
+			log := string(testutil.Must(os.ReadFile(logs[0])))
+			testutil.Equal(t, strings.Contains(log, "secret"), false)
+			testutil.Contains(t, log, "[redacted] diagnostics")
 		})
 	}
 }
