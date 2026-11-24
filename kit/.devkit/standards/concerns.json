@@ -48,7 +48,7 @@
     "contract": {
       "title": "Contract",
       "decides": "What callers may supply, observe and rely on through failure, reruns and concurrency.",
-      "routing": "what callers may send or receive: public interfaces, request and response shapes, accepted values and validation, error and failure responses, retries, reruns and concurrency",
+      "routing": "what callers may send or receive and how failures reach them: public interfaces, request and response shapes, accepted values and validation, error and failure responses, errors caught, ignored or turned into default values, retries, reruns and concurrency",
       "routing_threshold": 0.65,
       "principles": [
         "engineering.md#1",
