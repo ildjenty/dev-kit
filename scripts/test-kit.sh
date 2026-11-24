@@ -46,6 +46,9 @@ esac
 case "$prompt" in
   *"$ARTIFACTS_DIR/judge/diff.patch"*)
     test -s "$ARTIFACTS_DIR/judge/changes.json"
+    tree="$(sed -n 's/^  "tree": "\(.*\)",\{0,1\}$/\1/p' "$ARTIFACTS_DIR/judge/target.json")"
+    test -n "$tree"
+    test "$PWD" = "$tree"
     printf '{"qualities":[]}' > "$9"
     ;;
   *"$ARTIFACTS_DIR/refine/reflect-input.json"*)
@@ -62,7 +65,7 @@ export DEVKIT_CLAUDE="$temp/fixture-bin/claude"
 cat > "$DEVKIT_CLAUDE" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-test "$#" -eq 11
+test "$#" -eq 11 -o "$#" -eq 13
 test "$1 $2" = '-p --json-schema'
 test "$4 $5 $6 $7 $8 $9 ${10} ${11}" = '--allowedTools Read,Grep,Glob --tools Read,Grep,Glob --permission-mode dontAsk --output-format json'
 prompt="$(cat)"
@@ -72,6 +75,10 @@ esac
 case "$prompt" in
   *"$ARTIFACTS_DIR/judge/diff.patch"*)
     test -s "$ARTIFACTS_DIR/judge/changes.json"
+    tree="$(sed -n 's/^  "tree": "\(.*\)",\{0,1\}$/\1/p' "$ARTIFACTS_DIR/judge/target.json")"
+    test -n "$tree"
+    test "${12}" = --add-dir
+    test "${13}" = "$tree"
     answer='{"qualities":[]}'
     ;;
   *"$ARTIFACTS_DIR/refine/reflect-input.json"*)

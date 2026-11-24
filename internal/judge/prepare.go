@@ -135,7 +135,8 @@ func prepare(ctx record.ContextData, artifacts, shownArtifacts string) (doc, err
 	if err = save(filepath.Join(out, "accepted-objections.json"), doc{"accepted": accepted}); err != nil {
 		return nil, err
 	}
-	if err = g.ExportTree(commit, filepath.Join(out, "tree")); err != nil {
+	tree, err := judgedTree(ctx, g, commit)
+	if err != nil {
 		return nil, err
 	}
 	changes, err := g.Changes(base, commit)
@@ -149,7 +150,7 @@ func prepare(ctx record.ContextData, artifacts, shownArtifacts string) (doc, err
 	if err != nil {
 		return nil, err
 	}
-	target := doc{"base_branch": ctx.BaseBranch, "base": base, "commit": commit, "change_id": id, "criteria_commit": request["criteria_commit"], "requirements_version": requirements["version"], "plan_version": plan["version"], "language": c.Language, "standards": c.Standards}
+	target := doc{"base_branch": ctx.BaseBranch, "base": base, "commit": commit, "tree": tree, "change_id": id, "criteria_commit": request["criteria_commit"], "requirements_version": requirements["version"], "plan_version": plan["version"], "language": c.Language, "standards": c.Standards}
 	if err = save(filepath.Join(out, "target.json"), target); err != nil {
 		return nil, err
 	}
@@ -161,7 +162,7 @@ func prepare(ctx record.ContextData, artifacts, shownArtifacts string) (doc, err
 	checkConfig.Checks = allChecks
 	for _, q := range mapping.Judged("code") {
 		selected := mapping.Materials(filepath.Join(shownArtifacts, "criteria", c.Standards), q, "code")
-		material := doc{"language": c.Language, "standards": c.Standards, "quality": q, "criteria_folder": filepath.Join(shownArtifacts, "criteria", c.Standards), "criteria": selected.Criteria, "principles": selected.Principles, "every_quality": selected.EveryQuality, "common": selected.Common, "authority": selected.Authority, "tree": filepath.Join(shownArtifacts, "judge", "tree"), "checks": config.ChecksFor(checkConfig, changes), "changes": []doc{}, "rows": []doc{}, "without_plan": []doc{}}
+		material := doc{"language": c.Language, "standards": c.Standards, "quality": q, "criteria_folder": filepath.Join(shownArtifacts, "criteria", c.Standards), "criteria": selected.Criteria, "principles": selected.Principles, "every_quality": selected.EveryQuality, "common": selected.Common, "authority": selected.Authority, "tree": tree, "checks": config.ChecksFor(checkConfig, changes), "changes": []doc{}, "rows": []doc{}, "without_plan": []doc{}}
 		if err = save(filepath.Join(out, "materials", q+".json"), material); err != nil {
 			return nil, err
 		}

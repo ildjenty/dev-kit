@@ -31,6 +31,11 @@ func TestRouteCodexFallbackAndConservativeSelection(t *testing.T) {
 		} {
 			t.Run(provider+"/"+tc.name, func(t *testing.T) {
 				a := jevInput(t)
+				tree := t.TempDir()
+				testutil.Put(t, tree, "peer", "judged evidence")
+				target := must(read(filepath.Join(a, "judge/target.json")))
+				target["tree"] = tree
+				testutil.OK(t, save(filepath.Join(a, "judge/target.json"), target))
 				testutil.Git(t, a, "init", "-q")
 				testutil.Put(t, a, ".devkit/config.json", fmt.Sprintf(`{"provider":%q}`, provider))
 				testutil.Put(t, a, "pack/judge/commands/route.md", "Read $ARTIFACTS_DIR/judge/diff.patch and $PACK_DIR.")
@@ -46,7 +51,11 @@ printf '}'
 				}
 				fake := filepath.Join(a, "fake-codex")
 				if tc.body != "" {
-					testutil.OK(t, os.WriteFile(fake, []byte("#!/bin/sh\nprintf 'raw Codex output' >&2\n"+tc.body+"\n"), 0700))
+					checkTree := `test "$5" = "$PWD" && test -f peer || exit 1`
+					if provider == "claude" {
+						checkTree = `test "${12}" = --add-dir && test -f "${13}/peer" || exit 1`
+					}
+					testutil.OK(t, os.WriteFile(fake, []byte("#!/bin/sh\n"+checkTree+"\nprintf 'raw Codex output' >&2\n"+tc.body+"\n"), 0700))
 				}
 				var stdout, stderr bytes.Buffer
 				values := map[string]string{"ARTIFACTS_DIR": a, "PACK_DIR": filepath.Join(a, "pack"), "DEVKIT_CODEX": fake, "DEVKIT_CLAUDE": fake}

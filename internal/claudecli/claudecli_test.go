@@ -14,6 +14,28 @@ import (
 
 const testSchema = `{"type":"object","additionalProperties":false,"properties":{"answer":{"type":"string"}},"required":["answer"]}`
 
+func TestRunAddsJudgedTreeReadDirectory(t *testing.T) {
+	root, tree := t.TempDir(), t.TempDir()
+	testutil.Put(t, root, "pack/check.md", "$ARTIFACTS_DIR $PACK_DIR")
+	testutil.Put(t, tree, "peer", "evidence")
+	fake := filepath.Join(root, "fake-claude")
+	testutil.Put(t, root, "fake-claude", `#!/bin/sh
+test "$#" = 13 || exit 1
+test "${12}" = --add-dir || exit 2
+test -f "${13}/peer" || exit 3
+cat > prompt.txt
+printf '%s' '{"type":"result","subtype":"success","structured_output":{"answer":"read tree"}}'
+`)
+	testutil.OK(t, os.Chmod(fake, 0700))
+	values := map[string]string{"ARTIFACTS_DIR": "artifacts", "PACK_DIR": "pack", "DEVKIT_CLAUDE": fake}
+	var stdout, stderr bytes.Buffer
+	env := cli.Env{Cwd: root, Stdout: &stdout, Stderr: &stderr, LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
+	answer, err := Run(env, "judge", "check.md", testSchema, 10*time.Second, tree)
+	testutil.OK(t, err)
+	testutil.Equal(t, answer["answer"], "read tree")
+	testutil.Equal(t, string(testutil.Must(os.ReadFile(filepath.Join(root, "prompt.txt")))), filepath.Join(root, "artifacts")+" "+filepath.Join(root, "pack"))
+}
+
 func TestReadOnlyFlagsStructuredOutputAndOverride(t *testing.T) {
 	for _, override := range []bool{false, true} {
 		t.Run(map[bool]string{false: "PATH", true: "override"}[override], func(t *testing.T) {

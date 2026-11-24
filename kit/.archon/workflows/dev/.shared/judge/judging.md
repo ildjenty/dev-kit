@@ -10,16 +10,20 @@ Read `$ARTIFACTS_DIR/judge/materials/<quality>.json` first. It gives `language`,
 
 Common materials under `$ARTIFACTS_DIR/judge/`:
 
-- `target.json`: the fixed commit and merge base. Judge the whole change, including after a fix.
+- `target.json`: the fixed commit, merge base and absolute `tree` path. Judge the whole change, including after a fix.
 - `diff.patch`: the whole change; focus on your quality's files and rows.
 - `requirements.json` and `plan.json`, when present: completion conditions, constraints, decisions, increments and test plan. Row evidence names its source and verification location; author evidence is a claim to verify against those sources.
 - `answers.json`: answers identify their target and versions. Apply plan-row answers only for their requirements version and row content; follow the passed plan and its agreed records.
 - `accepted-objections.json`: each accepted objection names its original finding as `<judge-run>/<judge>/<finding-id>`. An acceptance applies only to that finding; references include their originating run. Do not repeat the accepted place and failure unless code changed since that commit and brings it back; cite that change.
-- `tree/`: the full judged commit exported before checks, with original file bytes. Use Read,
-  Grep and Glob here for declarations, callers, siblings and other unchanged evidence; do not use
-  the mutable checkout, where simultaneous checks may temporarily alter files.
 - `source/base/<path>` and `source/commit/<path>`: byte-exact base and judged versions of changed
   files; a missing side denotes an addition or deletion. Use them with the full tree and diff.
+
+Read the full judged commit at the absolute `tree` path in `target.json`, outside the run's artifacts.
+Prepare keeps one tree per branch in the state folder and updates it before checks, preserving
+original file bytes, executable bits and symlinks. Use Read, Grep and Glob with that absolute path
+for declarations, callers, siblings and other unchanged evidence. These read tools are allowed
+without checkout-relative path restrictions. Do not modify this shared tree or use the mutable
+checkout, where simultaneous checks may temporarily alter files.
 
 For structure, `facts` contains only git facts: added, removed and moved files and folders, the siblings along the full ancestor path at base and commit, `outside_plan`, and top-level and second-level folder counts. Apply the path-of-change and deferred-smell criteria in `review/structure.md`, including pre-existing smells. Judge ownership, boundaries and dependency direction from this evidence and source. No dependency, unused-code or duplication analysis results are supplied.
 

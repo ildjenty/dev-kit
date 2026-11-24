@@ -44,7 +44,7 @@ func TestRestoredStepSpecificInstructions(t *testing.T) {
 		"fix/commands/fix.md":              {"\"target\": \"finding|decision\"", "Difficulty of repair is not an objection", "failure cannot happen", "criterion does not apply", "break a completion condition", "command results"},
 		"implement/commands/step-back.md":  {"Judge from the logs", "not from what the implementation session said"},
 		"fix/commands/step-back.md":        {"Judge from the logs", "not from what the fixing session said"},
-		".shared/judge/judging.md":         {"`tree/`", "Grep and Glob", "every document in materials `criteria`", "Without requirements", "review/structure.md"},
+		".shared/judge/judging.md":         {"absolute `tree` path in `target.json`", "Grep and Glob", "every document in materials `criteria`", "Without requirements", "review/structure.md"},
 	}
 	for path, parts := range cases {
 		text, err := kit.Files.ReadFile(".archon/workflows/dev/" + path)

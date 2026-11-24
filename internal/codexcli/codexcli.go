@@ -17,12 +17,12 @@ import (
 
 const Timeout = 10 * time.Minute
 
-func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration) (map[string]any, error) {
+func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration, readDirs ...string) (map[string]any, error) {
 	prompt, err := os.ReadFile(env.Path(filepath.Join(env.Getenv("PACK_DIR"), promptPath)))
 	if err != nil {
 		return nil, fmt.Errorf("could not read Codex prompt")
 	}
-	text := strings.NewReplacer("$ARTIFACTS_DIR", env.Getenv("ARTIFACTS_DIR"), "$PACK_DIR", env.Getenv("PACK_DIR")).Replace(string(prompt))
+	text := strings.NewReplacer("$ARTIFACTS_DIR", env.Path(env.Getenv("ARTIFACTS_DIR")), "$PACK_DIR", env.Path(env.Getenv("PACK_DIR"))).Replace(string(prompt))
 	var source any
 	if err = json.Unmarshal([]byte(schema), &source); err != nil {
 		return nil, fmt.Errorf("invalid Codex output schema")
@@ -67,8 +67,12 @@ func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration) (m
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, executable, "exec", "--sandbox", "read-only", "--cd", env.Cwd, "--output-schema", schemaPath, "-o", answerPath, "--skip-git-repo-check", "-")
-	cmd.Dir = env.Cwd
+	cwd := env.Cwd
+	if len(readDirs) > 0 && readDirs[0] != "" {
+		cwd = readDirs[0]
+	}
+	cmd := exec.CommandContext(ctx, executable, "exec", "--sandbox", "read-only", "--cd", cwd, "--output-schema", schemaPath, "-o", answerPath, "--skip-git-repo-check", "-")
+	cmd.Dir = cwd
 	cmd.Env = env.Environ
 	cmd.Stdin = strings.NewReader(text)
 	cmd.Stdout, cmd.Stderr = log, log

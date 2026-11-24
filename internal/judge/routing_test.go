@@ -50,7 +50,7 @@ func TestRouteUnionsPathsPlanRowsAndInferredQualitiesWithFiles(t *testing.T) {
 	testutil.Put(t, repo, "unusual/source", "after\n")
 	testutil.Git(t, repo, "add", ".")
 	testutil.Git(t, repo, "commit", "-qm", "change")
-	ctx := record.ContextData{Cwd: repo, Dir: t.TempDir(), RunID: "judge-route", BaseBranch: "main"}
+	ctx := record.ContextData{Cwd: repo, Dir: record.RecordDir(t.TempDir(), "feature/x"), Branch: "feature/x", RunID: "judge-route", BaseBranch: "main"}
 	must(record.Start(ctx.Dir, "judge", record.StartOptions{RunID: ctx.RunID, Commit: testutil.Git(t, repo, "rev-parse", "HEAD"), BaseCommit: base}))
 	a := t.TempDir()
 	must(prepare(ctx, a, a))

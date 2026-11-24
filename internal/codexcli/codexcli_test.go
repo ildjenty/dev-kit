@@ -14,6 +14,29 @@ import (
 
 const testSchema = `{"type":"object","additionalProperties":false,"properties":{"answer":{"type":"string"}},"required":["answer"]}`
 
+func TestRunUsesJudgedTreeWithoutGitMetadata(t *testing.T) {
+	root, tree := t.TempDir(), t.TempDir()
+	testutil.Put(t, root, "pack/check.md", "$ARTIFACTS_DIR $PACK_DIR")
+	testutil.Put(t, tree, "peer", "evidence")
+	fake := filepath.Join(root, "fake-codex")
+	testutil.Put(t, root, "fake-codex", `#!/bin/sh
+test "$5" = "$PWD" || exit 1
+test -f peer || exit 2
+test ! -e .git || exit 3
+test "$1 $2 $3 $4" = 'exec --sandbox read-only --cd' || exit 4
+test "${10} ${11}" = '--skip-git-repo-check -' || exit 5
+case "$(cat)" in /*' '/*) ;; *) exit 6 ;; esac
+printf '{"answer":"read tree"}' > "$9"
+`)
+	testutil.OK(t, os.Chmod(fake, 0700))
+	values := map[string]string{"ARTIFACTS_DIR": "artifacts", "PACK_DIR": "pack", "DEVKIT_CODEX": fake}
+	var stdout, stderr bytes.Buffer
+	env := cli.Env{Cwd: root, Stdout: &stdout, Stderr: &stderr, LookupEnv: func(k string) (string, bool) { v, ok := values[k]; return v, ok }}
+	answer, err := Run(env, "judge", "check.md", testSchema, 10*time.Second, tree)
+	testutil.OK(t, err)
+	testutil.Equal(t, answer["answer"], "read tree")
+}
+
 func TestRunReadOnlySchemaPromptAndLogs(t *testing.T) {
 	for _, override := range []bool{false, true} {
 		t.Run(map[bool]string{false: "PATH", true: "override"}[override], func(t *testing.T) {

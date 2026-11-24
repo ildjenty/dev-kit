@@ -67,7 +67,7 @@ func runRouteTimeout(env cli.Env, timeout time.Duration) error {
 		runCLI = codexcli.Run
 		label = "Codex"
 	}
-	answer, err := runCLI(env, "judge", "judge/commands/route.md", string(schema), timeout)
+	answer, err := runCLI(env, "judge", "judge/commands/route.md", string(schema), timeout, text(target["tree"]))
 	if err == nil {
 		answer["source"] = settings.Provider
 		return env.JSON(answer)

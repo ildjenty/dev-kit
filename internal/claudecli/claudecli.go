@@ -15,12 +15,12 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
-func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration) (map[string]any, error) {
+func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration, readDirs ...string) (map[string]any, error) {
 	prompt, err := os.ReadFile(env.Path(filepath.Join(env.Getenv("PACK_DIR"), promptPath)))
 	if err != nil {
 		return nil, fmt.Errorf("could not read Claude prompt")
 	}
-	text := strings.NewReplacer("$ARTIFACTS_DIR", env.Getenv("ARTIFACTS_DIR"), "$PACK_DIR", env.Getenv("PACK_DIR")).Replace(string(prompt))
+	text := strings.NewReplacer("$ARTIFACTS_DIR", env.Path(env.Getenv("ARTIFACTS_DIR")), "$PACK_DIR", env.Path(env.Getenv("PACK_DIR"))).Replace(string(prompt))
 	var source any
 	if err = json.Unmarshal([]byte(schema), &source); err != nil {
 		return nil, fmt.Errorf("invalid Claude output schema")
@@ -63,7 +63,13 @@ func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration) (m
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, executable, "-p", "--json-schema", schema, "--allowedTools", "Read,Grep,Glob", "--tools", "Read,Grep,Glob", "--permission-mode", "dontAsk", "--output-format", "json")
+	args := []string{"-p", "--json-schema", schema, "--allowedTools", "Read,Grep,Glob", "--tools", "Read,Grep,Glob", "--permission-mode", "dontAsk", "--output-format", "json"}
+	for _, dir := range readDirs {
+		if dir != "" {
+			args = append(args, "--add-dir", dir)
+		}
+	}
+	cmd := exec.CommandContext(ctx, executable, args...)
 	cmd.Dir = env.Cwd
 	cmd.Env = env.Environ
 	cmd.Stdin = strings.NewReader(text)
