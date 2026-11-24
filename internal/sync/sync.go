@@ -78,16 +78,22 @@ func (g git) rebasing() (bool, error) {
 	return false, nil
 }
 func (g git) unmerged() ([]string, error) {
-	out, err := g.run("diff", "--name-only", "--diff-filter=U")
+	cmd := g.command("diff", "--name-only", "--diff-filter=U", "-z")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
 	files := []string{}
+	if err != nil {
+		return files, fmt.Errorf("Command failed: git diff --name-only --diff-filter=U -z\n%s", strings.TrimRight(stderr.String(), "\n"))
+	}
 	seen := map[string]bool{}
-	for _, f := range strings.Split(out, "\n") {
+	for _, f := range strings.Split(string(out), "\x00") {
 		if f != "" && !seen[f] {
 			files = append(files, f)
 			seen[f] = true
 		}
 	}
-	return files, err
+	return files, nil
 }
 func afterRebase(g git, s State) (State, error) {
 	for {
@@ -96,6 +102,12 @@ func afterRebase(g git, s State) (State, error) {
 			return s, err
 		}
 		if !active {
+			if s.Onto == nil {
+				return s, fmt.Errorf("the rebase has no recorded target commit")
+			}
+			if _, err = g.run("merge-base", "--is-ancestor", *s.Onto, "HEAD"); err != nil {
+				return s, fmt.Errorf("the rebase did not incorporate %s: %w", *s.Onto, err)
+			}
 			s.State = "done"
 			return s, nil
 		}
@@ -152,7 +164,22 @@ func start(g git, base string) (State, error) {
 		s.State = "current"
 		return s, nil
 	}
-	g.ok("rebase", "--quiet", onto)
+	if _, err = g.run("rebase", "--quiet", onto); err != nil {
+		active, stateErr := g.rebasing()
+		if stateErr != nil {
+			return s, stateErr
+		}
+		if !active {
+			return s, err
+		}
+		files, stateErr := g.unmerged()
+		if stateErr != nil {
+			return s, stateErr
+		}
+		if len(files) == 0 {
+			return s, err
+		}
+	}
 	return afterRebase(g, s)
 }
 func proceed(g git, s State, r Resolution, read func(string) (*string, error)) (State, error) {

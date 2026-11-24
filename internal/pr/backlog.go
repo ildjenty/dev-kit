@@ -1,9 +1,12 @@
 package pr
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
@@ -56,9 +59,6 @@ func backlog(judgments, results []doc) doc {
 
 func commitBacklog(ctx record.ContextData, judgments, results []doc) (string, error) {
 	file := filepath.Join(".devkit", "backlog", record.EncodeURIComponent(ctx.Branch)+".json")
-	if err := os.MkdirAll(filepath.Join(ctx.Cwd, filepath.Dir(file)), 0755); err != nil {
-		return "", err
-	}
 	runs, err := record.List(ctx.Dir, "run")
 	if err != nil {
 		return "", err
@@ -74,7 +74,7 @@ func commitBacklog(ctx record.ContextData, judgments, results []doc) (string, er
 	if len(reviews) > 0 {
 		value["review"] = reviews
 	}
-	if err := save(filepath.Join(ctx.Cwd, file), value); err != nil {
+	if err := saveBacklog(ctx.Cwd, file, value); err != nil {
 		return "", err
 	}
 	files := []string{file}
@@ -123,4 +123,57 @@ func commitBacklog(ctx record.ContextData, judgments, results []doc) (string, er
 		}
 	}
 	return gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
+}
+
+func saveBacklog(cwd, file string, value doc) error {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return err
+	}
+	root, err := os.OpenRoot(cwd)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
+	dir := "."
+	for _, part := range strings.Split(filepath.Dir(file), string(filepath.Separator)) {
+		dir = filepath.Join(dir, part)
+		info, err := root.Lstat(dir)
+		if os.IsNotExist(err) {
+			if err = root.Mkdir(dir, 0755); err != nil && !os.IsExist(err) {
+				return err
+			}
+			info, err = root.Lstat(dir)
+		}
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() {
+			return fmt.Errorf("backlog ancestor is not a directory: %s", dir)
+		}
+	}
+	mode := os.FileMode(0644)
+	info, err := root.Lstat(file)
+	if err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("backlog destination is not a regular file: %s", file)
+		}
+		mode = info.Mode().Perm()
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	temp := filepath.Join(dir, ".backlog-"+rand.Text())
+	f, err := root.OpenFile(temp, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	if err != nil {
+		return err
+	}
+	defer root.Remove(temp)
+	if _, err = f.Write(data); err != nil {
+		f.Close()
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
+	}
+	return root.Rename(temp, file)
 }
