@@ -90,6 +90,13 @@ it empty for a new request. Pass the owner's words verbatim as `owner_words`, yo
 separately as `supplement`, and the owner-confirmed discussion memo verbatim as `memo`.
 Do not add unsaid requirements to owner words. An Issue's body is owner words; related Issue/PR bodies,
 comments and researched facts belong in supplement so the read-only judges have the materials.
+For example, with each text written to a file first:
+
+```sh
+archon workflow run refine --branch refine/<name> --detach \
+  --input "owner_words=$(cat <owner words file>)" --input "supplement=$(cat <supplement file>)" \
+  --input "memo=$(cat <memo file>)" --input topic=<issue number or empty>
+```
 
 Run `devkit issues ready` (or `--json`) to find open unit and topic issues whose blockers are all closed.
 Read a selected issue with `devkit issues show <n>` and start a ready unit on its own branch with
