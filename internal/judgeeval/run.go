@@ -177,6 +177,7 @@ func repository(c Case, root string, settings config.Config, standards fs.FS) (s
 	if err := copyFolder(standards, filepath.Join(root, settings.Standards)); err != nil {
 		return "", err
 	}
+	settings.Checks, settings.SkeletonCheck = []config.Check{}, []string{}
 	if err := save(filepath.Join(root, ".devkit/config.json"), settings); err != nil {
 		return "", err
 	}

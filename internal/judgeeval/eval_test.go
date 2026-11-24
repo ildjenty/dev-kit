@@ -205,7 +205,6 @@ func TestEvalWithFakeProviders(t *testing.T) {
 				integrationCase(t, filepath.Join(root, "custom-eval/judge"), requirements)
 				testutil.Put(t, root, ".devkit/config.json", fmt.Sprintf(`{"provider":%q,"eval":"custom-eval","language":"fr","checks":[{"name":"never-run","command":"exit 99","timeout_seconds":1}]}`, provider))
 				env, stdout, stderr, calls := fakeEnv(t, root, requirements)
-				env = withEnv(env, map[string]string{"DEVKIT_EVAL_CHECKS": "true"})
 				out := filepath.Join(t.TempDir(), "results")
 				registry := cli.New("test", Commands())
 				code := registry.Execute([]string{"eval", "judge", "--out", out}, env)
@@ -454,9 +453,7 @@ func TestEvalCLIHelper(t *testing.T) {
 			testutil.Equal(t, material["quality"], kind)
 			testutil.Equal(t, material["tree"], tree)
 			testutil.Contains(t, fmt.Sprint(material["criteria"]), "review/"+kind+".md")
-			if os.Getenv("DEVKIT_EVAL_CHECKS") == "true" {
-				testutil.Contains(t, fmt.Sprint(material["checks"]), "exit 99")
-			}
+			testutil.Equal(t, material["checks"], []any{})
 			if marker := os.Getenv("DEVKIT_EVAL_STANDARDS"); marker != "" {
 				file := filepath.Join(artifacts, "criteria", target["standards"].(string), "authority.md")
 				testutil.Contains(t, string(testutil.Must(os.ReadFile(file))), "Standards marker: "+marker)

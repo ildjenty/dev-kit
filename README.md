@@ -189,7 +189,7 @@ prepare, changes, route and launch steps on a temporary Git repository, then one
 per launched quality using `judge/commands/quality.md` and the output schema read from its
 `judge-<quality>` YAML node. Routing uses Jev when `TYPESAFE_API_KEY` is set, with the workflow's
 same CLI and all-quality fallbacks. One additional read-only provider call matches all findings
-against the case's expected and not-expected lists. Checks are not run. Archon node wiring is not
+against the case's expected and not-expected lists. Checks are not run, and the judges are given no configured checks, so a defect a check would catch is not left to it: the evaluation measures what the judges find themselves. Archon node wiring is not
 exercised; keep running the workflow fixtures for that.
 
 Each case folder contains `case.json`, `base/` and `change.patch` (a patch that `git apply` can apply

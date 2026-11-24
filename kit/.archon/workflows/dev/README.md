@@ -163,7 +163,7 @@ ref is reported as a skipped check.
 Run `devkit eval judge [--case <name>]... [--dir <cases folder>] [--out <folder>]
 [--standards <folder>]` by hand after editing standards, routing or judge prompts. This calls the
 real configured provider CLI and costs real provider calls. It measures prompts and standards;
-Archon node wiring is not exercised, and checks are not run.
+Archon node wiring is not exercised, and checks are not run; judges get no configured checks, so they cannot leave a defect to one.
 
 Cases live under `<eval>/judge/` (`eval` defaults to `.devkit/eval` in `.devkit/config.json`). The
 kit source keeps its own cases in `eval/judge/`; init does not install those cases. Each folder has
