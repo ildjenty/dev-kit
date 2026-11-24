@@ -123,3 +123,17 @@
 - **Before and after**: "Added a webhook service" → "Added a webhook service. After merging, apply infrastructure changes before deploying the service. Store the new `WEBHOOK_SECRET` in the secret store."
 - **blocking**: A change requires external state but omits its requirements or execution order.
 - **Evidence**: Required external state, who prepares each item and when, and the order of infrastructure application, migrations, and deployment.
+
+## 8. Share definitions of rules that must change together
+
+- **Applicability**: When adding functions, conversions, checks, or rules, or considering sharing similar processing.
+- **Exemptions**: None.
+- **Principle**: Processing that must always reflect changes to the same rule simultaneously must share the rule's definition; keep processing independent when its reasons for change or contracts differ, even if its text is identical. Search for existing definitions before adding processing that does the same. Decide whether the processing must change together, rather than whether its text looks similar. Reuse the existing definition when the rule or behaviour must change together. Similar code is preferable to premature abstraction when the reasons for change are independent.
+- **Violations and signs**:
+  - Added code re-implements an existing function, conversion, check, or rule that must change together with it.
+  - Multiple modules independently define format or ordering rules that must change together.
+  - Multiple processing paths must apply the same rule, but there is no guarantee that changes are reflected simultaneously.
+  - Combining separate rules in one place merely because they happen to have the same shape (they will need separating again when only one must change).
+- **Before and after**: Re-implement the customer-name conversion used by receipts in a new invoice path that must follow the same display rule → Reuse the existing conversion; keep search normalization independent because its contract changes for different reasons.
+- **blocking**: Added code re-implements a rule or behaviour already defined elsewhere that must change together with it.
+- **Evidence**: Locations searched and existing definitions found. The shared rule or behaviour and why its uses must change together, or the different reasons for change or contracts that require independent processing.

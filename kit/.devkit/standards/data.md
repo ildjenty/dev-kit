@@ -2,21 +2,18 @@
 
 ## 1. Define the source of truth for facts with the same subject, time, and meaning
 
-- **Applicability**: When considering keeping the same information in multiple places. When considering sharing similar processing.
+- **Applicability**: When considering keeping the same information in multiple places.
 - **Exemptions**: When storing derived values or duplicating data is necessary to meet performance requirements, waive only the requirement to calculate derived values instead of storing them. Show the relevant performance requirements and evidence that storage or duplication is necessary. Also show the source of truth, who owns synchronization, the update method, the permitted inconsistency and its scope, and what to do if it exceeds that scope.
-- **Principle**: Define one source of truth for facts with the same subject, time, and meaning. Calculate derived values that can be reproduced from the current source of truth instead of storing them. Store values needed to reproduce decisions or transactions at a past point in time as facts from that time. For duplicates, define the source of truth, who owns synchronization, the update method, the permitted inconsistency, and what to do if it exceeds that scope. Processing that must always reflect changes to the same rule simultaneously must share the rule's definition; keep processing independent when its reasons for change or contracts differ, even if its text is identical.
+- **Principle**: Define one source of truth for facts with the same subject, time, and meaning. Calculate derived values that can be reproduced from the current source of truth instead of storing them. Store values needed to reproduce decisions or transactions at a past point in time as facts from that time. For duplicates, define the source of truth, who owns synchronization, the update method, the permitted inconsistency, and what to do if it exceeds that scope.
 - **Violations and signs**:
   - Data representing facts with the same subject, time, and meaning exists in multiple places and is updated through separate paths.
   - Boolean state flags keep increasing (when a single state transition could actually express them).
   - Deciding which value is correct at runtime by majority vote or timestamp comparison.
-  - Combining separate rules in one place merely because they happen to have the same shape (they will need separating again when only one must change).
   - The update method or permitted inconsistency of a duplicated list is undefined.
   - (In a design proposal) The same fact is stored in multiple places, but the source of truth and synchronization owner are not stated.
-  - Multiple modules independently define format or ordering rules that must change together.
-  - Multiple processing paths must apply the same rule, but there is no guarantee that changes are reflected simultaneously.
 - **Before and after**: Store both `user.isPremium` and `subscription.plan` → Calculate `isPremium` from `subscription.plan`. Recalculate an order amount from current product unit prices → Store unit prices at the time of the order and reproduce the transaction at that time.
 - **blocking**: Facts with the same subject, time, and meaning are updated independently in multiple places without a defined source of truth and synchronization method.
-- **Evidence**: The subject, time, and meaning of facts, and the location of their source of truth. The synchronization owner, update method, and permitted freshness or inconsistency of duplicates. Processing that shares the same rule, and processing kept independent because its reasons for change or contracts differ.
+- **Evidence**: The subject, time, and meaning of facts, and the location of their source of truth. The synchronization owner, update method, and permitted freshness or inconsistency of duplicates.
 
 ## 2. Define states and responses for failure, duplication, and interruption in advance
 

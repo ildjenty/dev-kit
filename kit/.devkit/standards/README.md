@@ -9,7 +9,7 @@ Keep mechanically decidable rules in checks rather than principles. Put workflow
 - [README.md](README.md): Standard ownership, principle format, conflict resolution, and updates.
 - [authority.md](authority.md): Decisions reserved for the owner and delegated to agents.
 - [git.md](git.md): Request branches, worktrees, commit prefixes, and owner-controlled merging.
-- [engineering.md](engineering.md): Failures, reruns, concurrency, naming, comments, change impact, permissions, and external prerequisites.
+- [engineering.md](engineering.md): Failures, reruns, concurrency, naming, comments, change impact, permissions, external prerequisites, and definitions of rules that must change together.
 - [designing.md](designing.md): Decision order, abstraction, integration, migrations, necessary mechanisms, and conventions.
 - [structure/purpose.md](structure/purpose.md): The five purposes of structure and their priority.
 - [structure/smells.md](structure/smells.md): Observations that structural purposes are failing.
@@ -43,7 +43,7 @@ Keep mechanically decidable rules in checks rather than principles. Put workflow
 - [review/cost.md](review/cost.md): Which performance, observability, rollout and operational measures justify their cost.
 - [review/delivery.md](review/delivery.md): How ordered release units and verification cover the request end to end.
 - [review/scope.md](review/scope.md): Which changes fulfill the agreed request and preserve affected uses within authority.
-- [review/readability.md](review/readability.md): Which names, comments and conventions make the changed code understandable.
+- [review/readability.md](review/readability.md): Which names, comments, conventions and shared rule definitions make the changed code understandable and keep rules that must change together consistent.
 
 ## Principle format
 

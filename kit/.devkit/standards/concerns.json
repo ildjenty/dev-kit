@@ -3,7 +3,7 @@
     "structure": {
       "title": "Structure",
       "decides": "Where responsibilities live and how boundaries and dependencies contain change.",
-      "routing": "where code lives, which module owns a responsibility, dependencies between modules, or module boundaries: files or folders added, removed or moved, new imports across modules",
+      "routing": "where code lives and how responsibilities are divided: files or folders added, removed or moved, imports across modules, logic that copies or re-implements behaviour existing elsewhere, the same check repeated in several places, a new path that skips a wrapper or check other paths go through, state or call order a caller must remember, a flag parameter that switches a function between behaviours, or a value threaded through several layers",
       "routing_threshold": 0.75,
       "principles": [
         "structure/principles.md#1",
@@ -27,7 +27,7 @@
     "data": {
       "title": "Data",
       "decides": "How facts, valid states, ownership and lifetime preserve meaning and invariants.",
-      "routing": "stored data: schemas, migrations, the source of truth of a fact, deletion or overwriting of stored records, transactions and invariants",
+      "routing": "data and its rules: schemas, migrations, the source of truth of a fact, deletion or overwriting of stored records, transactions and invariants, types or fields that decide which states and values can exist, and a domain rule (such as a plan, role or status check) written as branches in several places",
       "routing_threshold": 0.6,
       "principles": [
         "data.md#1",
@@ -170,10 +170,11 @@
     },
     "readability": {
       "title": "Readability",
-      "decides": "Which names, comments and conventions make the changed code understandable.",
+      "decides": "Which names, comments, conventions and shared rule definitions make the changed code understandable and keep rules that must change together consistent.",
       "principles": [
         "engineering.md#3",
         "engineering.md#4",
+        "engineering.md#8",
         "designing.md#7"
       ],
       "plan": [],
