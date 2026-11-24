@@ -393,6 +393,11 @@ func compare(root string, o options, language string) ([]*group, []byte, []byte,
 		decodeErr := json.Unmarshal(original, &stored)
 		validObject = decodeErr == nil && stored != nil
 		if validObject {
+			if o.explicit() {
+				if err := rejectDuplicateKeys(original); err != nil {
+					return nil, nil, nil, err
+				}
+			}
 			destinations := map[string]json.RawMessage{}
 			for _, key := range []string{"standards", "decisions", "units", "topics", "eval", "skills", "provider", "sessions", "language"} {
 				if value, ok := stored[key]; ok {
@@ -693,6 +698,47 @@ func installedByKit(root, folder string, names map[string]string) (bool, error) 
 		return nil
 	})
 	return found && ours, err
+}
+
+func rejectDuplicateKeys(data []byte) error {
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var visit func() error
+	visit = func() error {
+		token, err := decoder.Token()
+		if err != nil {
+			return err
+		}
+		switch token {
+		case json.Delim('{'):
+			seen := map[string]bool{}
+			for decoder.More() {
+				key, err := decoder.Token()
+				if err != nil {
+					return err
+				}
+				name := key.(string)
+				if seen[name] {
+					return fmt.Errorf("cannot partially update .devkit/config.json: duplicated key %q; remove the duplicate before retrying", name)
+				}
+				seen[name] = true
+				if err := visit(); err != nil {
+					return err
+				}
+			}
+		case json.Delim('['):
+			for decoder.More() {
+				if err := visit(); err != nil {
+					return err
+				}
+			}
+		default:
+			return nil
+		}
+		_, err = decoder.Token()
+		return err
+	}
+	return visit()
 }
 
 func withSetting(data []byte, setting string, skills []byte) ([]byte, error) {
