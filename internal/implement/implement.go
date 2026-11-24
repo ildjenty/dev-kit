@@ -336,10 +336,12 @@ func prepare(ctx record.ContextData, artifacts string) (record.Document, error) 
 		return nil, fmt.Errorf("no request is recorded yet")
 	}
 	criteriaDir := filepath.Join(artifacts, "criteria")
-	if _, err := criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: text(requests[0]["criteria_commit"]), Dir: pathAt(ctx.Cwd, criteriaDir)}); err != nil {
+	source, err := criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: text(requests[0]["criteria_commit"]), Dir: pathAt(ctx.Cwd, criteriaDir)})
+	if err != nil {
 		return nil, err
 	}
-	folder := filepath.Join(criteriaDir, cfg.Standards)
+	standards := source.Paths[0]
+	folder := filepath.Join(criteriaDir, standards)
 	gitCriteria, err := os.ReadFile(filepath.Join(pathAt(ctx.Cwd, folder), "git.md"))
 	if err != nil {
 		return nil, err
@@ -368,7 +370,7 @@ func prepare(ctx record.ContextData, artifacts string) (record.Document, error) 
 	if err != nil {
 		return nil, err
 	}
-	input := record.Document{"returned": returned, "language": cfg.Language, "standards": cfg.Standards, "criteria_folder": folder, "checks": configuredChecks, "commit_prefixes": prefixes, "writer_materials": mapping.Materials(folder, "writer:implement", "code"), "test_materials": mapping.Materials(folder, "writer:tests", "code"), "step_back_materials": mapping.Materials(folder, "judge:step-back", "code"), "dispute_materials": mapping.Materials(folder, "judge:dispute", "code")}
+	input := record.Document{"returned": returned, "language": cfg.Language, "standards": standards, "criteria_folder": folder, "checks": configuredChecks, "commit_prefixes": prefixes, "writer_materials": mapping.Materials(folder, "writer:implement", "code"), "test_materials": mapping.Materials(folder, "writer:tests", "code"), "step_back_materials": mapping.Materials(folder, "judge:step-back", "code"), "dispute_materials": mapping.Materials(folder, "judge:dispute", "code")}
 	s := state{Key: key, RequirementsVersion: requirements["version"], PlanVersion: plan["version"], Units: units, OwnerDecisions: []ownerDecision{}, DecisionErrors: []string{}}
 	for _, item := range []struct {
 		name  string

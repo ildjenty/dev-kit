@@ -332,11 +332,12 @@ func rebase(mode string, env cli.Env) error {
 		if err != nil {
 			return err
 		}
-		mapping, err := concerns.Load(filepath.Join(source.Dir, c.Standards))
+		standards := source.Paths[0]
+		mapping, err := concerns.Load(filepath.Join(source.Dir, standards))
 		if err != nil {
 			return err
 		}
-		resolver = record.Document{"language": c.Language, "standards": c.Standards, "writer_materials": mapping.Materials(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "criteria", c.Standards), "writer:sync", "code")}
+		resolver = record.Document{"language": c.Language, "standards": standards, "writer_materials": mapping.Materials(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "criteria", standards), "writer:sync", "code")}
 
 		base := env.Getenv("BASE_BRANCH")
 		if base == "" {

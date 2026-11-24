@@ -293,17 +293,20 @@ func facts(args []string, env cli.Env) error {
 		}
 	}
 	paths := []string{}
+	standards := c.Standards
 	var judgeMaterials, writerMaterials concerns.Material
 	if ready {
-		if _, err = criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: text(request["criteria_commit"]), Dir: env.Path(filepath.Join(out, "criteria"))}); err != nil {
-			return err
-		}
-		mapping, err := concerns.Load(env.Path(filepath.Join(out, "criteria", c.Standards)))
+		source, err := criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: text(request["criteria_commit"]), Dir: env.Path(filepath.Join(out, "criteria"))})
 		if err != nil {
 			return err
 		}
-		judgeMaterials = mapping.Materials(filepath.Join(out, "criteria", c.Standards), "judge:pr-body", "code")
-		writerMaterials = mapping.Materials(filepath.Join(out, "criteria", c.Standards), "writer:pr-body", "code")
+		standards = source.Paths[0]
+		mapping, err := concerns.Load(filepath.Join(source.Dir, standards))
+		if err != nil {
+			return err
+		}
+		judgeMaterials = mapping.Materials(filepath.Join(out, "criteria", standards), "judge:pr-body", "code")
+		writerMaterials = mapping.Materials(filepath.Join(out, "criteria", standards), "writer:pr-body", "code")
 		paths = judgeMaterials.Criteria
 		if err = save(env.Path(filepath.Join(out, "requirements.json")), doc{"requirements": requirements, "plan": input["plan"]}); err != nil {
 			return err
@@ -349,7 +352,7 @@ func facts(args []string, env cli.Env) error {
 	if base != "" {
 		baseValue = base
 	}
-	if err = save(env.Path(filepath.Join(out, "facts.json")), doc{"language": c.Language, "standards": c.Standards, "head": head, "base": baseValue, "branch": ctx.Branch, "versions": input["versions"], "recorded_versions": versions, "criteria_commit": request["criteria_commit"], "criteria": paths, "judge_materials": judgeMaterials, "writer_materials": writerMaterials, "criteria_folder": filepath.Join(out, "criteria", c.Standards), "chain": chain, "outcome": outcome, "questions": indexed}); err != nil {
+	if err = save(env.Path(filepath.Join(out, "facts.json")), doc{"language": c.Language, "standards": standards, "head": head, "base": baseValue, "branch": ctx.Branch, "versions": input["versions"], "recorded_versions": versions, "criteria_commit": request["criteria_commit"], "criteria": paths, "judge_materials": judgeMaterials, "writer_materials": writerMaterials, "criteria_folder": filepath.Join(out, "criteria", standards), "chain": chain, "outcome": outcome, "questions": indexed}); err != nil {
 		return err
 	}
 	return env.JSON(doc{"ready": ready, "outcome": outcome, "reasons": reasons, "question_count": len(questions), "head": head})

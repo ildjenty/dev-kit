@@ -375,7 +375,7 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	if len(requests) == 0 || (!owner && strings.TrimSpace(memo) == "" && topic == nil) {
 		return nil, fmt.Errorf("refine needs owner_words or a discussion memo")
 	}
-	_, e = criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: str(requests[0]["criteria_commit"]), Dir: filepath.Join(artifacts, "criteria")})
+	source, e := criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: str(requests[0]["criteria_commit"]), Dir: filepath.Join(artifacts, "criteria")})
 	if e != nil {
 		return nil, e
 	}
@@ -395,7 +395,8 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	for _, a := range answers {
 		as = append(as, doc{"question_id": a["question_id"], "question": a["question"], "target": a["target"], "answer": a["answer"]})
 	}
-	mapping, e := concerns.Load(filepath.Join(artifacts, "criteria", c.Standards))
+	fixed := filepath.Join(displayArtifacts, "criteria", source.Paths[0])
+	mapping, e := concerns.Load(filepath.Join(source.Dir, source.Paths[0]))
 	if e != nil {
 		return nil, e
 	}
@@ -418,7 +419,7 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	}
 	affected := decisions.Affected(data)
 	affected.Decisions = decisionIndex(affected.Decisions)
-	input := doc{"pending_proposal": pending, "previous_unapproved": pending != nil, "topic": topic, "topics": data.Topics, "requests": rs, "memo": memo, "answers": as, "previous": previous, "decisions": decisionIndex(data.Decisions), "units": data.Units, "documents": data.Documents, "affected": affected, "language": c.Language, "criteria": filepath.Join(displayArtifacts, "criteria", c.Standards), "folders": doc{"docs": c.Docs, "decisions": c.Decisions, "units": c.Units, "topics": c.Topics, "standards": c.Standards}, "next_proposal_version": num(previous["version"]) + 1, "judge_materials": mapping.Materials(filepath.Join(displayArtifacts, "criteria", c.Standards), "judge:refine", "plan"), "writer_materials": mapping.Materials(filepath.Join(displayArtifacts, "criteria", c.Standards), "writer:refine", "plan")}
+	input := doc{"pending_proposal": pending, "previous_unapproved": pending != nil, "topic": topic, "topics": data.Topics, "requests": rs, "memo": memo, "answers": as, "previous": previous, "decisions": decisionIndex(data.Decisions), "units": data.Units, "documents": data.Documents, "affected": affected, "language": c.Language, "criteria": fixed, "folders": doc{"docs": c.Docs, "decisions": c.Decisions, "units": c.Units, "topics": c.Topics, "standards": c.Standards}, "next_proposal_version": num(previous["version"]) + 1, "judge_materials": mapping.Materials(fixed, "judge:refine", "plan"), "writer_materials": mapping.Materials(fixed, "writer:refine", "plan")}
 	relevant, e := relevance(env, ctx.Cwd, artifacts, input, data, c)
 	if e != nil {
 		return nil, e

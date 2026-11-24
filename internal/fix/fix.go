@@ -414,10 +414,12 @@ func prepare(ctx record.ContextData, artifacts string) (prepared, error) {
 		return prepared{}, fmt.Errorf("no request is recorded yet")
 	}
 	criteriaDir := filepath.Join(artifacts, "criteria")
-	if _, err := criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: text(requests[0]["criteria_commit"]), Dir: pathAt(ctx.Cwd, criteriaDir)}); err != nil {
+	source, err := criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: text(requests[0]["criteria_commit"]), Dir: pathAt(ctx.Cwd, criteriaDir)})
+	if err != nil {
 		return prepared{}, err
 	}
-	folder := filepath.Join(criteriaDir, cfg.Standards)
+	standards := source.Paths[0]
+	folder := filepath.Join(criteriaDir, standards)
 	gitCriteria, err := os.ReadFile(filepath.Join(pathAt(ctx.Cwd, folder), "git.md"))
 	if err != nil {
 		return prepared{}, err
@@ -442,7 +444,7 @@ func prepare(ctx record.ContextData, artifacts string) (prepared, error) {
 	if err != nil {
 		return prepared{}, err
 	}
-	input := record.Document{"language": cfg.Language, "standards": cfg.Standards, "criteria_folder": folder, "checks": configuredChecks, "commit_prefixes": prefixes, "writer_materials": mapping.Materials(folder, "writer:fix", "code"), "test_materials": mapping.Materials(folder, "writer:tests", "code"), "step_back_materials": mapping.Materials(folder, "judge:step-back", "code"), "dispute_materials": mapping.Materials(folder, "judge:dispute", "code")}
+	input := record.Document{"language": cfg.Language, "standards": standards, "criteria_folder": folder, "checks": configuredChecks, "commit_prefixes": prefixes, "writer_materials": mapping.Materials(folder, "writer:fix", "code"), "test_materials": mapping.Materials(folder, "writer:tests", "code"), "step_back_materials": mapping.Materials(folder, "judge:step-back", "code"), "dispute_materials": mapping.Materials(folder, "judge:dispute", "code")}
 	for _, item := range []struct {
 		name  string
 		value any
