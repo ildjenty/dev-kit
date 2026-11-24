@@ -103,7 +103,7 @@ func TestIssueLabelsDefaultsMergeAndValidation(t *testing.T) {
 func TestStandardsDefaults(t *testing.T) {
 	c := Defaults("")
 	testutil.Equal(t, c.Standards, ".devkit/standards")
-	testutil.Equal(t, c.Docs, "docs")
+	testutil.Equal(t, c.Decisions, ".devkit/decisions")
 	testutil.Equal(t, Matches(c.Qualities["structure"].Paths, ".devkit/standards/authority.md"), true)
 	changes := DecisionChanges(c, gitx.Changes{Files: []gitx.File{{Path: ".devkit/standards/authority.md", Status: "M"}}})
 	testutil.Equal(t, changes, []DecisionChange{{Path: ".devkit/standards/authority.md", Status: "M", Kind: "file", Quality: "structure", Ask: true}})
@@ -203,7 +203,7 @@ func TestFormerUnitMarkersRemainInDecisionDetection(t *testing.T) {
 	testutil.Put(t, repo, ".devkit/units/U-abcdef.done.json", `{"unit":"U-abcdef","branch":"feature/x"}`)
 	testutil.Git(t, repo, "add", ".")
 	testutil.Git(t, repo, "commit", "-qm", "done")
-	testutil.Equal(t, len(DecisionChanges(c, testutil.Must(g.Changes("", "HEAD")))), 1)
+	testutil.Equal(t, len(DecisionChanges(c, testutil.Must(g.Changes("", "HEAD")))), 3)
 	testutil.Put(t, repo, ".devkit/units/U-fedcba.md", "another unit")
 	testutil.Git(t, repo, "add", ".")
 	testutil.Git(t, repo, "commit", "-qm", "another unit")
@@ -238,5 +238,17 @@ func TestObsoleteRefineRelevanceThresholdIsIgnored(t *testing.T) {
 	for _, raw := range []string{`{"refine":null}`, `{"refine":[]}`, `{"refine":{"extra":1}}`, `{"refine":{"relevance_threshold":0.2,"extra":1}}`} {
 		_, err := Parse([]byte(raw))
 		testutil.Fails(t, err, "invalid .devkit/config.json")
+	}
+}
+
+func TestObsoleteRefineFoldersAreAcceptedIgnoredAndNotEmitted(t *testing.T) {
+	c := testutil.Must(Parse([]byte(`{"docs":false,"units":"../obsolete","topics":null,"refine":{"relevance_threshold":0.9}}`)))
+	testutil.Equal(t, c, Defaults(""))
+	var encoded map[string]any
+	testutil.OK(t, json.Unmarshal(testutil.Must(json.Marshal(c)), &encoded))
+	for _, key := range []string{"docs", "units", "topics", "refine"} {
+		if _, exists := encoded[key]; exists {
+			t.Fatalf("obsolete setting emitted: %s", key)
+		}
 	}
 }

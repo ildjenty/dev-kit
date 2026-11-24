@@ -98,6 +98,9 @@ func (m Map) Materials(dir, subject, phase string) Material {
 	}
 	if subject == "judge:refine" {
 		material.Principles = append(material.Principles, paths(m.Qualities["document"].Principles)...)
+		binding := m.Materials(dir, "judge:retro", phase)
+		material.Criteria = append(material.Criteria, binding.Criteria...)
+		material.Principles = append(material.Principles, binding.Principles...)
 	}
 	if strings.HasPrefix(subject, "writer:") || subject == "judge:dispute" {
 		name := strings.TrimPrefix(subject, "writer:")

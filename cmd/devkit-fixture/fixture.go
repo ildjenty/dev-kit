@@ -85,9 +85,6 @@ func before(args []string, env cli.Env) error {
 		switch workflow + " " + args[1] {
 		case "plan check", "refine check", "retro check":
 			draft := "draft.json"
-			if workflow == "refine" && env.Getenv("INPUTS_PHASE") == "decide" {
-				draft = "decide.json"
-			}
 			data, err := os.ReadFile(filepath.Join(env.Cwd, ".archon/workflows/dev", workflow, "fixtures/executed", draft))
 			if err != nil {
 				return err
@@ -116,18 +113,6 @@ func before(args []string, env cli.Env) error {
 				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte("Approve the traced repair with approve=1, or provide answers for changes?"), 0644)
 			}
 			if workflow == "refine" {
-				if env.Getenv("INPUTS_PHASE") == "document" {
-					data, err := os.ReadFile(filepath.Join(env.Cwd, ".archon/workflows/dev/refine/fixtures/executed/document.md"))
-					if err != nil {
-						return err
-					}
-					if err = os.MkdirAll(filepath.Join(env.Cwd, "docs"), 0755); err != nil {
-						return err
-					}
-					if err = os.WriteFile(filepath.Join(env.Cwd, "docs/refined.md"), data, 0644); err != nil {
-						return err
-					}
-				}
 				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte("Owner decision: N1. Provisional decisions: none. Unit: UN1. Start refine with approve=1, or answers to request changes."), 0644)
 			}
 		case "sync continue":
@@ -420,25 +405,12 @@ func after(args []string, env cli.Env) error {
 		if err != nil {
 			return err
 		}
-		index, ok := input["decisions"].([]any)
-		relevant, relevantOK := input["relevant_decisions"].([]any)
-		if !ok || len(index) != 1 || !relevantOK || len(relevant) != 0 {
-			return fmt.Errorf("unexpected refine relevance input: %v", input)
+		records, ok := input["decisions"].([]any)
+		if !ok || len(records) != 1 || records[0].(map[string]any)["body"] == "" {
+			return fmt.Errorf("refine decision log is missing: %v", input)
 		}
-		entry, ok := index[0].(map[string]any)
-		if !ok || len(entry) != 6 || entry["id"] != "D-abcdef" {
-			return fmt.Errorf("unexpected refine decision index: %v", index)
-		}
-		relevance, err := read(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "refine/relevance.json"))
-		if err != nil {
-			return err
-		}
-		settings, err := config.Load(env.Cwd)
-		if err != nil {
-			return err
-		}
-		if relevance["source"] != settings.Provider {
-			return fmt.Errorf("refine did not use configured relevance fallback: %v", relevance)
+		if _, exists := input["relevant_decisions"]; exists {
+			return fmt.Errorf("removed relevance selection reached refine")
 		}
 	}
 	head, err := gitx.Run(env.Cwd, "rev-parse", "HEAD")

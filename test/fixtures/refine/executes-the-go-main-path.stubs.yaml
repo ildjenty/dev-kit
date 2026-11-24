@@ -9,14 +9,8 @@
       "check-decide",
       "judge-decide",
       "round-decide",
-      "decided",
-      "write-document",
-      "check-document",
-      "judge-document",
-      "round-document",
       "finish",
-      "result",
-      "reflect"
+      "result"
     ],
     "inputs": {
       "owner_words": "Update fixture.txt"
@@ -25,50 +19,54 @@
   "write-decide": {
     "draft": "/tmp/refine/draft.json"
   },
-  "write-document": {
-    "draft": "/tmp/refine/draft.json"
-  },
   "judge-decide": {
     "criteria": [
       {
         "aspect": "coverage",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "additions",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "open_points",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "consistency",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "sufficiency",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
-      }
-    ],
-    "findings": []
-  },
-  "judge-document": {
-    "criteria": [
+      },
       {
         "aspect": "wording",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
+        "not_checked": ""
+      },
+      {
+        "aspect": "bindings",
+        "verdict": "pass",
+        "checked": "Compared all materials",
+        "not_checked": ""
+      },
+      {
+        "aspect": "issues",
+        "verdict": "pass",
+        "checked": "Compared all materials",
         "not_checked": ""
       }
     ],

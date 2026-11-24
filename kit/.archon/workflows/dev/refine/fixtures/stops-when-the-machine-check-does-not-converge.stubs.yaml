@@ -5,9 +5,7 @@
       "prepare",
       "write-decide",
       "check-decide",
-      "judge-decide",
       "round-decide",
-      "decided",
       "finish",
       "result"
     ],
@@ -29,9 +27,6 @@
     "input": "/tmp/refine/input.json",
     "criteria": "/tmp/criteria"
   },
-  "decided": {
-    "ready": false
-  },
   "write-decide": {
     "draft": "/tmp/refine/draft.json"
   },
@@ -40,41 +35,6 @@
     "errors": [
       "Unknown decision"
     ]
-  },
-  "judge-decide": {
-    "criteria": [
-      {
-        "aspect": "coverage",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      },
-      {
-        "aspect": "additions",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      },
-      {
-        "aspect": "open_points",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      },
-      {
-        "aspect": "consistency",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      },
-      {
-        "aspect": "sufficiency",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      }
-    ],
-    "findings": []
   },
   "round-decide": {
     "round": 3,
@@ -86,12 +46,7 @@
     "outcome": "stop",
     "proposal_version": 1,
     "decision_ids": [],
-    "unit_ids": [],
-    "affected": {
-      "decisions": [],
-      "documents": [],
-      "units": []
-    },
+    "issue_numbers": [],
     "questions": [],
     "reasons": [
       "The draft did not clear review"
@@ -101,12 +56,7 @@
     "outcome": "stop",
     "proposal_version": 1,
     "decision_ids": [],
-    "unit_ids": [],
-    "affected": {
-      "decisions": [],
-      "documents": [],
-      "units": []
-    },
+    "issue_numbers": [],
     "questions": [],
     "reasons": [
       "The draft did not clear review"

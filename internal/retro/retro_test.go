@@ -11,7 +11,6 @@ import (
 
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
-	"github.com/ildjenty/dev-kit/internal/decisions"
 	"github.com/ildjenty/dev-kit/internal/record"
 	"github.com/ildjenty/dev-kit/internal/testutil"
 )
@@ -23,7 +22,13 @@ type fixture struct {
 }
 
 func envVars(vars map[string]string) cli.Env {
-	return cli.Env{LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
+	return cli.Env{LookupEnv: func(k string) (string, bool) {
+		v, ok := vars[k]
+		if !ok && k == "DEVKIT_GH" {
+			return os.LookupEnv(k)
+		}
+		return v, ok
+	}}
 }
 func finding() doc {
 	return doc{"finding": doc{"id": "F1", "text": "A defect", "blocking": false, "needs_decision": false, "evidence": "path"}, "source": doc{"judge": "structure", "run_id": "judge-1", "judgment": 1, "kind": "code", "target": doc{"commit": strings.Repeat("a", 40)}}}
@@ -33,6 +38,7 @@ func backlog() doc {
 }
 func setup(t *testing.T, b doc) *fixture {
 	t.Helper()
+	testutil.IssueCreationCLI(t)
 	root := t.TempDir()
 	cwd := filepath.Join(root, "repo")
 	testutil.OK(t, os.Mkdir(cwd, 0755))
@@ -72,7 +78,7 @@ func (r *fixture) begin() doc {
 }
 func (r *fixture) draft() doc {
 	input := testutil.Must(readJSON(file(r.artifacts, "input.json")))
-	return doc{"summary": "Repair the observed defect", "units": []doc{{"key": "repair", "title": "Repair defect", "goal": "Remove the defect", "completion_conditions": []string{"The failure no longer occurs"}, "entries": []string{str(items(input["entries"])[0]["id"])}}}, "checks": []doc{}, "standards": []doc{}, "dismissed": []doc{}, "escapes": []doc{}, "cases": []doc{}}
+	return doc{"summary": "Repair the observed defect", "units": []doc{{"key": "repair", "title": "Repair defect", "goal": "Remove the defect", "completion_conditions": []string{"The failure no longer occurs"}, "blocked_by": []string{}, "entries": []string{str(items(input["entries"])[0]["id"])}}}, "checks": []doc{}, "standards": []doc{}, "dismissed": []doc{}, "escapes": []doc{}, "cases": []doc{}}
 }
 func (r *fixture) write(d doc) {
 	r.t.Helper()
@@ -146,7 +152,7 @@ func TestProposalCommitsEverythingAndApprovalOnlyRecordsResult(t *testing.T) {
 	testutil.Equal(t, len(items(out["questions"])), 1)
 	testutil.Contains(t, string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, ".devkit/standards/harness.md")))), "clarification supported")
 	testutil.Equal(t, len(testutil.Must(config.Load(r.cwd)).Checks), len(c.Checks))
-	testutil.Equal(t, len(testutil.Must(decisions.List(r.cwd)).Units), 1)
+	testutil.Equal(t, len(items(obj(testutil.Must(record.Latest(r.ctx.Dir, "proposal"))["content"])["draft"].(map[string]any)["units"])), 1)
 	testutil.Equal(t, r.git("status", "--porcelain"), "")
 	proposal := testutil.Must(record.Latest(r.ctx.Dir, "proposal"))
 	content := obj(proposal["content"])
@@ -163,16 +169,12 @@ func TestProposalCommitsEverythingAndApprovalOnlyRecordsResult(t *testing.T) {
 	testutil.Equal(t, s.Stopped, false)
 	testutil.Equal(t, testutil.Must(approve(r.ctx, "1"))["outcome"], "pass")
 	testutil.Equal(t, r.git("rev-parse", "HEAD"), head)
-	unitPath := filepath.Join(r.cwd, str(obj(input["folders"])["units"]), stringsOf(content["unit_ids"])[0]+".md")
-	unit := testutil.Must(decisions.Parse(string(testutil.Must(os.ReadFile(unitPath)))))
-	testutil.Equal(t, unit["id"], stringsOf(content["unit_ids"])[0])
-	testutil.Contains(t, str(unit["body"]), refs[0])
-	testutil.Equal(t, decisions.Check(testutil.Must(decisions.List(r.cwd))), []string{})
+	testutil.Equal(t, testutil.Must(record.Latest(r.ctx.Dir, "result"))["issue_numbers"], []any{float64(101)})
 	testutil.Equal(t, len(testutil.Must(config.Load(r.cwd)).Checks), len(c.Checks))
 	testutil.Contains(t, string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, ".devkit/standards/harness.md")))), "clarification supported")
 	testutil.Equal(t, r.git("status", "--porcelain"), "")
 	changed := r.git("show", "--format=", "--name-only", "HEAD")
-	for _, p := range []string{".devkit/backlog/topic.json", ".devkit/backlog/second.json", ".devkit/config.json", ".devkit/standards/harness.md", str(stringsOf(content["unit_ids"])[0]) + ".md"} {
+	for _, p := range []string{".devkit/backlog/topic.json", ".devkit/backlog/second.json", ".devkit/config.json", ".devkit/standards/harness.md"} {
 		testutil.Contains(t, changed, p)
 	}
 	_, e = os.Stat(filepath.Join(r.cwd, ".devkit/backlog/topic.json"))
@@ -238,7 +240,7 @@ func TestMachineGateValidatesCoverageSchemaConfigStandardsAndTrace(t *testing.T)
 		{"unedited standard", "no checkout change", func(r *fixture, d doc) {
 			d["standards"] = []doc{{"path": ".devkit/standards/harness.md", "reason": "Reason", "evidence": "Evidence", "entries": items(d["units"])[0]["entries"]}}
 		}},
-		{"direct unit", "write units in the draft", func(r *fixture, d doc) { r.put(".devkit/units/U-123456.md", "Direct unit") }},
+		{"direct unit", "outside the allowed paths", func(r *fixture, d doc) { r.put(".devkit/units/U-123456.md", "Direct unit") }},
 		{"writer commit", "writer changed HEAD", func(r *fixture, d doc) { r.put("hidden.txt", "committed"); r.commit() }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -396,8 +398,7 @@ func TestStartRejectsWrongBranchOldApprovalChangedHeadAndMixedAnswers(t *testing
 func TestCorrectionWithdrawsUnitsWithoutLeavingGeneratedRecords(t *testing.T) {
 	r := setup(t, backlog())
 	r.begin()
-	first := r.propose()
-	firstID := stringsOf(first["unit_ids"])[0]
+	r.propose()
 	r.ctx.RunID = "r2"
 	s, e := start(r.ctx, envVars(map[string]string{"INPUTS_ANSWERS": `[{"question_id":"Q1","answer":"Dismiss the entry because it was fixed"}]`}))
 	testutil.OK(t, e)
@@ -418,7 +419,7 @@ func TestCorrectionWithdrawsUnitsWithoutLeavingGeneratedRecords(t *testing.T) {
 	testutil.OK(t, e)
 	testutil.Equal(t, s.Stopped, false)
 	testutil.Equal(t, testutil.Must(approve(r.ctx, "2"))["outcome"], "pass")
-	_, e = os.Stat(filepath.Join(r.cwd, ".devkit/units", firstID+".md"))
+	_, e = os.Stat(filepath.Join(r.cwd, ".devkit/units"))
 	testutil.Equal(t, os.IsNotExist(e), true)
 }
 func TestPrepareReadsAndValidatesFixedMapAndWritesSchemas(t *testing.T) {
@@ -482,24 +483,6 @@ func TestCommandsAbsoluteAndRelativePaths(t *testing.T) {
 	}
 }
 
-func TestUnitIDsAreStableExtendOnCollisionAndNeverOverwrite(t *testing.T) {
-	r := setup(t, backlog())
-	r.begin()
-	d := r.draft()
-	input := testutil.Must(readJSON(file(r.artifacts, "input.json")))
-	first, ids, e := materializedUnits(r.ctx, input, d)
-	testutil.OK(t, e)
-	repeated, again, e := materializedUnits(r.ctx, input, d)
-	testutil.OK(t, e)
-	testutil.Equal(t, repeated, first)
-	testutil.Equal(t, again, ids)
-	path := str(obj(input["folders"])["units"]) + "/" + ids[0] + ".md"
-	r.put(path, "Existing unit")
-	_, extended, e := materializedUnits(r.ctx, input, d)
-	testutil.OK(t, e)
-	testutil.Equal(t, len(extended[0]), len(ids[0])+1)
-	testutil.Equal(t, string(testutil.Must(os.ReadFile(filepath.Join(r.cwd, path)))), "Existing unit")
-}
 func TestApprovalQuestionCannotChangeAfterReview(t *testing.T) {
 	r := setup(t, backlog())
 	r.begin()

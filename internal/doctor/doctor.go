@@ -172,9 +172,9 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 	key := env.Getenv("TYPESAFE_API_KEY") != ""
 	if !key {
 		_, fallback := command(env, limit, settings.Provider, "--version")
-		finding("needed for a part", settings.Provider+" Jev fallback", fallback, "read-only CLI available for judge route and refine reflect", "Without Jev, reflection fails and routing selects all qualities; install and sign in to "+settings.Provider+".")
+		finding("needed for a part", settings.Provider+" Jev fallback", fallback, "read-only CLI available for judge route", "Without Jev or its CLI fallback, routing selects all qualities; install and sign in to "+settings.Provider+".")
 	}
-	finding("optional", "TYPESAFE_API_KEY", key, "set; TypeSafe receives changed-file diffs for routing and new decisions plus their citing documents for reflection", "Not set; the configured provider CLI performs routing and reflection. Set TYPESAFE_API_KEY to use TypeSafe (diffs, new decisions and citing documents are sent).")
+	finding("optional", "TYPESAFE_API_KEY", key, "set; TypeSafe receives changed-file diffs for routing", "Not set; the configured provider CLI performs routing. Set TYPESAFE_API_KEY to use TypeSafe (changed-file diffs are sent).")
 	finding("optional", "checks", len(settings.Checks) > 0, fmt.Sprintf("%d configured; command availability is checked when they run", len(settings.Checks)), "No verification runs; run the "+settings.Skills["devkit-optimize"]+" skill to configure repository checks.")
 	return valid
 }

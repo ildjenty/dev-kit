@@ -3,7 +3,7 @@ description: |
   Turn the checkout's review backlog into traced work units, mechanical checks and standard edits.
   Review up to three drafts, commit the proposal and ask one approval question.
   The proposal commit contains the edits and consumed backlog deletions.
-  Restart with approve=<version> to approve that clean branch head without further edits.
+  Restart with approve=<version> to create the unit Issues from that clean branch head.
 worktree:
   enabled: true
 inputs:
@@ -44,7 +44,7 @@ nodes:
       properties:
         outcome: { type: string, enum: [not_started, pass, question, stop] }
         proposal_version: { type: integer }
-        unit_ids: { type: array, items: { type: string } }
+        issue_numbers: { type: array, items: { type: integer } }
         questions:
           type: array
           items:
@@ -54,7 +54,7 @@ nodes:
               text: { type: string }
             required: [id, text]
         reasons: { type: array, items: { type: string } }
-      required: [outcome, proposal_version, unit_ids, questions, reasons]
+      required: [outcome, proposal_version, issue_numbers, questions, reasons]
 
   - id: approve
     depends_on: [start]

@@ -148,9 +148,9 @@ func TestRequestedRevisionKeepsUnitIDAndRevertsByNewCommit(t *testing.T) {
 	r.json(".devkit/config.json", c)
 	r.write(d)
 	testutil.Equal(t, testutil.Must(r.review(judgment()))["valid"], true)
-	first := testutil.Must(finish(r.ctx, r.artifacts))
+	testutil.Must(finish(r.ctx, r.artifacts))
 	firstHead := r.git("rev-parse", "HEAD")
-	firstID := stringsOf(first["unit_ids"])[0]
+	firstKey := str(items(obj(obj(testutil.Must(record.Latest(r.ctx.Dir, "proposal"))["content"])["draft"])["units"])[0]["key"])
 	r.ctx.RunID = "r2"
 	s, e := start(r.ctx, envVars(map[string]string{"INPUTS_ANSWERS": `[{"question_id":"Q1","answer":"Keep the unit, change its goal, withdraw the rule"}]`}))
 	testutil.OK(t, e)
@@ -166,13 +166,13 @@ func TestRequestedRevisionKeepsUnitIDAndRevertsByNewCommit(t *testing.T) {
 	testutil.Equal(t, testutil.Must(r.review(judgment()))["valid"], true)
 	second := testutil.Must(finish(r.ctx, r.artifacts))
 	testutil.Equal(t, second["proposal_version"], 2)
-	testutil.Equal(t, stringsOf(second["unit_ids"]), []string{firstID})
+	testutil.Equal(t, str(items(obj(obj(testutil.Must(record.Latest(r.ctx.Dir, "proposal"))["content"])["draft"])["units"])[0]["key"]), firstKey)
 	testutil.Equal(t, r.git("rev-parse", "HEAD^"), firstHead)
 	testutil.Equal(t, r.git("rev-list", "--count", base+"..HEAD"), "2")
 	testutil.Contains(t, r.git("show", firstHead+":"+path), "Proposed rule")
 	testutil.Equal(t, r.git("ls-tree", "--name-only", "HEAD", "--", path), "")
 	testutil.Equal(t, len(testutil.Must(config.Load(r.cwd)).Checks), len(c.Checks)-1)
-	testutil.Contains(t, r.git("show", "HEAD:.devkit/units/"+firstID+".md"), "A revised goal")
+	testutil.Equal(t, str(items(obj(obj(testutil.Must(record.Latest(r.ctx.Dir, "proposal"))["content"])["draft"])["units"])[0]["goal"]), "A revised goal")
 	testutil.Equal(t, r.git("status", "--porcelain"), "")
 }
 

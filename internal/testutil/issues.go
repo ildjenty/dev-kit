@@ -49,3 +49,39 @@ esac
 	t.Setenv("DEVKIT_GH", path)
 	return path
 }
+
+func IssueCreationCLI(t testing.TB) (string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	script := `#!/bin/sh
+state='` + dir + `'
+printf '%s\n' "$*" >> "$state/calls"
+case "$1 $2" in
+ "issue create")
+  body=$(cat)
+  printf '%s\n' "$body" >> "$state/bodies"
+  count=0
+  test ! -f "$state/count" || count=$(cat "$state/count")
+  count=$((count+1))
+  test ! -f "$state/fail" || test "$(cat "$state/fail")" != "$count" || exit 1
+  printf '%s' "$count" > "$state/count"
+  printf 'https://github.example/team/repo/issues/%s\n' "$((100+count))"
+  ;;
+ "issue close"|"issue comment") cat >/dev/null; printf '{}' ;;
+ "issue view")
+  printf '{"number":7,"title":"Audience","body":"Who may sign in?","state":"OPEN","labels":[{"name":"devkit:topic"}],"url":"https://github.example/team/repo/issues/7"}' ;;
+ "api "*)
+  case "$*" in
+   *--method*) printf '{}' ;;
+   *per_page*) printf '[[]]' ;;
+   *) printf '{"id":9001}' ;;
+  esac ;;
+ *) exit 97 ;;
+esac
+`
+	Put(t, dir, "gh", script)
+	path := filepath.Join(dir, "gh")
+	OK(t, os.Chmod(path, 0755))
+	t.Setenv("DEVKIT_GH", path)
+	return dir, path
+}

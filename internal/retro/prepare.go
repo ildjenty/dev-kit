@@ -8,7 +8,6 @@ import (
 	"github.com/ildjenty/dev-kit/internal/concerns"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/criteria"
-	"github.com/ildjenty/dev-kit/internal/decisions"
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
@@ -132,12 +131,8 @@ func prepare(ctx record.ContextData, artifacts string) (doc, error) {
 	if e != nil {
 		return nil, e
 	}
-	data, e := decisions.List(ctx.Cwd)
-	if e != nil {
-		return nil, e
-	}
 	fixedDisplay := filepath.Join(display, "criteria", source.Paths[0])
-	input := doc{"units": data.Units, "entries": entries, "backlog": backlog, "config": c, "concerns": mapping, "standards_index": string(index), "criteria": fixedDisplay, "judge_materials": mapping.Materials(fixedDisplay, "judge:retro", "plan"), "writer_materials": mapping.Materials(fixedDisplay, "writer:retro", "plan"), "language": c.Language, "folders": doc{"units": c.Units, "standards": c.Standards, "eval": c.Eval}, "answers": answers, "previous": previous, "next_proposal_version": num(previous["version"]) + 1}
+	input := doc{"entries": entries, "backlog": backlog, "config": c, "concerns": mapping, "standards_index": string(index), "criteria": fixedDisplay, "judge_materials": mapping.Materials(fixedDisplay, "judge:retro", "plan"), "writer_materials": mapping.Materials(fixedDisplay, "writer:retro", "plan"), "language": c.Language, "folders": doc{"standards": c.Standards, "eval": c.Eval}, "answers": answers, "previous": previous, "next_proposal_version": num(previous["version"]) + 1}
 	input["proposal_base"] = base
 	if e = writeJSON(file(artifacts, "input.json"), input); e != nil {
 		return nil, e

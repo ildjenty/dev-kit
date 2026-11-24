@@ -48,11 +48,8 @@ type Config struct {
 	Language      string             `json:"language"`
 	Skills        map[string]string  `json:"skills"`
 	Standards     string             `json:"standards"`
-	Docs          string             `json:"docs"`
 	Decisions     string             `json:"decisions"`
-	Topics        string             `json:"topics"`
 	Eval          string             `json:"eval"`
-	Units         string             `json:"units"`
 	Issues        Issues             `json:"issues"`
 	Checks        []Check            `json:"checks"`
 	SkeletonCheck []string           `json:"skeleton_check"`
@@ -133,6 +130,9 @@ func Parse(data []byte) (Config, error) {
 	var merged map[string]any
 	_ = json.Unmarshal(base, &merged)
 	for key, value := range supplied {
+		if key == "docs" || key == "units" || key == "topics" {
+			continue
+		}
 		if key == "issues" {
 			if !keys(value, []string{"labels"}) {
 				return Config{}, invalid("issues")
@@ -247,7 +247,7 @@ func keys(value any, allowed []string) bool {
 var SkillKeys = []string{"devkit-runs", "devkit-discuss", "devkit-optimize"}
 
 func shape(c map[string]any) error {
-	if !keys(c, []string{"provider", "sessions", "language", "skills", "standards", "docs", "decisions", "units", "topics", "issues", "eval", "checks", "skeleton_check", "qualities", "decision_paths", "limits"}) {
+	if !keys(c, []string{"provider", "sessions", "language", "skills", "standards", "decisions", "issues", "eval", "checks", "skeleton_check", "qualities", "decision_paths", "limits"}) {
 		return invalid("unknown setting")
 	}
 	if c["provider"] != "claude" && c["provider"] != "codex" {
@@ -289,7 +289,7 @@ func shape(c map[string]any) error {
 		}
 		used[name] = true
 	}
-	for _, key := range []string{"standards", "docs", "decisions", "units", "topics", "eval"} {
+	for _, key := range []string{"standards", "decisions", "eval"} {
 		s, _ := c[key].(string)
 		if !text(c[key]) || strings.HasPrefix(s, "/") || strings.Contains(s, "\\") || slices.Contains(strings.Split(s, "/"), "..") || slices.Contains(strings.Split(s, "/"), ".") {
 			return invalid(key + " must be a repository-relative folder")
@@ -483,7 +483,7 @@ func DecisionChanges(c Config, changes gitx.Changes) []DecisionChange {
 					continue
 				}
 				found = true
-				if !Covers(c.Decisions, changedPath) && !Covers(c.Units, changedPath) && !Covers(c.Topics, changedPath) && !slices.Contains(changes.Excluded, changedPath) {
+				if !Covers(c.Decisions, changedPath) && !slices.Contains(changes.Excluded, changedPath) {
 					return false
 				}
 			}

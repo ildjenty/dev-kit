@@ -16,7 +16,9 @@
               "open_points",
               "consistency",
               "sufficiency",
-              "wording"
+              "wording",
+              "bindings",
+              "issues"
             ]
           },
           "verdict": {
@@ -57,7 +59,8 @@
               "consistency",
               "sufficiency",
               "wording",
-              "reflection"
+              "bindings",
+              "issues"
             ]
           },
           "item": {

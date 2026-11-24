@@ -1,14 +1,14 @@
 name: refine
 description: |
-  Turn owner requests and discussion memos into decisions, prose documents and one-PR work units.
-  Settle one topic through decide and document, each with at most three drafts, then commit a proposal and
-  ask for approval. Start again with approve=<version> to agree it without AI.
+  Turn a topic Issue or owner request into decision records, binding changes and Issue drafts.
+  Review at most three drafts and commit one proposal per version.
+  Restart with approve=<version> to agree the decisions and create the Issues without AI.
 worktree:
   enabled: true
 inputs:
   topic:
     default: ""
-    description: A pickable topic ID; empty for the first run of a request.
+    description: An open Issue number with the configured topic label; empty for the first request.
   owner_words:
     default: ""
     description: The owner's words, verbatim; empty when only answering.
@@ -56,14 +56,7 @@ nodes:
         outcome: { type: string, enum: [not_started, pass, question, stop] }
         proposal_version: { type: integer }
         decision_ids: { type: array, items: { type: string } }
-        unit_ids: { type: array, items: { type: string } }
-        affected:
-          type: object
-          properties:
-            decisions: { type: array, items: { type: object } }
-            documents: { type: array, items: { type: object } }
-            units: { type: array, items: { type: object } }
-          required: [decisions, documents, units]
+        issue_numbers: { type: array, items: { type: integer } }
         questions:
           type: array
           items:
@@ -73,7 +66,7 @@ nodes:
               text: { type: string }
             required: [id, text]
         reasons: { type: array, items: { type: string } }
-      required: [outcome, proposal_version, decision_ids, unit_ids, affected, questions, reasons]
+      required: [outcome, proposal_version, decision_ids, issue_numbers, questions, reasons]
 
   - id: approve
     depends_on: [start]
@@ -110,105 +103,31 @@ nodes:
 
         - id: check-decide
           depends_on: [write-decide]
-          bash: INPUTS_PHASE=decide devkit refine check
+          bash: devkit refine check
           output_format: {"type": "object", "properties": {"valid": {"type": "boolean"}, "errors": {"type": "array", "items": {"type": "string"}}}, "required": ["valid", "errors"]}
 
         - id: judge-decide
           depends_on: [check-decide]
+          when: "$check-decide.output.valid == true"
           provider: claude
           settingSources: [user]
           command: judge-decide
           context: fresh
           mutates_checkout: false
           allowed_tools: [Read, Grep, Glob]
-          output_format: {"type": "object", "additionalProperties": false, "properties": {"criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["coverage", "additions", "open_points", "consistency", "sufficiency"]}, "verdict": {"type": "string", "enum": ["pass", "fail", "not_assessed"]}, "checked": {"type": "string"}, "not_checked": {"type": "string"}}, "required": ["aspect", "verdict", "checked", "not_checked"]}}, "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["coverage", "additions", "open_points", "consistency", "sufficiency"]}, "item": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "needs_decision": {"type": "boolean"}, "mechanical": {"type": "boolean"}, "failure_scenario": {"type": "string", "minLength": 1}, "evidence": {"type": "string", "minLength": 1}, "fix": {"type": "string", "minLength": 1}}, "required": ["aspect", "item", "blocking", "needs_decision", "failure_scenario", "evidence", "fix", "mechanical"]}}}, "required": ["criteria", "findings"]}
+          output_format: {"type":"object","additionalProperties":false,"properties":{"criteria":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"aspect":{"type":"string","enum":["coverage","additions","open_points","consistency","sufficiency","wording","bindings","issues"]},"verdict":{"type":"string","enum":["pass","fail","not_assessed"]},"checked":{"type":"string"},"not_checked":{"type":"string"}},"required":["aspect","verdict","checked","not_checked"]}},"findings":{"type":"array","items":{"type":"object","additionalProperties":false,"properties":{"aspect":{"type":"string","enum":["coverage","additions","open_points","consistency","sufficiency","wording","bindings","issues"]},"item":{"type":"string","minLength":1},"blocking":{"type":"boolean"},"needs_decision":{"type":"boolean"},"failure_scenario":{"type":"string","minLength":1},"evidence":{"type":"string","minLength":1},"fix":{"type":"string","minLength":1},"mechanical":{"type":"boolean"}},"required":["aspect","item","blocking","needs_decision","failure_scenario","evidence","fix","mechanical"]}}},"required":["criteria","findings"]}
 
         - id: round-decide
-          depends_on: [judge-decide]
+          depends_on: [check-decide, judge-decide]
+          trigger_rule: none_failed_min_one_success
           bash: |
             judgment=$judge-decide.output
-            INPUTS_PHASE=decide INPUTS_JUDGMENT="$judgment" devkit refine round
+            INPUTS_JUDGMENT="$judgment" devkit refine round
           output_format: {"type": "object", "properties": {"round": {"type": "integer"}, "valid": {"type": "boolean"}, "blocking_count": {"type": "integer"}, "not_assessed_count": {"type": "integer"}}, "required": ["round", "valid", "blocking_count", "not_assessed_count"]}
       until_bash: 'v=$round-decide.output.valid; b=$round-decide.output.blocking_count; n=$round-decide.output.not_assessed_count; test "$v" = true && test "$b" = 0 && test "$n" = 0'
 
-  - id: decided
-    depends_on: [decide]
-    bash: devkit refine decided
-    output_format:
-      type: object
-      properties:
-        ready: { type: boolean }
-      required: [ready]
-
-  - id: document
-    depends_on: [decided]
-    when: "$decided.output.ready == true"
-    loop_group:
-      max_iterations: 3
-      on_exhausted: complete
-      nodes:
-        - id: write-document
-          provider: claude
-          command: document
-          output_format:
-            type: object
-            additionalProperties: false
-            properties:
-              draft: { type: string }
-            required: [draft]
-
-        - id: check-document
-          depends_on: [write-document]
-          bash: INPUTS_PHASE=document devkit refine check
-          output_format: {"type": "object", "properties": {"valid": {"type": "boolean"}, "errors": {"type": "array", "items": {"type": "string"}}}, "required": ["valid", "errors"]}
-
-        - id: reflect
-          depends_on: [check-document]
-          when: "$check-document.output.valid == true"
-          bash: devkit refine reflect
-          timeout: 1200000
-          output_format:
-            type: object
-            properties:
-              source: { type: string, enum: [jev, claude, codex] }
-              model: { type: string }
-              not_reflected:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    title: { type: string }
-                    probability: { type: number }
-                    decision: { type: string, minLength: 1 }
-                    documents: { type: array, minItems: 1, items: { type: string, minLength: 1 } }
-                    reason: { type: string, minLength: 1 }
-                  required: [decision, documents]
-            required: [source, not_reflected]
-
-        - id: judge-document
-          depends_on: [check-document, reflect]
-          trigger_rule: none_failed_min_one_success
-          provider: claude
-          settingSources: [user]
-          command: judge-document
-          context: fresh
-          mutates_checkout: false
-          allowed_tools: [Read, Grep, Glob]
-          output_format: {"type": "object", "additionalProperties": false, "properties": {"criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["wording"]}, "verdict": {"type": "string", "enum": ["pass", "fail", "not_assessed"]}, "checked": {"type": "string"}, "not_checked": {"type": "string"}}, "required": ["aspect", "verdict", "checked", "not_checked"]}}, "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "properties": {"aspect": {"type": "string", "enum": ["wording"]}, "item": {"type": "string", "minLength": 1}, "blocking": {"type": "boolean"}, "needs_decision": {"type": "boolean"}, "mechanical": {"type": "boolean"}, "failure_scenario": {"type": "string", "minLength": 1}, "evidence": {"type": "string", "minLength": 1}, "fix": {"type": "string", "minLength": 1}}, "required": ["aspect", "item", "blocking", "needs_decision", "failure_scenario", "evidence", "fix", "mechanical"]}}}, "required": ["criteria", "findings"]}
-
-        - id: round-document
-          depends_on: [judge-document, reflect]
-          trigger_rule: none_failed_min_one_success
-          bash: |
-            judgment=$judge-document.output
-            reflect=$reflect.output
-            INPUTS_PHASE=document INPUTS_JUDGMENT="$judgment" INPUTS_REFLECT="$reflect" devkit refine round
-          output_format: {"type": "object", "properties": {"round": {"type": "integer"}, "valid": {"type": "boolean"}, "blocking_count": {"type": "integer"}, "not_assessed_count": {"type": "integer"}}, "required": ["round", "valid", "blocking_count", "not_assessed_count"]}
-      until_bash: 'v=$round-document.output.valid; b=$round-document.output.blocking_count; n=$round-document.output.not_assessed_count; test "$v" = true && test "$b" = 0 && test "$n" = 0'
-
   - id: finish
-    depends_on: [decided, document]
-    trigger_rule: none_failed_min_one_success
+    depends_on: [decide]
     bash: devkit refine finish
     output_format: *result
 

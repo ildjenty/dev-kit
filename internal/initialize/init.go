@@ -399,7 +399,7 @@ func compare(root string, o options, language string) ([]*group, []byte, []byte,
 				}
 			}
 			destinations := map[string]json.RawMessage{}
-			for _, key := range []string{"standards", "decisions", "units", "topics", "eval", "skills", "provider", "sessions", "language"} {
+			for _, key := range []string{"standards", "decisions", "eval", "skills", "provider", "sessions", "language"} {
 				if value, ok := stored[key]; ok {
 					destinations[key] = value
 				}
@@ -454,7 +454,7 @@ func compare(root string, o options, language string) ([]*group, []byte, []byte,
 	}
 	replaceNames := strings.NewReplacer(pairs...)
 	reserved := append([]string{}, paths...)
-	reserved = append(reserved, ".devkit/config.json", ".archon/config.yaml", settings.Decisions, settings.Units, settings.Topics, settings.Eval)
+	reserved = append(reserved, ".devkit/config.json", ".archon/config.yaml", settings.Decisions, settings.Eval)
 	paths = append(paths, settings.Standards, ".devkit/config.json", ".archon/config.yaml")
 	wanted := map[string]*tree{}
 	for _, path := range paths {

@@ -69,58 +69,6 @@
         ]
       }
     },
-    "rebased": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "from": {
-            "type": "string",
-            "minLength": 1
-          },
-          "to": {
-            "type": "string",
-            "minLength": 1
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "id",
-          "from",
-          "to",
-          "reason"
-        ]
-      }
-    },
-    "kept_docs": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "path": {
-            "type": "string",
-            "minLength": 1
-          },
-          "reason": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "path",
-          "reason"
-        ]
-      }
-    },
     "units": {
       "type": "array",
       "items": {
@@ -129,7 +77,7 @@
         "properties": {
           "key": {
             "type": "string",
-            "pattern": "^(UN[1-9][0-9]*|U-[0-9a-f]{6,64})$"
+            "minLength": 1
           },
           "title": {
             "type": "string",
@@ -141,29 +89,20 @@
           },
           "completion_conditions": {
             "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1
-            },
+            "minItems": 1,
             "uniqueItems": true,
-            "minItems": 1
-          },
-          "decisions": {
-            "type": "array",
             "items": {
               "type": "string",
               "minLength": 1
-            },
+            }
+          },
+          "blocked_by": {
+            "type": "array",
             "uniqueItems": true,
-            "minItems": 1
-          },
-          "depends_on": {
-            "type": "array",
             "items": {
               "type": "string",
               "minLength": 1
-            },
-            "uniqueItems": true
+            }
           }
         },
         "required": [
@@ -171,29 +110,7 @@
           "title",
           "goal",
           "completion_conditions",
-          "decisions",
-          "depends_on"
-        ]
-      }
-    },
-    "open_points": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "text": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "required": [
-          "id",
-          "text"
+          "blocked_by"
         ]
       }
     },
@@ -215,7 +132,7 @@
             "type": "string",
             "minLength": 1
           },
-          "depends_on": {
+          "blocked_by": {
             "type": "array",
             "uniqueItems": true,
             "items": {
@@ -228,17 +145,21 @@
           "key",
           "title",
           "body",
-          "depends_on"
+          "blocked_by"
         ]
       }
     },
-    "kept_units": {
+    "bindings": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision": {
             "type": "string",
             "minLength": 1
           },
@@ -248,7 +169,8 @@
           }
         },
         "required": [
-          "id",
+          "path",
+          "decision",
           "reason"
         ]
       }
@@ -257,11 +179,8 @@
   "required": [
     "summary",
     "decisions",
-    "rebased",
-    "kept_docs",
     "units",
-    "open_points",
     "topics",
-    "kept_units"
+    "bindings"
   ]
 }

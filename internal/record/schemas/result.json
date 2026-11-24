@@ -27,41 +27,13 @@
         "pattern": "^D-[0-9a-f]{6,64}$"
       }
     },
-    "unit_ids": {
+    "issue_numbers": {
       "type": "array",
+      "uniqueItems": true,
       "items": {
-        "type": "string",
-        "pattern": "^U-[0-9a-f]{6,64}$"
+        "type": "integer",
+        "minimum": 1
       }
-    },
-    "affected": {
-      "type": "object",
-      "properties": {
-        "decisions": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "documents": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        },
-        "units": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        }
-      },
-      "required": [
-        "decisions",
-        "documents",
-        "units"
-      ],
-      "additionalProperties": false
     },
     "run_id": {
       "$ref": "common.json#/$defs/run_id"

@@ -12,7 +12,7 @@ numbered principle references (path before `#`), including `harness.md` and `rev
 Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
 - `summary`: the proposed correction.
 - `units`: work for deferred or carried findings, or follow-up work traced to review entries, with stable draft `key`, `title`, `goal`,
-  `completion_conditions`, and source `entries`.
+  `completion_conditions`, `blocked_by` draft keys, and source `entries`. Each unit fits one PR and contains every constraint delivery needs.
 - `checks`: checks for mechanical findings, with the config check fields, `reason` and `entries`.
   Add precisely those checks to `.devkit/config.json`, retaining all existing settings and checks.
   An empty `paths` array selects no files; use applicable repository globs.
@@ -40,23 +40,20 @@ Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
   in `base/` so Git preserves the directory (use `.gitkeep` when otherwise empty). Include at least one
   expected finding. A genuine request gap needs no judge case; explain that choice in its trace.
 
-The input also lists existing units with `state`. A unit with `state: done` is finished work:
-preserve its file unchanged and propose a new unit for follow-up work; never edit or delete the done unit.
-
 Keep keys of retained units when revising a proposal and omit withdrawn ones. Use the exact entry IDs supplied in input. Cover every entry with a proposal or dismissal.
-Each revision builds on the previous proposal commit. Describe the complete proposal relative to its original base, including retained checks, standards and cases; revert withdrawn edits in the checkout. Omit withdrawn units from the draft; the machine deletes them in the next proposal commit. Never reset, amend or rewrite proposal history.
-Write units only in the draft; the machine materializes them before judgment. Edit only the config,
+Each revision builds on the previous proposal commit. Describe the complete proposal relative to its original base, including retained checks, standards and cases; revert withdrawn edits in the checkout. Omit withdrawn Issue drafts from the next proposal. Never reset, amend or rewrite proposal history.
+Write units only in the draft; they stay in the proposal record until approval. Edit only the config,
 configured standards folder and the new cases named in the draft. Do not edit existing cases.
 Remove withdrawn draft cases when revising. Do not commit. Revisions must address the previous round and answers.
 
 Write `$ARTIFACTS_DIR/retro/approval.txt` in `language`: one approval question describing the entire
 proposal, including dismissals, source entries, failure prevented, evidence and ongoing burden.
 Include the exact `approve=<next_proposal_version>` and explain `answers` for requesting changes.
-After the machine checks pass, the machine commits the real config, standards, cases and units,
-together with consumed backlog deletions. Each proposal version names one commit; no file snapshots
-are stored in a proposal JSON in the units folder. Judgment and verification inspect that committed,
-clean checkout. The final approval question includes its version and commit. Approval only records
-the result and requires that commit to remain the clean branch head.
+After the machine checks pass, the machine commits the real config, standards and cases,
+together with consumed backlog deletions. Each proposal version names one commit; Issue drafts stay in its proposal record. Judgment and verification inspect that committed,
+clean checkout. The final approval question includes its version and commit, every unit Issue draft
+and its blocked-by order. Approval creates the unit Issues and records each creation for retry,
+then records the result; the proposal commit must remain the clean branch head.
 After checks and independent judgment pass, it evaluates new escape cases against a temporary copy
 of the proposed standards and concern map. Evaluation misses and provider failures are reported to
 the owner before approval and do not block the proposal.

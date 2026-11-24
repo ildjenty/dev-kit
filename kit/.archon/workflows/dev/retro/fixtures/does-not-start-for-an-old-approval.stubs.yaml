@@ -1,4 +1,4 @@
 fixture: {"expect": "completed", "reached": ["start", "not-started", "result"], "inputs": {"approve": "1"}}
 start: {"stopped": true, "stage": "start", "reason": "approve must name the latest proposal version", "details": "/tmp/record", "remaining": [], "start": "first", "counted": false, "restarts": 0}
-not-started: {"outcome": "not_started", "proposal_version": 0, "unit_ids": [], "questions": [], "reasons": ["approve must name the latest proposal version"]}
-result: {"outcome": "not_started", "proposal_version": 0, "unit_ids": [], "questions": [], "reasons": ["approve must name the latest proposal version"]}
+not-started: {"outcome": "not_started", "proposal_version": 0, "issue_numbers": [], "questions": [], "reasons": ["approve must name the latest proposal version"]}
+result: {"outcome": "not_started", "proposal_version": 0, "issue_numbers": [], "questions": [], "reasons": ["approve must name the latest proposal version"]}

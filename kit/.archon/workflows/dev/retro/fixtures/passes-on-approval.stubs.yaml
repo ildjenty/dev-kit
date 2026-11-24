@@ -1,4 +1,4 @@
 fixture: {"expect": "completed", "reached": ["start", "approve", "result"], "inputs": {"approve": "1"}}
 start: {"stopped": false, "stage": "start", "reason": "", "details": "/tmp/record", "remaining": [], "start": "answer", "counted": false, "restarts": 0}
-approve: {"outcome": "pass", "proposal_version": 1, "unit_ids": ["U-abcdef"], "questions": [], "reasons": []}
-result: {"outcome": "pass", "proposal_version": 1, "unit_ids": ["U-abcdef"], "questions": [], "reasons": []}
+approve: {"outcome": "pass", "proposal_version": 1, "issue_numbers": [101], "questions": [], "reasons": []}
+result: {"outcome": "pass", "proposal_version": 1, "issue_numbers": [101], "questions": [], "reasons": []}

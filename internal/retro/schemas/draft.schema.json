@@ -41,6 +41,11 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          "blocked_by": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {"type": "string", "minLength": 1}
           }
         },
         "required": [
@@ -48,7 +53,8 @@
           "title",
           "goal",
           "completion_conditions",
-          "entries"
+          "entries",
+          "blocked_by"
         ]
       }
     },

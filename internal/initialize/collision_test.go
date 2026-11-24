@@ -28,8 +28,6 @@ func TestStandardsCollisionsRejectBeforeComparisonQuestionsAndWrites(t *testing.
 		{"standards": ".agents/skills/devkit-runs", "sessions": "codex"},
 		{"standards": "policy", "decisions": "policy"},
 		{"standards": "policy", "decisions": "policy//decisions/"},
-		{"standards": "policy/standards", "units": "policy"},
-		{"standards": "policy", "topics": "policy/topics"},
 		{"standards": "policy/eval/standards", "eval": "policy/eval"},
 	} {
 		for _, args := range [][]string{{"--yes"}, {"--no"}, {"--dry-run"}, nil} {

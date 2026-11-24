@@ -25,12 +25,7 @@
     "outcome": "not_started",
     "proposal_version": 0,
     "decision_ids": [],
-    "unit_ids": [],
-    "affected": {
-      "decisions": [],
-      "documents": [],
-      "units": []
-    },
+    "issue_numbers": [],
     "questions": [],
     "reasons": [
       "The start conditions do not hold",
@@ -41,12 +36,7 @@
     "outcome": "not_started",
     "proposal_version": 0,
     "decision_ids": [],
-    "unit_ids": [],
-    "affected": {
-      "decisions": [],
-      "documents": [],
-      "units": []
-    },
+    "issue_numbers": [],
     "questions": [],
     "reasons": [
       "The start conditions do not hold",

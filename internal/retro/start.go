@@ -10,6 +10,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
+	"github.com/ildjenty/dev-kit/internal/issues"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
@@ -54,7 +55,15 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 		if e != nil {
 			return record.StartOutput{}, e
 		}
-		answers = append(answers, record.Answer{QuestionID: str(items(r["questions"])[0]["id"]), Answer: "approve=" + approve})
+		qid := str(items(r["questions"])[0]["id"])
+		recorded, e := record.ReadKeyed(ctx.Dir, "answer", qid)
+		if e != nil {
+			return record.StartOutput{}, e
+		}
+		if recorded == nil {
+			answers = append(answers, record.Answer{QuestionID: qid, Answer: "approve=" + approve})
+		}
+
 	}
 	common, e := gitx.Run(ctx.Cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if e != nil {
@@ -165,8 +174,16 @@ func authorizedApproval(ctx record.ContextData, version string) error {
 	if e != nil {
 		return e
 	}
+	progress, e := issues.ReadCreation(filepath.Join(ctx.Dir, "issue-creation", version+".json"))
+	if e != nil {
+		return e
+	}
+	authorizationRun := ctx.RunID
+	if progress.RunID != "" {
+		authorizationRun = progress.RunID
+	}
 	for _, run := range runs {
-		if run["run_id"] == ctx.RunID && run["workflow"] == "retro" && run["start"] == "answer" && a["run_id"] == ctx.RunID && a["workflow"] == "retro" && a["answer"] == "approve="+version && a["commit"] == r["commit"] && obj(a["target"])["ref"] == version {
+		if run["run_id"] == authorizationRun && run["workflow"] == "retro" && run["start"] == "answer" && a["run_id"] == authorizationRun && a["workflow"] == "retro" && a["answer"] == "approve="+version && a["commit"] == r["commit"] && obj(a["target"])["ref"] == version {
 			for _, id := range stringsOf(run["answers"]) {
 				if id == q["id"] {
 					return nil

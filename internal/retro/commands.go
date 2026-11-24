@@ -26,7 +26,7 @@ func Commands() []cli.Command {
 				started.Details = displayDir
 				out = started
 			} else if mode == "approve" {
-				out, e = approve(ctx, env.Getenv("INPUTS_APPROVE"))
+				out, e = approve(ctx, env.Getenv("INPUTS_APPROVE"), env)
 			} else {
 				if artifacts == "" {
 					return fmt.Errorf("ARTIFACTS_DIR must be set")

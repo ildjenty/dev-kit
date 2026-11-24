@@ -1,15 +1,15 @@
 package retro
 
 import (
-	"encoding/json"
 	"fmt"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/ildjenty/dev-kit/internal/decisions"
+	"github.com/ildjenty/dev-kit/internal/cli"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
+	"github.com/ildjenty/dev-kit/internal/issues"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
@@ -26,8 +26,11 @@ func output(result doc, version int) doc {
 	for _, q := range items(result["questions"]) {
 		qs = append(qs, doc{"id": q["id"], "text": q["text"]})
 	}
-	ids := stringsOf(result["unit_ids"])
-	return doc{"outcome": result["outcome"], "proposal_version": version, "unit_ids": ids, "questions": qs, "reasons": stringsOf(obj(result["stop"])["unresolved"])}
+	numbers := result["issue_numbers"]
+	if numbers == nil {
+		numbers = []int{}
+	}
+	return doc{"outcome": result["outcome"], "proposal_version": version, "issue_numbers": numbers, "questions": qs, "reasons": stringsOf(obj(result["stop"])["unresolved"])}
 }
 func preflight(ctx record.ContextData) error {
 	o, e := resultOptions(ctx)
@@ -67,73 +70,6 @@ func empty(ctx record.ContextData, artifacts string) (doc, error) {
 		return nil, e
 	}
 	return saveResult(ctx, doc{"outcome": "pass"}, num(p.Entry["version"]))
-}
-func materializedUnits(ctx record.ContextData, input, draft doc) (doc, []string, error) {
-	edits, ids := doc{}, []string{}
-	data := decisions.Data{}
-	paths, e := filepath.Glob(filepath.Join(ctx.Cwd, str(obj(input["folders"])["units"]), "U-*.md"))
-	if e != nil {
-		return nil, nil, e
-	}
-	for _, path := range paths {
-		data.Units = append(data.Units, decisions.Item{"id": strings.TrimSuffix(filepath.Base(path), ".md")})
-	}
-	for _, u := range items(draft["units"]) {
-		id := ""
-		previous, e := record.Latest(ctx.Dir, "proposal")
-		if e != nil {
-			return nil, nil, e
-		}
-		content := obj(previous["content"])
-		for i, old := range items(obj(content["draft"])["units"]) {
-			if old["key"] == u["key"] && i < len(stringsOf(content["unit_ids"])) {
-				id = stringsOf(content["unit_ids"])[i]
-			}
-		}
-		if id == "" {
-			id, e = decisions.NextID("unit", ctx.Branch, str(u["key"]), data)
-			if e != nil {
-				return nil, nil, e
-			}
-		}
-		data.Units = append(data.Units, decisions.Item{"id": id})
-		path := str(obj(input["folders"])["units"]) + "/" + id + ".md"
-		var b strings.Builder
-		b.WriteString("---\n")
-		for _, kv := range []struct {
-			k string
-			v any
-		}{{"id", id}, {"title", u["title"]}, {"decisions", []string{}}, {"depends_on", []string{}}} {
-			encoded, e := json.Marshal(kv.v)
-			if e != nil {
-				return nil, nil, e
-			}
-			fmt.Fprintf(&b, "%s: %s\n", kv.k, encoded)
-		}
-		b.WriteString("---\n" + str(u["goal"]) + "\n\n")
-		for _, c := range stringsOf(u["completion_conditions"]) {
-			b.WriteString("- " + c + "\n")
-		}
-		b.WriteString("\nBacklog entries:\n")
-		for _, ref := range stringsOf(u["entries"]) {
-			b.WriteString("- " + ref + "\n")
-		}
-		edits[path] = b.String()
-		ids = append(ids, id)
-	}
-	return edits, ids, nil
-}
-func commitPaths(ctx record.ContextData, paths []string, message string) error {
-	if len(paths) == 0 {
-		_, e := gitx.Run(ctx.Cwd, "commit", "--allow-empty", "--only", "-m", message)
-		return e
-	}
-	slices.Sort(paths)
-	if _, e := gitx.Run(ctx.Cwd, append([]string{"add", "-A", "--"}, paths...)...); e != nil {
-		return e
-	}
-	_, e := gitx.Run(ctx.Cwd, append([]string{"commit", "--only", "-m", message, "--"}, paths...)...)
-	return e
 }
 func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	if e := preflight(ctx); e != nil {
@@ -184,7 +120,7 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	} else {
 		approvalText = fmt.Sprintf("%s\n\nProposal version: %d\nCommit: %s", strings.TrimSpace(approvalText), num(p["version"]), str(obj(p["content"])["commit"]))
 		content["approval_text"], content["judgment"], content["ready"] = approvalText, entry["judgment"], true
-		result = doc{"outcome": "question", "unit_ids": obj(p["content"])["unit_ids"], "questions": []doc{{"text": approvalText, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"retro"}, "invalidates": []string{}}}}
+		result = doc{"outcome": "question", "questions": []doc{{"text": approvalText, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"retro"}, "invalidates": []string{}}}}
 	}
 	if p == nil || p["run_id"] != ctx.RunID && str(obj(p["content"])["commit"]) == "" {
 		written, e := record.Write(ctx, "proposal", doc{"content": doc{"draft": entry["draft"], "ready": false}}, "")
@@ -255,7 +191,7 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 
 	return saveResult(ctx, result, num(p["version"]))
 }
-func approve(ctx record.ContextData, version string) (doc, error) {
+func approve(ctx record.ContextData, version string, environments ...cli.Env) (doc, error) {
 	if e := authorizedApproval(ctx, version); e != nil {
 		return nil, e
 	}
@@ -274,5 +210,34 @@ func approve(ctx record.ContextData, version string) (doc, error) {
 		return nil, e
 	}
 	content := obj(p["content"])
-	return saveResult(ctx, doc{"outcome": "pass", "unit_ids": content["unit_ids"]}, num(p["version"]))
+	c, e := config.Load(ctx.Cwd)
+	if e != nil {
+		return nil, e
+	}
+	drafts, e := issues.ReadDrafts(content["draft"])
+	if e != nil {
+		return nil, e
+	}
+	env := cli.Env{Cwd: ctx.Cwd}
+	if len(environments) > 0 {
+		env = environments[0]
+		env.Cwd = ctx.Cwd
+	}
+	path := filepath.Join(ctx.Dir, "issue-creation", version+".json")
+	progress, e := issues.ReadCreation(path)
+	if e != nil {
+		return nil, e
+	}
+	if progress.RunID == "" {
+		progress.RunID, progress.Commit = ctx.RunID, str(content["commit"])
+		if e = issues.SaveCreation(path, progress); e != nil {
+			return nil, e
+		}
+	}
+	progress, e = (issues.Client{Env: env}).CreateDrafts(path, drafts, c.Issues.Labels, nil, 0, "")
+	if e != nil {
+		return nil, e
+	}
+	return saveResult(ctx, doc{"outcome": "pass", "issue_numbers": progress.Numbers()}, num(p["version"]))
+
 }

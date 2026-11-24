@@ -1,15 +1,16 @@
 package refine
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/concerns"
@@ -17,6 +18,8 @@ import (
 	"github.com/ildjenty/dev-kit/internal/criteria"
 	"github.com/ildjenty/dev-kit/internal/decisions"
 	"github.com/ildjenty/dev-kit/internal/gitx"
+	"github.com/ildjenty/dev-kit/internal/issues"
+	"github.com/ildjenty/dev-kit/internal/proposal"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
@@ -141,93 +144,6 @@ func changes(cwd string) ([]string, error) {
 	}
 	return r, nil
 }
-func docsSnapshot(cwd, folder string) (map[string]string, error) {
-	paths, e := decisions.MarkdownFiles(filepath.Join(cwd, folder))
-	if e != nil {
-		return nil, e
-	}
-	r := map[string]string{}
-	for _, p := range paths {
-		b, e := os.ReadFile(p)
-		if e != nil {
-			return nil, e
-		}
-		rel, e := filepath.Rel(cwd, p)
-		if e != nil {
-			return nil, e
-		}
-		r[filepath.ToSlash(rel)] = string(b)
-	}
-	return r, nil
-}
-func changedDocs(cwd, folder string) (doc, error) {
-	paths, e := changes(cwd)
-	if e != nil {
-		return nil, e
-	}
-	r := doc{}
-	for _, p := range paths {
-		if !inside(p, folder) {
-			continue
-		}
-		b, e := os.ReadFile(filepath.Join(cwd, p))
-		if os.IsNotExist(e) {
-			r[p] = nil
-		} else if e != nil {
-			return nil, e
-		} else {
-			r[p] = string(b)
-		}
-	}
-	return r, nil
-}
-
-var draftKeys = regexp.MustCompile(`\b(?:N[1-9]\d*|UN[1-9]\d*|TN[1-9]\d*)\b`)
-
-func replaceKeys(text string, mapping doc) string {
-	return draftKeys.ReplaceAllStringFunc(text, func(k string) string {
-		if s, ok := mapping[k].(string); ok {
-			return s
-		}
-		return k
-	})
-}
-func question(text, kind, ref string) doc {
-	return doc{"text": text, "target": doc{"kind": kind, "ref": ref}, "next_workflows": []string{"refine"}, "invalidates": []string{}}
-}
-func resultOptions(ctx record.ContextData) (record.ResultOptions, error) {
-	base, e := gitx.Run(ctx.Cwd, "merge-base", "HEAD", ctx.BaseBranch)
-	if e != nil {
-		return record.ResultOptions{}, e
-	}
-	head, e := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
-	return record.ResultOptions{RunID: ctx.RunID, Base: base, Commit: head}, e
-}
-func approvalErrors(ctx record.ContextData, version string) ([]string, error) {
-	p, e := record.Latest(ctx.Dir, "proposal")
-	if e != nil {
-		return nil, e
-	}
-	r, e := record.Latest(ctx.Dir, "result")
-	if e != nil {
-		return nil, e
-	}
-	if !regexp.MustCompile(`^[1-9]\d*$`).MatchString(version) || strconv.Itoa(num(p["version"])) != version {
-		return []string{"approve must name the latest proposal version"}, nil
-	}
-	qs := items(r["questions"])
-	if obj(p["content"])["materialized"] != true || r["run_id"] != p["run_id"] || r["outcome"] != "question" || len(qs) != 1 || obj(qs[0]["target"])["kind"] != "proposal" || obj(qs[0]["target"])["ref"] != version {
-		return []string{"the latest proposal result did not ask for approval"}, nil
-	}
-	head, e := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
-	if e != nil {
-		return nil, e
-	}
-	if r["commit"] != head {
-		return []string{"HEAD changed after the proposal asked for approval"}, nil
-	}
-	return []string{}, nil
-}
 func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 	stopped := func(reason string) record.StartOutput {
 		return record.StartOutput{Stopped: true, Stage: "start", Reason: reason, Details: ctx.Dir, Remaining: []string{}}
@@ -242,8 +158,10 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 	if !strings.HasPrefix(ctx.Branch, "refine/") {
 		return stopped("refine requires a refine/<name> branch"), nil
 	}
-	if _, e := selectedTopic(ctx, env.Getenv("INPUTS_TOPIC")); e != nil {
-		return stopped(e.Error()), nil
+	if env.Getenv("INPUTS_APPROVE") == "" {
+		if _, e := selectedTopic(ctx, env, env.Getenv("INPUTS_TOPIC")); e != nil {
+			return stopped(e.Error()), nil
+		}
 	}
 	latest, e := record.Latest(ctx.Dir, "result")
 	if e != nil {
@@ -272,7 +190,15 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 		if e != nil {
 			return record.StartOutput{}, e
 		}
-		answers = append(answers, record.Answer{QuestionID: str(items(r["questions"])[0]["id"]), Answer: "approve=" + approve})
+		qid := str(items(r["questions"])[0]["id"])
+		recorded, e := record.ReadKeyed(ctx.Dir, "answer", qid)
+		if e != nil {
+			return record.StartOutput{}, e
+		}
+		if recorded == nil {
+			answers = append(answers, record.Answer{QuestionID: qid, Answer: "approve=" + approve})
+		}
+
 	}
 	common, e := gitx.Run(ctx.Cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
 	if e != nil {
@@ -342,7 +268,7 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 		if num(proposals[i]["version"]) <= approvedVersion {
 			break
 		}
-		if obj(proposals[i]["content"])["materialized"] == true {
+		if obj(proposals[i]["content"])["commit"] != nil {
 			pending = proposals[i]
 			break
 		}
@@ -352,7 +278,7 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	if len(topicID) > 0 {
 		selected = topicID[0]
 	}
-	topic, e := selectedTopic(ctx, selected)
+	topic, e := selectedTopic(ctx, env, selected)
 	if e != nil {
 		return nil, e
 	}
@@ -408,23 +334,17 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 		if text == "" {
 			text = memo
 		}
-		id, err := decisions.NextID("topic", ctx.Branch, "request", data)
-		if err != nil {
-			return nil, err
-		}
-		topic = doc{"id": id, "title": text, "body": text, "status": "open", "depends_on": []string{}}
+		topic = doc{"number": 0, "title": text, "body": text}
 	}
-	if pending != nil && obj(obj(pending["content"])["topic"])["id"] != topic["id"] {
-		pending = nil
-	}
-	affected := decisions.Affected(data)
-	affected.Decisions = decisionIndex(affected.Decisions)
-	input := doc{"pending_proposal": pending, "previous_unapproved": pending != nil, "topic": topic, "topics": data.Topics, "requests": rs, "memo": memo, "answers": as, "previous": previous, "decisions": decisionIndex(data.Decisions), "units": data.Units, "documents": data.Documents, "affected": affected, "language": c.Language, "criteria": fixed, "folders": doc{"docs": c.Docs, "decisions": c.Decisions, "units": c.Units, "topics": c.Topics, "standards": c.Standards}, "next_proposal_version": num(previous["version"]) + 1, "judge_materials": mapping.Materials(fixed, "judge:refine", "plan"), "writer_materials": mapping.Materials(fixed, "writer:refine", "plan")}
-	relevant, e := relevance(env, ctx.Cwd, artifacts, input, data, c)
+	input := doc{"pending_proposal": pending, "previous_unapproved": pending != nil, "topic": topic, "requests": rs, "memo": memo, "answers": as, "previous": previous, "decisions": data.Decisions, "language": c.Language, "config": c, "criteria": fixed, "folders": doc{"decisions": c.Decisions, "standards": c.Standards}, "next_proposal_version": num(previous["version"]) + 1, "judge_materials": mapping.Materials(fixed, "judge:refine", "plan"), "writer_materials": mapping.Materials(fixed, "writer:refine", "plan")}
+	base, e := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
 	if e != nil {
 		return nil, e
 	}
-	input["relevant_decisions"] = relevant
+	if pending != nil {
+		base = str(obj(pending["content"])["base_commit"])
+	}
+	input["proposal_base"] = base
 	for _, name := range []string{"draft", "judgment"} {
 		b, err := schemas.ReadFile("schemas/" + name + ".schema.json")
 		if err != nil {
@@ -441,397 +361,532 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	if e != nil {
 		return nil, e
 	}
-	docs, e := docsSnapshot(ctx.Cwd, c.Docs)
-	if e != nil {
-		return nil, e
-	}
-	if e = writeJSON(file(artifacts, "baseline.json"), doc{"commit": head, "docs": docs, "decisions_hash": decisionHash(data.Decisions)}); e != nil {
+	if e = writeJSON(file(artifacts, "baseline.json"), doc{"commit": head, "decisions_hash": decisionHash(data.Decisions)}); e != nil {
 		return nil, e
 	}
 	return doc{"input": file(displayArtifacts, "input.json"), "criteria": input["criteria"]}, nil
 }
-func draftErrors(ctx record.ContextData, artifacts string, value any, phases ...string) ([]string, error) {
-	artifacts = resolve(ctx.Cwd, artifacts)
-	errors, e := schema("draft", value)
-	if e != nil || len(errors) > 0 {
-		return errors, e
+func approvalStart(ctx record.ContextData, version string) error {
+	h, err := record.History(ctx.Dir)
+	if err != nil {
+		return err
 	}
-	phase := "document"
-	if len(phases) > 0 {
-		phase = phases[0]
+	result, err := record.Latest(ctx.Dir, "result")
+	if err != nil {
+		return err
 	}
-	draft := obj(value)
-	input, e := readJSON(file(artifacts, "input.json"))
-	if e != nil {
-		return nil, e
+	q := items(result["questions"])[0]
+	answer, err := record.ReadKeyed(ctx.Dir, "answer", str(q["id"]))
+	if err != nil {
+		return err
 	}
-	baseline, e := readJSON(file(artifacts, "baseline.json"))
-	if e != nil {
-		return nil, e
+	progress, err := issues.ReadCreation(creationPath(ctx, version))
+	if err != nil {
+		return err
 	}
-	head, e := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
-	if e != nil {
-		return nil, e
+	authorizationRun := ctx.RunID
+	if progress.RunID != "" {
+		authorizationRun = progress.RunID
 	}
-	if head != baseline["commit"] {
-		errors = append(errors, "writer changed HEAD; only finish may commit")
-	}
-	data, e := decisions.List(ctx.Cwd)
-	if e != nil {
-		return nil, e
-	}
-	existing := data.Decisions
-	newIDs := []string{}
-	known := []string{}
-	for _, d := range existing {
-		known = append(known, str(d["id"]))
-	}
-	for _, d := range items(draft["decisions"]) {
-		newIDs = append(newIDs, str(d["key"]))
-		known = append(known, str(d["key"]))
-	}
-	for _, pair := range [][2]string{{"topics", "key"}, {"decisions", "key"}, {"units", "key"}, {"open_points", "id"}, {"kept_docs", "path"}, {"kept_units", "id"}} {
-		seen := map[string]bool{}
-		duplicate := false
-		for _, d := range items(draft[pair[0]]) {
-			k := str(d[pair[1]])
-			duplicate = duplicate || seen[k]
-			seen[k] = true
-		}
-		if duplicate {
-			errors = append(errors, "duplicate "+pair[1])
+	valid := false
+	for _, run := range h.Runs {
+		if run["run_id"] == authorizationRun && run["workflow"] == "refine" && has(run["answers"], str(q["id"])) {
+			valid = true
 		}
 	}
-	superseded := []string{}
-	for _, d := range items(draft["decisions"]) {
-		for _, id := range stringsOf(d["supersedes"]) {
-			if !slices.Contains(superseded, id) {
-				superseded = append(superseded, id)
-			}
-		}
-		for _, id := range stringsOf(d["depends_on"]) {
-			if !slices.Contains(known, id) {
-				errors = append(errors, fmt.Sprintf("%s: missing dependency %s", d["key"], id))
-			}
-		}
-		for _, id := range stringsOf(d["supersedes"]) {
-			if find(existing, id) == nil {
-				errors = append(errors, fmt.Sprintf("%s: missing superseded decision %s", d["key"], id))
-			}
-		}
-		if d["decided_by"] == "owner" && d["source"] == "derived" {
-			errors = append(errors, fmt.Sprintf("%s: a derived choice cannot be attributed to the owner", d["key"]))
-		}
+	if !valid || answer["run_id"] != authorizationRun || answer["workflow"] != "refine" || answer["answer"] != "approve="+version || obj(answer["target"])["kind"] != "proposal" || obj(answer["target"])["ref"] != version || answer["commit"] != result["commit"] {
+		return fmt.Errorf("approval requires a successful refine start with the recorded approval answer")
 	}
-	for _, id := range superseded {
-		n := 0
-		for _, d := range items(draft["decisions"]) {
-			if has(d["supersedes"], id) {
-				n++
-			}
-		}
-		if n > 1 {
-			errors = append(errors, id+": more than one successor")
-		}
+	problems, err := record.StartConditions(ctx.Dir, "refine", record.ConditionOptions{Commit: str(result["commit"])})
+	if err != nil {
+		return err
 	}
-	graph := []doc{}
-	prospective := data
-	prospective.Decisions = []doc{}
-	for _, d := range existing {
-		g := clone(d)
-		g["depends_on"] = stringsOf(d["depends_on"])
-		graph = append(graph, g)
-		p := clone(d)
-		if slices.Contains(superseded, str(d["id"])) {
-			p["status"] = "superseded"
-		}
-		prospective.Decisions = append(prospective.Decisions, p)
+	if len(problems) > 0 {
+		return &record.RecordError{Message: "approval start conditions do not hold", Errors: problems}
 	}
-	impact := decisions.Affected(prospective)
-	targets := map[string]bool{}
-	for _, r := range items(draft["rebased"]) {
-		d := find(graph, str(r["id"]))
-		successor := find(existing, str(r["to"]))
-		for _, n := range items(draft["decisions"]) {
-			if n["key"] == r["to"] {
-				successor = n
-				break
-			}
-		}
-		key := str(r["id"]) + ":" + str(r["from"])
-		if targets[key] {
-			errors = append(errors, key+": duplicate rebase")
-		}
-		targets[key] = true
-		if find(impact.Decisions, str(r["id"])) == nil || !has(d["depends_on"], str(r["from"])) || !has(successor["supersedes"], str(r["from"])) {
-			errors = append(errors, str(r["id"])+": invalid dependency rebase")
-		} else {
-			deps := stringsOf(d["depends_on"])
-			for i, id := range deps {
-				if id == r["from"] {
-					deps[i] = str(r["to"])
-				}
-			}
-			d["depends_on"] = deps
-		}
+	options, err := resultOptions(ctx)
+	if err != nil {
+		return err
 	}
-	obsolete := []string{}
-	for _, d := range prospective.Decisions {
-		if d["status"] == "superseded" {
-			obsolete = append(obsolete, str(d["id"]))
-		}
-	}
-	for _, d := range impact.Decisions {
-		after := find(graph, str(d["id"]))
-		bad := false
-		for _, id := range stringsOf(after["depends_on"]) {
-			bad = bad || slices.Contains(obsolete, id)
-		}
-		if !slices.Contains(superseded, str(d["id"])) && bad {
-			errors = append(errors, str(d["id"])+": affected decision is neither superseded nor consistently rebased")
-		}
-	}
-	fullGraph := append([]doc{}, graph...)
-	for _, d := range items(draft["decisions"]) {
-		d = clone(d)
-		d["id"] = d["key"]
-		fullGraph = append(fullGraph, d)
-	}
-	errors = append(errors, decisions.GraphErrors(fullGraph)...)
-	unitIDs := []string{}
-	for _, u := range items(input["units"]) {
-		unitIDs = append(unitIDs, str(u["id"]))
-	}
-	for _, u := range items(draft["units"]) {
-		unitIDs = append(unitIDs, str(u["key"]))
-	}
-	retainedUnits := map[string]doc{}
-	previous := obj(obj(input["pending_proposal"])["content"])
-	for _, u := range items(draft["units"]) {
-		key := str(u["key"])
-		id := key
-		if input["previous_unapproved"] == true && str(obj(previous["mapping"])[key]) != "" {
-			id = str(obj(previous["mapping"])[key])
-		}
-		retainedUnits[id] = u
-		if strings.HasPrefix(key, "U-") {
-			existing := find(items(input["units"]), key)
-			if existing == nil {
-				errors = append(errors, key+": retained unit does not exist")
-			} else if existing["state"] == "done" {
-				errors = append(errors, "done unit may not be edited or removed: "+key)
-			}
-		}
-		for _, id := range stringsOf(u["decisions"]) {
-			if slices.Contains(superseded, id) {
-				errors = append(errors, key+": open unit cites superseded decision "+id)
-			}
-			if !slices.Contains(known, id) {
-				errors = append(errors, str(u["key"])+": missing decision "+id)
-			}
-		}
-		for _, id := range stringsOf(u["depends_on"]) {
-			if !slices.Contains(unitIDs, id) {
-				errors = append(errors, str(u["key"])+": missing unit "+id)
-			}
-		}
-	}
-	unitGraph := items(input["units"])
-	for _, u := range items(draft["units"]) {
-		u = clone(u)
-		u["id"] = u["key"]
-		unitGraph = append(unitGraph, u)
-	}
-	errors = append(errors, decisions.GraphErrors(unitGraph)...)
-	for _, pair := range []struct {
-		kind          string
-		before, after any
-	}{{"decision", baseline["decisions_hash"], decisionHash(data.Decisions)}, {"unit", input["units"], data.Units}} {
-		b, _ := json.Marshal(pair.before)
-		a, _ := json.Marshal(pair.after)
-		if string(b) != string(a) {
-			errors = append(errors, "writer edited "+pair.kind+" records directly")
-		}
-	}
-	edited, e := changes(ctx.Cwd)
-	if e != nil {
-		return nil, e
-	}
-	folders := obj(input["folders"])
-	for _, u := range items(input["units"]) {
-		if u["state"] == "done" && slices.Contains(edited, str(u["path"])) {
-			errors = append(errors, "done unit may not be edited or removed: "+str(u["id"]))
-		}
-	}
-	for _, p := range edited {
-		if !inside(p, str(folders["docs"])) {
-			errors = append(errors, "edited outside the docs folder: "+p)
-			continue
-		}
-		for _, reserved := range []string{"standards", "decisions", "units", "topics"} {
-			if inside(p, str(folders[reserved])) {
-				errors = append(errors, "edited a "+reserved+" file, which refine's writer may not change: "+p)
-			}
-		}
-	}
-	if phase == "document" {
-		for _, u := range items(input["units"]) {
-			id := str(u["id"])
-			retained := retainedUnits[id]
-			if u["state"] == "done" || retained == nil && input["previous_unapproved"] == true && has(previous["unit_ids"], id) {
-				continue
-			}
-			for _, old := range stringsOf(u["decisions"]) {
-				if !slices.Contains(superseded, old) {
-					continue
-				}
-				for _, successor := range items(draft["decisions"]) {
-					if has(successor["supersedes"], old) && !has(retained["decisions"], str(successor["key"])) {
-						errors = append(errors, id+": open unit must be retained citing the successor of superseded decision "+old)
-					}
-				}
-			}
-		}
-		for _, u := range impact.Units {
-			handled := false
-			for _, k := range items(draft["kept_units"]) {
-				handled = handled || k["id"] == u["id"]
-			}
-			if !handled {
-				errors = append(errors, str(u["id"])+": affected unit was not handled with a reason")
-			}
-		}
-		for _, d := range impact.Documents {
-			kept := false
-			for _, k := range items(draft["kept_docs"]) {
-				kept = kept || k["path"] == d.Path
-			}
-			if !slices.Contains(edited, d.Path) && !kept {
-				errors = append(errors, d.Path+": affected document was not edited or kept with a reason")
-			}
-		}
-	}
-	for _, k := range items(draft["kept_units"]) {
-		if find(data.Units, str(k["id"])) == nil {
-			errors = append(errors, str(k["id"])+": kept unit does not exist")
-		}
-	}
-	for _, k := range items(draft["kept_docs"]) {
-		found := false
-		for _, d := range data.Documents {
-			found = found || d.Path == k["path"]
-		}
-		if !found {
-			errors = append(errors, str(k["path"])+": kept document does not exist")
-		}
-	}
-	inspect := func(text, at string) {
-		for _, id := range decisions.Citations(text) {
-			if !slices.Contains(known, id) {
-				errors = append(errors, at+": missing citation "+id)
-			}
-		}
-		for _, key := range regexp.MustCompile(`\bN[1-9]\d*\b`).FindAllString(text, -1) {
-			if !slices.Contains(newIDs, key) {
-				errors = append(errors, at+": missing draft key "+key)
-			}
-		}
-	}
-	docs, e := docsSnapshot(ctx.Cwd, str(folders["docs"]))
-	if e != nil {
-		return nil, e
-	}
-	paths := []string{}
-	for p := range docs {
-		paths = append(paths, p)
-	}
-	slices.Sort(paths)
-	for _, p := range paths {
-		inspect(docs[p], p)
-	}
-	for _, d := range items(draft["decisions"]) {
-		inspect(str(d["body"]), str(d["key"]))
-	}
-	for _, topic := range items(draft["topics"]) {
-		inspect(str(topic["body"]), str(topic["key"]))
-	}
-	for _, u := range items(draft["units"]) {
-		inspect(str(u["goal"])+"\n"+strings.Join(stringsOf(u["completion_conditions"]), "\n"), str(u["key"]))
-	}
-	if phase == "document" && len(array(draft["open_points"])) == 0 {
-		b, e := os.ReadFile(file(artifacts, "approval.txt"))
-		if os.IsNotExist(e) || e == nil && strings.TrimSpace(string(b)) == "" {
-			errors = append(errors, "approval.txt is required in the configured language")
-		} else if e != nil {
-			return nil, e
-		} else {
-			text := string(b)
-			for _, d := range append(append(items(draft["decisions"]), items(draft["units"])...), items(draft["topics"])...) {
-				key := str(d["key"])
-				if !regexp.MustCompile(`\b` + regexp.QuoteMeta(key) + `\b`).MatchString(text) {
-					errors = append(errors, "approval.txt omits "+key)
-				}
-			}
-			if !strings.Contains(text, "approve="+strconv.Itoa(num(input["next_proposal_version"]))) || !strings.Contains(text, "answers") {
-				errors = append(errors, "approval.txt must explain approve=<version> and answers")
-			}
-		}
-	}
-	errors = append(errors, topicErrors(input, draft, data.Decisions)...)
-	errors = append(errors, phaseErrors(ctx, artifacts, phase, draft, input)...)
-	return errors, nil
+	_, err = record.BuildResult(ctx.Dir, "refine", doc{"outcome": "pass"}, options)
+	return err
 }
-func check(ctx record.ContextData, artifacts string, phases ...string) (doc, error) {
-	artifacts = resolve(ctx.Cwd, artifacts)
-	d, e := readDraft(artifacts)
-	if e != nil {
-		return nil, e
-	}
-	errors, e := draftErrors(ctx, artifacts, d, phases...)
-	if e != nil {
-		return nil, e
-	}
-	if len(errors) == 0 && (len(phases) == 0 || phases[0] == "document") {
-		reflection, err := reflectionInput(ctx.Cwd, artifacts)
+func decisionHash(ds []doc) string {
+	data, _ := json.Marshal(ds)
+	return fmt.Sprintf("%x", sha256.Sum256(data))
+}
+func selectedTopic(ctx record.ContextData, env cli.Env, value string) (doc, error) {
+	if value == "" {
+		previous, err := record.Latest(ctx.Dir, "proposal")
 		if err != nil {
 			return nil, err
 		}
-		if err = writeJSON(file(artifacts, "reflect-input.json"), reflection); err != nil {
+		result, err := record.Latest(ctx.Dir, "result")
+		if err != nil {
 			return nil, err
+		}
+		if result["outcome"] != "pass" {
+			return obj(obj(previous["content"])["topic"]), nil
+		}
+		return nil, nil
+	}
+	number, err := strconv.Atoi(value)
+	if err != nil || number <= 0 {
+		return nil, fmt.Errorf("topic must be a positive issue number")
+	}
+	c, err := config.Load(ctx.Cwd)
+	if err != nil {
+		return nil, err
+	}
+	env.Cwd = ctx.Cwd
+	topic, err := (issues.Client{Env: env}).Read(number)
+	if err != nil {
+		return nil, err
+	}
+	if topic.State != "open" || !slices.Contains(topic.Labels, c.Issues.Labels.Topic) {
+		return nil, fmt.Errorf("topic #%d must be open and carry topic label %q", number, c.Issues.Labels.Topic)
+	}
+	data, err := json.Marshal(topic)
+	if err != nil {
+		return nil, err
+	}
+	var out doc
+	err = json.Unmarshal(data, &out)
+	return out, err
+}
+func resultOptions(ctx record.ContextData) (record.ResultOptions, error) {
+	base, err := gitx.Run(ctx.Cwd, "merge-base", "HEAD", ctx.BaseBranch)
+	if err != nil {
+		return record.ResultOptions{}, err
+	}
+	head, err := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
+	return record.ResultOptions{RunID: ctx.RunID, Base: base, Commit: head}, err
+}
+func creationPath(ctx record.ContextData, version string) string {
+	return filepath.Join(ctx.Dir, "issue-creation", version+".json")
+}
+func approvalErrors(ctx record.ContextData, version string) ([]string, error) {
+	p, err := record.Latest(ctx.Dir, "proposal")
+	if err != nil {
+		return nil, err
+	}
+	r, err := record.Latest(ctx.Dir, "result")
+	if err != nil {
+		return nil, err
+	}
+	if !regexp.MustCompile(`^[1-9]\d*$`).MatchString(version) || strconv.Itoa(num(p["version"])) != version {
+		return []string{"approve must name the latest proposal version"}, nil
+	}
+	qs := items(r["questions"])
+	content := obj(p["content"])
+	if content["ready"] != true || r["workflow"] != "refine" || r["run_id"] != p["run_id"] || r["outcome"] != "question" || len(qs) != 1 || obj(qs[0]["target"])["kind"] != "proposal" || obj(qs[0]["target"])["ref"] != version {
+		return []string{"the latest proposal result did not ask for approval"}, nil
+	}
+	progress, err := issues.ReadCreation(creationPath(ctx, version))
+	if err != nil {
+		return nil, err
+	}
+	head, err := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	expected := str(content["commit"])
+	if progress.Commit != "" {
+		expected = progress.Commit
+	}
+	if expected != head {
+		return []string{"HEAD changed after the proposal asked for approval"}, nil
+	}
+	status, err := gitx.Run(ctx.Cwd, "status", "--porcelain", "--untracked-files=all")
+	if err != nil {
+		return nil, err
+	}
+	if status != "" {
+		return []string{"approval requires a clean worktree"}, nil
+	}
+	return []string{}, nil
+}
+func bindingPath(path string, c config.Config) bool {
+	if path == "" || filepath.IsAbs(path) || filepath.ToSlash(filepath.Clean(path)) != path || path == ".." || strings.HasPrefix(path, "../") || strings.Contains(path, "\\") {
+		return false
+	}
+	if inside(path, c.Decisions) {
+		return false
+	}
+	if inside(path, c.Standards) || path == ".devkit/config.json" || filepath.Base(path) == "CLAUDE.md" || filepath.Base(path) == "AGENTS.md" {
+		return true
+	}
+	for _, root := range []string{".claude/skills", ".agents/skills"} {
+		if inside(path, root) {
+			return true
+		}
+	}
+	return false
+}
+
+func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string, error) {
+	errors, err := schema("draft", value)
+	if err != nil || len(errors) > 0 {
+		return errors, err
+	}
+	artifacts = resolve(ctx.Cwd, artifacts)
+	input, err := readJSON(file(artifacts, "input.json"))
+	if err != nil {
+		return nil, err
+	}
+	baseline, err := readJSON(file(artifacts, "baseline.json"))
+	if err != nil {
+		return nil, err
+	}
+	head, err := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
+	if err != nil {
+		return nil, err
+	}
+	if head != baseline["commit"] {
+		errors = append(errors, "writer changed HEAD; only refine check may commit")
+	}
+	data, err := decisions.List(ctx.Cwd)
+	if err != nil {
+		return nil, err
+	}
+	if baseline["decisions_hash"] != decisionHash(data.Decisions) {
+		errors = append(errors, "writer edited decision records directly")
+	}
+	draft := obj(value)
+	ds, err := issues.ReadDrafts(draft)
+	if err != nil {
+		return nil, err
+	}
+	errors = append(errors, ds.Errors()...)
+	known := map[string]bool{}
+	graph := append([]doc{}, data.Decisions...)
+	pending := obj(obj(input["pending_proposal"])["content"])
+	for _, old := range stringsOf(pending["decision_ids"]) {
+		graph = slices.DeleteFunc(graph, func(d doc) bool { return d["id"] == old && d["status"] == "proposed" })
+	}
+	for _, d := range graph {
+		known[str(d["id"])] = true
+	}
+	for _, d := range items(draft["decisions"]) {
+		key := str(d["key"])
+		if known[key] {
+			errors = append(errors, "duplicate decision key: "+key)
+		}
+		known[key] = true
+		g := clone(d)
+		g["id"] = key
+		graph = append(graph, g)
+	}
+	errors = append(errors, decisions.GraphErrors(graph)...)
+	successors := map[string]bool{}
+	for _, d := range items(draft["decisions"]) {
+		if d["decided_by"] == "owner" && d["source"] == "derived" {
+			errors = append(errors, str(d["key"])+": a derived choice cannot be attributed to the owner")
+		}
+		for _, old := range stringsOf(d["supersedes"]) {
+			if find(data.Decisions, old) == nil {
+				errors = append(errors, "missing superseded decision "+old)
+			}
+			if successors[old] {
+				errors = append(errors, old+": more than one successor")
+			}
+			successors[old] = true
+		}
+		for _, id := range decisions.Citations(str(d["body"])) {
+			if !known[id] {
+				errors = append(errors, "missing citation "+id)
+			}
+		}
+	}
+	c, err := config.Load(ctx.Cwd)
+	if err != nil {
+		errors = append(errors, err.Error())
+		return errors, nil
+	}
+	raw, err := json.Marshal(input["config"])
+	if err != nil {
+		return nil, err
+	}
+	var original config.Config
+	if err = json.Unmarshal(raw, &original); err != nil {
+		return nil, err
+	}
+	original.Checks = c.Checks
+	if !reflect.DeepEqual(original, c) {
+		errors = append(errors, "config edits may change only checks")
+	}
+	traced := map[string]bool{}
+	for _, binding := range items(draft["bindings"]) {
+		path := str(binding["path"])
+		if traced[path] {
+			errors = append(errors, "duplicate binding path: "+path)
+		}
+		traced[path] = true
+		if !bindingPath(path, original) {
+			errors = append(errors, "binding is outside the allowed paths: "+path)
+		}
+		if !known[str(binding["decision"])] {
+			errors = append(errors, "binding has no decision: "+path)
+		}
+	}
+	paths, err := gitx.Run(ctx.Cwd, "diff", "--name-only", "--no-renames", "-z", str(input["proposal_base"]), "--")
+	if err != nil {
+		return nil, err
+	}
+	working, err := changes(ctx.Cwd)
+	if err != nil {
+		return nil, err
+	}
+	edited := append(strings.Split(paths, "\x00"), working...)
+	machinePaths := []string{}
+	for _, id := range stringsOf(pending["decision_ids"]) {
+		machinePaths = append(machinePaths, str(obj(input["folders"])["decisions"])+"/"+id+".md")
+	}
+	current, err := record.Latest(ctx.Dir, "proposal")
+	if err != nil {
+		return nil, err
+	}
+	if current["run_id"] == ctx.RunID {
+		for _, id := range stringsOf(obj(current["content"])["decision_ids"]) {
+			machinePaths = append(machinePaths, c.Decisions+"/"+id+".md")
+		}
+	}
+	for _, path := range edited {
+		if path == "" || slices.Contains(machinePaths, path) && !slices.Contains(working, path) {
+			continue
+		}
+		if !bindingPath(path, original) || !traced[path] {
+			errors = append(errors, "edited outside the traced binding changes: "+path)
+		}
+		info, err := os.Lstat(filepath.Join(ctx.Cwd, path))
+		if err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
+		if err == nil && !info.Mode().IsRegular() {
+			errors = append(errors, "edited path must be a regular file: "+path)
+		}
+	}
+	staged, err := gitx.Run(ctx.Cwd, "diff", "--cached", "--name-only", "-z")
+	if err != nil {
+		return nil, err
+	}
+	unstaged, err := gitx.Run(ctx.Cwd, "diff", "--name-only", "-z")
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range strings.Split(staged, "\x00") {
+		if path != "" && slices.Contains(strings.Split(unstaged, "\x00"), path) {
+			errors = append(errors, "index and worktree disagree: "+path)
+		}
+	}
+	if _, err = concerns.Load(filepath.Join(ctx.Cwd, c.Standards)); err != nil {
+		errors = append(errors, err.Error())
+	}
+	approval, err := os.ReadFile(file(artifacts, "approval.txt"))
+	if os.IsNotExist(err) {
+		errors = append(errors, "approval.txt is required in the configured language")
+	} else if err != nil {
+		return nil, err
+	} else {
+		text := string(approval)
+		if !strings.Contains(text, fmt.Sprintf("approve=%d", num(input["next_proposal_version"]))) || !strings.Contains(text, "answers") {
+			errors = append(errors, "approval.txt must explain approve=<version> and answers")
+		}
+		for _, group := range []string{"decisions", "units", "topics"} {
+			for _, item := range items(draft[group]) {
+				if !strings.Contains(text, str(item["key"])) {
+					errors = append(errors, "approval.txt omits "+str(item["key"]))
+				}
+			}
+		}
+		for path := range traced {
+			if !strings.Contains(text, path) {
+				errors = append(errors, "approval.txt omits binding "+path)
+			}
+		}
+	}
+	return errors, nil
+}
+
+func recordText(front doc, keys []string, body string) string {
+	var b strings.Builder
+	b.WriteString("---\n")
+	for _, key := range keys {
+		value, _ := json.Marshal(front[key])
+		fmt.Fprintf(&b, "%s: %s\n", key, value)
+	}
+	b.WriteString("---\n" + strings.TrimSpace(body) + "\n")
+	return b.String()
+}
+func decisionText(d doc) string {
+	return recordText(d, []string{"id", "title", "status", "decided_by", "depends_on", "supersedes", "request"}, str(d["body"]))
+}
+func materialize(ctx record.ContextData, draft, input doc) (doc, error) {
+	data, err := decisions.List(ctx.Cwd)
+	if err != nil {
+		return nil, err
+	}
+	previous := obj(obj(input["pending_proposal"])["content"])
+	mapping := doc{}
+	for _, d := range items(draft["decisions"]) {
+		key := str(d["key"])
+		id := str(obj(previous["mapping"])[key])
+		if old := find(data.Decisions, id); old == nil || old["status"] != "proposed" {
+			id = ""
+		}
+		if id == "" {
+			id, err = decisions.NextID("decision", ctx.Branch, key, data)
+			if err != nil {
+				return nil, err
+			}
+			data.Decisions = append(data.Decisions, doc{"id": id})
+		}
+		mapping[key] = id
+	}
+	ids, writes, removals := []string{}, map[string]string{}, []string{}
+	for _, d := range items(draft["decisions"]) {
+		d = clone(d)
+		id := str(mapping[str(d["key"])])
+		d["id"], d["status"], d["request"] = id, "proposed", ctx.Branch
+		deps := []string{}
+		for _, dep := range stringsOf(d["depends_on"]) {
+			if mapped := str(mapping[dep]); mapped != "" {
+				dep = mapped
+			}
+			deps = append(deps, dep)
+		}
+		d["depends_on"] = deps
+		body := str(d["body"])
+		body = regexp.MustCompile(`\bN[1-9]\d*\b`).ReplaceAllStringFunc(body, func(key string) string {
+			if mapped := str(mapping[key]); mapped != "" {
+				return mapped
+			}
+			return key
+		})
+		d["body"] = body
+		writes[str(obj(input["folders"])["decisions"])+"/"+id+".md"] = decisionText(d)
+		ids = append(ids, id)
+	}
+	for _, id := range stringsOf(previous["decision_ids"]) {
+		if slices.Contains(ids, id) {
+			continue
+		}
+		d := find(data.Decisions, id)
+		if d == nil || d["status"] != "proposed" {
+			return nil, fmt.Errorf("cannot withdraw settled record %s", id)
+		}
+		removals = append(removals, str(d["path"]))
+	}
+	prospective := decisions.Data{Decisions: []doc{}}
+	for _, d := range data.Decisions {
+		path := str(d["path"])
+		if path == "" || slices.Contains(removals, path) || writes[path] != "" {
+			continue
+		}
+		prospective.Decisions = append(prospective.Decisions, d)
+	}
+	for path, text := range writes {
+		d, err := decisions.Parse(text)
+		if err != nil {
+			return nil, err
+		}
+		d["path"] = path
+		prospective.Decisions = append(prospective.Decisions, d)
+	}
+	if errors := decisions.Check(prospective); len(errors) > 0 {
+		return nil, &record.RecordError{Message: "proposal failed the decision check", Errors: errors}
+	}
+	for path, body := range writes {
+		if err = put(filepath.Join(ctx.Cwd, path), body); err != nil {
+			return nil, err
+		}
+	}
+	for _, path := range removals {
+		if err = os.Remove(filepath.Join(ctx.Cwd, path)); err != nil {
+			return nil, err
+		}
+	}
+	return doc{"draft": draft, "mapping": mapping, "decision_ids": ids, "topic": input["topic"], "memo": input["memo"], "base_commit": input["proposal_base"], "ready": false}, nil
+}
+func check(ctx record.ContextData, artifacts string) (doc, error) {
+	artifacts = resolve(ctx.Cwd, artifacts)
+	draft, err := readDraft(artifacts)
+	if err != nil {
+		return nil, err
+	}
+	errors, err := draftErrors(ctx, artifacts, draft)
+	if err != nil {
+		return nil, err
+	}
+	if len(errors) == 0 {
+		options, err := resultOptions(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if _, err = record.BuildResult(ctx.Dir, "refine", doc{"outcome": "pass"}, options); err != nil {
+			return nil, err
+		}
+		committed, p, err := proposal.CommittedErrors(ctx, draft)
+		if err != nil {
+			return nil, err
+		}
+		input, err := readJSON(file(artifacts, "input.json"))
+		if err != nil {
+			return nil, err
+		}
+		if len(committed) > 0 || num(p["version"]) != num(input["next_proposal_version"]) {
+			if num(input["next_proposal_version"]) != num(p["version"])+1 {
+				return nil, fmt.Errorf("proposal version already has a commit; start the next draft version")
+			}
+			content, err := materialize(ctx, obj(draft), input)
+			if err != nil {
+				return nil, err
+			}
+			paths, err := changes(ctx.Cwd)
+			if err != nil {
+				return nil, err
+			}
+			p, err = proposal.Commit(ctx, paths, fmt.Sprintf("docs: propose refine decisions v%d", num(input["next_proposal_version"])), content)
+			if err != nil {
+				return nil, err
+			}
+			data, err := decisions.List(ctx.Cwd)
+			if err != nil {
+				return nil, err
+			}
+			if err = writeJSON(file(artifacts, "baseline.json"), doc{"commit": obj(p["content"])["commit"], "decisions_hash": decisionHash(data.Decisions)}); err != nil {
+				return nil, err
+			}
 		}
 	}
 	out := doc{"valid": len(errors) == 0, "errors": errors}
 	return out, writeJSON(file(artifacts, "check.json"), out)
 }
-func round(ctx record.ContextData, artifacts string, judgment any, phases ...string) (doc, error) {
+
+var aspects = []string{"coverage", "additions", "open_points", "consistency", "sufficiency", "wording", "bindings", "issues"}
+
+func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) {
 	artifacts = resolve(ctx.Cwd, artifacts)
 	d, e := readDraft(artifacts)
 	if e != nil {
 		return nil, e
 	}
-	errors, e := draftErrors(ctx, artifacts, d, phases...)
+	errors, e := draftErrors(ctx, artifacts, d)
 	if e != nil {
 		return nil, e
 	}
+	committed, proposal, e := proposal.CommittedErrors(ctx, d)
+	if e != nil {
+		return nil, e
+	}
+	errors = append(errors, committed...)
 	je, e := schema("judgment", judgment)
 	if e != nil {
 		return nil, e
 	}
 	j := obj(judgment)
 	if len(je) == 0 {
-		phase := "document"
-		if len(phases) > 0 {
-			phase = phases[0]
-		}
-		for _, finding := range items(j["findings"]) {
-			if !slices.Contains(phaseAspects(phase), str(finding["aspect"])) && !(phase == "document" && finding["aspect"] == "reflection") {
-				je = append(je, "finding is outside the current phase")
-			}
-		}
-		if len(items(j["criteria"])) != len(phaseAspects(phase)) {
-			je = append(je, "criteria must contain only the current phase aspects")
-		}
-		for _, aspect := range phaseAspects(phase) {
+		for _, aspect := range aspects {
 			n := 0
 			for _, c := range items(j["criteria"]) {
 				if c["aspect"] == aspect {
@@ -843,15 +898,14 @@ func round(ctx record.ContextData, artifacts string, judgment any, phases ...str
 			}
 		}
 	}
-	phase := "document"
-	if len(phases) > 0 {
-		phase = phases[0]
-	}
-	previous, e := readJSON(file(artifacts, phase+"/rounds/latest.json"))
+	previous, e := readJSON(file(artifacts, "rounds/latest.json"))
 	if e != nil && !os.IsNotExist(e) {
 		return nil, e
 	}
 	n := num(previous["round"]) + 1
+	if n > 3 {
+		return nil, fmt.Errorf("refine is limited to three rounds")
+	}
 	errors = append(errors, je...)
 	blocking, missing := 0, 0
 	if len(je) > 0 {
@@ -871,709 +925,309 @@ func round(ctx record.ContextData, artifacts string, judgment any, phases ...str
 			}
 		}
 	}
-	entry := doc{"round": n, "draft": d, "judgment": judgment, "errors": errors, "cleared": len(errors) == 0 && blocking == 0 && missing == 0}
-	if e = writeJSON(file(artifacts, fmt.Sprintf(phase+"/rounds/%d.json", n)), entry); e != nil {
+	approval, e := os.ReadFile(file(artifacts, "approval.txt"))
+	if e != nil && !os.IsNotExist(e) {
 		return nil, e
 	}
-	if e = writeJSON(file(artifacts, phase+"/rounds/latest.json"), entry); e != nil {
+	entry := doc{"approval_text": string(approval), "commit": obj(proposal["content"])["commit"], "proposal_version": proposal["version"], "round": n, "draft": d, "judgment": judgment, "errors": errors, "cleared": len(errors) == 0 && blocking == 0 && missing == 0}
+	if e = writeJSON(file(artifacts, fmt.Sprintf("rounds/%d.json", n)), entry); e != nil {
 		return nil, e
 	}
-	return doc{"round": n, "valid": len(errors) == 0, "blocking_count": blocking, "not_assessed_count": missing}, nil
-}
-func recordText(front doc, keys []string, body string) string {
-	var b strings.Builder
-	b.WriteString("---\n")
-	for _, k := range keys {
-		v, _ := json.Marshal(front[k])
-		fmt.Fprintf(&b, "%s: %s\n", k, v)
-	}
-	b.WriteString("---\n" + strings.TrimSpace(body) + "\n")
-	return b.String()
-}
-func decisionText(d doc) string {
-	return recordText(d, []string{"id", "title", "status", "decided_by", "depends_on", "supersedes", "request"}, str(d["body"]))
-}
-func restoreDocs(ctx record.ContextData, artifacts, docs string) error {
-	baseline, e := readJSON(file(artifacts, "baseline.json"))
-	if e != nil {
-		return e
-	}
-	paths, e := changes(ctx.Cwd)
-	if e != nil {
-		return e
-	}
-	for _, p := range paths {
-		if !inside(p, docs) {
-			continue
-		}
-		tracked, e := gitx.Run(ctx.Cwd, "ls-tree", str(baseline["commit"]), "--", p)
-		if e != nil {
-			return e
-		}
-		if tracked != "" {
-			_, e = gitx.Run(ctx.Cwd, "restore", "--source", str(baseline["commit"]), "--staged", "--worktree", "--", p)
-		} else {
-			e = os.Remove(filepath.Join(ctx.Cwd, p))
-			if os.IsNotExist(e) {
-				e = nil
-			}
-		}
-		if e != nil {
-			return e
-		}
-	}
-	return nil
-}
-func rewrite(v any, mapping doc) any {
-	switch x := v.(type) {
-	case string:
-		return replaceKeys(x, mapping)
-	case []any:
-		r := []any{}
-		for _, v := range x {
-			r = append(r, rewrite(v, mapping))
-		}
-		return r
-	case map[string]any:
-		r := doc{}
-		for k, v := range x {
-			r[k] = rewrite(v, mapping)
-		}
-		return r
-	}
-	return v
-}
-func materialize(ctx record.ContextData, artifacts string, draft, input doc) (doc, error) {
-	data, e := decisions.List(ctx.Cwd)
-	if e != nil {
-		return nil, e
-	}
-	prior := obj(input["pending_proposal"])
-	previous := obj(prior["content"])
-	reusable := input["previous_unapproved"] == true
-	mapping := doc{}
-	for _, kind := range []string{"decision", "unit", "topic"} {
-		for _, item := range items(draft[kind+"s"]) {
-			key := str(item["key"])
-			if kind == "unit" && strings.HasPrefix(key, "U-") {
-				existing := find(data.Units, key)
-				if existing == nil || existing["state"] == "done" {
-					return nil, fmt.Errorf("%s is not an open unit", key)
-				}
-				mapping[key] = key
-				continue
-			}
-			old := str(obj(previous["mapping"])[key])
-			var existing doc
-			switch kind {
-			case "decision":
-				existing = find(data.Decisions, old)
-				if existing["status"] != "proposed" {
-					existing = nil
-				}
-			case "unit":
-				existing = find(data.Units, old)
-				if existing["state"] == "done" {
-					existing = nil
-				}
-			case "topic":
-				existing = find(data.Topics, old)
-				if existing["status"] != "open" {
-					existing = nil
-				}
-			}
-			if reusable && existing != nil && has(previous[kind+"_ids"], old) {
-				mapping[key] = old
-			} else {
-				id, err := decisions.NextID(kind, ctx.Branch, key, data)
-				if err != nil {
-					return nil, err
-				}
-				mapping[key] = id
-				switch kind {
-				case "decision":
-					data.Decisions = append(data.Decisions, doc{"id": id})
-				case "unit":
-					data.Units = append(data.Units, doc{"id": id})
-				case "topic":
-					data.Topics = append(data.Topics, doc{"id": id})
-				}
-			}
-		}
-	}
-
-	resolved := obj(rewrite(draft, mapping))
-	folders := obj(input["folders"])
-	writes := map[string]string{}
-	removals := []string{}
-	paths := []string{}
-	add := func(p string) {
-		if !slices.Contains(paths, p) {
-			paths = append(paths, p)
-		}
-	}
-	if reusable {
-		for _, kind := range []string{"decision", "unit", "topic"} {
-			for key, value := range obj(previous["mapping"]) {
-				id := str(value)
-				if !has(previous[kind+"_ids"], id) || mapping[key] == value {
-					continue
-				}
-				group := data.Decisions
-				if kind == "unit" {
-					group = data.Units
-				}
-				if kind == "topic" {
-					group = data.Topics
-				}
-				item := find(group, id)
-				if item == nil {
-					continue
-				}
-				if kind == "unit" && item["state"] == "done" {
-					continue
-				}
-				if kind == "decision" && item["status"] != "proposed" || kind == "topic" && item["status"] != "open" {
-					return nil, fmt.Errorf("cannot withdraw settled record %s", id)
-				}
-				p := str(item["path"])
-				removals = append(removals, p)
-				add(p)
-			}
-		}
-	}
-	edited, e := changes(ctx.Cwd)
-	if e != nil {
-		return nil, e
-	}
-	for _, p := range edited {
-		if inside(p, str(folders["docs"])) {
-			add(p)
-		}
-	}
-	docs, e := docsSnapshot(ctx.Cwd, str(folders["docs"]))
-	if e != nil {
-		return nil, e
-	}
-	sorted := []string{}
-	for p := range docs {
-		sorted = append(sorted, p)
-	}
-	slices.Sort(sorted)
-	for _, p := range sorted {
-		if slices.ContainsFunc([]string{"standards", "decisions", "units", "topics"}, func(kind string) bool { return inside(p, str(folders[kind])) }) {
-			continue
-		}
-		if slices.ContainsFunc(data.Units, func(u doc) bool { return u["state"] == "done" && u["path"] == p }) {
-			continue
-		}
-		text := replaceKeys(docs[p], mapping)
-		if text != docs[p] {
-			writes[p] = text
-			add(p)
-		}
-	}
-	for _, d := range items(resolved["decisions"]) {
-		id := str(d["key"])
-		if v, ok := mapping[id]; ok {
-			id = str(v)
-		}
-		p := str(folders["decisions"]) + "/" + id + ".md"
-		d = clone(d)
-		d["id"], d["status"], d["request"] = id, "proposed", ctx.Branch
-		writes[p] = decisionText(d)
-		add(p)
-	}
-	for _, u := range items(resolved["units"]) {
-		id := str(u["key"])
-		if v, ok := mapping[id]; ok {
-			id = str(v)
-		}
-		p := str(folders["units"]) + "/" + id + ".md"
-		if existing := find(data.Units, id); str(existing["path"]) != "" {
-			p = str(existing["path"])
-		}
-		body := str(u["goal"]) + "\n\n"
-		for _, c := range stringsOf(u["completion_conditions"]) {
-			body += "- " + c + "\n"
-		}
-		u = clone(u)
-		u["id"] = id
-		writes[p] = recordText(u, []string{"id", "title", "decisions", "depends_on"}, body)
-		add(p)
-	}
-	for _, r := range items(resolved["rebased"]) {
-		d := find(data.Decisions, str(r["id"]))
-		deps := stringsOf(d["depends_on"])
-		for i, id := range deps {
-			if id == r["from"] {
-				deps[i] = str(r["to"])
-			}
-		}
-		d["depends_on"] = deps
-		p := str(d["path"])
-		writes[p] = decisionText(d)
-		add(p)
-	}
-	topicIDs := []string{}
-	for _, topic := range items(resolved["topics"]) {
-		topic = clone(topic)
-		topic["id"] = topic["key"]
-		topic["status"] = "open"
-		p := str(folders["topics"]) + "/" + str(topic["id"]) + ".md"
-		writes[p] = topicText(topic)
-		add(p)
-		topicIDs = append(topicIDs, str(topic["id"]))
-	}
-	topic := obj(input["topic"])
-	p := str(folders["topics"]) + "/" + str(topic["id"]) + ".md"
-	writes[p] = topicText(topic)
-	add(p)
-	if memo := str(input["memo"]); memo != "" {
-		slug := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(ctx.Branch, "-")
-		p := filepath.ToSlash(filepath.Join(filepath.Dir(str(folders["decisions"])), "discussions", time.Now().UTC().Format("2006-01-02")+"-"+slug+".md"))
-		writes[p] = replaceKeys(memo, mapping) + "\n"
-		add(p)
-	}
-	materialized := decisions.Data{}
-	for _, group := range []struct {
-		kind    string
-		before  []doc
-		after   *[]doc
-		pattern string
-	}{
-		{"decisions", data.Decisions, &materialized.Decisions, `^D-[0-9a-f]{6,64}\.md$`},
-		{"units", data.Units, &materialized.Units, `^U-[0-9a-f]{6,64}\.md$`},
-		{"topics", data.Topics, &materialized.Topics, `^T-[0-9a-f]{6,64}\.md$`},
-	} {
-		for _, item := range group.before {
-			p := str(item["path"])
-			if _, replaced := writes[p]; p != "" && !replaced && !slices.Contains(removals, p) {
-				*group.after = append(*group.after, item)
-			}
-		}
-		for _, p := range paths {
-			text, written := writes[p]
-			if !written || !inside(p, str(folders[group.kind])) || !regexp.MustCompile(group.pattern).MatchString(filepath.Base(p)) {
-				continue
-			}
-			item, err := decisions.Parse(text)
-			if err != nil {
-				return nil, err
-			}
-			item["path"] = p
-			*group.after = append(*group.after, item)
-		}
-	}
-	for _, p := range removals {
-		delete(docs, p)
-	}
-	for p, text := range writes {
-		if inside(p, str(folders["docs"])) && strings.HasSuffix(p, ".md") {
-			docs[p] = text
-		}
-	}
-	for p, text := range docs {
-		if !inside(p, str(folders["standards"])) {
-			materialized.Documents = append(materialized.Documents, decisions.Document{Path: p, Decisions: decisions.Citations(text)})
-		}
-	}
-	if errors := decisions.Check(materialized); len(errors) > 0 {
-		return nil, &record.RecordError{Message: "materialized proposal failed the decision check", Errors: errors}
-	}
-	for _, p := range removals {
-		if e = os.Remove(filepath.Join(ctx.Cwd, p)); e != nil {
-			return nil, e
-		}
-	}
-	for _, p := range paths {
-		if text, written := writes[p]; written {
-			if e = put(filepath.Join(ctx.Cwd, p), text); e != nil {
-				return nil, e
-			}
-		}
-	}
-	if len(paths) > 0 {
-		if _, e = gitx.Run(ctx.Cwd, append([]string{"add", "--"}, paths...)...); e != nil {
-			return nil, e
-		}
-		staged, e := gitx.Run(ctx.Cwd, "diff", "--cached", "--name-only")
-		if e != nil {
-			return nil, e
-		}
-		if staged != "" {
-			if _, e = commitPaths(ctx.Cwd, paths, "docs: propose decisions and work units"); e != nil {
-				return nil, e
-			}
-		}
-	}
-	ds, us := []string{}, []string{}
-	for _, d := range items(draft["decisions"]) {
-		ds = append(ds, str(mapping[str(d["key"])]))
-	}
-	for _, u := range items(draft["units"]) {
-		us = append(us, str(mapping[str(u["key"])]))
-	}
-	return doc{"mapping": mapping, "decision_ids": ds, "unit_ids": us, "topic_ids": topicIDs, "topic": topic}, nil
-}
-func output(result doc, version int, extra doc) doc {
-	qs := []doc{}
-	for _, q := range items(result["questions"]) {
-		qs = append(qs, doc{"id": q["id"], "text": q["text"]})
-	}
-	out := doc{"outcome": result["outcome"], "proposal_version": version, "questions": qs, "reasons": stringsOf(obj(result["stop"])["unresolved"]), "decision_ids": []string{}, "unit_ids": []string{}, "affected": decisions.Data{Decisions: []doc{}, Documents: []decisions.Document{}, Units: []doc{}}}
-	for k, v := range extra {
-		out[k] = v
-	}
-	return out
-}
-func finish(ctx record.ContextData, artifacts string) (doc, error) {
-	displayArtifacts := artifacts
-	artifacts = resolve(ctx.Cwd, artifacts)
-	phase := "document"
-	entry, e := readJSON(file(artifacts, phase+"/rounds/latest.json"))
-	if os.IsNotExist(e) {
-		phase = "decide"
-		entry, e = readJSON(file(artifacts, phase+"/rounds/latest.json"))
-	}
-	if e != nil {
+	if e = writeJSON(file(artifacts, "rounds/latest.json"), entry); e != nil {
 		return nil, e
 	}
 	input, e := readJSON(file(artifacts, "input.json"))
 	if e != nil {
 		return nil, e
 	}
-	errors, e := draftErrors(ctx, artifacts, entry["draft"], phase)
-	if e != nil {
+	input["next_proposal_version"] = num(proposal["version"]) + 1
+	if num(proposal["version"]) > 0 {
+		input["pending_proposal"], input["previous_unapproved"] = proposal, true
+	}
+	if e = writeJSON(file(artifacts, "input.json"), input); e != nil {
 		return nil, e
 	}
-	errors = append(stringsOf(entry["errors"]), errors...)
-	draft, j := obj(entry["draft"]), obj(entry["judgment"])
-	folders := obj(input["folders"])
-	docs, e := changedDocs(ctx.Cwd, str(folders["docs"]))
-	if e != nil {
-		return nil, e
-	}
-	content := doc{"draft": entry["draft"], "judgment": entry["judgment"], "rounds": entry["round"], "memo": input["memo"], "documents": docs, "materialized": false, "topic": input["topic"], "phase": phase}
-	var resultDoc doc
-	if entry["cleared"] != true || len(errors) > 0 {
-		unresolved := append([]string{}, errors...)
-		for _, f := range items(j["findings"]) {
-			if f["blocking"] == true || f["needs_decision"] == true {
-				unresolved = append(unresolved, str(f["failure_scenario"]))
-			}
-		}
-		for _, c := range items(j["criteria"]) {
-			if c["verdict"] != "pass" {
-				text := str(c["not_checked"])
-				if text == "" {
-					text = str(c["checked"])
-				}
-				unresolved = append(unresolved, str(c["aspect"])+": "+text)
-			}
-		}
-		if len(unresolved) == 0 {
-			unresolved = append(unresolved, "The last round did not pass")
-		}
-		resultDoc = doc{"outcome": "stop", "stop": doc{"state": "The refine draft did not clear the review", "unresolved": unresolved, "premise": ""}}
-		if e = restoreDocs(ctx, artifacts, str(folders["docs"])); e != nil {
-			return nil, e
-		}
-	} else if phase == "decide" && len(array(draft["open_points"])) == 0 {
-		return nil, fmt.Errorf("document phase has not completed")
-	} else if len(array(draft["open_points"])) > 0 {
-		qs := []doc{}
-		for _, p := range items(draft["open_points"]) {
-			qs = append(qs, question(str(p["text"]), "open_point", str(p["id"])))
-		}
-		resultDoc = doc{"outcome": "question", "questions": qs}
-		if e = restoreDocs(ctx, artifacts, str(folders["docs"])); e != nil {
-			return nil, e
-		}
-	} else {
-		m, e := materialize(ctx, artifacts, draft, input)
-		if e != nil {
-			return nil, e
-		}
-		for k, v := range m {
-			content[k] = v
-		}
-		content["materialized"] = true
-		b, e := os.ReadFile(file(artifacts, "approval.txt"))
-		if e != nil {
-			return nil, e
-		}
-		content["approval_text"] = replaceKeys(strings.TrimSpace(string(b)), obj(content["mapping"]))
-		resultDoc = doc{"outcome": "question", "questions": []doc{question(str(content["approval_text"]), "proposal", strconv.Itoa(num(input["next_proposal_version"])))}}
-	}
-	if phase == "document" {
-		frozen, err := readJSON(file(artifacts, "decided.json"))
-		if err != nil && !os.IsNotExist(err) {
-			return nil, err
-		}
-		content["decide"] = frozen
-	}
-	proposal, e := record.Write(ctx, "proposal", doc{"content": content}, "")
-	if e != nil {
-		return nil, e
-	}
-	phaseEntries := map[string]doc{phase: entry}
-	if phase == "document" {
-		frozen, err := readJSON(file(artifacts, "decided.json"))
-		if err != nil && !os.IsNotExist(err) {
-			return nil, err
-		}
-		if frozen != nil {
-			phaseEntries["decide"] = frozen
-		}
-	}
-	loops := []doc{}
-	records := []doc{}
-	for _, phaseName := range []string{"decide", "document"} {
-		phaseEntry := phaseEntries[phaseName]
-		if phaseEntry == nil {
-			continue
-		}
-		ended := "cleared"
-		if phaseEntry["cleared"] != true {
-			ended = "stuck"
-			if num(phaseEntry["round"]) >= 3 {
-				ended = "max_iterations"
-			}
-		}
-		loops = append(loops, doc{"name": phaseName, "ended": ended, "rounds": phaseEntry["round"]})
-		for n := 1; n <= num(phaseEntry["round"]); n++ {
-			roundEntry, e := readJSON(file(artifacts, fmt.Sprintf("%s/rounds/%d.json", phaseName, n)))
-			if e != nil {
-				return nil, e
-			}
-			de, e := schema("draft", roundEntry["draft"])
-			if e != nil {
-				return nil, e
-			}
-			je, e := schema("judgment", roundEntry["judgment"])
-			if e != nil {
-				return nil, e
-			}
-			if len(de) == 0 && len(je) == 0 {
-				j := obj(roundEntry["judgment"])
-				observations := []string{}
-				verdict := "pass"
-				for _, c := range items(j["criteria"]) {
-					observations = append(observations, str(c["aspect"])+": "+str(c["checked"]))
-					if c["verdict"] == "not_assessed" && verdict != "fail" {
-						verdict = "not_assessed"
-					}
-					if c["verdict"] == "fail" {
-						verdict = "fail"
-					}
-				}
-				findings := []doc{}
-				for i, f := range items(j["findings"]) {
-					if f["blocking"] == true || f["needs_decision"] == true {
-						verdict = "fail"
-					}
-					findings = append(findings, doc{"id": fmt.Sprintf("refine-%d", i+1), "blocking": f["blocking"], "needs_decision": f["needs_decision"], "text": fmt.Sprintf("%s %s: %s; %s", f["aspect"], f["item"], f["failure_scenario"], f["fix"]), "evidence": f["evidence"], "mechanical": f["mechanical"] == true, "deferred": f["deferred"] == true, "resolution_key": str(f["aspect"]) + "\n" + str(f["item"]) + "\n" + str(f["failure_scenario"])})
-				}
-				if errors := stringsOf(roundEntry["errors"]); len(errors) > 0 {
-					verdict = "not_assessed"
-					observations = append(observations, errors...)
-				}
-				records = append(records, doc{"judge": "refine", "phase": phaseName, "round": n, "kind": "proposal", "target": doc{"proposal_version": proposal.Entry["version"]}, "materials": []string{file(displayArtifacts, "input.json"), file(displayArtifacts, fmt.Sprintf("%s/rounds/%d.json", phaseName, n)), str(input["criteria"])}, "observations": observations, "verdict": verdict, "findings": findings})
-			} else {
-				records = append(records, doc{"judge": "refine", "phase": phaseName, "round": n, "kind": "proposal", "target": doc{"proposal_version": proposal.Entry["version"]}, "materials": []string{file(displayArtifacts, fmt.Sprintf("%s/rounds/%d.json", phaseName, n))}, "observations": append(de, je...), "verdict": "not_assessed", "findings": []doc{}})
-			}
-		}
-	}
-	if e = record.WriteLoopJudgments(ctx, records, ""); e != nil {
-		return nil, e
-	}
-
-	resultDoc["loops"] = loops
-
-	ds, us := stringsOf(content["decision_ids"]), stringsOf(content["unit_ids"])
-	resultDoc["proposal_version"], resultDoc["decision_ids"], resultDoc["unit_ids"] = proposal.Entry["version"], ds, us
-	o, e := resultOptions(ctx)
-	if e != nil {
-		return nil, e
-	}
-	result, e := record.WriteResult(ctx.Dir, "refine", resultDoc, o)
-	if e != nil {
-		return nil, e
-	}
-	return output(result, num(proposal.Entry["version"]), doc{"decision_ids": ds, "unit_ids": us}), nil
+	return doc{"round": n, "valid": len(errors) == 0, "blocking_count": blocking, "not_assessed_count": missing}, nil
 }
-func approve(ctx record.ContextData, version string) (doc, error) {
-	errors, e := approvalErrors(ctx, version)
-	if e != nil {
-		return nil, e
+
+func output(result doc, version int) doc {
+	qs := []doc{}
+	for _, q := range items(result["questions"]) {
+		qs = append(qs, doc{"id": q["id"], "text": q["text"]})
 	}
-	if len(errors) > 0 {
-		return nil, &record.RecordError{Message: "proposal cannot be approved", Errors: errors}
+	numbers := result["issue_numbers"]
+	if numbers == nil {
+		numbers = []int{}
 	}
-	if e = approvalStart(ctx, version); e != nil {
-		return nil, e
+	return doc{"outcome": result["outcome"], "proposal_version": version, "decision_ids": stringsOf(result["decision_ids"]), "issue_numbers": numbers, "questions": qs, "reasons": stringsOf(obj(result["stop"])["unresolved"])}
+}
+func finish(ctx record.ContextData, artifacts string) (doc, error) {
+	artifacts = resolve(ctx.Cwd, artifacts)
+	entry, err := readJSON(file(artifacts, "rounds/latest.json"))
+	if err != nil {
+		return nil, err
 	}
-	status, e := gitx.Run(ctx.Cwd, "status", "--porcelain", "--untracked-files=all")
-	if e != nil {
-		return nil, e
+	input, err := readJSON(file(artifacts, "input.json"))
+	if err != nil {
+		return nil, err
 	}
-	if status != "" {
-		return nil, fmt.Errorf("approval requires a clean worktree")
+	problems, p, err := proposal.CommittedErrors(ctx, entry["draft"])
+	if err != nil {
+		return nil, err
 	}
-	proposal, e := record.Latest(ctx.Dir, "proposal")
-	if e != nil {
-		return nil, e
+	if entry["commit"] != obj(p["content"])["commit"] || num(entry["proposal_version"]) != num(p["version"]) {
+		problems = append(problems, "proposal commit changed after the judgment")
 	}
-	data, e := decisions.List(ctx.Cwd)
-	if e != nil {
-		return nil, e
+	draft, err := readDraft(artifacts)
+	if err != nil {
+		return nil, err
 	}
-	content := obj(proposal["content"])
+	if !reflect.DeepEqual(draft, entry["draft"]) {
+		problems = append(problems, "draft changed after the judgment")
+	}
+	content := obj(p["content"])
+	result := doc{}
+	if entry["cleared"] != true || len(problems) > 0 {
+		problems = append(problems, stringsOf(entry["errors"])...)
+		if len(problems) == 0 {
+			problems = append(problems, "The refine draft did not clear review")
+		}
+		result = doc{"outcome": "stop", "stop": doc{"state": "The refine draft did not clear review", "unresolved": problems, "premise": ""}}
+	} else {
+		text := str(entry["approval_text"])
+		text += fmt.Sprintf("\n\nProposal version: %d\nCommit: %s\nParent: #%d %s", num(p["version"]), str(content["commit"]), num(obj(content["topic"])["number"]), str(obj(content["topic"])["title"]))
+		for _, group := range []string{"mapping", "decisions", "bindings", "units", "topics"} {
+			value := obj(entry["draft"])[group]
+			if group == "mapping" {
+				value = content["mapping"]
+			}
+			encoded, err := json.MarshalIndent(value, "", "  ")
+			if err != nil {
+				return nil, err
+			}
+			text += "\n\n" + group + ":\n" + string(encoded)
+		}
+		content["ready"], content["approval_text"] = true, text
+		if err = proposal.Save(ctx, p, content); err != nil {
+			return nil, err
+		}
+		result = doc{"outcome": "question", "decision_ids": content["decision_ids"], "questions": []doc{{"text": text, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"refine"}, "invalidates": []string{}}}}
+	}
+	records := []doc{}
+	for n := 1; n <= num(entry["round"]); n++ {
+		roundEntry, err := readJSON(file(artifacts, fmt.Sprintf("rounds/%d.json", n)))
+		if err != nil {
+			return nil, err
+		}
+		observations, findings, verdict := []string{}, []doc{}, "pass"
+		for _, c := range items(obj(roundEntry["judgment"])["criteria"]) {
+			observations = append(observations, str(c["aspect"])+": "+str(c["checked"]))
+			if c["verdict"] == "fail" {
+				verdict = "fail"
+			} else if c["verdict"] == "not_assessed" && verdict != "fail" {
+				verdict = "not_assessed"
+			}
+		}
+		for i, f := range items(obj(roundEntry["judgment"])["findings"]) {
+			if f["blocking"] == true || f["needs_decision"] == true {
+				verdict = "fail"
+			}
+			findings = append(findings, doc{"id": fmt.Sprintf("refine-%d", i+1), "blocking": f["blocking"], "needs_decision": f["needs_decision"], "text": fmt.Sprintf("%s %s: %s; %s", f["aspect"], f["item"], f["failure_scenario"], f["fix"]), "evidence": f["evidence"], "mechanical": f["mechanical"] == true, "deferred": false, "resolution_key": str(f["aspect"]) + "\n" + str(f["item"]) + "\n" + str(f["failure_scenario"])})
+		}
+		if len(stringsOf(roundEntry["errors"])) > 0 {
+			verdict = "not_assessed"
+			observations = append(observations, stringsOf(roundEntry["errors"])...)
+		}
+		version := roundEntry["proposal_version"]
+		if num(version) == 0 {
+			version = max(1, num(p["version"]))
+		}
+		records = append(records, doc{"judge": "refine", "phase": "decide", "round": n, "kind": "proposal", "target": doc{"proposal_version": version}, "materials": []string{file(artifacts, "input.json"), file(artifacts, fmt.Sprintf("rounds/%d.json", n)), str(input["criteria"])}, "observations": observations, "verdict": verdict, "findings": findings})
+	}
+	if err = record.WriteLoopJudgments(ctx, records, ""); err != nil {
+		return nil, err
+	}
+	options, err := resultOptions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if num(p["version"]) > 0 {
+		result["proposal_version"] = p["version"]
+	}
+	result["loops"] = []doc{{"name": "decide", "ended": func() string {
+		if entry["cleared"] == true {
+			return "cleared"
+		}
+		return "max_iterations"
+	}(), "rounds": num(entry["round"])}}
+	saved, err := record.WriteResult(ctx.Dir, "refine", result, options)
+	if err != nil {
+		return nil, err
+	}
+	return output(saved, num(p["version"])), nil
+}
+func approve(ctx record.ContextData, version string, environments ...cli.Env) (doc, error) {
+	problems, err := approvalErrors(ctx, version)
+	if err != nil {
+		return nil, err
+	}
+	if len(problems) > 0 {
+		return nil, &record.RecordError{Message: "proposal cannot be approved", Errors: problems}
+	}
+	if err = approvalStart(ctx, version); err != nil {
+		return nil, err
+	}
+	p, err := record.Latest(ctx.Dir, "proposal")
+	if err != nil {
+		return nil, err
+	}
+	content := obj(p["content"])
 	ids := stringsOf(content["decision_ids"])
-	paths := []string{}
-	add := func(p string) {
-		if !slices.Contains(paths, p) {
-			paths = append(paths, p)
-		}
+	path := creationPath(ctx, version)
+	progress, err := issues.ReadCreation(path)
+	if err != nil {
+		return nil, err
 	}
-	for _, id := range ids {
-		d := find(data.Decisions, id)
-		if d == nil || d["status"] != "proposed" {
-			return nil, fmt.Errorf("%s is not proposed", id)
+	if progress.Commit == "" {
+		data, err := decisions.List(ctx.Cwd)
+		if err != nil {
+			return nil, err
 		}
-		d["status"] = "agreed"
-		for _, oldID := range stringsOf(d["supersedes"]) {
-			old := find(data.Decisions, oldID)
-			if old == nil {
-				return nil, fmt.Errorf("%s does not exist", oldID)
+		paths := []string{}
+		for _, id := range ids {
+			d := find(data.Decisions, id)
+			if d == nil || d["status"] != "proposed" {
+				return nil, fmt.Errorf("%s is not proposed", id)
 			}
-			old["status"] = "superseded"
-			add(str(old["path"]))
-		}
-		add(str(d["path"]))
-	}
-	topic := obj(content["topic"])
-	topic = find(data.Topics, str(topic["id"]))
-	if topic == nil || topic["status"] != "open" {
-		return nil, fmt.Errorf("proposal topic is not open")
-	}
-	topic["status"] = "settled"
-	add(str(topic["path"]))
-	if invalid := decisions.Check(data); len(invalid) > 0 {
-		return nil, &record.RecordError{Message: "approval failed the decision check", Errors: invalid}
-	}
-	for _, p := range paths {
-		if topic["path"] == p {
-			if e = put(filepath.Join(ctx.Cwd, p), topicText(topic)); e != nil {
-				return nil, e
+			d["status"] = "agreed"
+			paths = append(paths, str(d["path"]))
+			for _, oldID := range stringsOf(d["supersedes"]) {
+				old := find(data.Decisions, oldID)
+				if old == nil {
+					return nil, fmt.Errorf("missing superseded decision %s", oldID)
+				}
+				old["status"] = "superseded"
+				if !slices.Contains(paths, str(old["path"])) {
+					paths = append(paths, str(old["path"]))
+				}
 			}
-			continue
+		}
+		if errors := decisions.Check(data); len(errors) > 0 {
+			return nil, &record.RecordError{Message: "approval failed the decision check", Errors: errors}
 		}
 		for _, d := range data.Decisions {
-			if d["path"] == p {
-				if e = put(filepath.Join(ctx.Cwd, p), decisionText(d)); e != nil {
-					return nil, e
+			if slices.Contains(paths, str(d["path"])) {
+				if err = put(filepath.Join(ctx.Cwd, str(d["path"])), decisionText(d)); err != nil {
+					return nil, err
 				}
-				break
 			}
 		}
-	}
-	if len(paths) > 0 {
-		if _, e = gitx.Run(ctx.Cwd, append([]string{"add", "--"}, paths...)...); e != nil {
-			return nil, e
+		if len(paths) > 0 {
+			if err = proposal.CommitPaths(ctx, paths, "docs: agree refine proposal "+version); err != nil {
+				return nil, err
+			}
 		}
-		if _, e = commitPaths(ctx.Cwd, paths, "docs: agree refine proposal "+version); e != nil {
-			return nil, e
+		progress.RunID = ctx.RunID
+		progress.Commit, err = gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
+		if err != nil {
+			return nil, err
+		}
+		if err = issues.SaveCreation(path, progress); err != nil {
+			return nil, err
 		}
 	}
-	data, e = decisions.List(ctx.Cwd)
-	if e != nil {
-		return nil, e
+	c, err := config.Load(ctx.Cwd)
+	if err != nil {
+		return nil, err
 	}
-	remaining := decisions.Affected(data)
-	o, e := resultOptions(ctx)
-	if e != nil {
-		return nil, e
+	ds, err := issues.ReadDrafts(content["draft"])
+	if err != nil {
+		return nil, err
+	}
+	env := cli.Env{Cwd: ctx.Cwd}
+	if len(environments) > 0 {
+		env = environments[0]
+		env.Cwd = ctx.Cwd
+	}
+	topic := obj(content["topic"])
+	parent := &issues.TopicDraft{Title: str(topic["title"]), Body: str(topic["body"])}
+	comment := strings.Join(ids, "\n")
+	progress, err = (issues.Client{Env: env}).CreateDrafts(path, ds, c.Issues.Labels, parent, num(topic["number"]), comment)
+	if err != nil {
+		return nil, err
+	}
+	options, err := resultOptions(ctx)
+	if err != nil {
+		return nil, err
 	}
 	v, _ := strconv.Atoi(version)
-	extra := doc{"decision_ids": ids, "unit_ids": content["unit_ids"], "affected": remaining}
-	result, e := record.WriteResult(ctx.Dir, "refine", doc{"outcome": "pass", "proposal_version": v, "decision_ids": ids, "unit_ids": content["unit_ids"], "affected": remaining}, o)
-	if e != nil {
-		return nil, e
+	saved, err := record.WriteResult(ctx.Dir, "refine", doc{"outcome": "pass", "proposal_version": v, "decision_ids": ids, "issue_numbers": progress.Numbers()}, options)
+	if err != nil {
+		return nil, err
 	}
-	return output(result, v, extra), nil
+	return output(saved, v), nil
 }
 func Commands() []cli.Command {
-	commands := []cli.Command{{Area: "refine", Name: "reflect", Usage: "devkit refine reflect", Run: runReflect}}
-	for _, mode := range []string{"start", "prepare", "check", "round", "finish", "decided", "approve", "not-started"} {
+	commands := []cli.Command{}
+	for _, mode := range []string{"start", "prepare", "check", "round", "finish", "approve", "not-started"} {
 		commands = append(commands, cli.Command{Area: "refine", Name: mode, Usage: "devkit refine " + mode, Run: func(args []string, env cli.Env) error {
-			ctx, e := record.Context(env)
-			if e != nil {
-				return e
+			ctx, err := record.Context(env)
+			if err != nil {
+				return err
 			}
-			displayDir := ctx.Dir
+			display := ctx.Dir
 			ctx.Dir = env.Path(ctx.Dir)
 			artifacts := env.Getenv("ARTIFACTS_DIR")
 			var out any
-			if mode == "start" {
+			switch mode {
+			case "start":
 				var started record.StartOutput
-				started, e = start(ctx, env)
-				started.Details = displayDir
+				started, err = start(ctx, env)
+				started.Details = display
 				out = started
-			} else if mode == "approve" {
-				out, e = approve(ctx, env.Getenv("INPUTS_APPROVE"))
-			} else {
+			case "approve":
+				out, err = approve(ctx, env.Getenv("INPUTS_APPROVE"), env)
+			default:
 				if artifacts == "" {
 					return fmt.Errorf("ARTIFACTS_DIR must be set")
 				}
 				switch mode {
 				case "prepare":
-					out, e = prepare(ctx, env, artifacts, env.Getenv("INPUTS_OWNER_WORDS"), env.Getenv("INPUTS_SUPPLEMENT"), env.Getenv("INPUTS_MEMO"), env.Getenv("INPUTS_TOPIC"))
+					out, err = prepare(ctx, env, artifacts, env.Getenv("INPUTS_OWNER_WORDS"), env.Getenv("INPUTS_SUPPLEMENT"), env.Getenv("INPUTS_MEMO"), env.Getenv("INPUTS_TOPIC"))
 				case "check":
-					out, e = check(ctx, artifacts, env.Getenv("INPUTS_PHASE"))
+					out, err = check(ctx, artifacts)
 				case "round":
-					var j any
-					e = json.Unmarshal([]byte(env.Getenv("INPUTS_JUDGMENT")), &j)
-					if e == nil && env.Getenv("INPUTS_PHASE") == "document" {
-						checked, err := readJSON(file(resolve(ctx.Cwd, artifacts), "check.json"))
-						if err != nil {
-							return err
-						}
-						if checked["valid"] == true {
-							j, e = roundReflection(env, obj(j))
-						}
+					var judgment any
+					judgment = doc{}
+					if text := env.Getenv("INPUTS_JUDGMENT"); text != "" {
+						err = json.Unmarshal([]byte(text), &judgment)
 					}
-					if e == nil {
-						out, e = round(ctx, artifacts, j, env.Getenv("INPUTS_PHASE"))
+					if err == nil {
+						out, err = round(ctx, artifacts, judgment)
 					}
-				case "decided":
-					out, e = decided(ctx, artifacts)
 				case "finish":
-					out, e = finish(ctx, artifacts)
+					out, err = finish(ctx, artifacts)
 				case "not-started":
-					var s doc
-					e = json.Unmarshal([]byte(env.Getenv("INPUTS_START")), &s)
-					if e == nil {
-						reasons := append([]any{s["reason"]}, array(s["remaining"])...)
-						out = output(doc{"outcome": "not_started"}, 0, doc{"reasons": reasons})
-					}
+					var stopped doc
+					err = json.Unmarshal([]byte(env.Getenv("INPUTS_START")), &stopped)
+					out = output(doc{"outcome": "not_started", "stop": doc{"unresolved": append([]any{stopped["reason"]}, array(stopped["remaining"])...)}}, 0)
 				}
 			}
-			if e != nil {
-				return e
+			if err != nil {
+				return err
 			}
 			return env.JSON(out)
 		}})
 	}
-	commands = append(commands, cli.Command{Area: "refine", Usage: "devkit refine start | prepare | check | reflect | round | decided | finish | approve | not-started", Run: func(args []string, env cli.Env) error {
+	commands = append(commands, cli.Command{Area: "refine", Usage: "devkit refine start | prepare | check | round | finish | approve | not-started", Run: func(args []string, env cli.Env) error {
 		if _, err := record.Context(env); err != nil {
 			return err
 		}
 		if env.Getenv("ARTIFACTS_DIR") == "" {
 			return fmt.Errorf("ARTIFACTS_DIR must be set")
 		}
-		return &cli.ExitError{Code: 1, Message: "Usage: devkit refine start | prepare | check | reflect | round | decided | finish | approve | not-started"}
+		return &cli.ExitError{Code: 1, Message: "Usage: devkit refine start | prepare | check | round | finish | approve | not-started"}
+
 	}})
 	return commands
 }

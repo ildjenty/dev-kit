@@ -6,5 +6,5 @@ check: {"valid": true, "errors": []}
 judge: {"criteria": [{"aspect": "traceability", "verdict": "pass", "checked": "Compared the proposal and its entries", "not_checked": ""}, {"aspect": "evidence", "verdict": "pass", "checked": "Compared the proposal and its entries", "not_checked": ""}, {"aspect": "mechanism", "verdict": "pass", "checked": "Compared the proposal and its entries", "not_checked": ""}], "findings": []}
 round: {"round": 1, "valid": true, "blocking_count": 0, "not_assessed_count": 0}
 verify: {"needed": false}
-finish: {"outcome": "question", "proposal_version": 1, "unit_ids": ["U-abcdef"], "questions": [{"id": "Q1", "text": "Approve version 1, commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, with approve=1, or provide answers for changes?"}], "reasons": []}
-result: {"outcome": "question", "proposal_version": 1, "unit_ids": ["U-abcdef"], "questions": [{"id": "Q1", "text": "Approve version 1, commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, with approve=1, or provide answers for changes?"}], "reasons": []}
+finish: {"outcome": "question", "proposal_version": 1, "issue_numbers": [], "questions": [{"id": "Q1", "text": "Approve version 1, commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, with approve=1, or provide answers for changes?"}], "reasons": []}
+result: {"outcome": "question", "proposal_version": 1, "issue_numbers": [], "questions": [{"id": "Q1", "text": "Approve version 1, commit aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, with approve=1, or provide answers for changes?"}], "reasons": []}

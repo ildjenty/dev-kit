@@ -12,6 +12,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/concerns"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
+	"github.com/ildjenty/dev-kit/internal/issues"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
@@ -51,13 +52,8 @@ func scopeErrors(ctx record.ContextData, input doc, backlog bool) ([]string, err
 	}
 	folders := obj(input["folders"])
 	errors := []string{}
-	for _, u := range items(input["units"]) {
-		if u["state"] == "done" && slices.Contains(paths, str(u["path"])) {
-			errors = append(errors, "done unit may not be edited or removed: "+str(u["id"]))
-		}
-	}
 	for _, p := range paths {
-		allowed := safePath(p) && (inside(p, str(folders["units"])) || inside(p, str(folders["standards"])) || inside(p, str(folders["eval"])+"/judge") || p == ".devkit/config.json")
+		allowed := safePath(p) && (inside(p, str(folders["standards"])) || inside(p, str(folders["eval"])+"/judge") || p == ".devkit/config.json")
 		if backlog && obj(input["backlog"])[p] != nil {
 			allowed = true
 		}
@@ -89,6 +85,11 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		errors = append(errors, "writer changed HEAD; only retro check may commit")
 	}
 	draft := obj(value)
+	ds, e := issues.ReadDrafts(draft)
+	if e != nil {
+		return nil, e
+	}
+	errors = append(errors, ds.Errors()...)
 	known, used, dismissed := map[string]bool{}, map[string]bool{}, map[string]bool{}
 	for _, entry := range items(input["entries"]) {
 		known[str(entry["id"])] = true
@@ -167,16 +168,9 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		}
 		named = append(named, p)
 	}
-	working, e := changes(ctx.Cwd)
-	if e != nil {
-		return nil, e
-	}
 	for _, p := range paths {
 		if inside(p, standards) && !slices.Contains(named, p) {
 			errors = append(errors, "standard edit has no backlog trace: "+p)
-		}
-		if inside(p, str(obj(input["folders"])["units"])) && slices.Contains(working, p) {
-			errors = append(errors, "write units in the draft, not directly: "+p)
 		}
 	}
 	current, e := config.Load(ctx.Cwd)

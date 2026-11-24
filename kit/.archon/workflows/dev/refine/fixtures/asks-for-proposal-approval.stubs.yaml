@@ -7,14 +7,8 @@
       "check-decide",
       "judge-decide",
       "round-decide",
-      "decided",
       "finish",
-      "result",
-      "write-document",
-      "check-document",
-      "judge-document",
-      "round-document",
-      "reflect"
+      "result"
     ],
     "inputs": {
       "owner_words": "Provide staff access"
@@ -34,9 +28,6 @@
     "input": "/tmp/refine/input.json",
     "criteria": "/tmp/criteria"
   },
-  "decided": {
-    "ready": true
-  },
   "write-decide": {
     "draft": "/tmp/refine/draft.json"
   },
@@ -49,31 +40,49 @@
       {
         "aspect": "coverage",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "additions",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "open_points",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "consistency",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "sufficiency",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
+        "not_checked": ""
+      },
+      {
+        "aspect": "wording",
+        "verdict": "pass",
+        "checked": "Compared all materials",
+        "not_checked": ""
+      },
+      {
+        "aspect": "bindings",
+        "verdict": "pass",
+        "checked": "Compared all materials",
+        "not_checked": ""
+      },
+      {
+        "aspect": "issues",
+        "verdict": "pass",
+        "checked": "Compared all materials",
         "not_checked": ""
       }
     ],
@@ -85,44 +94,13 @@
     "blocking_count": 0,
     "not_assessed_count": 0
   },
-  "write-document": {
-    "draft": "/tmp/refine/draft.json"
-  },
-  "check-document": {
-    "valid": true,
-    "errors": []
-  },
-  "judge-document": {
-    "criteria": [
-      {
-        "aspect": "wording",
-        "verdict": "pass",
-        "checked": "Compared the input and draft",
-        "not_checked": ""
-      }
-    ],
-    "findings": []
-  },
-  "round-document": {
-    "round": 1,
-    "valid": true,
-    "blocking_count": 0,
-    "not_assessed_count": 0
-  },
   "finish": {
     "outcome": "question",
     "proposal_version": 1,
     "decision_ids": [
       "D-abcdef"
     ],
-    "unit_ids": [
-      "U-abcdef"
-    ],
-    "affected": {
-      "decisions": [],
-      "documents": [],
-      "units": []
-    },
+    "issue_numbers": [],
     "questions": [
       {
         "id": "Q1",
@@ -137,14 +115,7 @@
     "decision_ids": [
       "D-abcdef"
     ],
-    "unit_ids": [
-      "U-abcdef"
-    ],
-    "affected": {
-      "decisions": [],
-      "documents": [],
-      "units": []
-    },
+    "issue_numbers": [],
     "questions": [
       {
         "id": "Q1",
@@ -152,10 +123,5 @@
       }
     ],
     "reasons": []
-  },
-  "reflect": {
-    "model": "jev-stub",
-    "not_reflected": [],
-    "source": "jev"
   }
 }

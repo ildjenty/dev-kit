@@ -11,8 +11,6 @@
       "source": "owner_words"
     }
   ],
-  "rebased": [],
-  "kept_docs": [],
   "units": [
     {
       "key": "UN1",
@@ -21,13 +19,9 @@
       "completion_conditions": [
         "fixture.txt contains fixture result"
       ],
-      "decisions": [
-        "N1"
-      ],
-      "depends_on": []
+      "blocked_by": []
     }
   ],
-  "open_points": [],
   "topics": [],
-  "kept_units": []
+  "bindings": []
 }

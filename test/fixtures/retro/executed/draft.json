@@ -12,7 +12,8 @@
       ],
       "entries": [
         ".devkit/backlog/fixture.json#deferred/0"
-      ]
+      ],
+      "blocked_by": []
     }
   ],
   "checks": [],

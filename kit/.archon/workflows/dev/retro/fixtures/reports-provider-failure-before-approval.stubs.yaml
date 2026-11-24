@@ -7,5 +7,5 @@ judge: {"criteria": [{"aspect": "traceability", "verdict": "pass", "checked": "T
 round: {"round": 1, "valid": true, "blocking_count": 0, "not_assessed_count": 0}
 verify: {"needed": true}
 verification: {"text": "Escape case not scored: provider call failed. The owner may still approve."}
-finish: {"outcome": "question", "proposal_version": 1, "unit_ids": [], "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case not scored: provider call failed."}], "reasons": []}
-result: {"outcome": "question", "proposal_version": 1, "unit_ids": [], "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case not scored: provider call failed."}], "reasons": []}
+finish: {"outcome": "question", "proposal_version": 1, "issue_numbers": [], "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case not scored: provider call failed."}], "reasons": []}
+result: {"outcome": "question", "proposal_version": 1, "issue_numbers": [], "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case not scored: provider call failed."}], "reasons": []}

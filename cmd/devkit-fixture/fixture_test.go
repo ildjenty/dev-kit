@@ -30,19 +30,18 @@ func TestDraftIsReadFromFixtureRepository(t *testing.T) {
 	testutil.Equal(t, string(testutil.Must(os.ReadFile(filepath.Join(repo, "fixture.txt")))), "fixture result\nPlan skeleton.\n")
 }
 
-func TestRefineDocumentFixtureCreatesDocsFolder(t *testing.T) {
+func TestRefineFixtureKeepsIssueDraftsWithoutProse(t *testing.T) {
 	root := t.TempDir()
 	repo := filepath.Join(root, "fixture-exec-local")
 	artifacts := filepath.Join(root, "artifacts")
 	testutil.Put(t, artifacts, "fixture.json", `{"workflow":"refine"}`)
 	testutil.Put(t, artifacts, "refine/draft.json", `{}`)
 	testutil.Put(t, repo, ".archon/workflows/dev/refine/fixtures/executed/draft.json", `{}`)
-	body := "# Refined document\n"
-	testutil.Put(t, repo, ".archon/workflows/dev/refine/fixtures/executed/document.md", body)
 	vars := map[string]string{"DEVKIT_FIXTURE": "1", "ARTIFACTS_DIR": artifacts, "STATE_DIR": filepath.Join(root, "state"), "INPUTS_PHASE": "document"}
 	env := cli.Env{Cwd: repo, LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
 	testutil.OK(t, before([]string{"refine", "check"}, env))
-	testutil.Equal(t, string(testutil.Must(os.ReadFile(filepath.Join(repo, "docs/refined.md")))), body)
+	_, err := os.Stat(filepath.Join(repo, "docs"))
+	testutil.Equal(t, os.IsNotExist(err), true)
 }
 func TestRetroDraftAndApprovalArePreparedForExecutedFixture(t *testing.T) {
 	root := t.TempDir()

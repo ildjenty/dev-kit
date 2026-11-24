@@ -7,7 +7,6 @@
       "check-decide",
       "judge-decide",
       "round-decide",
-      "decided",
       "finish",
       "result"
     ],
@@ -29,9 +28,6 @@
     "input": "/tmp/refine/input.json",
     "criteria": "/tmp/criteria"
   },
-  "decided": {
-    "ready": false
-  },
   "write-decide": {
     "draft": "/tmp/refine/draft.json"
   },
@@ -43,32 +39,50 @@
     "criteria": [
       {
         "aspect": "coverage",
-        "verdict": "fail",
-        "checked": "Compared the input and draft",
+        "verdict": "pass",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "additions",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "open_points",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "consistency",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
         "not_checked": ""
       },
       {
         "aspect": "sufficiency",
         "verdict": "pass",
-        "checked": "Compared the input and draft",
+        "checked": "Compared all materials",
+        "not_checked": ""
+      },
+      {
+        "aspect": "wording",
+        "verdict": "pass",
+        "checked": "Compared all materials",
+        "not_checked": ""
+      },
+      {
+        "aspect": "bindings",
+        "verdict": "pass",
+        "checked": "Compared all materials",
+        "not_checked": ""
+      },
+      {
+        "aspect": "issues",
+        "verdict": "pass",
+        "checked": "Compared all materials",
         "not_checked": ""
       }
     ],
@@ -84,12 +98,7 @@
     "outcome": "stop",
     "proposal_version": 1,
     "decision_ids": [],
-    "unit_ids": [],
-    "affected": {
-      "decisions": [],
-      "documents": [],
-      "units": []
-    },
+    "issue_numbers": [],
     "questions": [],
     "reasons": [
       "The draft did not clear review"
@@ -99,12 +108,7 @@
     "outcome": "stop",
     "proposal_version": 1,
     "decision_ids": [],
-    "unit_ids": [],
-    "affected": {
-      "decisions": [],
-      "documents": [],
-      "units": []
-    },
+    "issue_numbers": [],
     "questions": [],
     "reasons": [
       "The draft did not clear review"
