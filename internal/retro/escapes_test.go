@@ -278,7 +278,11 @@ func TestEscapeProviderHelper(t *testing.T) {
 		if kind == "contract" {
 			findings = append(findings, doc{"aspect": "contract", "file": "value.go", "line": "2", "blocking": true, "needs_decision": false, "deferred": false, "mechanical": false, "failure_scenario": "Wrong return value", "evidence": "return 2", "fix": "Return 1"})
 		}
-		answer = doc{"criteria": []doc{}, "findings": findings}
+		verdict := "pass"
+		if len(findings) > 0 {
+			verdict = "fail"
+		}
+		answer = doc{"criteria": []doc{{"aspect": kind, "verdict": verdict, "checked": "Read the change", "not_checked": ""}}, "findings": findings}
 	}
 	if kind == os.Getenv("DEVKIT_ESCAPE_FAILURE") {
 		fmt.Fprintln(os.Stderr, "Fake provider failure")

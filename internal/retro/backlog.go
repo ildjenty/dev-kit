@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	backlogschema "github.com/ildjenty/dev-kit/internal/backlog"
 	"github.com/ildjenty/dev-kit/internal/escape"
 )
 
@@ -31,6 +32,19 @@ func readBacklog(cwd string) ([]doc, doc, error) {
 			return nil, nil, e
 		}
 		rel = filepath.ToSlash(rel)
+		entriesOnly := doc{}
+		for _, kind := range []string{"deferred", "carried", "mechanical", "accepted_objections", "review"} {
+			if v, exists := value[kind]; exists {
+				entriesOnly[kind] = v
+			}
+		}
+		entryData, e := json.Marshal(entriesOnly)
+		if e != nil {
+			return nil, nil, e
+		}
+		if e = backlogschema.Validate(entryData); e != nil {
+			return nil, nil, fmt.Errorf("%s: %w", rel, e)
+		}
 		files[rel] = string(b)
 		for _, kind := range []string{"deferred", "carried", "mechanical", "accepted_objections", "review"} {
 			if _, exists := value[kind]; kind == "review" && !exists {
@@ -44,10 +58,6 @@ func readBacklog(cwd string) ([]doc, doc, error) {
 				item, ok := v.(map[string]any)
 				if !ok {
 					return nil, nil, fmt.Errorf("%s: %s/%d must be an object", rel, kind, i)
-				}
-				finding, source := obj(item["finding"]), obj(item["source"])
-				if str(finding["id"]) == "" || str(source["run_id"]) == "" || str(source["kind"]) == "" || kind != "review" && (str(source["judge"]) == "" || num(source["judgment"]) < 1) || kind == "review" && (source["kind"] != "review" || str(obj(source["target"])["commit"]) == "") || source["target"] == nil {
-					return nil, nil, fmt.Errorf("%s: %s/%d requires finding and source", rel, kind, i)
 				}
 				entries = append(entries, doc{"id": fmt.Sprintf("%s#%s/%d", rel, kind, i), "path": rel, "kind": kind, "content": item})
 			}

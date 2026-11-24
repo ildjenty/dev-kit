@@ -1003,6 +1003,8 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 
 	resolved := obj(rewrite(draft, mapping))
 	folders := obj(input["folders"])
+	writes := map[string]string{}
+	removals := []string{}
 	paths := []string{}
 	add := func(p string) {
 		if !slices.Contains(paths, p) {
@@ -1034,9 +1036,7 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 					return nil, fmt.Errorf("cannot withdraw settled record %s", id)
 				}
 				p := str(item["path"])
-				if e = os.Remove(filepath.Join(ctx.Cwd, p)); e != nil {
-					return nil, e
-				}
+				removals = append(removals, p)
 				add(p)
 			}
 		}
@@ -1060,14 +1060,15 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 	}
 	slices.Sort(sorted)
 	for _, p := range sorted {
+		if slices.ContainsFunc([]string{"standards", "decisions", "units", "topics"}, func(kind string) bool { return inside(p, str(folders[kind])) }) {
+			continue
+		}
 		if slices.ContainsFunc(data.Units, func(u doc) bool { return u["state"] == "done" && u["path"] == p }) {
 			continue
 		}
 		text := replaceKeys(docs[p], mapping)
 		if text != docs[p] {
-			if e = put(filepath.Join(ctx.Cwd, p), text); e != nil {
-				return nil, e
-			}
+			writes[p] = text
 			add(p)
 		}
 	}
@@ -1079,9 +1080,7 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 		p := str(folders["decisions"]) + "/" + id + ".md"
 		d = clone(d)
 		d["id"], d["status"], d["request"] = id, "proposed", ctx.Branch
-		if e = put(filepath.Join(ctx.Cwd, p), decisionText(d)); e != nil {
-			return nil, e
-		}
+		writes[p] = decisionText(d)
 		add(p)
 	}
 	for _, u := range items(resolved["units"]) {
@@ -1099,9 +1098,7 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 		}
 		u = clone(u)
 		u["id"] = id
-		if e = put(filepath.Join(ctx.Cwd, p), recordText(u, []string{"id", "title", "decisions", "depends_on"}, body)); e != nil {
-			return nil, e
-		}
+		writes[p] = recordText(u, []string{"id", "title", "decisions", "depends_on"}, body)
 		add(p)
 	}
 	for _, r := range items(resolved["rebased"]) {
@@ -1114,9 +1111,7 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 		}
 		d["depends_on"] = deps
 		p := str(d["path"])
-		if e = put(filepath.Join(ctx.Cwd, p), decisionText(d)); e != nil {
-			return nil, e
-		}
+		writes[p] = decisionText(d)
 		add(p)
 	}
 	topicIDs := []string{}
@@ -1125,32 +1120,77 @@ func materialize(ctx record.ContextData, artifacts string, draft, input doc) (do
 		topic["id"] = topic["key"]
 		topic["status"] = "open"
 		p := str(folders["topics"]) + "/" + str(topic["id"]) + ".md"
-		if e = put(filepath.Join(ctx.Cwd, p), topicText(topic)); e != nil {
-			return nil, e
-		}
+		writes[p] = topicText(topic)
 		add(p)
 		topicIDs = append(topicIDs, str(topic["id"]))
 	}
 	topic := obj(input["topic"])
 	p := str(folders["topics"]) + "/" + str(topic["id"]) + ".md"
-	if e = put(filepath.Join(ctx.Cwd, p), topicText(topic)); e != nil {
-		return nil, e
-	}
+	writes[p] = topicText(topic)
 	add(p)
 	if memo := str(input["memo"]); memo != "" {
 		slug := regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(ctx.Branch, "-")
 		p := filepath.ToSlash(filepath.Join(filepath.Dir(str(folders["decisions"])), "discussions", time.Now().UTC().Format("2006-01-02")+"-"+slug+".md"))
-		if e = put(filepath.Join(ctx.Cwd, p), replaceKeys(memo, mapping)+"\n"); e != nil {
-			return nil, e
-		}
+		writes[p] = replaceKeys(memo, mapping) + "\n"
 		add(p)
 	}
-	materialized, e := decisions.List(ctx.Cwd)
-	if e != nil {
-		return nil, e
+	materialized := decisions.Data{MarkerErrors: data.MarkerErrors}
+	for _, group := range []struct {
+		kind    string
+		before  []doc
+		after   *[]doc
+		pattern string
+	}{
+		{"decisions", data.Decisions, &materialized.Decisions, `^D-[0-9a-f]{6,64}\.md$`},
+		{"units", data.Units, &materialized.Units, `^U-[0-9a-f]{6,64}\.md$`},
+		{"topics", data.Topics, &materialized.Topics, `^T-[0-9a-f]{6,64}\.md$`},
+	} {
+		for _, item := range group.before {
+			p := str(item["path"])
+			if _, replaced := writes[p]; p != "" && !replaced && !slices.Contains(removals, p) {
+				*group.after = append(*group.after, item)
+			}
+		}
+		for _, p := range paths {
+			text, written := writes[p]
+			if !written || !inside(p, str(folders[group.kind])) || !regexp.MustCompile(group.pattern).MatchString(filepath.Base(p)) {
+				continue
+			}
+			item, err := decisions.Parse(text)
+			if err != nil {
+				return nil, err
+			}
+			item["path"] = p
+			*group.after = append(*group.after, item)
+		}
+	}
+	for _, p := range removals {
+		delete(docs, p)
+	}
+	for p, text := range writes {
+		if inside(p, str(folders["docs"])) && strings.HasSuffix(p, ".md") {
+			docs[p] = text
+		}
+	}
+	for p, text := range docs {
+		if !inside(p, str(folders["standards"])) {
+			materialized.Documents = append(materialized.Documents, decisions.Document{Path: p, Decisions: decisions.Citations(text)})
+		}
 	}
 	if errors := decisions.Check(materialized); len(errors) > 0 {
 		return nil, &record.RecordError{Message: "materialized proposal failed the decision check", Errors: errors}
+	}
+	for _, p := range removals {
+		if e = os.Remove(filepath.Join(ctx.Cwd, p)); e != nil {
+			return nil, e
+		}
+	}
+	for _, p := range paths {
+		if text, written := writes[p]; written {
+			if e = put(filepath.Join(ctx.Cwd, p), text); e != nil {
+				return nil, e
+			}
+		}
 	}
 	if len(paths) > 0 {
 		if _, e = gitx.Run(ctx.Cwd, append([]string{"add", "--"}, paths...)...); e != nil {
