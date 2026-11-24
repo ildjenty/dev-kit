@@ -1,5 +1,6 @@
 {
   "description": "Checkout reimplements the shared quote and charge total rule.",
+  "requirements": "Update checkout total calculation while preserving the pricing policy used by quotes. The charged total must continue to match the quote, including discounts, tax and rounding.",
   "expected": [
     {
       "id": "price-rule",

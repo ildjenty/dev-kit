@@ -1,5 +1,6 @@
 {
   "description": "A fast export branch skips the wrapper that guarantees an audit record.",
+  "requirements": "Add a fast export path for fast requests. Every export must still record who exported which data.",
   "expected": [
     {
       "id": "audit-boundary",

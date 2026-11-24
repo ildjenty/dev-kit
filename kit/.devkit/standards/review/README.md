@@ -6,7 +6,7 @@ A check selecting review criteria also selects every document named as part of t
 
 The repository owns and maintains review criteria. Changes count as workflow changes.
 
-`concerns.json` selects the criteria for every quality and names the owner of every numbered principle. Quality documents separate Decisions from Code: code checks conformance to choices passed at plan time. Each quality applies `every_quality` to its own rows, including missing hard-to-change choices and decision timing.
+`concerns.json` selects the criteria for every quality and names the owner of every numbered principle. Quality documents separate Decisions from Code: code checks conformance to choices passed at plan time. At plan time, each quality applies `every_quality` to its own rows, including missing hard-to-change choices and decision timing. Code judges receive no `every_quality` principles; the machine checks changes covered by `decision_paths` but absent from plan rows, and scope checks authorization under principle 6 of `working.md`.
 
 ## Common judgment rules
 

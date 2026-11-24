@@ -1,5 +1,6 @@
 {
   "description": "One report function gains a flag selecting unrelated preview and export behavior.",
+  "requirements": "Add CSV report export with redacted rows and the legal footer. Preserve the existing HTML preview behavior.",
   "expected": [
     {
       "id": "report-flag",

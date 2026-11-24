@@ -1,5 +1,6 @@
 {
   "description": "Mutually exclusive payment states become optional fields without validation.",
+  "requirements": "Flatten payment state into fields on Payment. Continue to accept only valid pending, paid, failed and refunded states with their required details.",
   "expected": [
     {
       "id": "payment-state",

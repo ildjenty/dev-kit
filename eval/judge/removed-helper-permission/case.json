@@ -1,5 +1,6 @@
 {
   "description": "An authorization check is removed from a helper outside an auth folder.",
+  "requirements": "Simplify document download handling while preserving access restrictions. Authenticated users may read only their own documents.",
   "expected": [
     {
       "id": "document-owner",

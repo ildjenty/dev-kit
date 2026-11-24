@@ -1,5 +1,6 @@
 {
   "description": "A new submitting state leaves a failed checkout disabled without failure-path tests.",
+  "requirements": "Disable checkout submission while an order is being sent. If it fails, show the error and let the user retry; verify both success and failure recovery.",
   "expected": [
     {
       "id": "checkout-recovery",

@@ -1,5 +1,6 @@
 {
   "description": "A presentation setting is threaded through service and domain only for formatting.",
+  "requirements": "Format amounts using the request's x-locale header while preserving the existing save behavior.",
   "expected": [
     {
       "id": "locale-reach",

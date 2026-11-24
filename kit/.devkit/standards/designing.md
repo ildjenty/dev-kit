@@ -18,7 +18,7 @@
 
 - **Applicability**: When about to build substitution mechanisms, plugins, or generalizations.
 - **Exemptions**: When converting external types to internal types at a boundary under principle 5 of `structure/principles.md` to prevent external types from constraining the internal design. Perform the conversion without waiting for a second concrete example. Do not use this as a reason to create an interface for substitution too.
-- **Principle**: Identify the boundary between what changes and what does not, and define only its location and interface. Do not implement substitution mechanisms, plugins, or generalizations until a second concrete example appears. "We may need it in the future" is not a reason to implement it. Keeping a structure that allows implementation when needed is sufficient. Multiple similar pieces of code are preferable to premature abstraction.
+- **Principle**: Identify the boundary between what changes and what does not, and define only its location and interface. Do not implement substitution mechanisms, plugins, or generalizations until a second concrete example appears. "We may need it in the future" is not a reason to implement it. Keeping a structure that allows implementation when needed is sufficient. Multiple similar pieces of code are preferable to premature abstraction; use the deciding question in principle 8 of `engineering.md` to determine whether to share their definitions or keep them independent.
 - **Violations and signs**:
   - Many interfaces or abstract base classes have only one implementation.
   - Unused optional arguments, configuration fields, or generics exist.
@@ -96,7 +96,7 @@
 - **Principle**: Before writing, find how the repository handles the same kind of processing (naming, error-handling forms, existing utilities and abstractions, test style, and libraries), and follow conventions that meet the current requirements and guarantees. Placement, divisions, boundaries, and dependency direction are excluded from what to follow; verify them under `structure/deciding.md`. When adopting a different approach, migrate only the scope inseparable from the current change. If making everything consistent is an independent improvement, make it a separate issue. Show in the artifact the existing locations followed, or the locations not followed, differences, and reasons.
 - **Violations and signs**:
   - The same kind of processing exists in two styles.
-  - Adding a new helper with the same role despite an existing utility or abstraction.
+  - One of several processing paths of the same kind is handled differently without a stated reason.
   - Error handling or log formats differ from surrounding code.
   - Introducing a new library alongside an existing library with the same role.
   - (In a design proposal) Neither existing locations to follow nor reasons for not following them are shown.

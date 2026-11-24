@@ -1,5 +1,6 @@
 {
   "description": "Invoice mapping copies the existing shared customer-name converter.",
+  "requirements": "Expose customer-name formatting through InvoiceMapper.customerName and use it for invoice recipients. Keep the existing customer display policy, including name order and company fallback.",
   "expected": [
     {
       "id": "customer-name-rule",

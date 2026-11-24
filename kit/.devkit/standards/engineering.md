@@ -57,6 +57,7 @@
   - Boolean names that do not match reality (`isValid` actually means "has been saved").
   - Names chosen only for their difference from existing names, such as `processData2` or `newHelper`.
   - Naming processing or data that covers the whole after only the single item currently being handled.
+  - A unit's responsibility cannot be stated in one sentence without "and", "or", or a vague name such as "manager", indicating mixed responsibilities. Divide the unit rather than merely renaming it.
 - **Before and after**: `const data = await getUser(id)` → `const customer = await findCustomerById(id)`
 - **blocking**: None (record as reference information).
 - **Evidence**: The scope of responsibility can be stated in one sentence from the name.
@@ -67,7 +68,7 @@
 - **Exemptions**:
   - Comments required for license notices or code-generation integration. Show the grounds for retaining them in the artifact.
   - Directive comments read as input by compilers, build tools, or analysis tools. This does not exempt the validity of suppressing checks itself. Put the reason for suppression on the same line.
-- **Principle**: Do not write comments in code. Express design through module divisions, names, types, and data structures. Before explaining something in a comment, consider whether structure can express it; if so, correct the structure. Designs that need comments usually have structural errors. Only two kinds of comments are permitted:
+- **Principle**: Do not write comments in code. Express design through module divisions, names, types, and data structures. Before explaining something in a comment, consider whether structure can express it; if so, correct the structure. For design reasons that structure cannot express, follow "Design reasons and code comments" in `README.md`. Designs that need comments usually have structural errors. Only two kinds of comments are permitted:
   - Code working around a specific behavior or defect in an external library, tool, or platform. State what is being avoided. For defects, include removal conditions such as a fixed version or upstream issue.
   - Deliberately unnatural implementations required by particular circumstances. State those circumstances and when the implementation can be removed.
 - **Violations and signs**:
@@ -131,6 +132,7 @@
 - **Principle**: Processing that must always reflect changes to the same rule simultaneously must share the rule's definition; keep processing independent when its reasons for change or contracts differ, even if its text is identical. Search for existing definitions before adding processing that does the same. Decide whether the processing must change together, rather than whether its text looks similar. Reuse the existing definition when the rule or behaviour must change together. Similar code is preferable to premature abstraction when the reasons for change are independent.
 - **Violations and signs**:
   - Added code re-implements an existing function, conversion, check, or rule that must change together with it.
+  - Adding a new helper with the same role despite an existing utility or abstraction; decide whether to share it by this principle's reasons for change and contracts.
   - Multiple modules independently define format or ordering rules that must change together.
   - Multiple processing paths must apply the same rule, but there is no guarantee that changes are reflected simultaneously.
   - Combining separate rules in one place merely because they happen to have the same shape (they will need separating again when only one must change).

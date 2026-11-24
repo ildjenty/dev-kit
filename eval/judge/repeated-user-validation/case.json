@@ -1,5 +1,6 @@
 {
   "description": "A handler adds its own copy of the user-ID acceptance rule.",
+  "requirements": "Validate user IDs before updating users. Update and delete must accept the same ID format and reject invalid IDs with the existing bad-id response.",
   "expected": [
     {
       "id": "user-id-rule",

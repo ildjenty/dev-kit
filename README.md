@@ -138,7 +138,7 @@ Each failing result records `base: failed|passed|unavailable` and a `base_log` w
 
 `<standards>/concerns.json` maps ten qualities—structure, data, contract, security, ui, cost, test, delivery, scope and readability—to their principles and phase criteria. Every numbered principle has exactly one owner, counting `every_quality` as one shared assignment. Every review document except `review/README.md` must be mapped. `devkit concerns check` validates this and prepare stops on violations. The machine derives writer/judge materials from this map. Common judgment rules live in `review/README.md`; owner authority lives in `authority.md`.
 
-`devkit judge launch` records the selected qualities in `judge/launched.json` from the same decision as its `launch_<quality>` flags; `devkit eval judge` uses the same launch processing. Quality judges read this file and the fixed `concerns.json`: they report failures of their own principles, including `every_quality`, and may report another quality's failure only when its owner was not launched. A consequence that fails their own quality remains reportable, such as a missing test or a changed caller contract, even when another judge reports the defect itself.
+`devkit judge launch` records the selected qualities in `judge/launched.json` from the same decision as its `launch_<quality>` flags; `devkit eval judge` uses the same launch processing. Code quality judges read this file and the fixed `concerns.json`: they report failures of their own principles and may report another quality's failure only when its owner was not launched. They receive no `every_quality` principles; these remain in requirements, plan, implement and fix materials. The machine checks `decision_paths` changes absent from plan rows, and scope checks authorization under `working.md#6`. A consequence that fails their own quality remains reportable, such as a missing test or a changed caller contract, even when another judge reports the defect itself.
 
 Each quality has one `review/<quality>.md` with Decisions, Code, Blocking and Not reported sections. Plan judges choices and the skeleton; code judges bodies and conformance to passed choices. Agreed choices are carried by reference rather than judged again.
 
@@ -199,6 +199,7 @@ duplication cases. Base files must be regular files, without Git metadata. For e
 ```json
 {
   "description": "A settings read error becomes success",
+  "requirements": "Preserve settings read failures so callers can distinguish an outage from empty settings.",
   "expected": [
     {
       "id": "settings-error",
@@ -215,7 +216,8 @@ finding shape and describes a specific false positive a correct judge must avoid
 unique across both lists; qualities must have a code judge (`delivery` is plan-only), files must
 be repository-relative and exist in the base or changed repository, and summaries must explain
 what is wrong and why it matters. Unknown properties, missing fields and invalid types are errors.
-Optional non-empty `requirements` supplies the verbatim request when scope needs one; it becomes
+Optional non-empty `requirements` supplies the verbatim request; all cases shipped in `eval/judge/`
+include it so scope judges against an agreed request, including the clean change. It becomes
 normal `requirements.json` goal and completion-condition material, without a plan. Other cases
 use review-only materials with neither requirements nor plan. Descriptions and expectations are
 not supplied to the quality judges.

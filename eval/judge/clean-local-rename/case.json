@@ -1,5 +1,6 @@
 {
   "description": "A local accumulator rename preserves the sum and its tests.",
+  "requirements": "Rename the local accumulator in Sum from t to total for clarity. Preserve the calculation and existing behavior.",
   "expected": [],
   "not_expected": [
     {

@@ -6,7 +6,7 @@ Judge the quality supplied by `quality` using the fixed standards named in its m
 
 ## Materials
 
-Read `$ARTIFACTS_DIR/judge/materials/<quality>.json` first. It gives `language`, `standards`, `criteria_folder`, `criteria`, configured `checks`, your `files`, decision `changes`, decision-list `rows`, and `without_plan` entries. Read only your quality's materials, its named criteria and files, plus the common materials below. Paths in `criteria`, `common` and `authority` name fixed documents. Read them. `principles` and `every_quality` name numbered sections: read the path before `#` and apply that section.
+Read `$ARTIFACTS_DIR/judge/materials/<quality>.json` first. It gives `language`, `standards`, `criteria_folder`, `criteria`, configured `checks`, your `files`, decision `changes`, decision-list `rows`, and `without_plan` entries. Read only your quality's materials, its named criteria and files, plus the common materials below. Paths in `criteria`, `common` and `authority` name fixed documents. Read them. `principles` names numbered sections: read the path before `#` and apply that section. Code judges receive no `every_quality` principles.
 
 Common materials under `$ARTIFACTS_DIR/judge/`:
 
@@ -37,7 +37,7 @@ The completion machine separately verifies that every test-plan entry with metho
 
 Follow the common rules named by `common` and the authority document named by `authority`. Apply Code in the selected quality criteria; assess conformance to passed choices and Decisions only for `without_plan` entries. For `owner_check` or `screen_record`, the owner's verification alone does not require `not_assessed`.
 
-Read `$ARTIFACTS_DIR/judge/launched.json` and `concerns.json` in `criteria_folder` to identify launched qualities and principle ownership. Report a failure under your quality only when the violated principle belongs to your quality (including `every_quality`), or its owning quality is absent from `launched`. When the owner was launched, leave that failure to its judge. A consequence that violates your own quality's principle remains yours: a missing test for the behaviour belongs to test, and a changed caller contract belongs to contract, even when another judge reports the defect itself.
+Read `$ARTIFACTS_DIR/judge/launched.json` and `concerns.json` in `criteria_folder` to identify launched qualities and principle ownership. Report a failure under your quality only when the violated principle belongs to your quality, or its owning quality is absent from `launched`. Do not apply `every_quality`. When the owner was launched, leave that failure to its judge. A consequence that violates your own quality's principle remains yours: a missing test for the behaviour belongs to test, and a changed caller contract belongs to contract, even when another judge reports the defect itself.
 
 Report an owner decision using the named authority document and the finding output shape.
 With requirements, the machine returns it to plan. Without requirements, this is a review report:

@@ -1,5 +1,6 @@
 {
   "description": "Two modules independently enumerate the same premium eligibility rule.",
+  "requirements": "Give premium and premium_annual plans priority support on invoices and an upload limit of 100. Keep other plans at the existing upload limit without priority support.",
   "expected": [
     {
       "id": "premium-rule",

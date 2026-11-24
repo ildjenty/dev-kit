@@ -53,13 +53,12 @@
 
 ## 4. Express domain rules in one structure rather than scattered branches
 
-- **Applicability**: When about to add a conditional branch. When designing around states or kinds.
-- **Exemptions**: Even when rules branch on the same key, if they change independently and combining them would propagate unrelated changes, waive only the requirement to combine those rules in one structure. Apply this principle within each rule. Show each rule's reasons for change and a concrete example where only one changes.
-- **Principle**: Express domain rules with structures (state machines, tables, sum types, or reducers) rather than scattered conditional branches. Choose structures that prevent missed rule updates and invalid transitions. Do not combine independently changing rules (such as pricing and backup retention periods) into one structure merely because they branch on the same kind.
+- **Applicability**: When expressing a domain rule through conditional branches or designing around states or kinds. Re-implemented rule definitions are covered by principle 8 of `engineering.md`.
+- **Exemptions**: When principle 8 of `engineering.md` calls for rules branching on the same key to remain independent, waive only the requirement to combine those rules in one structure. Apply this principle within each rule. Show the evidence required by that principle for keeping them independent.
+- **Principle**: Express domain rules with structures (state machines, tables, sum types, or reducers) rather than scattered conditional branches. Choose structures that prevent missed rule updates and invalid transitions. Use principle 8 of `engineering.md` to decide whether rule definitions should be shared or kept independent.
 - **Violations and signs**:
   - `if / else` branches concerning the same rule keep growing in multiple places.
   - A second boolean appears that must be synchronized.
-  - The same rule is independently defined in multiple places.
   - (In a design proposal) Rules for states or kinds that must change together are written as conditional branches across multiple modules rather than expressed in a shared structure.
 - **Before and after**: Define the same pricing rule in multiple conditional branches → Share a pricing table, and separately define the independently changing backup retention rule.
 - **blocking**: None (record as reference information).
@@ -73,6 +72,7 @@
 - **Violations and signs**:
   - Data has no defined owner.
   - State has no defined lifetime.
+  - An operation is missing its required counterpart on some path: acquire/release, open/close, subscribe/unsubscribe, lock/unlock, or start/stop.
   - Transaction boundaries are implicit.
   - An interruption leaves a parent record without required detail records.
   - Acceptable temporary states or recovery methods are undefined for updates across boundaries.

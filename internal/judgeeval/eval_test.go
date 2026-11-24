@@ -108,6 +108,9 @@ func TestSeedRepositories(t *testing.T) {
 	covered := map[string]bool{}
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
+			if strings.TrimSpace(c.Requirements) == "" {
+				t.Fatal("seed case has no requirements")
+			}
 			repo := t.TempDir()
 			base := testutil.Must(repository(c, repo, config.Defaults(""), embeddedStandards(t)))
 			testutil.Equal(t, base, testutil.Git(t, repo, "rev-parse", "main"))
@@ -446,6 +449,7 @@ func TestEvalCLIHelper(t *testing.T) {
 				t.Fatal("schema was not read from installed YAML")
 			}
 			material := readDoc("judge/materials/" + kind + ".json")
+			testutil.Equal(t, material["every_quality"], []any{})
 			testutil.Equal(t, material["language"], "fr")
 			testutil.Equal(t, material["quality"], kind)
 			testutil.Equal(t, material["tree"], tree)

@@ -27,7 +27,8 @@ func TestProviderRenderingAndSessions(t *testing.T) {
 			judging := string(testutil.Must(os.ReadFile(filepath.Join(root, ".archon/workflows/dev/.shared/judge/judging.md"))))
 			for _, text := range []string{
 				"Read `$ARTIFACTS_DIR/judge/launched.json` and `concerns.json` in `criteria_folder`",
-				"only when the violated principle belongs to your quality (including `every_quality`), or its owning quality is absent from `launched`",
+				"only when the violated principle belongs to your quality, or its owning quality is absent from `launched`",
+				"Do not apply `every_quality`.",
 				"When the owner was launched, leave that failure to its judge.",
 				"A consequence that violates your own quality's principle remains yours",
 				"a missing test for the behaviour belongs to test",

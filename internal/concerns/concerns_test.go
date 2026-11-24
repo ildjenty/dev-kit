@@ -91,9 +91,16 @@ func TestMaterialsComeFromMapForEachPhaseAndWriter(t *testing.T) {
 		for _, q := range m.Judged(phase) {
 			material := m.Materials(dir, q, phase)
 			testutil.Equal(t, material.Criteria, []string{filepath.Join(dir, "review", q+".md")})
-			testutil.Equal(t, material.EveryQuality, []string{filepath.Join(dir, "designing.md#1")})
+			if phase == "plan" {
+				testutil.Equal(t, material.EveryQuality, []string{filepath.Join(dir, "designing.md#1")})
+			} else {
+				testutil.Equal(t, material.EveryQuality, []string{})
+			}
 			testutil.Equal(t, material.Common, filepath.Join(dir, "review/README.md"))
 		}
+	}
+	for _, item := range []struct{ subject, phase string }{{"writer:requirements", "plan"}, {"judge:requirements", "plan"}, {"writer:plan", "plan"}, {"writer:implement", "code"}, {"writer:tests", "code"}, {"writer:fix", "code"}} {
+		testutil.Equal(t, m.Materials(dir, item.subject, item.phase).EveryQuality, []string{filepath.Join(dir, "designing.md#1")})
 	}
 	testutil.Equal(t, m.Materials(dir, "delivery", "code").Criteria, []string{})
 	testutil.Equal(t, m.Materials(dir, "writer:retro", "plan"), m.Materials(dir, "judge:retro", "plan"))

@@ -214,6 +214,7 @@ func TestPrepareAndChangesPinCustomCriteriaChecksLanguageAndGitFacts(t *testing.
 	material := must(read(filepath.Join(artifacts, "judge/materials/structure.json")))
 	testutil.Equal(t, material["language"], "fr")
 	testutil.Equal(t, material["standards"], "standards")
+	testutil.Equal(t, material["every_quality"], []any{})
 	testutil.Equal(t, docs(material["checks"])[0]["name"], "verify")
 	testutil.Contains(t, jsonText(material["criteria"]), "review/structure.md")
 	found := false

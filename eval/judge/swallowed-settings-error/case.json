@@ -1,5 +1,6 @@
 {
   "description": "A load failure is silently converted into a successful default.",
+  "requirements": "Adjust settings loading while preserving its failure contract. Storage read failures must still reach the caller so startup cannot report them as successful disabled settings.",
   "expected": [
     {
       "id": "settings-error",

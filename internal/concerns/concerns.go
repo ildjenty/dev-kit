@@ -82,11 +82,11 @@ func (m Map) Materials(dir, subject, phase string) Material {
 	if q, ok := m.Qualities[subject]; ok {
 		if phase == "plan" {
 			material.Criteria = paths(q.Plan)
+			material.EveryQuality = paths(m.EveryQuality)
 		} else {
 			material.Criteria = paths(q.Code)
 		}
 		material.Principles = paths(q.Principles)
-		material.EveryQuality = paths(m.EveryQuality)
 	} else {
 		for _, ref := range m.Others[subject] {
 			if strings.Contains(ref, "#") {
@@ -111,6 +111,9 @@ func (m Map) Materials(dir, subject, phase string) Material {
 			}
 			material.EveryQuality = paths(m.EveryQuality)
 		}
+	}
+	if subject == "writer:requirements" || subject == "judge:requirements" {
+		material.EveryQuality = paths(m.EveryQuality)
 	}
 	return material
 }

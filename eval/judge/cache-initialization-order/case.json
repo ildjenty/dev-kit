@@ -1,5 +1,6 @@
 {
   "description": "Cache consumers must now remember to initialize global state first.",
+  "requirements": "Allow the cache connection URL to be configured at startup. Existing catalog lookups must continue to work from the first request.",
   "expected": [
     {
       "id": "cache-order",
