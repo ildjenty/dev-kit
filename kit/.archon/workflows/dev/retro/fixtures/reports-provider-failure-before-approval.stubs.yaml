@@ -1,0 +1,11 @@
+fixture: {"expect": "completed", "reached": ["start", "prepare", "write", "check", "judge", "round", "verify", "verification", "finish", "result"], "inputs": {}}
+start: {"stopped": false, "stage": "start", "reason": "", "details": "/tmp/record", "remaining": [], "start": "first", "counted": false, "restarts": 0}
+prepare: {"input": "/tmp/retro/input.json", "criteria": "/tmp/criteria", "empty": false}
+write: {"draft": "/tmp/retro/draft.json"}
+check: {"valid": true, "errors": []}
+judge: {"criteria": [{"aspect": "traceability", "verdict": "pass", "checked": "Traced the entering change", "not_checked": ""}, {"aspect": "evidence", "verdict": "pass", "checked": "Reproduced the defect", "not_checked": ""}, {"aspect": "mechanism", "verdict": "pass", "checked": "Checked the proposed correction", "not_checked": ""}], "findings": []}
+round: {"round": 1, "valid": true, "blocking_count": 0, "not_assessed_count": 0}
+verify: {"needed": true}
+verification: {"text": "Escape case not scored: provider call failed. The owner may still approve."}
+finish: {"outcome": "question", "proposal_version": 1, "unit_ids": [], "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case not scored: provider call failed."}], "reasons": []}
+result: {"outcome": "question", "proposal_version": 1, "unit_ids": [], "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case not scored: provider call failed."}], "reasons": []}

@@ -57,7 +57,7 @@ func prepare(ctx record.ContextData, artifacts string) (doc, error) {
 		return nil, e
 	}
 	fixedDisplay := filepath.Join(display, "criteria", c.Standards)
-	input := doc{"units": data.Units, "entries": entries, "backlog": backlog, "config": c, "concerns": mapping, "standards_index": string(index), "criteria": fixedDisplay, "judge_materials": mapping.Materials(fixedDisplay, "judge:retro", "plan"), "writer_materials": mapping.Materials(fixedDisplay, "writer:retro", "plan"), "language": c.Language, "folders": doc{"units": c.Units, "standards": c.Standards}, "answers": answers, "previous": previous, "next_proposal_version": num(previous["version"]) + 1}
+	input := doc{"units": data.Units, "entries": entries, "backlog": backlog, "config": c, "concerns": mapping, "standards_index": string(index), "criteria": fixedDisplay, "judge_materials": mapping.Materials(fixedDisplay, "judge:retro", "plan"), "writer_materials": mapping.Materials(fixedDisplay, "writer:retro", "plan"), "language": c.Language, "folders": doc{"units": c.Units, "standards": c.Standards, "eval": c.Eval}, "answers": answers, "previous": previous, "next_proposal_version": num(previous["version"]) + 1}
 	if e = writeJSON(file(artifacts, "input.json"), input); e != nil {
 		return nil, e
 	}

@@ -15,5 +15,7 @@
   ],
   "checks": [],
   "standards": [],
-  "dismissed": []
+  "dismissed": [],
+  "escapes": [],
+  "cases": []
 }

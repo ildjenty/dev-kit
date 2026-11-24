@@ -1,6 +1,6 @@
 ---
 name: devkit-runs
-description: Start and monitor Archon development workflows, route requests through discussion and refinement or downstream delivery, and relay recorded questions, answers and approvals to the owner.
+description: Start and monitor Archon development workflows, route requests, relay owner handoffs, and record defects found after merge, including those repaired directly outside workflows.
 ---
 
 # Run development workflows
@@ -49,6 +49,15 @@ branch without requirements it returns a report and nothing else.
 
 When you cannot tell which kind the request is, ask the owner once, naming the two ways and why it
 is unclear. When the owner explicitly asks for the workflows, use them.
+
+## Record defects found after merge
+
+When the owner reports a defect in merged work, record the escape however it will be fixed,
+including a small direct fix outside the workflows. Write the owner's description verbatim to a
+file, find the entering commit or PR with `git log`/`git blame` (ask the owner if it is unclear),
+then run `devkit backlog escape --defect-file <file> --entered <ref>`; optionally add `--fixed <ref>`.
+Commit the printed record with the fix or through the repository's PR process so it reaches the
+base branch. Retro traces the missed stage and adds and evaluates a judge case when applicable.
 
 ## Choose the sequence
 

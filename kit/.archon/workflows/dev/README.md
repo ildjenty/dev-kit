@@ -22,6 +22,22 @@ Only after that merge, start each eligible unit on its own branch: `requirements
 
 After backlog reaches the base branch, run `retro` on a `retro/<name>` branch created from that base. It proposes units, check additions, standard edits or reasoned dismissals; its approval applies the changes and deletes consumed backlog files in one commit. Publish and merge the correction PR before starting its units.
 
+Record defects found after merge, including small direct fixes, with
+`devkit backlog escape --defect-file <file> --entered <commit-or-PR> [--fixed <commit-or-PR>]`.
+The file preserves the owner's description without command-line text. References accept locally
+resolvable commits (stored as full hashes), commit hashes, GitHub PR URLs or positive PR numbers.
+Commit the printed `.devkit/backlog/escapes/<random-hex>.json` with the fix or through the PR process.
+Retro reads it as `kind: escape`, with ID `<path>#escape/0`, and requires a used/dismissed decision
+and a trace of the entering change and missed stage. Routing misses correct the quality's `routing`
+sentence in the standards folder's `concerns.json`. Each used escape the judge should have caught
+adds a minimal `base/`, `change.patch` and `case.json` under the configured `<eval>/judge/<name>/`.
+The retro check reuses judge-evaluation validation. After checks and judgment pass, `verify` runs
+only the new cases against a temporary copy of the proposed standards and concern map. The AI
+reports found/missed expectations, routing misses and provider failures in the approval question's
+configured language. Misses and provider errors do not block the proposal. This incurs provider
+calls only for escape cases. Cases are restored until approval, then applied with the corrections
+and deletion of the consumed records in one commit.
+
 A `question` result ends the run. Relay every question and ID and restart its named `next_workflows` workflow with verbatim owner answers. Refine and retro approval use the exact recorded version. Requirements and plan ask unresolved request/design questions; implementation, judge and fix return `back` to plan for owner decisions. PR asks only for uncovered `ask` changes. Follow `back.to`; `stop` describes unresolved work, and `not_started` means prerequisites rejected the start. `carry` is a plan result carrying detail findings forward. Counted restarts and fix runs obey configured limits; supply owner words as `continue` only when the restart limit is reached.
 
 When every failing check is `preexisting`, implement/fix stop immediately without stuck, step-back or pass consumption. Judge includes base failures in its judgment and stops when any check is preexisting instead of recommending fix. The stop records `base_failed: true`; loops end `base_failed`. Relay the failing checks and their log paths and tell the owner to fix the base branch first, then start the same workflow again. `devkit record limit` classifies that restart as `retry_after_base`, not counted against `limits.restarts`, even at the limit. `devkit status` explains this. Retrying before the base is fixed is pointless. Regressed and unavailable comparisons retain the existing implement/fix behavior. Implement and fix call `devkit checks --base-on-repeat`: a failing check is compared with the base only when it also failed in the previous pass (others record `base: not_compared`); judge and sync compare every failing check.
@@ -85,7 +101,7 @@ The shared `internal/jev` client also serves `devkit refine reflect`, after a va
 - Fix: `devkit record start fix`, then `devkit fix prepare`, `proceed`, `objections`, `dispute-end`, `round-end`, `state`, `finish`, and `devkit checks`. An independent judge settles evidence-backed objections. Finding references include the original judge run, judge and local ID; acceptance cannot suppress another run's finding.
 - PR: `devkit record start pr`, then `devkit pr answers`, `facts`, `assemble`, `judgment`, `state`, `open`, `finish`, and `output`. `pr/` holds facts, machine lists, body and title, report findings and publication result. Publication pushes to `origin` and uses `gh`; it does not merge.
 - Sync: `devkit sync start`, `continue`, `state`, `finish`, `output`, and `devkit checks`. Before rebasing, sync writes mapped materials from the request's fixed standards into `sync/input.json`; conflict resolution receives them through `sync/conflict.json`. Failed resolution aborts the rebase and restores the original commit; successful conflict resolution sets `needs_judge`. Sync does not push.
-- Retro: `devkit retro start`, `prepare`, `check`, `round`, `finish`, `approve`, `empty`, `not-started`. `retro/` contains backlog input, schemas, draft, check, rounds and approval text. Proposed config/standard edits are restored until approval; an empty backlog passes without approval.
+- Retro: `devkit retro start`, `prepare`, `check`, `round`, `verify`, `finish`, `approve`, `empty`, `not-started`. `retro/` contains backlog input, schemas, draft, check, rounds, evaluation results and approval text. Proposed config/standard/case edits are restored until approval; an empty backlog passes without approval.
 
 Shared commands include `devkit config`, `devkit criteria`, `devkit concerns check`, `devkit decisions list`, `topics`, `check`, `affected`, `dependents`, `next-id`, and `devkit record start`, `write`, `latest`, `dir`, `limit`, `result`. Consult help for arguments.
 

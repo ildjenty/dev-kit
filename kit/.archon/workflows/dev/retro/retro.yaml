@@ -180,9 +180,36 @@ nodes:
             required: [round, valid, blocking_count, not_assessed_count]
       until_bash: 'v=$round.output.valid; b=$round.output.blocking_count; n=$round.output.not_assessed_count; test "$v" = true && test "$b" = 0 && test "$n" = 0'
 
-  - id: finish
+  - id: verify
     depends_on: [draft]
-    bash: devkit retro finish
+    bash: devkit retro verify
+    output_format:
+      type: object
+      properties:
+        needed: { type: boolean }
+      required: [needed]
+
+  - id: verification
+    depends_on: [verify]
+    when: "$verify.output.needed == true"
+    provider: claude
+    command: verification
+    context: fresh
+    mutates_checkout: false
+    allowed_tools: [Read, Grep, Glob]
+    output_format:
+      type: object
+      additionalProperties: false
+      properties:
+        text: { type: string, minLength: 1 }
+      required: [text]
+
+  - id: finish
+    depends_on: [verify, verification]
+    trigger_rule: none_failed_min_one_success
+    bash: |
+      verified=$verification.output
+      INPUTS_VERIFICATION="$verified" devkit retro finish
     output_format: *result
 
   - id: result

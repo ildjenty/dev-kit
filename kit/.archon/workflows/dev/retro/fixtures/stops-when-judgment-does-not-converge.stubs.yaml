@@ -1,9 +1,10 @@
-fixture: {"expect": "completed", "reached": ["check", "judge", "round", "finish", "result"], "inputs": {}}
+fixture: {"expect": "completed", "reached": ["check", "judge", "round", "verify", "finish", "result"], "inputs": {}}
 start: {"stopped": false, "stage": "start", "reason": "", "details": "/tmp/record", "remaining": [], "start": "first", "counted": false, "restarts": 0}
 prepare: {"input": "/tmp/retro/input.json", "criteria": "/tmp/criteria", "empty": false}
 write: {"draft": "/tmp/retro/draft.json"}
 check: {"valid": true, "errors": []}
 judge: {"criteria": [{"aspect": "traceability", "verdict": "pass", "checked": "Compared the proposal and its entries", "not_checked": ""}, {"aspect": "evidence", "verdict": "pass", "checked": "Compared the proposal and its entries", "not_checked": ""}, {"aspect": "mechanism", "verdict": "fail", "checked": "Compared the proposal and its entries", "not_checked": ""}], "findings": []}
 round: {"round": 3, "valid": true, "blocking_count": 1, "not_assessed_count": 0}
+verify: {"needed": false}
 finish: {"outcome": "stop", "proposal_version": 1, "unit_ids": [], "questions": [], "reasons": ["The draft did not clear review"]}
 result: {"outcome": "stop", "proposal_version": 1, "unit_ids": [], "questions": [], "reasons": ["The draft did not clear review"]}

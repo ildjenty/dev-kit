@@ -98,6 +98,26 @@ Review fixes require passed requirements and plan and the same judged change as 
 backlog/done-marker commit is accepted. A passing fix needs `judge` again, then `pr` updates the PR.
 Review findings are saved in the next backlog with source `review`.
 
+For a defect discovered after merge, including one repaired directly outside the workflows, write
+the owner's description to a file and record it in the current checkout:
+
+```sh
+devkit backlog escape --defect-file /path/to/defect.txt --entered <commit-or-PR> [--fixed <commit-or-PR>]
+```
+
+`--entered` and optional `--fixed` accept a locally resolvable commit, a commit hash, a GitHub PR
+URL or a positive PR number. Local commits are saved as full hashes. Defect text is accepted only
+through `--defect-file`. The command prints `.devkit/backlog/escapes/<random-hex>.json`; commit it
+with the fix or through the repository's PR process so it reaches the base branch.
+Retro traces the entering change and missed stage, including routing sentences in `concerns.json`.
+For every used escape a judge should have caught it proposes a minimal case under `<eval>/judge/`
+(`eval/judge/` in this repository, with `eval` configured accordingly). After machine checks and
+independent judgment, it runs those cases against a temporary copy of the proposed standards and
+concern map. The approval question reports found/missed expectations and provider failures in the
+configured language; misses and failures do not block approval. Only escape cases incur these
+provider calls. Approval applies the cases and corrections and deletes the consumed escape records
+in the same commit.
+
 Comments that change or add to the request go to `requirements` on the same branch as `owner_words`,
 then through the usual flow. Fix returns out-of-scope or disputed review items as `outside_requirements`
 with reasons and `back` to requirements. Never answer or resolve comments on the reviewer's behalf.

@@ -8,6 +8,14 @@ Read `$ARTIFACTS_DIR/retro/input.json`, `$ARTIFACTS_DIR/retro/draft.json`,
 Use only the fixed criteria copy named by input's `criteria` and `judge_materials`, including
 `harness.md`, `review/harness.md`, `review/README.md` and `authority.md`.
 
+For every escape, check the trace's evidence of the entering change, the stage that should have
+stopped it and why it missed. If the entering change could not be read, require that limitation
+explicitly rather than a guessed history. Check that routing misses correct the relevant routing
+sentence in `concerns.json`. For each used escape the judge should have caught, inspect the new
+evaluation case: it must reproduce the entering defect with minimal code and meaningful expected
+findings, not the fixing change. Genuine gaps in the request must be justified. These files are
+proposed edits, not criteria that override the fixed standards.
+
 Apply the named criteria documents and return the aspects `traceability`, `evidence` and `mechanism`.
 
 Return an object matching the supplied judgment schema and node output format: `criteria` contains

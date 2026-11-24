@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -43,7 +42,7 @@ func snapshot(ctx record.ContextData, artifacts string) (doc, error) {
 	}
 	out := doc{}
 	for _, p := range paths {
-		if !safePath(p) || !(inside(p, str(obj(input["folders"])["standards"])) || p == ".devkit/config.json") {
+		if !safePath(p) || !(inside(p, str(obj(input["folders"])["standards"])) || inside(p, caseFolder(input)) || p == ".devkit/config.json") {
 			continue
 		}
 		b, e := os.ReadFile(filepath.Join(ctx.Cwd, p))
@@ -64,7 +63,7 @@ func restore(ctx record.ContextData, input doc) error {
 	}
 	folders := obj(input["folders"])
 	for _, p := range paths {
-		if !safePath(p) || !(inside(p, str(folders["units"])) || inside(p, str(folders["standards"])) || p == ".devkit/config.json") {
+		if !safePath(p) || !(inside(p, str(folders["units"])) || inside(p, str(folders["standards"])) || inside(p, caseFolder(input)) || p == ".devkit/config.json") {
 			continue
 		}
 		exists, e := gitx.Run(ctx.Cwd, "ls-tree", "--name-only", "HEAD", "--", p)
@@ -195,26 +194,26 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	if e != nil {
 		return nil, e
 	}
-	errors, e := draftErrors(ctx, artifacts, entry["draft"])
+	errors, edits, e := reviewedErrors(ctx, artifacts, entry)
 	if e != nil {
 		return nil, e
-	}
-	errors = append(stringsOf(entry["errors"]), errors...)
-	edits, e := snapshot(ctx, artifacts)
-	if e != nil {
-		return nil, e
-	}
-	approval, e := os.ReadFile(file(artifacts, "approval.txt"))
-	if e != nil && !os.IsNotExist(e) {
-		return nil, e
-	}
-	if string(approval) != str(entry["approval_text"]) {
-		errors = append(errors, "approval question changed after the judgment")
-	}
-	if !reflect.DeepEqual(edits, obj(entry["edits"])) {
-		errors = append(errors, "checkout changed after the judgment")
 	}
 	content := doc{"draft": entry["draft"], "judgment": entry["judgment"], "ready": false}
+	approvalText := str(entry["approval_text"])
+	if entry["cleared"] == true && len(errors) == 0 && len(items(obj(entry["draft"])["cases"])) > 0 {
+		verification, e := readJSON(file(artifacts, "verification.json"))
+		if e != nil || verification["review"] != reviewHash(entry) {
+			errors = append(errors, "escape evaluation must verify the reviewed draft before approval")
+		} else {
+			report, e := readJSON(file(artifacts, "verification-text.json"))
+			if e != nil || strings.TrimSpace(str(report["text"])) == "" {
+				errors = append(errors, "escape evaluation report is required in the configured language")
+			} else {
+				content["verification"] = verification
+				approvalText += "\n\n" + str(report["text"])
+			}
+		}
+	}
 	result := doc{}
 	if entry["cleared"] != true || len(errors) > 0 {
 		if len(errors) == 0 {
@@ -239,11 +238,7 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 			return nil, e
 		}
 		content["edits"], content["backlog"], content["unit_ids"], content["proposal_path"], content["ready"] = edits, input["backlog"], ids, path, true
-		b, e := os.ReadFile(file(artifacts, "approval.txt"))
-		if e != nil {
-			return nil, e
-		}
-		content["approval_text"] = strings.TrimSpace(string(b))
+		content["approval_text"] = strings.TrimSpace(approvalText)
 		if e = restore(ctx, input); e != nil {
 			return nil, e
 		}

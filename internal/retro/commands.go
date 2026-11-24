@@ -10,7 +10,7 @@ import (
 
 func Commands() []cli.Command {
 	commands := []cli.Command{}
-	for _, mode := range []string{"start", "prepare", "check", "round", "finish", "empty", "approve", "not-started"} {
+	for _, mode := range []string{"start", "prepare", "check", "round", "verify", "finish", "empty", "approve", "not-started"} {
 		commands = append(commands, cli.Command{Area: "retro", Name: mode, Usage: "devkit retro " + mode, Run: func(args []string, env cli.Env) error {
 			ctx, e := record.Context(env)
 			if e != nil {
@@ -45,7 +45,18 @@ func Commands() []cli.Command {
 				case "empty":
 					out, e = empty(ctx, artifacts)
 				case "finish":
-					out, e = finish(ctx, artifacts)
+					if text := env.Getenv("INPUTS_VERIFICATION"); text != "" {
+						var report doc
+						e = json.Unmarshal([]byte(text), &report)
+						if e == nil {
+							e = writeJSON(file(resolve(ctx.Cwd, artifacts), "verification-text.json"), report)
+						}
+					}
+					if e == nil {
+						out, e = finish(ctx, artifacts)
+					}
+				case "verify":
+					out, e = verify(ctx, artifacts, env)
 				case "not-started":
 					var s doc
 					e = json.Unmarshal([]byte(env.Getenv("INPUTS_START")), &s)
@@ -61,14 +72,14 @@ func Commands() []cli.Command {
 			return env.JSON(out)
 		}})
 	}
-	commands = append(commands, cli.Command{Area: "retro", Usage: "devkit retro start | prepare | check | round | finish | empty | approve | not-started", Run: func(args []string, env cli.Env) error {
+	commands = append(commands, cli.Command{Area: "retro", Usage: "devkit retro start | prepare | check | round | verify | finish | empty | approve | not-started", Run: func(args []string, env cli.Env) error {
 		if _, err := record.Context(env); err != nil {
 			return err
 		}
 		if env.Getenv("ARTIFACTS_DIR") == "" {
 			return fmt.Errorf("ARTIFACTS_DIR must be set")
 		}
-		return &cli.ExitError{Code: 1, Message: "Usage: devkit retro start | prepare | check | round | finish | empty | approve | not-started"}
+		return &cli.ExitError{Code: 1, Message: "Usage: devkit retro start | prepare | check | round | verify | finish | empty | approve | not-started"}
 	}})
 	return commands
 }

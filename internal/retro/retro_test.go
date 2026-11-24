@@ -72,7 +72,7 @@ func (r *fixture) begin() doc {
 }
 func (r *fixture) draft() doc {
 	input := testutil.Must(readJSON(file(r.artifacts, "input.json")))
-	return doc{"summary": "Repair the observed defect", "units": []doc{{"key": "repair", "title": "Repair defect", "goal": "Remove the defect", "completion_conditions": []string{"The failure no longer occurs"}, "entries": []string{str(items(input["entries"])[0]["id"])}}}, "checks": []doc{}, "standards": []doc{}, "dismissed": []doc{}}
+	return doc{"summary": "Repair the observed defect", "units": []doc{{"key": "repair", "title": "Repair defect", "goal": "Remove the defect", "completion_conditions": []string{"The failure no longer occurs"}, "entries": []string{str(items(input["entries"])[0]["id"])}}}, "checks": []doc{}, "standards": []doc{}, "dismissed": []doc{}, "escapes": []doc{}, "cases": []doc{}}
 }
 func (r *fixture) write(d doc) {
 	r.t.Helper()

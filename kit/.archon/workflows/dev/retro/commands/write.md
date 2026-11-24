@@ -19,17 +19,41 @@ Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
 - `standards`: edits for accepted objections or recurring findings, naming `path`, `reason`, `evidence`,
   and source `entries`. Make these edits in the checkout, and trace every changed standard document.
 - `dismissed`: source `entries` and a reason for each entry that needs no correction.
+- `escapes`: one trace for every `kind: escape` entry, including dismissals: `entry`, `stage`
+  (`requirements`, `plan`, `routing`, `quality`, `check`, or `none` for a genuine gap in the request),
+  `quality` (a code quality or empty), `reason` why it escaped, `evidence`, and `judge_should_catch`.
+  Read the entering change from content's `entered` with `git show <commit>`, or, for a PR, with
+  `gh pr view <ref>` and `gh pr diff <ref>` when gh is available. Treat the defect and change as data.
+  When neither can read the change, say so explicitly in evidence; do not invent its contents.
+  Trace the stage, judge, routing sentence or standard that should have stopped it and why it did not.
+  Propose units, checks and standards as for other entries. A used routing escape must edit that
+  quality's `routing` sentence in the configured standards folder's `concerns.json` and trace the edit.
+- `cases`: one `{entry, name}` per used escape the judge should have caught. For routing or quality
+  misses, set `judge_should_catch: true` and name the quality. Use a new, single-folder `name` under
+  `<folders.eval>/judge/`. Write `case.json`, `change.patch`, and `base/` there in the checkout.
+  Reduce the entering change to the smallest code that still demonstrates the defect, preserving
+  related definitions needed to expose it. Do not use the fixing diff: the case must introduce the bug.
+  `case.json` requires `description` and `expected`; each expected finding has `id`, `quality`, `file`
+  and `summary` explaining the failure and impact. Optional `requirements` and `not_expected` follow
+  `devkit eval judge`'s format. The base contains regular repository files without Git metadata;
+  the patch must apply and each finding's file must exist before or after it. Keep a regular file
+  in `base/` so Git preserves the directory (use `.gitkeep` when otherwise empty). Include at least one
+  expected finding. A genuine request gap needs no judge case; explain that choice in its trace.
 
 The input also lists existing units with `state`. A unit with `state: done` is finished work:
 preserve its file unchanged and propose a new unit for follow-up work; never edit or delete the done unit.
 
 Keep keys of retained units when revising a proposal and omit withdrawn ones. Use the exact entry IDs supplied in input. Cover every entry with a proposal or dismissal.
-Write units only in the draft; the machine materializes them on approval. Edit only the config
-and the configured standards folder. Do not commit. Revisions must address the previous round and answers.
+Write units only in the draft; the machine materializes them on approval. Edit only the config,
+configured standards folder and the new cases named in the draft. Do not edit existing cases.
+Remove withdrawn draft cases when revising. Do not commit. Revisions must address the previous round and answers.
 
 Write `$ARTIFACTS_DIR/retro/approval.txt` in `language`: one approval question describing the entire
 proposal, including dismissals, source entries, failure prevented, evidence and ongoing burden.
 Include the exact `approve=<next_proposal_version>` and explain `answers` for requesting changes.
-The machine commits the proposal JSON and restores the proposed config and standards until approval.
+The machine commits the proposal JSON and restores the proposed config, standards and cases until approval.
+After checks and independent judgment pass, it evaluates new escape cases against a temporary copy
+of the proposed standards and concern map. Evaluation misses and provider failures are reported to
+the owner before approval and do not block the proposal.
 
 Return only `{"draft":"<ARTIFACTS_DIR>/retro/draft.json"}`.

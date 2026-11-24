@@ -137,6 +137,34 @@
         ]
       }
     },
+    "escapes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entry": {"type": "string", "pattern": "\\S"},
+          "stage": {"type": "string", "enum": ["requirements", "plan", "routing", "quality", "check", "none"]},
+          "quality": {"type": "string", "enum": ["", "structure", "data", "contract", "security", "ui", "cost", "test", "scope", "readability"]},
+          "reason": {"type": "string", "pattern": "\\S"},
+          "evidence": {"type": "string", "pattern": "\\S"},
+          "judge_should_catch": {"type": "boolean"}
+        },
+        "required": ["entry", "stage", "quality", "reason", "evidence", "judge_should_catch"]
+      }
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entry": {"type": "string", "pattern": "\\S"},
+          "name": {"type": "string", "pattern": "\\S"}
+        },
+        "required": ["entry", "name"]
+      }
+    },
     "dismissed": {
       "type": "array",
       "items": {
@@ -169,6 +197,8 @@
     "units",
     "checks",
     "standards",
-    "dismissed"
+    "dismissed",
+    "escapes",
+    "cases"
   ]
 }

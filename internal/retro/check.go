@@ -48,7 +48,7 @@ func scopeErrors(ctx record.ContextData, input doc, backlog bool) ([]string, err
 		}
 	}
 	for _, p := range paths {
-		allowed := safePath(p) && (inside(p, str(folders["units"])) || inside(p, str(folders["standards"])) || p == ".devkit/config.json")
+		allowed := safePath(p) && (inside(p, str(folders["units"])) || inside(p, str(folders["standards"])) || inside(p, str(folders["eval"])+"/judge") || p == ".devkit/config.json")
 		if backlog && obj(input["backlog"])[p] != nil {
 			allowed = true
 		}
@@ -107,6 +107,9 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 			}
 		}
 	}
+	for _, c := range items(draft["cases"]) {
+		used[str(c["entry"])] = true
+	}
 	for _, entry := range items(input["entries"]) {
 		id := str(entry["id"])
 		if !used[id] && !dismissed[id] {
@@ -116,6 +119,11 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 			errors = append(errors, "backlog entry is both used and dismissed: "+id)
 		}
 	}
+	escapeErrors, e := escapeDraftErrors(ctx, input, draft, used)
+	if e != nil {
+		return nil, e
+	}
+	errors = append(errors, escapeErrors...)
 	se, e := scopeErrors(ctx, input, false)
 	if e != nil {
 		return nil, e

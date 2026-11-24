@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+
+	"github.com/ildjenty/dev-kit/internal/escape"
 )
 
 func readBacklog(cwd string) ([]doc, doc, error) {
@@ -49,6 +52,36 @@ func readBacklog(cwd string) ([]doc, doc, error) {
 				entries = append(entries, doc{"id": fmt.Sprintf("%s#%s/%d", rel, kind, i), "path": rel, "kind": kind, "content": item})
 			}
 		}
+	}
+	paths, e = filepath.Glob(filepath.Join(cwd, ".devkit/backlog/escapes/*.json"))
+	if e != nil {
+		return nil, nil, e
+	}
+	for _, path := range paths {
+		if !escape.ID.MatchString(strings.TrimSuffix(filepath.Base(path), ".json")) {
+			return nil, nil, fmt.Errorf("%s: invalid escape id", path)
+		}
+		if info, e := os.Lstat(path); e != nil || !info.Mode().IsRegular() {
+			return nil, nil, fmt.Errorf("%s: escape must be a regular file", path)
+		}
+		b, e := os.ReadFile(path)
+		if e != nil {
+			return nil, nil, e
+		}
+		if _, e = escape.Validate(b); e != nil {
+			return nil, nil, fmt.Errorf("%s: %w", path, e)
+		}
+		rel, e := filepath.Rel(cwd, path)
+		if e != nil {
+			return nil, nil, e
+		}
+		rel = filepath.ToSlash(rel)
+		var value doc
+		if e = json.Unmarshal(b, &value); e != nil {
+			return nil, nil, e
+		}
+		files[rel] = string(b)
+		entries = append(entries, doc{"id": rel + "#escape/0", "path": rel, "kind": "escape", "content": value})
 	}
 	return entries, files, nil
 }
