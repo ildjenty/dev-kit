@@ -30,6 +30,10 @@ func request(dir string) {
 func run(dir, id string) {
 	must(record.Append(dir, "run", document{"run_id": id, "workflow": "requirements", "started_at": "t", "start": "other", "counted": false, "answers": []string{}}))
 }
+func roundInput(t *testing.T, artifacts string) {
+	t.Helper()
+	testutil.OK(t, write(filepath.Join(artifacts, "requirements", "input.json"), document{"input_id": "input1", "run_id": "r1", "request": 1}))
+}
 
 func TestRequirementsOutcomes(t *testing.T) {
 	e := document{"round": 3, "schema_errors": []string{}, "requirements": requirements(), "judgment": judgment()}
@@ -55,6 +59,7 @@ func TestRequirementsOutcomes(t *testing.T) {
 }
 func TestInvalidRoundsAreNotPersisted(t *testing.T) {
 	artifacts := t.TempDir()
+	roundInput(t, artifacts)
 	dir := filepath.Join(artifacts, "record")
 	request(dir)
 	run(dir, "r1")
@@ -97,6 +102,7 @@ func TestPrepareSeparatesSupplementsAndPinsStandards(t *testing.T) {
 }
 func TestCommands(t *testing.T) {
 	artifacts := t.TempDir()
+	roundInput(t, artifacts)
 	vars := map[string]string{"ARTIFACTS_DIR": artifacts}
 	var out, stderr bytes.Buffer
 	env := cli.Env{Cwd: t.TempDir(), Stdout: &out, Stderr: &stderr, LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
@@ -164,6 +170,7 @@ func TestRequiredAspectsCannotPassWithoutFindings(t *testing.T) {
 				entries(j["criteria"])[0]["verdict"] = verdict
 			}
 			a := t.TempDir()
+			roundInput(t, a)
 			r := must(round(a, requirements(), j))
 			if r["blocking_count"] == 0 && r["not_assessed_count"] == 0 {
 				t.Fatal("loop would terminate successfully")

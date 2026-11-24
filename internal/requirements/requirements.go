@@ -1,6 +1,7 @@
 package requirements
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"github.com/ildjenty/dev-kit/internal/concerns"
@@ -192,6 +193,9 @@ func prepare(ctx record.ContextData, artifacts, ownerWords, supplement, display 
 		return nil, err
 	}
 	input := document{"returned": returned, "unit": unit, "agreed_decisions": agreed, "language": c.Language, "standards": source.Paths[0], "criteria_folder": filepath.Join(display, "criteria", source.Paths[0]), "requests": rs, "previous": strip(previous, "version", "request", "run_id", "recorded_at"), "answers": answers, "criteria": paths, "judge_materials": selected, "writer_materials": mapping.Materials(filepath.Join(display, "criteria", source.Paths[0]), "writer:requirements", "plan")}
+	input["input_id"] = rand.Text()
+	input["run_id"] = ctx.RunID
+	input["request"] = len(requests)
 	if err = os.MkdirAll(rounds(artifacts), 0755); err != nil {
 		return nil, err
 	}
@@ -246,6 +250,13 @@ func schemaErrors(d document) ([]string, error) {
 	return record.Validate("requirements", v)
 }
 func round(artifacts string, d, j document) (document, error) {
+	input, err := read(filepath.Join(artifacts, "requirements", "input.json"))
+	if err != nil {
+		return nil, err
+	}
+	if text(input["input_id"]) == "" || text(input["run_id"]) == "" || number(input["request"]) < 1 || input["request"] != float64(number(input["request"])) {
+		return nil, fmt.Errorf("requirements input is not bound to a prepared run and request; run prepare again")
+	}
 	previous, err := read(filepath.Join(rounds(artifacts), "latest.json"))
 	if err != nil && !os.IsNotExist(err) {
 		return nil, err
@@ -256,6 +267,9 @@ func round(artifacts string, d, j document) (document, error) {
 		return nil, err
 	}
 	entry := document{"round": n, "requirements": d, "judgment": j, "schema_errors": errors, "verdict": verdictOf(j)}
+	entry["input_id"] = input["input_id"]
+	entry["run_id"] = input["run_id"]
+	entry["request"] = input["request"]
 	data, err := json.MarshalIndent(entry, "", "  ")
 	if err != nil {
 		return nil, err
@@ -361,18 +375,52 @@ func finish(ctx record.ContextData, artifacts string, o record.ResultOptions) (d
 	if err != nil {
 		return nil, err
 	}
+	input, err := read(filepath.Join(artifacts, "requirements", "input.json"))
+	if err != nil {
+		return nil, err
+	}
+	if text(e["input_id"]) == "" || e["input_id"] != input["input_id"] || e["run_id"] != ctx.RunID || e["run_id"] != input["run_id"] || number(e["request"]) < 1 || e["request"] != input["request"] {
+		return nil, fmt.Errorf("requirements round does not match the prepared input and run; run round again after prepare")
+	}
+	requests, err := record.List(ctx.Dir, "request")
+	if err != nil {
+		return nil, err
+	}
+	if e["request"] != float64(len(requests)) {
+		return nil, fmt.Errorf("requests changed after requirements prepare; run prepare and round again")
+	}
 	version := 0
 	j := object(e["judgment"])
 	if len(stringsOf(e["schema_errors"])) == 0 {
-		saved, err := record.Write(ctx, "requirements", object(e["requirements"]), o.Now)
+		body := object(e["requirements"])
+		if body == nil {
+			return nil, &record.RecordError{Message: "the requirements must be an object"}
+		}
+		supplied := []string{}
+		for _, key := range []string{"version", "request", "run_id", "recorded_at"} {
+			if _, ok := body[key]; ok {
+				supplied = append(supplied, key)
+			}
+		}
+		if len(supplied) > 0 {
+			return nil, &record.RecordError{Message: "the record fills " + strings.Join(supplied, ", ") + "; leave them out of the requirements"}
+		}
+		history, err := record.History(ctx.Dir)
+		if err != nil {
+			return nil, err
+		}
+		if !slices.ContainsFunc(history.Runs, func(r document) bool { return r["run_id"] == ctx.RunID }) {
+			return nil, &record.RecordError{Message: fmt.Sprintf("run %s did not pass the start conditions, so it does not write the record", ctx.RunID)}
+		}
+		body = strip(body)
+		body["request"] = e["request"]
+		body["run_id"] = ctx.RunID
+		body["recorded_at"] = o.Now
+		saved, err := record.Append(ctx.Dir, "requirements", body)
 		if err != nil {
 			return nil, err
 		}
 		version = number(saved.Entry["version"])
-		input, err := read(filepath.Join(artifacts, "requirements", "input.json"))
-		if err != nil {
-			return nil, err
-		}
 		materials := []string{"All original requests", "All owner answers", fmt.Sprintf("Requirements draft from round %d", number(e["round"]))}
 		materials = append(materials, stringsOf(input["criteria"])...)
 		observations := []string{}

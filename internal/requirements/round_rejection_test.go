@@ -15,6 +15,7 @@ func TestRoundCLIRejectsBrokenIndexWithoutChangingHistory(t *testing.T) {
 	for _, failure := range []string{"malformed", "read-error", "missing-index", "stale-index"} {
 		t.Run(failure, func(t *testing.T) {
 			artifacts := t.TempDir()
+			roundInput(t, artifacts)
 			must(round(artifacts, requirements(), judgment()))
 			first := filepath.Join(rounds(artifacts), "1.json")
 			original := must(os.ReadFile(first))
@@ -60,6 +61,7 @@ func TestRoundCLIRejectsBrokenIndexWithoutChangingHistory(t *testing.T) {
 
 func TestRoundIndexWriteFailureKeepsHistoryAndRejectsRetry(t *testing.T) {
 	artifacts := t.TempDir()
+	roundInput(t, artifacts)
 	must(round(artifacts, requirements(), judgment()))
 	latest := filepath.Join(rounds(artifacts), "latest.json")
 	before := must(os.ReadFile(latest))
@@ -91,6 +93,7 @@ func TestRoundIndexWriteFailureKeepsHistoryAndRejectsRetry(t *testing.T) {
 
 func TestRoundCreatesFirstAndNextWithoutChangingEarlierHistory(t *testing.T) {
 	artifacts := t.TempDir()
+	roundInput(t, artifacts)
 	testutil.Equal(t, must(round(artifacts, requirements(), judgment()))["round"], 1)
 	first := must(os.ReadFile(filepath.Join(rounds(artifacts), "1.json")))
 	draft := requirements()
