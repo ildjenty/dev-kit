@@ -76,15 +76,8 @@ func TestWorkflowAIContracts(t *testing.T) {
 							t.Errorf("%s judge %v is not fresh and read-only", path, value["id"])
 						}
 						allowed, hasAllowed := value["allowed_tools"].([]any)
-						denied, hasDenied := value["denied_tools"].([]any)
-						if hasAllowed {
-							for _, tool := range allowed {
-								if tool != "Read" && tool != "Grep" && tool != "Glob" {
-									t.Errorf("%s judge %v allows %v", path, value["id"], tool)
-								}
-							}
-						} else if !hasDenied || !slices.Contains(denied, any("Edit")) || !slices.Contains(denied, any("Write")) || !slices.Contains(denied, any("NotebookEdit")) {
-							t.Errorf("%s judge %v lacks read-only tool restrictions", path, value["id"])
+						if !hasAllowed || len(allowed) != 3 || !slices.Contains(allowed, any("Read")) || !slices.Contains(allowed, any("Grep")) || !slices.Contains(allowed, any("Glob")) {
+							t.Errorf("%s judge %v must allow only Read, Grep and Glob, got %v", path, value["id"], value["allowed_tools"])
 						}
 					}
 				}

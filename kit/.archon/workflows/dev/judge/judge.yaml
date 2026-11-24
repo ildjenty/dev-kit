@@ -345,10 +345,10 @@ nodes:
   command: quality
   context: fresh
   mutates_checkout: false
-  denied_tools:
-  - Edit
-  - Write
-  - NotebookEdit
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
   output_format: *4
   with:
     quality: data
@@ -362,10 +362,10 @@ nodes:
   command: quality
   context: fresh
   mutates_checkout: false
-  denied_tools:
-  - Edit
-  - Write
-  - NotebookEdit
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
   output_format: *4
   with:
     quality: contract
@@ -379,10 +379,10 @@ nodes:
   command: quality
   context: fresh
   mutates_checkout: false
-  denied_tools:
-  - Edit
-  - Write
-  - NotebookEdit
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
   output_format: *4
   with:
     quality: security
@@ -396,10 +396,10 @@ nodes:
   command: quality
   context: fresh
   mutates_checkout: false
-  denied_tools:
-  - Edit
-  - Write
-  - NotebookEdit
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
   output_format: *4
   with:
     quality: ui
@@ -413,10 +413,10 @@ nodes:
   command: quality
   context: fresh
   mutates_checkout: false
-  denied_tools:
-  - Edit
-  - Write
-  - NotebookEdit
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
   output_format: *4
   with:
     quality: cost
@@ -430,10 +430,10 @@ nodes:
   command: quality
   context: fresh
   mutates_checkout: false
-  denied_tools:
-  - Edit
-  - Write
-  - NotebookEdit
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
   output_format: *4
   with:
     quality: test
@@ -447,10 +447,10 @@ nodes:
   command: quality
   context: fresh
   mutates_checkout: false
-  denied_tools:
-  - Edit
-  - Write
-  - NotebookEdit
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
   output_format: *4
   with:
     quality: scope
@@ -464,10 +464,10 @@ nodes:
   command: quality
   context: fresh
   mutates_checkout: false
-  denied_tools:
-  - Edit
-  - Write
-  - NotebookEdit
+  allowed_tools:
+  - Read
+  - Grep
+  - Glob
   output_format: *4
   with:
     quality: readability

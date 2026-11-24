@@ -145,7 +145,7 @@ nodes:
           command: dispute
           context: fresh
           mutates_checkout: false
-          denied_tools: [Edit, Write, NotebookEdit]
+          allowed_tools: [Read, Grep, Glob]
           output_format:
             type: object
             additionalProperties: false
@@ -225,7 +225,7 @@ nodes:
     command: step-back
     context: fresh
     mutates_checkout: false
-    denied_tools: [Edit, Write, NotebookEdit]
+    allowed_tools: [Read, Grep, Glob]
     output_format:
       type: object
       additionalProperties: false
