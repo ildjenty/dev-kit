@@ -159,10 +159,14 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 		_, ok := command(env, limit, session, "--version")
 		finding("needed for a part", session+" sessions", ok, "skills can be used in "+session+" sessions", "Installed skills need the "+session+" session tool; install and sign in to "+session+".")
 	}
-	_, gh := command(env, limit, "gh", "--version")
-	finding("needed for a part", "gh (pr)", gh, "GitHub CLI available", "The pr workflow cannot publish; install gh from https://cli.github.com.")
-	_, auth := command(env, limit, "gh", "auth", "status")
-	finding("needed for a part", "gh authentication (pr)", auth, "authenticated", "The pr workflow cannot publish; run gh auth login.")
+	ghExecutable := env.Getenv("DEVKIT_GH")
+	if ghExecutable == "" {
+		ghExecutable = "gh"
+	}
+	_, gh := command(env, limit, ghExecutable, "--version")
+	finding("needed for a part", "gh (issues, pr)", gh, "GitHub CLI available", "Issue operations and pr publishing need GitHub CLI; install gh from https://cli.github.com.")
+	_, auth := command(env, limit, ghExecutable, "auth", "status")
+	finding("needed for a part", "gh authentication (issues, pr)", auth, "authenticated", "Issue operations and pr publishing need authentication; run gh auth login.")
 	origin, remote := command(env, limit, "git", "remote", "get-url", "origin")
 	finding("needed for a part", "origin (pr)", remote && origin != "", "origin configured", "The pr workflow needs origin; run git remote add origin <repository-url>.")
 	key := env.Getenv("TYPESAFE_API_KEY") != ""

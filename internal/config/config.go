@@ -35,6 +35,13 @@ type Limits struct {
 	Fixes    int `json:"fixes"`
 	Passes   int `json:"passes"`
 }
+type IssueLabels struct {
+	Unit  string `json:"unit"`
+	Topic string `json:"topic"`
+}
+type Issues struct {
+	Labels IssueLabels `json:"labels"`
+}
 type Config struct {
 	Provider      string             `json:"provider"`
 	Sessions      []string           `json:"sessions"`
@@ -46,6 +53,7 @@ type Config struct {
 	Topics        string             `json:"topics"`
 	Eval          string             `json:"eval"`
 	Units         string             `json:"units"`
+	Issues        Issues             `json:"issues"`
 	Checks        []Check            `json:"checks"`
 	SkeletonCheck []string           `json:"skeleton_check"`
 	Qualities     map[string]Quality `json:"qualities"`
@@ -125,6 +133,21 @@ func Parse(data []byte) (Config, error) {
 	var merged map[string]any
 	_ = json.Unmarshal(base, &merged)
 	for key, value := range supplied {
+		if key == "issues" {
+			if !keys(value, []string{"labels"}) {
+				return Config{}, invalid("issues")
+			}
+			if labels, exists := value.(map[string]any)["labels"]; exists {
+				if !keys(labels, []string{"unit", "topic"}) {
+					return Config{}, invalid("issues.labels")
+				}
+				nested := merged["issues"].(map[string]any)["labels"].(map[string]any)
+				for k, v := range labels.(map[string]any) {
+					nested[k] = v
+				}
+			}
+			continue
+		}
 		if key == "refine" {
 			if !keys(value, []string{"relevance_threshold"}) {
 				return Config{}, invalid("refine")
@@ -224,7 +247,7 @@ func keys(value any, allowed []string) bool {
 var SkillKeys = []string{"devkit-runs", "devkit-discuss", "devkit-optimize"}
 
 func shape(c map[string]any) error {
-	if !keys(c, []string{"provider", "sessions", "language", "skills", "standards", "docs", "decisions", "units", "topics", "eval", "checks", "skeleton_check", "qualities", "decision_paths", "limits"}) {
+	if !keys(c, []string{"provider", "sessions", "language", "skills", "standards", "docs", "decisions", "units", "topics", "issues", "eval", "checks", "skeleton_check", "qualities", "decision_paths", "limits"}) {
 		return invalid("unknown setting")
 	}
 	if c["provider"] != "claude" && c["provider"] != "codex" {
@@ -244,6 +267,12 @@ func shape(c map[string]any) error {
 	}
 	if !text(c["language"]) {
 		return invalid("language must be a non-empty string")
+	}
+	labels := c["issues"].(map[string]any)["labels"].(map[string]any)
+	for _, key := range []string{"unit", "topic"} {
+		if !text(labels[key]) {
+			return invalid("issues.labels." + key + " must be a non-empty string")
+		}
 	}
 	if !keys(c["skills"], SkillKeys) {
 		return invalid("skills must map " + strings.Join(SkillKeys, ", ") + " to skill names")

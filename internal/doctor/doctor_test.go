@@ -170,6 +170,31 @@ func TestPartCommandsDoNotFailDoctorAndNoCommandOutputLeaks(t *testing.T) {
 	}
 }
 
+func TestGhAuthenticationCoversIssuesAndPrWithExecutableOverride(t *testing.T) {
+	env, bin, out := environment(t, "claude")
+	testutil.OK(t, os.Remove(filepath.Join(bin, "gh")))
+	path := filepath.Join(bin, "fake-gh")
+	t.Setenv("DEVKIT_GH", path)
+	executable(t, bin, "fake-gh", `case "$*" in
+ '--version') printf 'gh test' ;;
+ 'auth status') exit 0 ;;
+ *) exit 19 ;;
+esac`)
+	testutil.Equal(t, Report(env), true)
+	testutil.Contains(t, out.String(), "gh (issues, pr): OK")
+	testutil.Contains(t, out.String(), "gh authentication (issues, pr): OK")
+	executable(t, bin, "fake-gh", `case "$*" in
+ '--version') printf 'gh test' ;;
+ 'auth status') printf 'private diagnostic' >&2; exit 4 ;;
+ *) exit 19 ;;
+esac`)
+	out.Reset()
+	testutil.Equal(t, Report(env), true)
+	testutil.Contains(t, out.String(), "gh authentication (issues, pr): MISSING")
+	testutil.Contains(t, out.String(), "Issue operations and pr publishing need authentication; run gh auth login.")
+	testutil.Equal(t, strings.Contains(out.String(), "private diagnostic"), false)
+}
+
 func TestShortTimeoutsAndExitCodes(t *testing.T) {
 	env, bin, out := environment(t, "claude")
 	executable(t, bin, "archon", "exec /bin/sleep 5")

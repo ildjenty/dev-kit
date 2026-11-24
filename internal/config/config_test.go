@@ -68,6 +68,37 @@ func TestConfigDefaultsAndCheckout(t *testing.T) {
 	testutil.OK(t, json.Unmarshal(stdout.Bytes(), &actual))
 	testutil.Equal(t, actual, c)
 }
+
+func TestIssueLabelsDefaultsMergeAndValidation(t *testing.T) {
+	want := IssueLabels{Unit: "devkit:unit", Topic: "devkit:topic"}
+	testutil.Equal(t, Defaults("").Issues.Labels, want)
+	for _, raw := range []string{`{}`, `{"issues":{}}`, `{"issues":{"labels":{}}}`} {
+		testutil.Equal(t, testutil.Must(Parse([]byte(raw))).Issues.Labels, want)
+	}
+	testutil.Equal(t, testutil.Must(Parse([]byte(`{"issues":{"labels":{"unit":"work items"}}}`))).Issues.Labels, IssueLabels{Unit: "work items", Topic: "devkit:topic"})
+	testutil.Equal(t, testutil.Must(Parse([]byte(`{"issues":{"labels":{"topic":"questions"}}}`))).Issues.Labels, IssueLabels{Unit: "devkit:unit", Topic: "questions"})
+	for _, raw := range []string{
+		`{"issues":null}`, `{"issues":[]}`, `{"issues":"text"}`, `{"issues":{"extra":true}}`,
+		`{"issues":{"labels":null}}`, `{"issues":{"labels":[]}}`, `{"issues":{"labels":{"extra":"label"}}}`,
+		`{"issues":{"labels":{"unit":null}}}`, `{"issues":{"labels":{"unit":42}}}`, `{"issues":{"labels":{"unit":[]}}}`,
+		`{"issues":{"labels":{"unit":""}}}`, `{"issues":{"labels":{"unit":" "}}}`,
+		`{"issues":{"labels":{"topic":false}}}`, `{"issues":{"labels":{"topic":""}}}`, `{"issues":{"labels":{"topic":"\n"}}}`,
+	} {
+		t.Run(raw, func(t *testing.T) {
+			_, err := Parse([]byte(raw))
+			testutil.Fails(t, err, "invalid .devkit/config.json: issues")
+		})
+	}
+	data := testutil.Must(os.ReadFile("../../kit/.devkit/config.json"))
+	testutil.Equal(t, testutil.Must(Parse(data)).Issues.Labels, want)
+	repo := testutil.Repo(t)
+	testutil.Put(t, repo, ".devkit/config.json", `{"issues":{"labels":{"unit":"work","topic":"questions"}}}`)
+	var stdout, stderr bytes.Buffer
+	testutil.Equal(t, cli.New("test", Commands()).Execute([]string{"config"}, cli.Env{Cwd: repo, Stdout: &stdout, Stderr: &stderr}), 0)
+	var actual Config
+	testutil.OK(t, json.Unmarshal(stdout.Bytes(), &actual))
+	testutil.Equal(t, actual.Issues.Labels, IssueLabels{Unit: "work", Topic: "questions"})
+}
 func TestStandardsDefaults(t *testing.T) {
 	c := Defaults("")
 	testutil.Equal(t, c.Standards, ".devkit/standards")

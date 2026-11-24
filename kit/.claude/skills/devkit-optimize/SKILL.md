@@ -98,6 +98,9 @@ Start from the current files and keep what already fits. For each change, keep t
 **`.devkit/config.json`**
 
 - `language`: as observed.
+- `issues.labels.unit` and `issues.labels.topic`: GitHub Issue labels for work units and open
+  questions. Defaults are `devkit:unit` and `devkit:topic`; keep them unless the repository uses
+  different labels. Each must be a non-empty string; omitted labels retain their defaults.
 - `docs`: the folder where the repository's product and design documents live. Keep `standards`,
   `decisions`, `units`, `topics` and `eval` unless a path collides with something that exists.
   `eval` defaults to `.devkit/eval`; judge evaluation cases live in its `judge/` subfolder. Keep

@@ -12,6 +12,12 @@
   "eval": ".devkit/eval",
   "decisions": ".devkit/decisions",
   "units": ".devkit/units",
+  "issues": {
+    "labels": {
+      "unit": "devkit:unit",
+      "topic": "devkit:topic"
+    }
+  },
   "checks": [],
   "skeleton_check": [],
   "qualities": {
