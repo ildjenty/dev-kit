@@ -126,7 +126,6 @@ Start from the current files and keep what already fits. For each change, keep t
   definitions, CI definitions, env examples, and the kit's own files (`.archon/**`, the standards
   folder, `.devkit/config.json`). Keep `ask: true` on those the owner must allow before a pull request
   (cost, permissions and exposure, CI, the kit's own rules); ask the owner about any you are unsure of.
-- `refine.relevance_threshold`: default 0.2, a probability in [0, 1]. Keep the recall-oriented default unless the owner asks; missing a relevant decision can hide a conflict.
 - `limits`, `skills`, `provider` and `sessions`: leave as they are unless the owner asks.
 
 Confirm that every glob you keep or add matches at least one tracked file, and list those that match

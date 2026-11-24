@@ -35,9 +35,6 @@ type Limits struct {
 	Fixes    int `json:"fixes"`
 	Passes   int `json:"passes"`
 }
-type Refine struct {
-	RelevanceThreshold float64 `json:"relevance_threshold"`
-}
 type Config struct {
 	Provider      string             `json:"provider"`
 	Sessions      []string           `json:"sessions"`
@@ -52,7 +49,6 @@ type Config struct {
 	SkeletonCheck []string           `json:"skeleton_check"`
 	Qualities     map[string]Quality `json:"qualities"`
 	DecisionPaths []DecisionRule     `json:"decision_paths"`
-	Refine        Refine             `json:"refine"`
 	Limits        Limits             `json:"limits"`
 }
 
@@ -128,7 +124,13 @@ func Parse(data []byte) (Config, error) {
 	var merged map[string]any
 	_ = json.Unmarshal(base, &merged)
 	for key, value := range supplied {
-		if key == "limits" || key == "qualities" || key == "skills" || key == "refine" {
+		if key == "refine" {
+			if !keys(value, []string{"relevance_threshold"}) {
+				return Config{}, invalid("refine")
+			}
+			continue
+		}
+		if key == "limits" || key == "qualities" || key == "skills" {
 			object, ok := value.(map[string]any)
 			if !ok {
 				return Config{}, invalid(key + " must be an object")
@@ -221,7 +223,7 @@ func keys(value any, allowed []string) bool {
 var SkillKeys = []string{"devkit-runs", "devkit-discuss", "devkit-optimize"}
 
 func shape(c map[string]any) error {
-	if !keys(c, []string{"provider", "sessions", "language", "skills", "standards", "docs", "decisions", "units", "topics", "checks", "skeleton_check", "qualities", "decision_paths", "limits", "refine"}) {
+	if !keys(c, []string{"provider", "sessions", "language", "skills", "standards", "docs", "decisions", "units", "topics", "checks", "skeleton_check", "qualities", "decision_paths", "limits"}) {
 		return invalid("unknown setting")
 	}
 	if c["provider"] != "claude" && c["provider"] != "codex" {
@@ -322,13 +324,6 @@ func shape(c map[string]any) error {
 		if !texts(rule["paths"]) || !slices.Contains(concerns.Names(), quality) || !boolean {
 			return invalid("decision_paths entry must have paths, quality and ask")
 		}
-	}
-	if !keys(c["refine"], []string{"relevance_threshold"}) {
-		return invalid("refine")
-	}
-	threshold, ok := c["refine"].(map[string]any)["relevance_threshold"].(float64)
-	if !ok || math.IsNaN(threshold) || math.IsInf(threshold, 0) || threshold < 0 || threshold > 1 {
-		return invalid("refine.relevance_threshold must be a number between 0 and 1")
 	}
 	if !keys(c["limits"], []string{"restarts", "fixes", "passes"}) {
 		return invalid("limits")

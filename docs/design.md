@@ -23,9 +23,9 @@
 
 `devkit refine prepare` は関連判断を一度だけ選び、decide・document の執筆者と判定者の全ラウンドで同じ集合を使う。`refine/input.json` の `decisions` は全判断の索引（`id`、`title`、`status`、`depends_on`、`supersedes`、`path`）、`relevant_decisions` は関連集合の全文とする。トピックの推移的な判断依存と引用、未承認提案と前回提案の判断、それらを置き換える・それらに置き換えられる判断(置き換えの連鎖は閉包までたどる)は必ず含める。さらに、これらを引用する未完了単位が併せて引用する判断を1段だけ加える。文書の共引用はたどらない。概要文書が多くの判断を引くと全件に広がるためで、関連性は次の判定に任せる。
 
-それ以外の `agreed` 判断は一件ずつ、トピックの判断を制約する・重なる・依存する・衝突する可能性があるかを Jev の `noul` 質問で広く選ぶ。トピックの題名と本文、依頼の owner words、メモと supplement、判断の題名と本文を指示でなくデータとして送り、共有 `internal/jev` でバッチ処理する。確率が設定 `refine.relevance_threshold` 以上なら含める。既定0.2は、関連判断の見落としが衝突を隠すため再現率を優先した値である。`superseded`・`withdrawn` は Jev に送らず、必須規則からのみ含める。`refine/relevance.json` に全判断の採否と出典、Jev の確率、代替経路へ移った理由を記録する。キーは環境変数だけから読み、ログにも出さない。
+それ以外の `agreed` 判断は、設定 provider の読み取り専用 CLI を一度呼んでまとめて選ぶ。Jev の関連性確率は実 API で関連・無関係の判断を分離できず、CLI は測定した関連判断を見落とさずに無関係な判断をより多く除外したため、関連判断の選定には Jev を使わない。`refine/relevance-input.json` にトピックの題名と本文、依頼の owner words と supplement、メモ、必須集合以外の各候補の ID・題名・本文・パスを渡す。必須集合の ID は `always_ids` に列挙し、返す必要がないことを伝える。すべての文章を指示でなくデータとして扱い、必要なら判断ファイルも読める。これは執筆者と判定者のための広いフィルターであり、迷えば含める一方、同じシステムの別機能でも今回の結論が従う・変更する・土台とする必要がない判断は除く。題材が触れていなくても、新しく広がる範囲や変わる範囲が引き続き従う規則は、間接的な制約として含める。`superseded`・`withdrawn` は候補にせず、必須規則からのみ含める。候補がなければ CLI は呼ばない。
 
-キー未設定または Jev のクレジット切れ・エラー・不正回答なら、設定 provider の読み取り専用 CLI を一度呼ぶ。`refine/relevance-input.json` にトピックの材料と全 `agreed` 判断の ID・題名・パスの索引を渡し、判断ファイルの読み取りを許して strict schema の関連 ID 配列を求める。CLI も失敗すれば全 `agreed` 判断を含め、両失敗を記録する。執筆者と判定者は関連集合の全文を読み、ほかの判断も題名から関係がありそうなら索引のパスで読む。ドラフトが置き換える・依存する・引用する判断は必ず全文を読む。実際の判断は Codex・Claude が担う。`affected.decisions` も同じ索引形式にし、関連集合外の本文を重複して渡さない。機械検査と適用、反映判定、単位の領域検査はチェックアウトの全判断を使い、AI 入力の削減では検査を変えない。判断の直接編集検出は準備時の全レコードのハッシュとの照合を維持する。
+CLI には strict schema の関連 ID 配列を求める。CLI の失敗や不正回答では全 `agreed` 判断を含める。`refine/relevance.json` に全判断の採否と出典、失敗時の理由を記録する。廃止した `refine.relevance_threshold` は既存設定に残っていても受け入れて無視し、有効設定には出力しない。執筆者と判定者は関連集合の全文を読み、ほかの判断も題名から関係がありそうなら索引のパスで読む。ドラフトが置き換える・依存する・引用する判断は必ず全文を読む。実際の判断は Codex・Claude が担う。`affected.decisions` も同じ索引形式にし、関連集合外の本文を重複して渡さない。機械検査と適用、反映判定、単位の領域検査はチェックアウトの全判断を使い、AI 入力の削減では検査を変えない。判断の直接編集検出は準備時の全レコードのハッシュとの照合を維持する。
 
 ## 品質の担当を一つにする
 
@@ -73,7 +73,7 @@ ID はブランチとドラフトのキーから作る小文字の16進数で、
 
 `judge` はコミットした差分を読み、設定パス、計画行、`devkit judge route` の Jev または代替の設定プロバイダー CLI による選択を合わせて品質判定者を起動する。`scope` は毎回、ソースやテストが変われば `test` と `readability` も動く。パスの指定だけで品質の変更を見落とすことを防ぐ。`devkit judge route` は固定した関心マップの `routing`(その品質に関わる変更の具体的な説明)を質問にし、ファイルごとの差分を TypeSafe API に送る。品質ごとの `routing_threshold` 以上の確率になった品質を選ぶ。閾値は、見落としたくない変更を見落とさない値を品質ごとに測って決めてあり、リポジトリが関心マップで調整できる。ソース・テストの質問は確率 0.3 以上で `test` と `readability` を選ぶ。差分は行の境界で最大 8 KiB に分割し、送信 JSON も 24 KiB 以下に収め、同時実行は最大 4 件とする。各リクエストは 10 秒でタイムアウトし、タイムアウト・429・5xx のみ 100 ms 後に 1 回再試行する。1 件でも失敗、または回答が不正なら部分選択を破棄し、設定した provider の読み取り専用 CLI に切り替える。両方が利用できない場合は、見落としを避けるため、変更された各ファイルに対してコード判定可能な全品質を選び、理由に両失敗を記録する。出力の `source` は `jev`・`claude`・`codex`・`all` のいずれかになる。全確率は `judge/route-jev.json` に残す。`launch` はこの単一の出力を読む。任意の環境変数 `TYPESAFE_API_KEY` を設定した場合だけ送信し、キー未設定なら TypeSafe には何も送らない。キーは環境変数以外から読まず、記録にも出さない。代替経路には設定した provider の認証済み CLI を必要とする。
 
-Jev の HTTP クライアントは `internal/jev` に共有し、ルーティングの挙動は変えない。`refine` の反映判定では、新しい判断の題名・本文と、それを引用する文書の全文を TypeSafe に送る。判断中のキーは引用文書が使う表記へ置換する。文書は見出しを優先して最大 8 KiB に分割し、見出し内の長い部分は UTF-8 の境界で分割する。同じチャンクに対応する複数の判断は一度に問い合わせ、送信 JSON は 24 KiB 以下にする。同時実行・タイムアウト・再試行はルーティングと同じで、どれか一つの引用チャンクが確率 0.5 以上なら反映済みとする。全確率は `refine/reflect-jev.json` に保存する。1 件でも失敗や不正回答があれば部分判定を採用せず、設定した provider の CLI へ切り替える。機械検査は代替判定用の全文を `refine/reflect-input.json` に書く。判定基準の文言は Jev の質問と `refine/commands/reflect.md` に置き、文書の AI 判定と `review/purpose.md` から反映判定を外す。キー未設定なら、ルーティング・反映判定とも TypeSafe に送信しない。Jev はルーティング・反映判定・関連判断の選定に使う。
+Jev の HTTP クライアントは `internal/jev` に共有し、ルーティングの挙動は変えない。`refine` の反映判定では、新しい判断の題名・本文と、それを引用する文書の全文を TypeSafe に送る。判断中のキーは引用文書が使う表記へ置換する。文書は見出しを優先して最大 8 KiB に分割し、見出し内の長い部分は UTF-8 の境界で分割する。同じチャンクに対応する複数の判断は一度に問い合わせ、送信 JSON は 24 KiB 以下にする。同時実行・タイムアウト・再試行はルーティングと同じで、どれか一つの引用チャンクが確率 0.5 以上なら反映済みとする。全確率は `refine/reflect-jev.json` に保存する。1 件でも失敗や不正回答があれば部分判定を採用せず、設定した provider の CLI へ切り替える。機械検査は代替判定用の全文を `refine/reflect-input.json` に書く。判定基準の文言は Jev の質問と `refine/commands/reflect.md` に置き、文書の AI 判定と `review/purpose.md` から反映判定を外す。キー未設定なら、ルーティング・反映判定とも TypeSafe に送信しない。Jev は judge のルーティングと refine の文書反映判定だけに使う。
 
 判定対象コミットの全ツリーは `$STATE_DIR/trees/<符号化したブランチ名>/` にブランチごとに一つ保持する。記録フォルダー内には置かない。`judge/target.json` と品質ごとの材料の `tree` に絶対パスを渡す。判定者は同時実行するチェックが変更し得るチェックアウトを使わず、このツリーを Read・Grep・Glob で読む。Claude の読み取りツールにはパスを限定せず、Codex のノードも状態フォルダーを読める。
 
@@ -125,11 +125,11 @@ workflows がバイナリの配布内容と一致する新規導入・Yes・差�
 
 配置先やリポジトリ内の祖先にあるシンボリックリンクは名前を示して確認し、No なら影響する配置先を処理しない。Yes はリンク自体を通常のファイルやフォルダーに置き換え、リンク先には書き込まない。共有する祖先リンクの置き換えが拒否したグループのファイルを失わせる場合、そのリンクの置き換えも行わない。`--yes` と `--no` は全確認に同じ回答を適用する。標準入力が端末でなく、どちらもなければ、その旨を表示してすべて No とする。`--force` は廃止し、別名としても残さない。`--dry-run` は比較と予定する質問だけを表示し、書き込みも削除もしない。完了時に書いたもの・削除したもの・保持したものを列挙し、拒否だけでは失敗にしない。不正な JSON 設定は既定の配置先で比較することを警告し、保持または置き換えを選べる。ただし `skills` だけの更新には JSON オブジェクトが必要であり、壊れた設定のまま名前だけを変更することはできない。不正な配置先設定は書き込む前にエラーにする。
 
-Archon、Git、`devkit` と、設定チェック用のツールが必要になる。執筆・判定には設定した Archon provider、ルーティングと文書反映判定の代替経路には同じ provider の認証済み CLI、PR 公開は認証済みの `gh` と `origin` を使う。Go と mise は dev-kit 自体の開発に使い、対象リポジトリにはビルド済みバイナリを置ける。基点ブランチは Archon の `worktree.baseBranch` で指定する。
+Archon、Git、`devkit` と、設定チェック用のツールが必要になる。執筆・判定には設定した Archon provider、関連判断の選定とルーティング・文書反映判定の代替経路には同じ provider の認証済み CLI、PR 公開は認証済みの `gh` と `origin` を使う。Go と mise は dev-kit 自体の開発に使い、対象リポジトリにはビルド済みバイナリを置ける。基点ブランチは Archon の `worktree.baseBranch` で指定する。
 
 `.devkit/config.json` の `provider` は `claude`（既定）または `codex`。`devkit init --provider <name>` が保存し、workflow の AI ノードを描画する。ソースは Claude のままにし、Codex 導入時は全 AI ノードを Codex にし、未対応の `allowed_tools`・`denied_tools`・`settingSources` を除く。変更後の再導入は通常の workflow フォルダー差分として y/N を尋ねる。全 AI 出力スキーマは、入れ子を含め全プロパティを required に列挙し、`additionalProperties: false` にする。適用しない値は空文字・空配列・false で表し、プロンプトと読み取り側もそれを扱う。
 
-Codex の workflow 判定者は full access で動き、ツール制限で書き込みを防げない。両 provider とも `mutates_checkout: false` を保ち、checkout を変更したノードを Archon が失敗にする。これは変更後の検出である。別経路の CLI フォールバックは読み取り専用とし、Codex は `codex exec --sandbox read-only --cd <checkout> --output-schema <一時スキーマ> -o <一時回答> --skip-git-repo-check -`、Claude は `claude -p --json-schema <schema> --allowedTools Read,Grep,Glob --tools Read,Grep,Glob --permission-mode dontAsk --output-format json` を使う。ルーティングの Codex は Git 管理情報のない判定ツリーを作業ディレクトリにし、Claude は `--add-dir <判定ツリー>` を追加する。Claude は JSON 結果の `structured_output` を読み、通常の `result` 文字列を回答として扱わない。両者を10分で打ち切り、回答をスキーマで検証する。実行ファイルは `DEVKIT_CODEX`・`DEVKIT_CLAUDE` でテスト用に置換できる。プロンプトは `$PACK_DIR` 内の `commands/*.md` を読み、`$ARTIFACTS_DIR`・`$PACK_DIR` を絶対パスに置換して標準入力へ渡す。CLI の出力は成果物内のログへ保存し、標準エラーにはパスと失敗時の末尾4000文字までを出す。実行 fixture はキーを外して偽 CLI で両 provider の経路を通し、ソース・描画後の provider と strict schema も Go テストで検査する。
+Codex の workflow 判定者は full access で動き、ツール制限で書き込みを防げない。両 provider とも `mutates_checkout: false` を保ち、checkout を変更したノードを Archon が失敗にする。これは変更後の検出である。関連判断の選定と別経路の CLI フォールバックは読み取り専用とし、Codex は `codex exec --sandbox read-only --cd <checkout> --output-schema <一時スキーマ> -o <一時回答> --skip-git-repo-check -`、Claude は `claude -p --json-schema <schema> --allowedTools Read,Grep,Glob --tools Read,Grep,Glob --permission-mode dontAsk --output-format json` を使う。ルーティングの Codex は Git 管理情報のない判定ツリーを作業ディレクトリにし、Claude は `--add-dir <判定ツリー>` を追加する。Claude は JSON 結果の `structured_output` を読み、通常の `result` 文字列を回答として扱わない。両者を10分で打ち切り、回答をスキーマで検証する。実行ファイルは `DEVKIT_CODEX`・`DEVKIT_CLAUDE` でテスト用に置換できる。プロンプトは `$PACK_DIR` 内の `commands/*.md` を読み、`$ARTIFACTS_DIR`・`$PACK_DIR` を絶対パスに置換して標準入力へ渡す。CLI の出力は成果物内のログへ保存し、標準エラーにはパスと失敗時の末尾4000文字までを出す。実行 fixture はキーを外して偽 CLI で両 provider の経路を通し、ソース・描画後の provider と strict schema も Go テストで検査する。
 
 `sessions` はスキルを導入するセッションツールの配列で、未指定なら provider 一つ。`devkit init --sessions claude,codex` で両方へ導入でき、空配列ならスキルは導入しない。Claude は `.claude/skills/<name>/`、Codex は `.agents/skills/<name>/` へ置き、内部参照も導入先に合わせる。明示された sessions は provider 変更時にも保持する。`--provider`・`--sessions` は `--skill` と同じく、設定全体の置換を断っても指定値だけ保存し、他の設定と書式を保つ。改名・差分確認・自分が導入したと確認できない旧フォルダーを削除候補にしない規則を、各配置先に適用する。
 
@@ -147,10 +147,9 @@ Codex の workflow 判定者は full access で動き、ツール制限で書き
 - `skeleton_check` はスケルトンに実行するチェック名で、既定は空。
 - `qualities` は品質判定の起動パスを定める。判定するフェーズは関心マップが、差分からの追加選択はルーティングが担う。
 - `decision_paths` は判断を伴う変更の `paths`、`quality`、`ask` を定める。既定では依存、マイグレーション、インフラ、CI、環境変数サンプル、ワークフロー、規範、設定自身を含む。基点の設定と現在の設定のチェックを合わせて実行するため、チェックを削除しても検査を回避できない。
-- `refine.relevance_threshold` は関連判断の選定確率で、0以上1以下の数値。既定は0.2。省略時は個別に補完する。
 - `limits.restarts` と `limits.fixes` は再開始と修正の上限で、既定はそれぞれ3。`limits.passes` は `implement` がリリース単位1つに使える回数で、既定は3。ある単位が使い切ると、その単位の名前と落ちたチェックを示して止まる。単位の数に関係なく、ほかの単位の回数は減らない。
 
-省略した項目には既定値を使い、品質・上限・refine は個別に補完する。それ以外の指定配列は既定の配列を置き換える。グロブは `**`、`*`、`?` を使える。
+省略した項目には既定値を使い、品質・上限は個別に補完する。それ以外の指定配列は既定の配列を置き換える。グロブは `**`、`*`、`?` を使える。
 
 ## キットを検証する
 
@@ -171,4 +170,4 @@ Go テストは各機械処理の判断分岐とスキーマを検証する。pl
 
 ## まだないもの
 
-依存解析ツールから取得する事実は持たず、構造の材料は Git の変更と階層の情報に限られる。執筆者・判定者・ルーティングと文書反映判定の代替 CLI は設定した provider を使い、PR 公開先は GitHub のみである。リポジトリ固有のマイグレーション検証や依存監査などは、必要なチェックを設定して補う。
+依存解析ツールから取得する事実は持たず、構造の材料は Git の変更と階層の情報に限られる。執筆者・判定者・関連判断の選定 CLI とルーティング・文書反映判定の代替 CLI は設定した provider を使い、PR 公開先は GitHub のみである。リポジトリ固有のマイグレーション検証や依存監査などは、必要なチェックを設定して補う。

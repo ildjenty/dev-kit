@@ -13,9 +13,6 @@
   "units": ".devkit/units",
   "checks": [],
   "skeleton_check": [],
-  "refine": {
-    "relevance_threshold": 0.2
-  },
   "qualities": {
     "structure": {
       "paths": [

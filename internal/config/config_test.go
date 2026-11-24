@@ -171,17 +171,19 @@ func TestUnitDoneExclusionAlsoAppliesToDecisionDetection(t *testing.T) {
 	testutil.Equal(t, found, true)
 }
 
-func TestRefineRelevanceThreshold(t *testing.T) {
-	testutil.Equal(t, testutil.Must(Parse([]byte(`{}`))).Refine.RelevanceThreshold, .2)
-	testutil.Equal(t, testutil.Must(Parse([]byte(`{"refine":{}}`))).Refine.RelevanceThreshold, .2)
-	for _, value := range []string{"0", "0.7", "1"} {
-		c, err := Parse([]byte(`{"refine":{"relevance_threshold":` + value + `}}`))
-		testutil.OK(t, err)
-		var want float64
-		testutil.OK(t, json.Unmarshal([]byte(value), &want))
-		testutil.Equal(t, c.Refine.RelevanceThreshold, want)
+func TestObsoleteRefineRelevanceThresholdIsIgnored(t *testing.T) {
+	repo := testutil.Repo(t)
+	for _, value := range []string{"0", "0.7", "1", "null", `"obsolete"`, "true", "-0.1", "1.1"} {
+		testutil.Put(t, repo, ".devkit/config.json", `{"refine":{"relevance_threshold":`+value+`}}`)
+		c := testutil.Must(Load(repo))
+		testutil.Equal(t, c, Defaults(""))
+		var output map[string]any
+		testutil.OK(t, json.Unmarshal(testutil.Must(json.Marshal(c)), &output))
+		_, exists := output["refine"]
+		testutil.Equal(t, exists, false)
 	}
-	for _, raw := range []string{`{"refine":null}`, `{"refine":[]}`, `{"refine":{"extra":1}}`, `{"refine":{"relevance_threshold":null}}`, `{"refine":{"relevance_threshold":"0.2"}}`, `{"refine":{"relevance_threshold":true}}`, `{"refine":{"relevance_threshold":-0.1}}`, `{"refine":{"relevance_threshold":1.1}}`} {
+	testutil.Equal(t, testutil.Must(Parse([]byte(`{"refine":{}}`))), Defaults(""))
+	for _, raw := range []string{`{"refine":null}`, `{"refine":[]}`, `{"refine":{"extra":1}}`, `{"refine":{"relevance_threshold":0.2,"extra":1}}`} {
 		_, err := Parse([]byte(raw))
 		testutil.Fails(t, err, "invalid .devkit/config.json")
 	}
