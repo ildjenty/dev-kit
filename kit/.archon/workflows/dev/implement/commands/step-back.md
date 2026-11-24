@@ -1,6 +1,6 @@
 ## Purpose
 
-Find the broken premise after repeated implementation check failures or an environment failure. You did not write the implementation; verify it yourself. The workflow routes your diagnosis upstream, where the writer must address it before trying again; a diagnosis based on the implementer's account can repeat the same failed premise.
+Find the broken premise after repeated implementation check failures, an environment failure or a writer's unresolved observation. You did not write the implementation; verify it yourself. The workflow routes your diagnosis upstream, where the writer must address it before trying again; a diagnosis based on the implementer's account can repeat the same failed premise.
 
 ## Fixed standards
 
@@ -16,6 +16,7 @@ Read `$ARTIFACTS_DIR/implement/input.json` and its `step_back_materials`: read t
 - The requirements: `$ARTIFACTS_DIR/implement/requirements.json`.
 - The passed plan: `$ARTIFACTS_DIR/implement/plan.json` (decision list, increments,
   test plan).
+- The writer's unresolved observations: `$ARTIFACTS_DIR/implement/uncertain.json`, when present. Verify each against the completion condition, planned test and actual test code. They can require diagnosis even when checks pass.
 - The check history: `$ARTIFACTS_DIR/checks/<round>.jsonl` for each round, with the logs they name,
   and the change of each round in `$ARTIFACTS_DIR/checks/<round>-diff.patch`.
 - The criteria, as fixed for this request: `$ARTIFACTS_DIR/criteria/`.
@@ -30,7 +31,7 @@ Apply the named step-back criteria and common rules.
 - `next`:
   - `requirements` when a completion condition or constraint cannot hold as written
   - `plan` when a decision of the plan, its increments or its test plan does not hold
-  - `implement` when the requirements and the plan hold and the implementation is wrong
+  - `implement` when the requirements and the plan hold and the implementation is wrong, or the unresolved observations require no upstream change; for observations this continues the current run under the usual check gate
   - `environment` when the failure is the machine's (unavailable tools, missing environment, or network access), not the change's
 - `premise`: the premise that does not hold, in the language named by `language` in your input, naming the completion condition, the plan
   row or the step of the check it belongs to.

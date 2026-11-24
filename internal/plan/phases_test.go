@@ -30,7 +30,7 @@ func startStructure(t *testing.T) (record.ContextData, string) {
 	testutil.Equal(t, checked["structure"], true)
 	testutil.Equal(t, checked["data"], false)
 	j := string(must(json.Marshal(judgment(nil))))
-	must(settle(a, map[string]string{"structure": j}, "", "May work proceed?"))
+	must(settle(a, map[string]string{"structure": j}, "", "May work proceed?", nil))
 	testutil.Equal(t, must(advance(ctx, a))["proceed"], true)
 	return ctx, a
 }
@@ -68,7 +68,7 @@ func TestDetailAllowsSignaturesAndUsesItsOwnRoundCounter(t *testing.T) {
 	state := must(read(filepath.Join(rounds(a), "latest.json")))
 	testutil.Equal(t, state["judges"], []string{"delivery"})
 	j := string(must(json.Marshal(judgment(nil))))
-	testutil.Equal(t, must(settle(a, map[string]string{"delivery": j}, "", ""))["done"], true)
+	testutil.Equal(t, must(settle(a, map[string]string{"delivery": j}, "", "", nil))["done"], true)
 }
 func TestDetailStructureChangesStopImmediately(t *testing.T) {
 	for _, kind := range []string{"add", "remove", "move", "row"} {
@@ -90,8 +90,13 @@ func TestDetailStructureChangesStopImmediately(t *testing.T) {
 			testutil.Equal(t, r["valid"], false)
 			testutil.Equal(t, r["structure_changed"], true)
 			testutil.Contains(t, strings.Join(stringsOf(r["errors"]), "\n"), "Restart plan")
-			testutil.Equal(t, must(settle(a, nil, "", ""))["done"], true)
+			testutil.Equal(t, must(settle(a, nil, "", "", nil))["done"], true)
 			testutil.Equal(t, outcomeOf(must(read(filepath.Join(rounds(a), "latest.json"))), nil)["outcome"], "stop")
+			diagnostic := "C1 needs a structure change; src/entry.ext:1 is the evidence."
+			must(settle(a, nil, "", "", []string{diagnostic}))
+			outcome := outcomeOf(must(read(filepath.Join(rounds(a), "latest.json"))), nil)
+			testutil.Equal(t, outcome["outcome"], "stop")
+			testutil.Contains(t, strings.Join(stringsOf(object(outcome["stop"])["unresolved"]), "\n"), diagnostic)
 		})
 	}
 }
@@ -102,7 +107,7 @@ func TestStructureDoesNotAdvancePastQuestionsOrBlockingFindings(t *testing.T) {
 		state["judges"] = []string{"structure"}
 		testutil.OK(t, write(filepath.Join(rounds(a), "latest.json"), state))
 		output := string(must(json.Marshal(judgment(document{"findings": []document{finding(extra)}}))))
-		must(settle(a, map[string]string{"structure": output}, "", ""))
+		must(settle(a, map[string]string{"structure": output}, "", "", nil))
 		testutil.Equal(t, must(advance(ctx, a))["proceed"], false)
 	}
 }
@@ -112,7 +117,7 @@ func TestDeferredPlanFindingsNeverBlockOrAskAndRetainMechanical(t *testing.T) {
 	state["judges"] = []string{"structure"}
 	testutil.OK(t, write(filepath.Join(rounds(a), "latest.json"), state))
 	output := string(must(json.Marshal(judgment(document{"findings": []document{finding(document{"deferred": true, "mechanical": true, "blocking": false, "needs_decision": false})}}))))
-	r := must(settle(a, map[string]string{"structure": output}, "", ""))
+	r := must(settle(a, map[string]string{"structure": output}, "", "", nil))
 	testutil.Equal(t, r["fixable_count"], 0)
 	testutil.Equal(t, r["needs_decision_count"], 0)
 	testutil.Equal(t, must(advance(ctx, a))["proceed"], true)
@@ -152,7 +157,7 @@ func TestTwoPhaseFinishRecordsBothJudgmentsAndLoopOutcomes(t *testing.T) {
 	testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), draft()))
 	must(checkCommand(ctx, a, nil, "", "detail"))
 	j := string(must(json.Marshal(judgment(nil))))
-	must(settle(a, map[string]string{"delivery": j}, "", ""))
+	must(settle(a, map[string]string{"delivery": j}, "", "", nil))
 	head := testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD")
 	result := must(finish(ctx, a, record.ResultOptions{Base: head, Commit: head}))
 	testutil.Equal(t, result["outcome"], "pass")
@@ -172,7 +177,7 @@ func TestExhaustedStructureNeverProducesAnAcceptedPartialPlan(t *testing.T) {
 	requirements(ctx.Dir, "r1")
 	run(ctx.Dir, ctx.RunID)
 	output := string(must(json.Marshal(judgment(document{"verdict": "fail", "findings": []document{finding(nil)}}))))
-	must(settle(a, map[string]string{"structure": output}, "", ""))
+	must(settle(a, map[string]string{"structure": output}, "", "", nil))
 	head := testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD")
 	result := must(finish(ctx, a, record.ResultOptions{Base: head, Commit: head}))
 	testutil.Equal(t, result["outcome"], "stop")

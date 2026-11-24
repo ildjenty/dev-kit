@@ -16,7 +16,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
-func settle(artifacts string, outputs map[string]string, prototype, structureQuestion string) (document, error) {
+func settle(artifacts string, outputs map[string]string, prototype, structureQuestion string, uncertain []string) (document, error) {
 	state, err := read(filepath.Join(rounds(artifacts), "latest.json"))
 	if err != nil {
 		return nil, err
@@ -79,6 +79,7 @@ func settle(artifacts string, outputs map[string]string, prototype, structureQue
 	state["judgments"] = judgments
 	state["prototype"] = prototype
 	state["structure_question"] = structureQuestion
+	state["uncertain"] = uncertain
 	state["back"] = back
 	state["fixable"] = fixable
 	state["needs_decision"] = needs
@@ -92,7 +93,7 @@ func settle(artifacts string, outputs map[string]string, prototype, structureQue
 	if err = write(filepath.Join(artifacts, "plan", "findings.json"), document{"round": state["round"], "errors": state["errors"], "findings": findings, "not_assessed": missing}); err != nil {
 		return nil, err
 	}
-	return document{"round": state["round"], "valid": state["valid"], "fixable_count": len(fixable), "needs_decision_count": len(needs), "not_assessed_count": len(missing), "back": back != nil, "done": state["structure_changed"] == true || state["valid"] == true && len(fixable) == 0 && len(missing) == 0 || back != nil || strings.TrimSpace(prototype) != ""}, nil
+	return document{"round": state["round"], "valid": state["valid"], "fixable_count": len(fixable), "needs_decision_count": len(needs), "not_assessed_count": len(missing), "back": back != nil, "done": state["structure_changed"] == true || state["phase"] == "detail" && len(uncertain) > 0 || state["valid"] == true && len(fixable) == 0 && len(missing) == 0 || back != nil || strings.TrimSpace(prototype) != ""}, nil
 }
 func findingText(f document) string {
 	parts := []string{}
@@ -154,6 +155,10 @@ func ownerQuestions(state document, answers []document) []document {
 		return document{"text": value, "target": document{"kind": kind, "ref": ref, "content_hash": hash}, "next_workflows": []string{"plan"}, "invalidates": []string{}}
 	}
 	questions := []document{}
+	if uncertain := stringsOf(state["uncertain"]); state["phase"] == "detail" && len(uncertain) > 0 {
+		parts := append([]string{text(state["structure_question"])}, uncertain...)
+		questions = append(questions, ask(strings.Join(parts, "\n"), "change", "structure-uncertain", contentHash(document{"uncertain": uncertain})))
+	}
 	draft := object(state["draft"])
 	for _, d := range entries(draft["decisions"]) {
 		if d["decided_by"] != "owner" || d["when"] != "now" || text(d["ref"]) != "" || answered("decision", text(d["id"]), ownerRowHash(state, d)) {
@@ -218,6 +223,9 @@ func ownerQuestions(state document, answers []document) []document {
 	return questions
 }
 func outcomeOf(state document, answers []document) document {
+	if state["phase"] == "detail" && state["structure_changed"] != true && len(stringsOf(state["uncertain"])) > 0 {
+		return document{"outcome": "question", "questions": ownerQuestions(state, answers)}
+	}
 	if strings.TrimSpace(text(state["prototype"])) != "" {
 		return document{"outcome": "question", "questions": []document{{"text": state["prototype"], "target": document{"kind": "decision", "ref": "prototype"}, "next_workflows": []string{"plan"}, "invalidates": []string{}}}}
 	}
@@ -225,7 +233,11 @@ func outcomeOf(state document, answers []document) document {
 		return document{"outcome": "stop", "stop": document{"state": message, "unresolved": unresolved, "premise": ""}}
 	}
 	if state["valid"] != true {
-		return stop(fmt.Sprintf("The plan draft still fails the machine checks after round %d", number(state["round"])), stringsOf(state["errors"]))
+		unresolved := stringsOf(state["errors"])
+		if state["phase"] == "detail" {
+			unresolved = append(unresolved, stringsOf(state["uncertain"])...)
+		}
+		return stop(fmt.Sprintf("The plan draft still fails the machine checks after round %d", number(state["round"])), unresolved)
 	}
 	if back := object(state["back"]); back != nil {
 		return document{"outcome": "back", "back": document{"to": "requirements", "premise": back["premise"], "observation": back["observation"]}}

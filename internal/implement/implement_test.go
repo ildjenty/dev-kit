@@ -187,7 +187,7 @@ func TestCommitsPassingUnitAndResumesNextUnitWithConfiguredChecksAndLanguage(t *
 	testutil.Must(testsWritten(artifacts))
 	testutil.Equal(t, testutil.Must(next(artifacts))["tests_written"], true)
 	testutil.Put(t, ctx.Cwd, "state.mjs", "export const cancelled = true;\n")
-	testutil.Equal(t, testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "change: allow cancellation"}))["committed"], true)
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "change: allow cancellation"}, nil))["committed"], true)
 	testutil.Contains(t, testutil.Git(t, ctx.Cwd, "log", "-1", "--format=%B"), "Archon-Run: i1\nArchon-Unit: U1\nArchon-Inputs: requirements=1 plan=2")
 	later := filepath.Join(artifacts, "later")
 	testutil.Equal(t, testutil.Must(prepare(ctx, later))["remaining"], 1)
@@ -199,10 +199,10 @@ func TestDoesNotCommitFailedChecksOwnerDecisionsOrInvalidDecisionRows(t *testing
 	head := testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD")
 	gate := gateFixture()
 	gate.Passed = false
-	testutil.Equal(t, testutil.Must(end(ctx, artifacts, gate, &codeOutput{}))["committed"], false)
-	testutil.Equal(t, testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{OwnerDecisions: []ownerDecision{{"D1", "Choose?"}}}))["committed"], false)
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, gate, &codeOutput{}, nil))["committed"], false)
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{OwnerDecisions: []ownerDecision{{"D1", "Choose?"}}}, nil))["committed"], false)
 	putJSON(t, filepath.Join(artifacts, "implement/decisions.json"), record.Document{"rows": []record.Document{rowFixture(record.Document{"decided_by": "owner"})}})
-	testutil.Equal(t, testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{}))["committed"], false)
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{}, nil))["committed"], false)
 	testutil.Equal(t, testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD"), head)
 }
 func TestEachReleaseStepHasItsOwnPassLimit(t *testing.T) {
@@ -214,10 +214,10 @@ func TestEachReleaseStepHasItsOwnPassLimit(t *testing.T) {
 		gate.Failing = []string{name}
 		return gate
 	}
-	first := testutil.Must(end(ctx, artifacts, failing("lint"), &codeOutput{}))
+	first := testutil.Must(end(ctx, artifacts, failing("lint"), &codeOutput{}, nil))
 	testutil.Equal(t, first["finished"], false)
-	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing("types"), &codeOutput{}))["finished"], false)
-	third := testutil.Must(end(ctx, artifacts, failing("tests"), &codeOutput{}))
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing("types"), &codeOutput{}, nil))["finished"], false)
+	third := testutil.Must(end(ctx, artifacts, failing("tests"), &codeOutput{}, nil))
 	testutil.Equal(t, third["finished"], true)
 	s := testutil.Must(readJSON[state](filepath.Join(artifacts, "implement/state.json")))
 	testutil.Equal(t, s.Exhausted, first["unit"])
@@ -234,9 +234,9 @@ func TestPassingStepsDoNotUseUpTheNextStepsPasses(t *testing.T) {
 	failing := gateFixture()
 	failing.Passed = false
 	failing.Failing = []string{"lint"}
-	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing, &codeOutput{}))["finished"], false)
-	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing, &codeOutput{}))["finished"], false)
-	passed := testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "feat: first step"}))
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing, &codeOutput{}, nil))["finished"], false)
+	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing, &codeOutput{}, nil))["finished"], false)
+	passed := testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "feat: first step"}, nil))
 	testutil.Equal(t, passed["committed"], true)
 	s := testutil.Must(readJSON[state](filepath.Join(artifacts, "implement/state.json")))
 	testutil.Equal(t, s.Exhausted, "")
@@ -246,7 +246,7 @@ func TestWritesImplementationDecisionsIntoNewPlanVersionAndResultUsesIt(t *testi
 	ctx, artifacts := setup(t, true)
 	testutil.Must(prepare(ctx, artifacts))
 	putJSON(t, filepath.Join(artifacts, "implement/decisions.json"), record.Document{"rows": []record.Document{rowFixture(nil)}})
-	testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "change: allow cancellation"}))
+	testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "change: allow cancellation"}, nil))
 	result := testutil.Must(finish(ctx, artifacts, nil))
 	testutil.Equal(t, result["outcome"], "pass")
 	testutil.Equal(t, result["inputs"].(map[string]any)["plan_version"], 2)
@@ -359,7 +359,7 @@ func TestBaseFailureStopsImmediatelyWithoutPassOrStepBack(t *testing.T) {
 	testutil.Put(t, artifacts, "checks.jsonl", `{"name":"unit","status":"fail","base":"failed","log":"/checks/unit.log"}`+"\n")
 	gate := &checks.Gate{Failing: []string{"unit"}, Preexisting: []string{"unit"}, Results: results}
 	before := testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD")
-	ended := testutil.Must(end(ctx, artifacts, gate, nil))
+	ended := testutil.Must(end(ctx, artifacts, gate, nil, nil))
 	testutil.Equal(t, ended["finished"], true)
 	testutil.Equal(t, ended["stuck"], false)
 	testutil.Equal(t, ended["committed"], false)
@@ -389,7 +389,7 @@ func TestRegressedOrUnavailableChecksStillConsumeImplementationPass(t *testing.T
 			if base == "passed" {
 				gate.Regressed = []string{"unit"}
 			}
-			ended := testutil.Must(end(ctx, artifacts, gate, nil))
+			ended := testutil.Must(end(ctx, artifacts, gate, nil, nil))
 			testutil.Equal(t, ended["stuck"], true)
 			s := testutil.Must(readJSON[state](filepath.Join(artifacts, "implement/state.json")))
 			testutil.Equal(t, s.Round, 1)

@@ -325,13 +325,14 @@ nodes:
           bash: |
             prototype=$write.output.prototype
             structure_question=$write.output.structure_question
+            uncertain=$write.output.uncertain
             data=$judge-data.output
             contract=$judge-contract.output
             security=$judge-security.output
             ui=$judge-ui.output
             cost=$judge-cost.output
             delivery=$judge-delivery.output
-            INPUTS_PROTOTYPE="$prototype" INPUTS_STRUCTURE_QUESTION="$structure_question" INPUTS_DATA="$data" INPUTS_CONTRACT="$contract" \
+            INPUTS_PROTOTYPE="$prototype" INPUTS_STRUCTURE_QUESTION="$structure_question" INPUTS_UNCERTAIN="$uncertain" INPUTS_DATA="$data" INPUTS_CONTRACT="$contract" \
               INPUTS_SECURITY="$security" INPUTS_UI="$ui" INPUTS_COST="$cost" INPUTS_DELIVERY="$delivery" \
               devkit plan settle
           output_format:

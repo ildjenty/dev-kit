@@ -241,7 +241,7 @@ func TestSettle(t *testing.T) {
 	state["judges"] = []string{"structure", "delivery"}
 	check := func(outputs map[string]string, prototype string) document {
 		testutil.OK(t, write(filepath.Join(rounds(a), "latest.json"), state))
-		return must(settle(a, outputs, prototype, ""))
+		return must(settle(a, outputs, prototype, "", nil))
 	}
 	encode := func(d document) string { return string(must(json.Marshal(d))) }
 	outputs := map[string]string{"structure": encode(judgment(nil)), "delivery": encode(judgment(nil))}
@@ -339,7 +339,7 @@ func TestCheckCommitsSkeletonAndAsksStructure(t *testing.T) {
 		t.Fatal(state)
 	}
 	j := string(must(json.Marshal(judgment(nil))))
-	must(settle(a, map[string]string{"structure": j, "delivery": j}, "", "May work proceed with the proposed structure?"))
+	must(settle(a, map[string]string{"structure": j, "delivery": j}, "", "May work proceed with the proposed structure?", nil))
 	out := outcomeOf(must(read(filepath.Join(rounds(a), "latest.json"))), nil)
 	testutil.Equal(t, out["outcome"], "question")
 	q := text(entries(out["questions"])[0]["text"])
@@ -453,7 +453,7 @@ func TestPlanFailWithoutFindingsAndMissingJudgeNeverPass(t *testing.T) {
 		state := settled()
 		state["judges"] = []string{"structure"}
 		testutil.OK(t, write(filepath.Join(rounds(a), "latest.json"), state))
-		r := must(settle(a, map[string]string{"structure": output}, "", ""))
+		r := must(settle(a, map[string]string{"structure": output}, "", "", nil))
 		testutil.Equal(t, r["done"], false)
 		if outcomeOf(must(read(filepath.Join(rounds(a), "latest.json"))), nil)["outcome"] == "pass" {
 			t.Fatal("unpassed verdict passed")
@@ -567,7 +567,7 @@ func TestAgreedRecordsAreInTheSkeletonCommit(t *testing.T) {
 	testutil.Put(t, ctx.Cwd, "src/entry.ext", "skeleton signature\n")
 	must(checkCommand(ctx, a, nil, "", "detail"))
 	j := string(must(json.Marshal(judgment(nil))))
-	must(settle(a, map[string]string{"structure": j, "delivery": j}, "", ""))
+	must(settle(a, map[string]string{"structure": j, "delivery": j}, "", "", nil))
 	testutil.Equal(t, must(finishTestPlan(t, ctx, a, record.ResultOptions{Base: parent, Commit: parent}))["outcome"], "pass")
 	testutil.Equal(t, testutil.Git(t, ctx.Cwd, "rev-parse", "HEAD^"), parent)
 	files := testutil.Git(t, ctx.Cwd, "diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD")
@@ -594,7 +594,7 @@ func completeStructure(t *testing.T, ctx record.ContextData, artifacts string) {
 	}
 	testutil.OK(t, write(filepath.Join(artifacts, "plan/draft.json"), structureDraft()))
 	must(checkCommand(ctx, artifacts, nil, "", "structure"))
-	must(settle(artifacts, map[string]string{"structure": string(must(json.Marshal(judgment(nil))))}, "", ""))
+	must(settle(artifacts, map[string]string{"structure": string(must(json.Marshal(judgment(nil))))}, "", "", nil))
 	testutil.Equal(t, must(advance(ctx, artifacts))["proceed"], true)
 	testutil.OK(t, write(filepath.Join(artifacts, "plan/draft.json"), draft()))
 }

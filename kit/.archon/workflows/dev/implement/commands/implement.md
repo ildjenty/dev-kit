@@ -33,7 +33,7 @@ Return the node's JSON shape in input `language`:
 - `owner_decisions`: `{ "row": "<existing or new row ID>", "question": "..." }` for choices
   reserved by the named authority document. Leave dependent code unwritten; the machine returns
   `back` to plan, which asks the question.
-- `uncertain`: unresolved observations.
+- `uncertain`: unresolved observations, including a test's misreading of a completion condition with the condition, test location and evidence. Non-empty entries go verbatim to the step-back judge before the unit can be committed; its `implement` decision continues the run, and its upstream decision returns the diagnosis for correction.
 - `commit_message`: one line with a prefix from fixed `git.md`, followed by the unit's result derived
   from the requirements' goal and this unit's completion conditions. Do not include unit or condition
   IDs or `ALL`; the machine adds provenance trailers. Leave committing to the workflow.

@@ -1,0 +1,14 @@
+fixture:
+  expect: completed
+  reached: [uncertain, uncertain-step-back, unit-end, finish, result]
+start: { stopped: false, stage: start, reason: "", details: "", remaining: [], start: next, counted: false, restarts: 0 }
+prepare: { units: 1, remaining: 1, has_plan: true }
+unit: { unit: U1, tests_written: true, round: 1 }
+code: { owner_decisions: [], uncertain: ["C1 retains cancellation; tests/cancel.ext:12 expects deletion."], commit_message: "feat: allow cancellation" }
+uncertain: { needed: true }
+checks: { round: 1, passed: true, stuck: false, failing: [], stuck_checks: [], skipped: [], results: x }
+uncertain-step-back: { next: plan, premise: "C1 test interpretation", observation: "tests/cancel.ext:12" }
+unit-end: { unit: U1, committed: false, all_done: false, finished: true, needs_owner: 0, stuck: false, decision_errors: 0 }
+units-state: { stuck: false }
+finish: '{"outcome":"back"}'
+result: '{"outcome":"back"}'

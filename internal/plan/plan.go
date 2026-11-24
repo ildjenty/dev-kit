@@ -365,7 +365,13 @@ func Commands() []cli.Command {
 				for _, j := range concerns.Names() {
 					outputs[j] = env.Getenv("INPUTS_" + strings.ToUpper(j))
 				}
-				out, err = settle(artifacts, outputs, env.Getenv("INPUTS_PROTOTYPE"), env.Getenv("INPUTS_STRUCTURE_QUESTION"))
+				var uncertain []string
+				if value := env.Getenv("INPUTS_UNCERTAIN"); strings.TrimSpace(value) != "" {
+					if err := json.Unmarshal([]byte(value), &uncertain); err != nil {
+						return err
+					}
+				}
+				out, err = settle(artifacts, outputs, env.Getenv("INPUTS_PROTOTYPE"), env.Getenv("INPUTS_STRUCTURE_QUESTION"), uncertain)
 			} else {
 				ctx, e := record.Context(env)
 				if e != nil {

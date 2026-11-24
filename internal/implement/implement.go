@@ -53,11 +53,14 @@ type state struct {
 	BaseFailed          []string        `json:"base_failed,omitempty"`
 	FailingLogs         []string        `json:"failing_logs,omitempty"`
 	LastFailing         []string        `json:"last_failing,omitempty"`
+	Uncertain           []string        `json:"uncertain,omitempty"`
+	StepBack            *stepBack       `json:"step_back,omitempty"`
 }
 
 type codeOutput struct {
 	OwnerDecisions []ownerDecision `json:"owner_decisions"`
 	CommitMessage  any             `json:"commit_message"`
+	Uncertain      []string        `json:"uncertain"`
 }
 
 type stepBack struct {
@@ -502,7 +505,7 @@ func commitSubject(written any, u unit, requirements, plan record.Document, pref
 	return prefixes[0] + ": " + goal
 }
 
-func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *codeOutput) (record.Document, error) {
+func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *codeOutput, back *stepBack) (record.Document, error) {
 	dir := filepath.Join(artifacts, "implement")
 	file := filepath.Join(dir, "state.json")
 	s, err := readJSON[state](file)
@@ -520,6 +523,9 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 			return nil, err
 		}
 		return record.Document{"unit": u.ID, "committed": false, "all_done": false, "finished": true, "needs_owner": 0, "stuck": false, "decision_errors": 0}, nil
+	}
+	if code != nil && len(code.Uncertain) > 0 && (back == nil || back.Next != "requirements" && back.Next != "plan" && back.Next != "implement" && back.Next != "environment") {
+		return nil, fmt.Errorf("non-empty uncertain requires a step-back judgment")
 	}
 	s.Round++
 	if u != nil {
@@ -542,6 +548,12 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 		return nil, err
 	}
 	s.OwnerDecisions = []ownerDecision{}
+	s.Uncertain = nil
+	s.StepBack = nil
+	if code != nil && len(code.Uncertain) > 0 && back.Next != "implement" {
+		s.Uncertain = code.Uncertain
+		s.StepBack = back
+	}
 	if code != nil && code.OwnerDecisions != nil {
 		s.OwnerDecisions = code.OwnerDecisions
 	}
@@ -554,7 +566,7 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 		s.Stuck = &stuckChecks{gate.Failing, gate.StuckChecks, gate.Results}
 	}
 	committed := false
-	if gate != nil && gate.Passed && len(errors) == 0 && len(s.OwnerDecisions) == 0 {
+	if gate != nil && gate.Passed && len(errors) == 0 && len(s.OwnerDecisions) == 0 && s.StepBack == nil {
 		if _, err := gitx.Run(ctx.Cwd, "add", "-A"); err != nil {
 			return nil, err
 		}
@@ -588,7 +600,7 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 	if gate != nil && !gate.Passed {
 		s.LastFailing = gate.Failing
 	}
-	if !committed && u != nil && s.Stuck == nil && len(s.OwnerDecisions) == 0 {
+	if !committed && u != nil && s.Stuck == nil && len(s.OwnerDecisions) == 0 && s.StepBack == nil {
 		passes := 3
 		if c, err := config.Load(ctx.Cwd); err == nil && c.Limits.Passes > 0 {
 			passes = c.Limits.Passes
@@ -604,7 +616,7 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 	if u == nil {
 		return nil, fmt.Errorf("Cannot read properties of undefined (reading 'id')")
 	}
-	return record.Document{"unit": u.ID, "committed": committed, "all_done": allDone, "finished": allDone || s.Stuck != nil || len(s.OwnerDecisions) > 0 || s.Exhausted != "", "needs_owner": len(s.OwnerDecisions), "stuck": s.Stuck != nil, "decision_errors": len(errors)}, nil
+	return record.Document{"unit": u.ID, "committed": committed, "all_done": allDone, "finished": allDone || s.Stuck != nil || s.StepBack != nil || len(s.OwnerDecisions) > 0 || s.Exhausted != "", "needs_owner": len(s.OwnerDecisions), "stuck": s.Stuck != nil, "decision_errors": len(errors)}, nil
 }
 
 func outcome(s state, plan record.Document, written json.RawMessage, back *stepBack) (record.Document, []record.Document, error) {
@@ -613,7 +625,7 @@ func outcome(s state, plan record.Document, written json.RawMessage, back *stepB
 		ended = "cleared"
 	} else if len(s.BaseFailed) > 0 {
 		ended = "base_failed"
-	} else if s.Stuck != nil {
+	} else if s.Stuck != nil || s.StepBack != nil {
 		ended = "stuck"
 	}
 	loops := []record.Document{{"name": "implement", "ended": ended, "rounds": s.Round}}
@@ -633,6 +645,13 @@ func outcome(s state, plan record.Document, written json.RawMessage, back *stepB
 		result := record.BackToPlan(rows)
 		result["loops"] = loops
 		return result, nil, nil
+	}
+	if s.StepBack != nil {
+		back := s.StepBack
+		if back.Next == "requirements" || back.Next == "plan" {
+			return record.Document{"outcome": "back", "loops": loops, "back": record.Document{"to": back.Next, "premise": back.Premise, "observation": back.Observation + "\n" + strings.Join(s.Uncertain, "\n")}}, nil, nil
+		}
+		return stop("The step-back judge found an environment failure", s.Uncertain, back.Premise+"\n"+back.Observation), nil, nil
 	}
 	if s.Stuck != nil {
 		if back != nil && (back.Next == "requirements" || back.Next == "plan") {
@@ -774,7 +793,7 @@ func parseEnv[T any](value string) (*T, error) {
 
 func Commands() []cli.Command {
 	commands := []cli.Command{}
-	for _, mode := range []string{"prepare", "next", "tests-written", "end", "state", "finish"} {
+	for _, mode := range []string{"prepare", "next", "tests-written", "uncertain", "end", "state", "finish"} {
 		commands = append(commands, cli.Command{Area: "implement", Name: mode, Usage: "devkit implement " + mode, Run: func(args []string, env cli.Env) error {
 			artifacts := env.Getenv("ARTIFACTS_DIR")
 			if artifacts == "" {
@@ -786,10 +805,21 @@ func Commands() []cli.Command {
 				out, err = next(env.Path(artifacts))
 			} else if mode == "tests-written" {
 				out, err = testsWritten(env.Path(artifacts))
+			} else if mode == "uncertain" {
+				code, parseErr := parseEnv[codeOutput](env.Getenv("CODE"))
+				if parseErr != nil {
+					return parseErr
+				}
+				uncertain := []string{}
+				if code != nil && code.Uncertain != nil {
+					uncertain = code.Uncertain
+				}
+				err = writeJSON(filepath.Join(env.Path(artifacts), "implement/uncertain.json"), uncertain)
+				out = record.Document{"needed": len(uncertain) > 0}
 			} else if mode == "state" {
 				var s state
 				s, err = readJSON[state](filepath.Join(env.Path(artifacts), "implement/state.json"))
-				out = record.Document{"stuck": s.Stuck != nil && len(s.OwnerDecisions) == 0}
+				out = record.Document{"stuck": s.Stuck != nil && s.StepBack == nil && len(s.OwnerDecisions) == 0}
 			} else {
 				ctx, contextErr := record.Context(env)
 				if contextErr != nil {
@@ -808,7 +838,11 @@ func Commands() []cli.Command {
 					if parseErr != nil {
 						return parseErr
 					}
-					out, err = end(ctx, env.Path(artifacts), gate, code)
+					back, parseErr := parseEnv[stepBack](env.Getenv("STEP_BACK"))
+					if parseErr != nil {
+						return parseErr
+					}
+					out, err = end(ctx, env.Path(artifacts), gate, code, back)
 				case "finish":
 					back, parseErr := parseEnv[stepBack](env.Getenv("STEP_BACK"))
 					if parseErr != nil {

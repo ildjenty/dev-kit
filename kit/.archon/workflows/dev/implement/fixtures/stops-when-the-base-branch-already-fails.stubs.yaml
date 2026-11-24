@@ -12,3 +12,4 @@ unit-end: { unit: U1, committed: false, all_done: false, finished: true, needs_o
 units-state: { stuck: false }
 finish: '{"outcome":"stop","stop":{"state":"the base branch fails test already: fix the base branch first, then start this workflow again","unresolved":["test: /tmp/checks/test.log"],"premise":"","base_failed":true}}'
 result: '{"outcome":"stop","stop":{"state":"the base branch fails test already: fix the base branch first, then start this workflow again","unresolved":["test: /tmp/checks/test.log"],"premise":"","base_failed":true}}'
+uncertain: { needed: false }

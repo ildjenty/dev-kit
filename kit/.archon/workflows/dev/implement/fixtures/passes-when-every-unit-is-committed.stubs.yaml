@@ -12,3 +12,4 @@ unit-end: { unit: U1, committed: true, all_done: true, finished: true, needs_own
 units-state: { stuck: false }
 finish: '{"outcome":"pass"}'
 result: '{"outcome":"pass"}'
+uncertain: { needed: false }

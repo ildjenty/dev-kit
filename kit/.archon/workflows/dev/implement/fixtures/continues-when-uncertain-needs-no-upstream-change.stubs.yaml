@@ -1,0 +1,14 @@
+fixture:
+  expect: completed
+  reached: [uncertain, uncertain-step-back, unit-end, finish, result]
+start: { stopped: false, stage: start, reason: "", details: "", remaining: [], start: next, counted: false, restarts: 0 }
+prepare: { units: 1, remaining: 1, has_plan: true }
+unit: { unit: U1, tests_written: true, round: 1 }
+code: { owner_decisions: [], uncertain: ["C1 may conflict with tests/cancel.ext:12."], commit_message: "feat: allow cancellation" }
+uncertain: { needed: true }
+checks: { round: 1, passed: true, stuck: false, failing: [], stuck_checks: [], skipped: [], results: x }
+uncertain-step-back: { next: implement, premise: "C1 and its planned tests hold", observation: "tests/cancel.ext:12 verifies cancellation." }
+unit-end: { unit: U1, committed: true, all_done: true, finished: true, needs_owner: 0, stuck: false, decision_errors: 0 }
+units-state: { stuck: false }
+finish: '{"outcome":"pass"}'
+result: '{"outcome":"pass"}'

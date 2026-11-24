@@ -61,7 +61,7 @@ func TestF4DetailLaunchesDetectedQualityWithoutRows(t *testing.T) {
 	testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), structureDraft()))
 	testutil.Put(t, ctx.Cwd, "src/entry.ext", "signature\n")
 	must(checkCommand(ctx, a, nil, "", "structure"))
-	must(settle(a, map[string]string{"structure": string(must(json.Marshal(judgment(nil))))}, "", ""))
+	must(settle(a, map[string]string{"structure": string(must(json.Marshal(judgment(nil))))}, "", "", nil))
 	if next := must(advance(ctx, a)); next["proceed"] != true {
 		t.Fatalf("%v", outcomeOf(must(read(filepath.Join(rounds(a), "latest.json"))), nil))
 	}
@@ -81,7 +81,7 @@ func TestF5PlanRejectsContradictoryDeferred(t *testing.T) {
 		testutil.OK(t, write(filepath.Join(rounds(a), "latest.json"), state))
 		f := finding(document{"deferred": true})
 		output := string(must(json.Marshal(judgment(document{"findings": []document{f}}))))
-		result := must(settle(a, map[string]string{q: output}, "", ""))
+		result := must(settle(a, map[string]string{q: output}, "", "", nil))
 		testutil.Equal(t, result["not_assessed_count"], 1)
 	}
 }
@@ -127,14 +127,14 @@ func TestF12PlanKeepsResolvedMechanicalFindingsFromEveryRound(t *testing.T) {
 	testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), structureDraft()))
 	must(checkCommand(ctx, a, nil, "", "structure"))
 	output := string(must(json.Marshal(judgment(document{"verdict": "fail", "findings": []document{finding(document{"mechanical": true})}}))))
-	must(settle(a, map[string]string{"structure": output}, "", ""))
+	must(settle(a, map[string]string{"structure": output}, "", "", nil))
 	must(checkCommand(ctx, a, nil, "", "structure"))
 	passed := string(must(json.Marshal(judgment(nil))))
-	must(settle(a, map[string]string{"structure": passed}, "", ""))
+	must(settle(a, map[string]string{"structure": passed}, "", "", nil))
 	testutil.Equal(t, must(advance(ctx, a))["proceed"], true)
 	testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), draft()))
 	must(checkCommand(ctx, a, nil, "", "detail"))
-	must(settle(a, map[string]string{"delivery": passed}, "", ""))
+	must(settle(a, map[string]string{"delivery": passed}, "", "", nil))
 	must(finish(ctx, a, record.ResultOptions{Base: sha("b"), Commit: sha("c")}))
 	judgments := must(record.List(ctx.Dir, "judgment"))
 	testutil.Equal(t, len(judgments), 3)
@@ -183,7 +183,7 @@ func TestF13FinishRequiresMatchingCompletedPhases(t *testing.T) {
 			run(ctx.Dir, ctx.RunID)
 			testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), draft()))
 			must(checkCommand(ctx, a, nil, "", "detail"))
-			must(settle(a, map[string]string{"delivery": string(must(json.Marshal(judgment(nil))))}, "", ""))
+			must(settle(a, map[string]string{"delivery": string(must(json.Marshal(judgment(nil))))}, "", "", nil))
 			fixed := must(read(filepath.Join(a, "plan/structure.json")))
 			switch fault {
 			case "run":
@@ -210,10 +210,10 @@ func TestF12PlanRecordsEarlierJudgmentsAfterFinalMachineFailure(t *testing.T) {
 	testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), structureDraft()))
 	must(checkCommand(ctx, a, nil, "", "structure"))
 	failed := judgment(document{"verdict": "fail", "findings": []document{finding(document{"mechanical": true})}})
-	must(settle(a, map[string]string{"structure": string(must(json.Marshal(failed)))}, "", ""))
+	must(settle(a, map[string]string{"structure": string(must(json.Marshal(failed)))}, "", "", nil))
 	testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), document{}))
 	must(checkCommand(ctx, a, nil, "", "structure"))
-	must(settle(a, nil, "", ""))
+	must(settle(a, nil, "", "", nil))
 	out := must(finish(ctx, a, record.ResultOptions{Base: sha("b"), Commit: sha("c")}))
 	testutil.Equal(t, out["outcome"], "stop")
 	judgments := must(record.List(ctx.Dir, "judgment"))

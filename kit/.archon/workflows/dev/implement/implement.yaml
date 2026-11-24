@@ -115,8 +115,18 @@ nodes:
               uncertain: { type: array, items: { type: string } }
               commit_message: { type: string }
             required: [owner_decisions, uncertain, commit_message]
-        - id: checks
+        - id: uncertain
           depends_on: [code]
+          bash: |
+            code=$code.output
+            CODE="$code" devkit implement uncertain
+          output_format:
+            type: object
+            properties:
+              needed: { type: boolean }
+            required: [needed]
+        - id: checks
+          depends_on: [uncertain]
           bash: devkit checks --base-on-repeat
           output_format:
             type: object
@@ -131,12 +141,30 @@ nodes:
               skipped: { type: array, items: { type: string } }
               results: { type: string }
             required: [round, passed, stuck, failing, stuck_checks, skipped, results]
+        - id: uncertain-step-back
+          depends_on: [uncertain, checks]
+          when: "$uncertain.output.needed == true"
+          provider: claude
+          command: step-back
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          output_format: &step_back
+            type: object
+            additionalProperties: false
+            properties:
+              next: { type: string, enum: [requirements, plan, implement, environment] }
+              premise: { type: string }
+              observation: { type: string }
+            required: [next, premise, observation]
         - id: unit-end
-          depends_on: [checks]
+          depends_on: [checks, uncertain-step-back]
+          trigger_rule: none_failed_min_one_success
           bash: |
             gate=$checks.output
             code=$code.output
-            GATE="$gate" CODE="$code" devkit implement end
+            back=$uncertain-step-back.output
+            GATE="$gate" CODE="$code" STEP_BACK="$back" devkit implement end
           output_format:
             type: object
             properties:
@@ -168,14 +196,7 @@ nodes:
     context: fresh
     mutates_checkout: false
     allowed_tools: [Read, Grep, Glob]
-    output_format:
-      type: object
-      additionalProperties: false
-      properties:
-        next: { type: string, enum: [requirements, plan, implement, environment] }
-        premise: { type: string }
-        observation: { type: string }
-      required: [next, premise, observation]
+    output_format: *step_back
 
   - id: finish
     depends_on: [units-state, step-back]

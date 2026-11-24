@@ -1,0 +1,7 @@
+exec-code: true
+fixture:
+  expect: completed
+  reached: [start, prepare, unit, tests-written, uncertain, checks, uncertain-step-back, unit-end, units-state, finish, result]
+tests: { tests: ["fixture.txt: contains fixture result"] }
+code: { owner_decisions: [], uncertain: ["C1 may require a different test; fixture.txt:1 already contains fixture result."], commit_message: "feat: update fixture result" }
+uncertain-step-back: { next: implement, premise: "C1 and the planned test hold", observation: "fixture.txt:1 contains fixture result." }

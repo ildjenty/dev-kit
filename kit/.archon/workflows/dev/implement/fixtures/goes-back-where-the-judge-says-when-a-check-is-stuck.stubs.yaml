@@ -11,3 +11,4 @@ units-state: { stuck: true }
 step-back: { next: plan, premise: "The contract in D2 does not hold", observation: "checks/2-test.log:12" }
 finish: '{"outcome":"back"}'
 result: '{"outcome":"back"}'
+uncertain: { needed: false }

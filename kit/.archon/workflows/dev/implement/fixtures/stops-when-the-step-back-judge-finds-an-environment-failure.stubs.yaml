@@ -11,3 +11,4 @@ units-state: { stuck: true }
 step-back: { next: environment, premise: "A required executable is unavailable", observation: "checks/2-test.log:12" }
 finish: '{"outcome":"stop"}'
 result: '{"outcome":"stop"}'
+uncertain: { needed: false }
