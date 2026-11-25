@@ -160,16 +160,17 @@ func (d Drafts) Errors() []string {
 }
 
 type Creation struct {
-	PRNumber    int                `json:"pr_number,omitempty"`
-	PRURL       string             `json:"pr_url,omitempty"`
-	Publication string             `json:"publication,omitempty"`
-	RunID       string             `json:"run_id"`
-	Commit      string             `json:"commit"`
-	Parent      *Created           `json:"parent"`
-	Created     map[string]Created `json:"created"`
-	SubIssues   map[string]bool    `json:"sub_issues"`
-	BlockedBy   map[string]bool    `json:"blocked_by"`
-	Commented   bool               `json:"commented"`
+	LabelsEnsured bool               `json:"labels_ensured,omitempty"`
+	PRNumber      int                `json:"pr_number,omitempty"`
+	PRURL         string             `json:"pr_url,omitempty"`
+	Publication   string             `json:"publication,omitempty"`
+	RunID         string             `json:"run_id"`
+	Commit        string             `json:"commit"`
+	Parent        *Created           `json:"parent"`
+	Created       map[string]Created `json:"created"`
+	SubIssues     map[string]bool    `json:"sub_issues"`
+	BlockedBy     map[string]bool    `json:"blocked_by"`
+	Commented     bool               `json:"commented"`
 }
 
 func ReadCreation(path string) (Creation, error) {

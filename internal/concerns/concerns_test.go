@@ -192,7 +192,7 @@ func TestConfigAndSchemaQualitySetsMatchConstant(t *testing.T) {
 					qualities := []string{}
 					for _, name := range enum {
 						s := name.(string)
-						if !slices.Contains([]string{"requirements", "pr-body", "report", "dispute", "refine", "retro"}, s) {
+						if !slices.Contains([]string{"requirements", "pr-body", "report", "dispute", "refine", "retro", "optimize"}, s) {
 							qualities = append(qualities, s)
 						}
 					}

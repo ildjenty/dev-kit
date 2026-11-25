@@ -1,0 +1,47 @@
+{
+  "exec-code": true,
+  "fixture": {
+    "expect": "completed",
+    "reached": [
+      "start",
+      "prepare",
+      "write",
+      "check",
+      "judge",
+      "round",
+      "finish",
+      "result"
+    ],
+    "inputs": {
+      "instructions": "Fit the fixture instructions"
+    }
+  },
+  "write": {
+    "draft": "/tmp/optimize/draft.json"
+  },
+  "judge": {
+    "criteria": [
+      {
+        "aspect": "fit",
+        "verdict": "pass",
+        "checked": "Compared repository and fixed standards",
+        "not_checked": ""
+      },
+      {
+        "aspect": "harness",
+        "verdict": "pass",
+        "checked": "Compared repository and fixed standards",
+        "not_checked": ""
+      },
+      {
+        "aspect": "triage",
+        "verdict": "pass",
+        "checked": "Compared repository and fixed standards",
+        "not_checked": ""
+      }
+    ],
+    "findings": [
+
+    ]
+  }
+}

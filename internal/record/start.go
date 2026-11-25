@@ -202,7 +202,7 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 		return nil, err
 	}
 	reasons := []string{}
-	if workflow != "refine" && workflow != "retro" && workflow != "requirements" && workflow != "sync" {
+	if workflow != "optimize" && workflow != "refine" && workflow != "retro" && workflow != "requirements" && workflow != "sync" {
 		req, err := requirementsInput(dir, valid, workflow == "plan" || workflow == "implement" || workflow == "fix" && options.Review != "")
 		if err != nil {
 			return nil, err

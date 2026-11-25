@@ -199,7 +199,7 @@ func reportOutput(env cli.Env, limit, providerLimit time.Duration) (bool, error)
 		finding("needed for a part", settings.Provider+" Jev fallback", fallback, "read-only CLI available for judge route", "Without Jev or its CLI fallback, routing selects all qualities; install and sign in to "+settings.Provider+".")
 	}
 	finding("optional", "TYPESAFE_API_KEY", key, "set; TypeSafe receives changed-file diffs for routing", "Not set; the configured provider CLI performs routing. Set TYPESAFE_API_KEY to use TypeSafe (changed-file diffs are sent).")
-	finding("optional", "checks", len(settings.Checks) > 0, fmt.Sprintf("%d configured; command availability is checked when they run", len(settings.Checks)), "No verification runs; run the "+settings.Skills["devkit-optimize"]+" skill to configure repository checks.")
+	finding("optional", "checks", len(settings.Checks) > 0, fmt.Sprintf("%d configured; command availability is checked when they run", len(settings.Checks)), "No verification runs; run the "+settings.Skills["devkit-optimize"]+" skill to start the reviewed optimize workflow and configure repository checks.")
 	return valid, outputErr
 }
 

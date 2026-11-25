@@ -62,6 +62,8 @@ func proposalText(content map[string]any, progress issues.Creation, branch, repo
 		Draft   struct {
 			prText
 			issues.Drafts
+			Changes   []struct{ Path, Reason, Evidence string } `json:"changes"`
+			Triage    []issues.TriageItem                       `json:"triage"`
 			Decisions []struct{ Key, Title string }             `json:"decisions"`
 			Bindings  []struct{ Path, Decision, Reason string } `json:"bindings"`
 			Standards []struct {
@@ -112,6 +114,9 @@ func proposalText(content map[string]any, progress issues.Creation, branch, repo
 		return id
 	}
 	rows := []string{}
+	for _, change := range draft.Changes {
+		rows = append(rows, fmt.Sprintf("- `%s` — %s; %s", change.Path, change.Reason, change.Evidence))
+	}
 	for _, binding := range draft.Bindings {
 		rows = append(rows, fmt.Sprintf("- `%s` — %s: %s", binding.Path, decisionLabel(binding.Decision), binding.Reason))
 	}
@@ -194,5 +199,34 @@ func proposalText(content map[string]any, progress issues.Creation, branch, repo
 		rows = append([]string{ready, ""}, rows...)
 	}
 	section(created, rows)
+	rows = nil
+	heading, parentLabel := "Issue triage", "parent"
+	kinds := map[string]string{"unit": "Unit", "topic": "Topic", "leave": "Left out"}
+	if japanese(cfg.Language) {
+		heading, parentLabel = "Issue の整理", "親"
+		kinds = map[string]string{"unit": "作業単位", "topic": "トピック", "leave": "対象外"}
+	}
+	for _, item := range draft.Triage {
+		if item.Kind == "leave" {
+			rows = append(rows, fmt.Sprintf("- #%d — %s: %s", item.Number, kinds[item.Kind], item.Reason))
+			continue
+		}
+		if issue, ok := progress.Created[item.Key]; ok {
+			row := "- " + issueLink(issue, item.Title) + " — " + kinds[item.Kind] + ": " + item.Reason
+			if parent, ok := progress.Created[item.Parent]; ok {
+				row += "; " + parentLabel + ": " + issueLink(parent, "")
+			}
+			for _, key := range item.BlockedBy {
+				if blocker, ok := progress.Created[key]; ok {
+					row += "; " + blocked + ": " + issueLink(blocker, "")
+				}
+			}
+			rows = append(rows, row)
+		} else {
+			rows = append(rows, fmt.Sprintf("- %s (#%d) — %s: %s", item.Title, item.Number, kinds[item.Kind], item.Reason))
+		}
+	}
+	section(heading, rows)
+
 	return draft.Title, body, nil
 }

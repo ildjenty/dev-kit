@@ -17,7 +17,8 @@
         "dispute",
         "refine",
         "report",
-        "retro"
+        "retro",
+        "optimize"
       ]
     },
     "kind": {
@@ -150,7 +151,8 @@
         "detail",
         "decide",
         "document",
-        "retro"
+        "retro",
+        "optimize"
       ]
     },
     "round": {

@@ -273,7 +273,8 @@
               "requirements",
               "plan",
               "pr",
-              "retro"
+              "retro",
+              "optimize"
             ]
           }
         }

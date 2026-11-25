@@ -19,7 +19,7 @@ import (
 
 type Document = map[string]any
 
-var Workflows = []string{"refine", "requirements", "plan", "implement", "judge", "fix", "pr", "sync", "retro"}
+var Workflows = []string{"refine", "requirements", "plan", "implement", "judge", "fix", "pr", "sync", "retro", "optimize"}
 
 func StageOf(workflow string) (int, error) {
 	stage := slices.Index(Workflows, workflow)

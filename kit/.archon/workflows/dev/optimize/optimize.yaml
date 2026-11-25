@@ -1,0 +1,197 @@
+name: optimize
+description: |
+  Fit the kit to repository evidence and the owner's instructions, and triage existing open Issues.
+  Review up to three committed drafts with machine checks and a fresh read-only judge.
+  Ask approval of the reviewed summary and owner-reserved points, then publish the PR and issue triage.
+worktree:
+  enabled: true
+inputs:
+  instructions:
+    default: ""
+    description: The owner's words verbatim, or empty for a full repository fit.
+  answers:
+    default: ""
+    description: 'Owner answers as a JSON array of {"question_id":"Q1","answer":"..."}.'
+  approve:
+    default: ""
+    description: The latest proposal version to agree, or empty.
+  continue:
+    default: ""
+    description: The owner's words authorizing a restart past the configured limit, or empty.
+returns: result
+nodes:
+  - id: start
+    bash: devkit optimize start
+    output_format:
+      type: object
+      properties:
+        stopped: { type: boolean }
+        stage: { type: string }
+        reason: { type: string }
+        details: { type: string }
+        remaining: { type: array, items: { type: string } }
+        start: { type: string }
+        counted: { type: boolean }
+        restarts: { type: integer }
+      required: [stopped, stage, reason, details, remaining, start, counted, restarts]
+
+  - id: not-started
+    depends_on: [start]
+    when: "$start.output.stopped == true"
+    bash: |
+      started=$start.output
+      INPUTS_START="$started" devkit optimize not-started
+    output_format: &result
+      type: object
+      properties:
+        outcome: { type: string, enum: [not_started, pass, question, stop] }
+        proposal_version: { type: integer }
+        issue_numbers: { type: array, items: { type: integer } }
+        pr_number: { type: integer }
+        pr_url: { type: string }
+        publication: { type: string }
+        questions:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              text: { type: string }
+            required: [id, text]
+        reasons: { type: array, items: { type: string } }
+      required: [outcome, proposal_version, issue_numbers, pr_number, pr_url, publication, questions, reasons]
+
+  - id: approve
+    depends_on: [start]
+    when: "$start.output.stopped == false && $INPUTS.approve != ''"
+    bash: devkit optimize approve
+    output_format: *result
+
+  - id: prepare
+    depends_on: [start]
+    when: "$start.output.stopped == false && $INPUTS.approve == ''"
+    bash: devkit optimize prepare
+    output_format:
+      type: object
+      properties:
+        input: { type: string }
+        criteria: { type: string }
+      required: [input, criteria]
+
+  - id: draft
+    depends_on: [prepare]
+    loop_group:
+      max_iterations: 3
+      on_exhausted: complete
+      nodes:
+        - id: write
+          provider: claude
+          command: write
+          output_format:
+            type: object
+            additionalProperties: false
+            properties:
+              draft: { type: string }
+            required: [draft]
+
+        - id: check
+          depends_on: [write]
+          bash: devkit optimize check
+          output_format:
+            type: object
+            properties:
+              valid: { type: boolean }
+              errors: { type: array, items: { type: string } }
+            required: [valid, errors]
+
+        - id: judge
+          depends_on: [check]
+          when: "$check.output.valid == true"
+          provider: claude
+          settingSources: [user]
+          command: judge
+          context: fresh
+          mutates_checkout: false
+          allowed_tools: [Read, Grep, Glob]
+          output_format:
+            type: "object"
+            additionalProperties: false
+            properties:
+              criteria:
+                type: "array"
+                items:
+                  type: "object"
+                  additionalProperties: false
+                  properties:
+                    aspect:
+                      type: "string"
+                      enum: ["fit","harness","triage"]
+                    verdict:
+                      type: "string"
+                      enum: ["pass","fail","not_assessed"]
+                    checked:
+                      type: "string"
+                    not_checked:
+                      type: "string"
+                  required: ["aspect","verdict","checked","not_checked"]
+              findings:
+                type: "array"
+                items:
+                  type: "object"
+                  additionalProperties: false
+                  properties:
+                    aspect:
+                      type: "string"
+                      enum: ["fit","harness","triage"]
+                    item:
+                      type: "string"
+                      minLength: 1
+                    blocking:
+                      type: "boolean"
+                    mechanical:
+                      type: "boolean"
+                    needs_decision:
+                      type: "boolean"
+                    failure_scenario:
+                      type: "string"
+                      minLength: 1
+                    evidence:
+                      type: "string"
+                      minLength: 1
+                    fix:
+                      type: "string"
+                      minLength: 1
+                  required: ["aspect","item","blocking","needs_decision","failure_scenario","evidence","fix","mechanical"]
+            required: ["criteria","findings"]
+
+        - id: round
+          depends_on: [check, judge]
+          trigger_rule: none_failed_min_one_success
+          bash: |
+            judgment=$judge.output
+            INPUTS_JUDGMENT="$judgment" devkit optimize round
+          output_format:
+            type: object
+            properties:
+              round: { type: integer }
+              valid: { type: boolean }
+              blocking_count: { type: integer }
+              not_assessed_count: { type: integer }
+            required: [round, valid, blocking_count, not_assessed_count]
+      until_bash: 'v=$round.output.valid; b=$round.output.blocking_count; n=$round.output.not_assessed_count; test "$v" = true && test "$b" = 0 && test "$n" = 0'
+
+  - id: finish
+    depends_on: [draft]
+    trigger_rule: none_failed_min_one_success
+    bash: devkit optimize finish
+    output_format: *result
+
+  - id: result
+    depends_on: [not-started, approve, finish]
+    trigger_rule: none_failed_min_one_success
+    bash: |
+      finished=$finish.output
+      approved=$approve.output
+      skipped=$not-started.output
+      printf '%s' "${finished:-${approved:-$skipped}}"
+    output_format: *result

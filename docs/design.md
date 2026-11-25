@@ -191,7 +191,7 @@ Issue の一覧・ページ一覧と Archon の `projects` は正常な空配列
 
 ## 導入と設定
 
-`kit/` は対象リポジトリに配るワークフロー、規範、スキル、初期設定を持つ。`cmd/devkit/` が CLI を登録し、`internal/` が機械処理を実装する。`devkit init [--yes | --no] [--dry-run] [--provider claude|codex] [--sessions claude,codex] [--language <code>] [dir]` はキットを展開するがコミットはしない。初めて導入したときは、最後に `devkit-optimize` の実行を促す。`devkit-optimize` はセッションで一度使うスキルで、リポジトリを読み、チェック、判定者と判断を選ぶパス、基点ブランチ、worktree の準備を提案し、配った規範とリポジトリの既存の決まりとの食い違いを洗い出し、人が承認したものだけを書く。
+`kit/` は対象リポジトリに配るワークフロー、規範、スキル、初期設定を持つ。`cmd/devkit/` が CLI を登録し、`internal/` が機械処理を実装する。`devkit init [--yes | --no] [--dry-run] [--provider claude|codex] [--sessions claude,codex] [--language <code>] [dir]` はキットを展開するがコミットはしない。初めて導入したときは、最後に `devkit-optimize` の実行を促す。`devkit-optimize` は人の指示を原文のままファイル経由で `optimize` ワークフローへ渡し、質問と版を指定した承認を取り次ぎ、公開された PR を伝えるスキルである。起動・監視・再開の操作は `devkit-runs` に委ねる。
 
 `--language <code>`（`--language=<code>` も可）は人が読む文章の言語を保存する。検証は設定と同じで、空文字列と空白だけの値を拒否する。新規導入で指定がなければ、`LC_ALL`、`LC_MESSAGES`、`LANG` の順で最初の空でない値を読み、`_`・`.`・`@` より前を小文字にする。`ja_JP.UTF-8` は `ja`、`pt_BR` は `pt` になる。`C`・`POSIX`・空なら `en` を使う。init は選んだ言語と出典、`devkit-optimize` でリポジトリに合わせられることを表示する。再導入では明示指定がなければ既存言語を保持し、指定があれば `--provider` と同じく設定全体の置換を断ってもその値だけ保存して他のキーと書式を保つ。
 
@@ -199,7 +199,7 @@ Issue の一覧・ページ一覧と Archon の `projects` は正常な空配列
 
 workflows がバイナリの配布内容と一致する新規導入・Yes・差分なしの場合、`.archon/workflows/dev/.devkit-installed.json` に `devkit_version` と `kit_digest` を記録する。No では欠落ファイルを補っても印を保持し、印がなければ作らない。印は workflows グループに含め、余分なファイルとして扱わない。workflow の手編集では印は変わらない。`devkit version` は版と埋め込みキットの SHA-256 ダイジェストを表示する。ファイルパスと内容を長さ付きで辞書順にハッシュするため、ビルド日時・ファイル時刻・権限によらず、埋め込み内容が同じなら一致する。
 
-`devkit record start <workflow>` と refine・retro の専用 start は、記録・回答の保存前に `$PACK_DIR` 内の対象 workflow の YAML と commands を読み、呼ばれるコマンドが実行中バイナリに登録されているかを検査する。抽出処理は plumbing test と共用し、テスト fixture は除く。未登録なら `not_started` で終了し、コマンド名、workflow とバイナリの版違い、適合するバイナリでリポジトリ内の `devkit init` を実行するか導入時のバイナリを使う対処を示す。印があれば導入元の版も示す。`devkit-runs` は人に伝え、再試行しない。ダイジェストの相違だけでは開始を拒否しない。
+`devkit record start <workflow>` と refine・retro・optimize の専用 start は、記録・回答の保存前に `$PACK_DIR` 内の対象 workflow の YAML と commands を読み、呼ばれるコマンドが実行中バイナリに登録されているかを検査する。抽出処理は plumbing test と共用し、テスト fixture は除く。未登録なら `not_started` で終了し、コマンド名、workflow とバイナリの版違い、適合するバイナリでリポジトリ内の `devkit init` を実行するか導入時のバイナリを使う対処を示す。印があれば導入元の版も示す。`devkit-runs` は人に伝え、再試行しない。ダイジェストの相違だけでは開始を拒否しない。
 
 `--skill devkit-runs=<名前> --skill devkit-discuss=<名前> --skill devkit-optimize=<名前>` でスキルの配置名を変更できる。小文字英字・数字・ハイフンだけからなる重複しない名前を `.devkit/config.json` の `skills` に保存し、次回から再利用する。フォルダー、フロントマターの `name`、スキル内の相互参照と `scripts/watch.sh` の呼び出しパスも置き換える。変更前の名前が新しい配置先として使われていなければ、旧フォルダーを削除対象として確認する。設定全体の置き換えを断っても、明示した `--skill` は `skills` の値だけを更新し、他のキーや書式を保つ。設定を置き換える場合も、既存の規範の配置先と選んだスキル名は引き継ぐ。本文中のスキル名は既定名を表す。
 
@@ -241,6 +241,20 @@ Codex の workflow 判定者は full access で動き、ツール制限で書き
 廃止した `docs`・`units`・`topics` と `refine.relevance_threshold` は既存設定に残っていても受け入れて無視し、有効設定には出力しない。旧単位・トピックファイルの自動移行や削除、旧依頼の `unit` や計画行の `ref` の自動変換は行わず、新しい依頼は Issue 番号で requirements から作る。
 
 省略した項目には既定値を使い、品質・上限は個別に補完する。それ以外の指定配列は既定の配列を置き換える。グロブは `**`、`*`、`?` を使える。
+
+## リポジトリへの適合を独立判定する
+
+`optimize` は `optimize/<name>` ブランチで動く。入力は、人の原文の `instructions`（空なら全体の適合）、`answers`、`approve`、`continue`。retro と同じ start・prepare、最大3ラウンドの write → check → fresh な読み取り専用 judge → round、finish・approve の流れを使う。AI ノードは執筆者と判定者だけである。
+
+執筆者は CI 定義、タスク実行手段、配置、README・CONTRIBUTING、既存の規約と人が使う言語を読み、根拠付きで実ファイルを編集する。対象は `.devkit/config.json` のチェック・品質と判断を選ぶパス・ラベル・言語、`.archon/config.yaml` の基点ブランチと worktree.postCreate、既存の規約と照合した規範、concerns.json の routing、キットのスキルへ誘導する短いエージェント指示の節である。規範の食い違いは保持・適合・リポジトリの規則の採用から選ぶ。セキュリティ・データ喪失・人の権限に関する blocking は弱めない。人が求めた場合だけ workflow を編集し、provider・model・effort の指定を各ノードへ展開する。Codex にするノードから allowed_tools・denied_tools・settingSources を除き、mutates_checkout: false は維持する。製品コード・CI・スクリプト・判断ログは編集しない。
+
+既存の open Issue のうち、設定した unit・topic ラベルのないものもすべて整理する。提案の triage は既存 Issue の番号、キー、分類、題名・本文、完了条件、held_units、parent、blocked_by、理由を持つ。分類は unit・topic・理由付きの対象外とする。足りない完了条件は依頼から確実に導けるものだけ補い、不明な要件は推測せず topic にする。問いのグループ化は固定した `review/purpose.md` に従う。新規 Issue は既存の親 topic の下で問いを分ける topic に限る。topic から切った unit は sub-issue とし、順序と待機は blocked-by で表す。topic 本文に止める unit のキーを明記し、止める単位がなければその旨を書く。held_units と unit 側の blocked_by を一致させる。
+
+機械処理は `internal/optimize` に置く。config、編集後の concerns、編集範囲と根拠、PR 文面の必須項目と題名の上限、既存 open Issue だけを参照すること、分類の網羅、親子・依存の循環、topic が止める unit の構造を検査する。workflow の検証は `scripts/test-kit.sh` と同じ `archon validate workflows` を警告なしで通す。Archon がなければ既存の devkit plumbing 検査と YAML 解析へ代替し、どちらを使ったか記録する。提案の postCreate で準備した一時 worktree の基点上で、パス選択にかかわらず設定した全チェックを実行する。失敗・未実行・準備失敗をログ付きで報告し、検証済みとして承認へ進めない。一時 worktree は削除する。
+
+通った下書きと実ファイルは `internal/proposal` で版ごとの提案コミットにする。独立判定者は編集前に固定した規範の `harness.md`・`review/harness.md`・`authority.md` と、Issue 整理には `review/purpose.md` を使い、人の指示への適合、規範の変更と負担、Issue の意味とグループ化を確認する。blocking または未評価が残れば執筆者へ戻し、3ラウンドで通らなければ stop とする。再提案は履歴を書き換えず次のコミットにする。
+
+承認質問には判定済みの簡潔な summary、人だけが決める owner_points、執筆者の pr_title・pr_summary の原文、版とコミットを示す。人に未判定の大量の変更一覧の検査を委ねない。承認は共通の開始条件・記録済み回答・最新の質問・clean な HEAD と照合する。承認前には外部へ書き込まない。承認後は共通の proposal 公開処理で push → PR 作成・更新 → Issue 整理の順に進み、ラベル、本文、必要な新規 topic、sub-issue、blocked-by を適用する。PR 本文の冒頭は承認済み pr_summary、その後の変更・整理の一覧は機械が組み立てる。Issue の操作は `internal/issues` を再利用し、`issue-creation/<version>.json` に適用済みの項目を保存する。新規 topic は共通の隠しマーカーでも照合し、再実行は作成・本文編集・接続の不足分だけを補う。対象外の Issue は変更しない。`devkit status` は承認への回答方法と公開 PR の次の手順を示し、人が PR をマージする。
 
 ## キットを検証する
 

@@ -74,7 +74,37 @@ devkit-discuss mode (discussion → refine → approval → Issues) → refine P
   → retro → approval → correction PR → owner merges
 ```
 
-After the first `devkit init`, which ends by naming it, run `devkit-optimize` once in a session: it reads the repository, proposes the checks, paths, base branch and worktree preparation, reconciles the installed standards with the repository's own conventions, and writes what the owner approves. `devkit-discuss` stays active from invocation until settled work and open questions have become Issues. It keeps a running conversation memo of decided, overturned (with decision IDs) and still-open points, updating it as choices change and restating it after interruptions or summarisation. It handles unrelated requests and then resumes. Comparing the decision log, confirming the memo, starting refine and relaying its questions and exact-version approval all belong to this mode. `devkit-runs` starts and watches workflows and relays their recorded results. Workflows do not invoke one another.
+After the first `devkit init`, run the `devkit-optimize` skill with the owner's instructions. It delegates run mechanics to `devkit-runs` and starts the `optimize` workflow; it relays reviewed questions and exact-version approval, then reports the PR. `devkit-discuss` stays active from invocation until settled work and open questions have become Issues. It keeps a running conversation memo of decided, overturned (with decision IDs) and still-open points, updating it as choices change and restating it after interruptions or summarisation. It handles unrelated requests and then resumes. Comparing the decision log, confirming the memo, starting refine and relaying its questions and exact-version approval all belong to this mode. `devkit-runs` starts and watches workflows and relays their recorded results. Workflows do not invoke one another.
+
+
+`optimize` runs on an `optimize/<name>` branch with `instructions` (verbatim, possibly empty),
+`answers`, `approve` and `continue`. Empty instructions request a full repository fit.
+A writer reads CI, task runners, layout, guides, conventions and people's language, then drafts
+settings, worktree preparation, reconciled standards, routing sentences and short agent instruction
+sections. Workflow edits, including per-node provider/model/effort, require the owner's request.
+Security, data-loss and authority blocking cannot be weakened. The same writer triages every open
+Issue without the configured unit/topic labels: unit with entailed completion conditions, topic
+when requirements are unclear, or exclusion with a reason. Related inseparable questions follow
+the topic rule in `review/purpose.md`. New topic groups go under an existing topic parent;
+units cut from topics are sub-issues, and blocked-by expresses order and waiting.
+
+Each draft is machine-checked and committed as a new proposal version before fresh read-only
+judgment against the fixed standards, `harness.md`, `review/harness.md`, `authority.md` and
+`review/purpose.md`. At most three rounds run. Checks cover config, concern ownership, edit scope,
+title limits, existing open Issue references and topic/blocked-by structure. Workflow validation
+uses `archon validate workflows` without warnings; if Archon is unavailable, it explicitly reports
+the devkit command-plumbing and YAML parsing fallback. Every configured check runs on the base
+in a temporary worktree prepared with the proposed `postCreate`, regardless of path selection.
+Failures, skips and preparation errors are reported with logs and prevent an unverified approval.
+
+After review, one question shows the concise summary, owner-reserved points, unchanged PR title
+and summary, version and commit. `approve=<version>` requires the recorded approval and clean
+reviewed HEAD. Shared proposal publishing pushes and opens or updates the PR before triage writes:
+labels, edited bodies, new topics, sub-issues and blocked-by links. Progress in
+`issue-creation/<version>.json` resumes missing operations; new topics use the shared hidden
+draft marker to recover lost creation responses. Excluded Issues are left untouched. External
+writes happen only after approval. `devkit status` relays the approval or published PR next step;
+the owner merges the PR. Do not run concurrent approvals.
 
 Run `refine` on a `refine/<name>` branch with an open Issue carrying the topic label as `topic=<number>`, or leave it empty for a new request. It reads the full decision log, owner words, supplement, confirmed memo and answers against fixed criteria. One phase has at most three machine-check/judge rounds. Refine proposes decision records for people, binding edits about how agents work to standards, agent instructions, skills or checks, and unit/topic Issue drafts. Each unit fits one PR and includes its goal and observable completion conditions; `blocked_by` refers to other Issue draft keys in the same proposal. The machine writes proposed decisions and commits them with binding edits before fresh read-only judgment. Revisions create new proposal commits, retaining decision IDs for kept keys and deleting withdrawn unapproved records.
 

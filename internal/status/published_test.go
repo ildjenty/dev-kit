@@ -9,7 +9,7 @@ import (
 )
 
 func TestApprovedProposalPointsToItsPullRequest(t *testing.T) {
-	for _, workflow := range []string{"refine", "retro"} {
+	for _, workflow := range []string{"refine", "retro", "optimize"} {
 		b := Branch{Branch: workflow + "/topic", Workflow: workflow, Outcome: "pass", Limit: 3}
 		got := next(b, record.Document{"outcome": "pass", "pr_url": "https://github.example/team/repo/pull/1"})
 		testutil.Contains(t, got, "published as https://github.example/team/repo/pull/1")

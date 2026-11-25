@@ -299,7 +299,7 @@ func (c Client) Close(number int, comment string) error {
 	return err
 }
 
-func (c Client) ListOpen(label string) ([]Issue, error) {
+func (c Client) listOpen() ([]Issue, error) {
 	data, err := c.run(nil, "issue", "list", "--state", "open", "--limit", strconv.Itoa(int(^uint(0)>>1)), "--json", fields)
 	if err != nil {
 		return nil, err
@@ -311,11 +311,29 @@ func (c Client) ListOpen(label string) ([]Issue, error) {
 	result := []Issue{}
 	for _, item := range raw {
 		issue := item.issue()
-		if issue.State == "open" && slices.Contains(issue.Labels, label) {
+		if issue.State == "open" {
 			result = append(result, issue)
 		}
 	}
 	return result, nil
+}
+
+func (c Client) ListOpen(label string) ([]Issue, error) {
+	all, err := c.listOpen()
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(all, func(i Issue) bool { return !slices.Contains(i.Labels, label) }), nil
+}
+
+func (c Client) Untriaged(labels config.IssueLabels) ([]Issue, error) {
+	all, err := c.listOpen()
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(all, func(i Issue) bool {
+		return slices.Contains(i.Labels, labels.Unit) || slices.Contains(i.Labels, labels.Topic)
+	}), nil
 }
 
 func (c Client) Ready(labels config.IssueLabels) (Ready, error) {

@@ -77,7 +77,7 @@ func before(args []string, env cli.Env) error {
 		if err = save(marker, m); err != nil {
 			return err
 		}
-		if env.Getenv("INPUTS_APPROVE") != "" && (workflow == "refine" || workflow == "retro") {
+		if env.Getenv("INPUTS_APPROVE") != "" && (workflow == "refine" || workflow == "retro" || workflow == "optimize") {
 			if err = seedApproval(workflow, env); err != nil {
 				return err
 			}
@@ -91,7 +91,7 @@ func before(args []string, env cli.Env) error {
 	}
 	if len(args) > 1 && args[0] == workflow {
 		switch workflow + " " + args[1] {
-		case "plan check", "refine check", "retro check":
+		case "plan check", "refine check", "retro check", "optimize check":
 			draft := "draft.json"
 			data, err := os.ReadFile(filepath.Join(env.Cwd, ".archon/workflows/dev", workflow, "fixtures/executed", draft))
 			if err != nil {
@@ -116,6 +116,12 @@ func before(args []string, env cli.Env) error {
 			}
 			if workflow == "plan" {
 				return os.WriteFile(filepath.Join(env.Cwd, "fixture.txt"), []byte("fixture result\nPlan skeleton.\n"), 0644)
+			}
+			if workflow == "optimize" {
+				if err = os.WriteFile(filepath.Join(env.Cwd, "CLAUDE.md"), []byte("Route development through the devkit-runs skill. Relay owner questions verbatim.\n"), 0644); err != nil {
+					return err
+				}
+				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte("Approve with approve=1, or answers for changes."), 0644)
 			}
 			if workflow == "retro" {
 				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte("Approve the traced repair with approve=1, or provide answers for changes?"), 0644)
@@ -147,6 +153,9 @@ func seedApproval(workflow string, env cli.Env) error {
 	aspects := []string{"coverage", "additions", "open_points", "consistency", "sufficiency", "wording", "bindings", "issues"}
 	if workflow == "retro" {
 		aspects = []string{"traceability", "evidence", "mechanism"}
+	}
+	if workflow == "optimize" {
+		aspects = []string{"fit", "harness", "triage"}
 	}
 	criteria := []doc{}
 	for _, aspect := range aspects {
@@ -205,7 +214,7 @@ func setup(workflow string, env cli.Env) error {
 	}
 	run := func(args ...string) error { _, err := gitx.Run(env.Cwd, args...); return err }
 	branch := "fixture/" + filepath.Base(env.Cwd)
-	if workflow == "refine" || workflow == "retro" {
+	if workflow == "refine" || workflow == "retro" || workflow == "optimize" {
 		branch = workflow + "/" + filepath.Base(env.Cwd)
 	}
 	for _, args := range [][]string{{"switch", "-c", branch}, {"config", "user.name", "dev-kit"}, {"config", "user.email", "dev-kit@example.invalid"}, {"config", "commit.gpgsign", "false"}, {"config", "core.hooksPath", "/dev/null"}} {
@@ -276,7 +285,7 @@ func setup(workflow string, env cli.Env) error {
 		}
 		return nil
 	}
-	if workflow == "requirements" || workflow == "refine" || workflow == "retro" {
+	if workflow == "requirements" || workflow == "refine" || workflow == "retro" || workflow == "optimize" {
 		return nil
 	}
 	ctx, err := record.Context(env)
@@ -424,7 +433,7 @@ func after(args []string, env cli.Env) error {
 			return err
 		}
 	}
-	if len(args) >= 2 && args[1] == "approve" && (args[0] == "refine" || args[0] == "retro") {
+	if len(args) >= 2 && args[1] == "approve" && (args[0] == "refine" || args[0] == "retro" || args[0] == "optimize") {
 		return verifyPublication(args[0], env)
 	}
 	if len(args) < 2 || args[1] != "finish" {
@@ -439,7 +448,7 @@ func after(args []string, env cli.Env) error {
 		return err
 	}
 	expected := "pass"
-	if args[0] == "refine" || args[0] == "retro" {
+	if args[0] == "refine" || args[0] == "retro" || args[0] == "optimize" {
 		expected = "question"
 	}
 	if args[0] == "implement" || args[0] == "fix" {
@@ -500,7 +509,7 @@ func after(args []string, env cli.Env) error {
 			return fmt.Errorf("fixture conflict was not resolved: %v", state)
 		}
 	}
-	if args[0] == "refine" || args[0] == "retro" {
+	if args[0] == "refine" || args[0] == "retro" || args[0] == "optimize" {
 		proposal, err := record.Latest(ctx.Dir, "proposal")
 		if err != nil {
 			return err

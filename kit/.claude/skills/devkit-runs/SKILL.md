@@ -63,6 +63,7 @@ base branch. Retro traces the missed stage and adds and evaluates a judge case w
 
 Use a branch for each topic or work unit, and start workflows with `--branch <name> --detach`.
 
+- Fit the installed kit or requested workflow settings: `devkit-optimize` → `optimize` → exact-version approval → reviewed fit PR → owner merges.
 - Unsettled request: `devkit-discuss` → `refine` one topic at a time → exact-version approval →
   approval run publishes the refine PR → owner merges it → for each ready unit, on its own branch:
   `requirements` (`issue=<n>`) → `plan` → `implement` → `judge` ⇄ `fix` → `pr`.
@@ -140,7 +141,7 @@ archon workflow run <workflow> --branch <branch> --detach --input "answers=$(cat
 
 where the answers file holds `[{"question_id":"Q1","answer":"<owner answer verbatim>"}]`.
 
-For refine's or retro's single proposal approval question, show the full question, including the
+For refine's, retro's or optimize's single proposal approval question, show the full question, including the
 proposed `pr_title` and `pr_summary`, and the exact version. Only
 when the owner approves that version, start that workflow again on the same branch with
 `--input approve=<version>`. To request changes, restart it with the owner's words in `answers` for the
@@ -161,6 +162,15 @@ approved changes, decision records and created Issues with blocked-by links. It 
 approval instructions or the general proposal summary as PR text.
 The owner merges it; units become ready after that merge and after their blockers close.
 When `publication` is `nothing_to_publish`, relay that no commits remain beyond the base.
+
+Run optimize on an `optimize/<name>` branch. Pass the owner's verbatim instructions through a file
+as `instructions`, or empty for the full fit. The writer and fresh read-only judge review settings,
+standards, requested workflow edits and existing open Issue triage, with machine checks between them.
+After at most three rounds it asks one reviewed approval question; relay summary, owner-reserved
+points, pr_title/pr_summary, version and commit unchanged. On exact-version approval the machine
+publishes the PR, then applies Issue labels, bodies and relationships with recorded retry progress.
+Relay pr_url and issue_numbers. The owner merges the PR. Use the same version to resume a failed
+publication; do not apply Issue edits in the session or invent approval.
 
 Run retro on a `retro/<name>` branch created from the base. It reads that branch's backlog, proposes
 unit Issue drafts, check additions and standard edits, commits the real files and consumed backlog

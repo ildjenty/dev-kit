@@ -318,6 +318,8 @@ func next(b Branch, result record.Document) string {
 	switch b.Workflow {
 	case "refine":
 		return published("The proposal is approved", result) + " The units it created become ready when the owner merges that pull request; then find them, or the next topic, with `devkit issues ready`."
+	case "optimize":
+		return published("The repository fit is approved", result) + " The owner reviews and merges that pull request; use `devkit issues ready` for the triaged work."
 	case "retro":
 		return published("The corrections are approved", result) + " Their units become ready when the owner merges that pull request (`devkit issues ready`)."
 	case "requirements":

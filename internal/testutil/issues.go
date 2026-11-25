@@ -90,6 +90,8 @@ case "$1 $2" in
   test ! -f "$state/pr-lost" || exit 1
   cat "$state/pr" ;;
  "pr edit") save_pr "$@" ;;
+ "issue list") test ! -f "$state/open" || cat "$state/open"; test -f "$state/open" || printf '[]' ;;
+ "issue edit") cat > "$state/edited-$3" ;;
  "issue create")
   test -f "$state/labels" || exit 96
   body=$(cat)

@@ -80,34 +80,8 @@ func compareBase(g *gitx.Git, selected []config.Check, results []Result, dir str
 		_, e := g.Run("worktree", "remove", "--force", "--force", worktree)
 		err = errors.Join(err, e)
 	}()
-	var settings struct {
-		Worktree struct {
-			PostCreate        []string `yaml:"postCreate"`
-			PostCreateTimeout float64  `yaml:"postCreateTimeout"`
-		} `yaml:"worktree"`
-	}
-	settings.Worktree.PostCreateTimeout = 300000
-	data, e := os.ReadFile(filepath.Join(g.Cwd, ".archon/config.yaml"))
-	if e != nil && !os.IsNotExist(e) {
+	if e := PrepareWorktree(g.Cwd, worktree, out, round, env); e != nil {
 		return unavailable(e)
-	}
-	if e == nil {
-		if e := yaml.Unmarshal(data, &settings); e != nil {
-			return unavailable(e)
-		}
-	}
-	if settings.Worktree.PostCreateTimeout <= 0 {
-		return unavailable(fmt.Errorf("worktree.postCreateTimeout must be positive"))
-	}
-	for i, command := range settings.Worktree.PostCreate {
-		check := config.Check{Name: fmt.Sprintf("prepare-%d", i+1), Command: command, TimeoutSeconds: settings.Worktree.PostCreateTimeout / 1000}
-		r, e := runCheck(check, CheckOptions{Cwd: worktree, Dir: out, Round: round, Env: env}, false)
-		if e != nil {
-			return unavailable(e)
-		}
-		if r.Status != "pass" {
-			return unavailable(fmt.Errorf("base preparation failed: %s", r.Log))
-		}
 	}
 	for i, r := range results {
 		if r.Status != "fail" || r.Base == "not_compared" {
@@ -130,6 +104,39 @@ func compareBase(g *gitx.Git, selected []config.Check, results []Result, dir str
 			results[i].Base = "failed"
 		case "pass":
 			results[i].Base = "passed"
+		}
+	}
+	return nil
+}
+
+func PrepareWorktree(settingsRoot, worktree, out string, round int, env []string) error {
+	var settings struct {
+		Worktree struct {
+			PostCreate        []string `yaml:"postCreate"`
+			PostCreateTimeout float64  `yaml:"postCreateTimeout"`
+		} `yaml:"worktree"`
+	}
+	settings.Worktree.PostCreateTimeout = 300000
+	data, e := os.ReadFile(filepath.Join(settingsRoot, ".archon/config.yaml"))
+	if e != nil && !os.IsNotExist(e) {
+		return e
+	}
+	if e == nil {
+		if e := yaml.Unmarshal(data, &settings); e != nil {
+			return e
+		}
+	}
+	if settings.Worktree.PostCreateTimeout <= 0 {
+		return fmt.Errorf("worktree.postCreateTimeout must be positive")
+	}
+	for i, command := range settings.Worktree.PostCreate {
+		check := config.Check{Name: fmt.Sprintf("prepare-%d", i+1), Command: command, TimeoutSeconds: settings.Worktree.PostCreateTimeout / 1000}
+		r, e := runCheck(check, CheckOptions{Cwd: worktree, Dir: out, Round: round, Env: env}, false)
+		if e != nil {
+			return e
+		}
+		if r.Status != "pass" {
+			return fmt.Errorf("base preparation failed: %s", r.Log)
 		}
 	}
 	return nil

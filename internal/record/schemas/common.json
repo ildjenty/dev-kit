@@ -30,7 +30,8 @@
         "fix",
         "pr",
         "sync",
-        "retro"
+        "retro",
+        "optimize"
       ]
     },
     "run_id": {

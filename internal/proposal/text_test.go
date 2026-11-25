@@ -113,3 +113,37 @@ func TestRetroBodyListsApprovedCorrectionsEscapesAndCases(t *testing.T) {
 		})
 	}
 }
+
+func TestOptimizeBodyListsChangesAndTriageInConfiguredLanguage(t *testing.T) {
+	for _, language := range []string{"en", "ja"} {
+		t.Run(language, func(t *testing.T) {
+			cfg := config.Defaults("")
+			cfg.Language = language
+			content := map[string]any{"draft": map[string]any{
+				"pr_title": "Fit verification", "pr_summary": "Use the repository checks.",
+				"changes": []map[string]any{{"path": ".devkit/config.json", "reason": "Follow CI", "evidence": "CI job"}},
+				"triage": []issues.TriageItem{
+					{Key: "topic", Number: 7, Kind: "topic", Title: "Audience", Reason: "Open audience question"},
+					{Key: "unit", Number: 42, Kind: "unit", Title: "Deliver", Parent: "topic", BlockedBy: []string{"topic"}, Reason: "Settled request"},
+					{Key: "leave", Number: 8, Kind: "leave", Reason: "Out of scope"},
+				},
+			}}
+			progress := issues.Creation{Created: map[string]issues.Created{"topic": {Number: 7}, "unit": {Number: 42}}}
+			title, body, err := proposalText(content, progress, "optimize/fit", "https://github.example/team/repo", cfg)
+			testutil.OK(t, err)
+			testutil.Equal(t, title, "Fit verification")
+			testutil.Contains(t, body, "- `.devkit/config.json`")
+			testutil.Contains(t, body, "[#42 Deliver](https://github.example/team/repo/issues/42)")
+			testutil.Contains(t, body, "[#7](https://github.example/team/repo/issues/7)")
+			if language == "en" {
+				testutil.Contains(t, body, "## Issue triage")
+				testutil.Contains(t, body, "parent:")
+				testutil.Contains(t, body, "Left out: Out of scope")
+			} else {
+				testutil.Contains(t, body, "## Issue の整理")
+				testutil.Contains(t, body, "親:")
+				testutil.Contains(t, body, "対象外: Out of scope")
+			}
+		})
+	}
+}

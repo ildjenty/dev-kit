@@ -1,6 +1,6 @@
 {
   "$id": "proposal.json",
-  "description": "A version of a refine or retro proposal. Content is owned and validated by its workflow. Request counts the requests read to produce this proposal.",
+  "description": "A version of a refine, retro or optimize proposal. Content is owned and validated by its workflow. Request counts the requests read to produce this proposal.",
   "type": "object",
   "additionalProperties": false,
   "properties": {

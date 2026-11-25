@@ -1,6 +1,6 @@
 # Development workflows
 
-The owner decides what matters, changes stay local, and observed failures improve the process. Archon runs nine workflows; `devkit` performs mechanical checks and records transitions. The installed `devkit-discuss` and `devkit-runs` session skills handle conversation, starting runs and relaying results. Workflows never start each other.
+The owner decides what matters, changes stay local, and observed failures improve the process. Archon runs ten workflows; `devkit` performs mechanical checks and records transitions. The installed `devkit-discuss` and `devkit-runs` session skills handle conversation, starting runs and relaying results. Workflows never start each other.
 
 ## Installing and updating
 
@@ -19,6 +19,29 @@ Destination and ancestor symbolic links are named and asked about. Yes replaces 
 Init writes `.devkit-installed.json` in this folder with `devkit_version` and `kit_digest` when the workflows match its kit after a fresh install, Yes, or no differences. No keeps the previous stamp, including when missing files are added. The stamp belongs to the workflow comparison and is never an extra file; hand edits do not update it. `devkit version` prints the binary version and the embedded kit's SHA-256 digest, stable for the same paths and contents across builds.
 
 Every start checks this workflow's YAML and command files in `$PACK_DIR` for unregistered commands before saving records or answers. A missing command returns `not_started` with the command, the kit/binary mismatch explanation, and remedies: run `devkit init` in the repository with the matching binary or install the binary that installed these workflows (the stamp names its version). Relay this to the owner and do not retry. Digest differences alone do not prevent a start.
+
+Run `devkit-optimize` after init or when repository conventions or owner workflow preferences change.
+The skill invokes `devkit-runs`, passes verbatim `instructions` through a file and starts
+`optimize` on `optimize/<name>`. Inputs are `instructions`, `answers`, `approve`, `continue`;
+empty instructions request the full fit. The writer drafts config, worktree preparation, standards
+reconciliation, routing and short agent instruction sections; workflow edits require the owner's
+request. It also triages every open Issue without the kit's labels as a unit with observable,
+request-supported completion conditions, a grouped topic, or a reasoned exclusion.
+
+Start and prepare lead to at most three write → check → fresh read-only judge → round iterations.
+The Go machine validates config, concerns, scope, PR titles and Issue structure, and runs every
+configured check on the base in a temporary worktree prepared by the proposed postCreate.
+Archon validates workflows without warnings; if unavailable, the reported fallback checks command
+plumbing and YAML parsing. Failures and skipped base checks retain log paths and block approval.
+The judge uses fixed harness, authority and purpose standards, comparing the actual proposal to
+the owner's instructions. Security, data-loss and authority blocking cannot be weakened.
+
+Finish asks approval of the reviewed summary, owner-reserved points, PR title/summary and
+clean committed proposal version. Approval publishes through shared proposal code, then applies
+labels, body edits, new topic groups under existing parents, sub-issues and blocked-by links.
+Topic held_units and unit links must match. Progress and stable new-topic markers let retries
+resume missing operations without duplicating Issues. No external writes precede approval.
+The owner merges the PR; status reports the approval question or published PR.
 
 Use `devkit-discuss` from invocation until the discussion has become Issues. Keep a running memo of decided, overturned (with decision IDs) and still-open points; update it as choices change, preserve it through summarisation and restate it when resuming. Handle unrelated requests, then return to the discussion. Starting refine with the confirmed memo, relaying questions and exact-version approval are part of this mode.
 

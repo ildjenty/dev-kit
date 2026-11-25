@@ -350,7 +350,7 @@ func run(args []string, env cli.Env, interactive bool) error {
 	if err != nil {
 		return nil
 	}
-	_, err = fmt.Fprintf(env.Stdout, "\nNext: in a session in this repository, run the %s skill. It fits the settings, checks and standards to this repository; until then no checks are configured.\n", settings.Skills["devkit-optimize"])
+	_, err = fmt.Fprintf(env.Stdout, "\nNext: in a session in this repository, run the %s skill. It starts the reviewed optimize workflow to fit settings, checks, standards and issue triage; until then no checks are configured.\n", settings.Skills["devkit-optimize"])
 	return err
 }
 

@@ -1,0 +1,18 @@
+{
+  "summary": "Point fixture sessions at the kit",
+  "owner_points": [
+
+  ],
+  "pr_title": "Route fixture development through the kit",
+  "pr_summary": "Add the kit routing instructions for fixture sessions.",
+  "changes": [
+    {
+      "path": "CLAUDE.md",
+      "reason": "Route sessions through the kit",
+      "evidence": "The fixture has no kit instructions"
+    }
+  ],
+  "triage": [
+
+  ]
+}
