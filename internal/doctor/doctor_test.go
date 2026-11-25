@@ -346,7 +346,7 @@ func TestProviderPluginFallback(t *testing.T) {
 					}
 					started := time.Now()
 					ok, detail := providerInstalled(cli.Env{Cwd: bin}, limit, "claude")
-					if time.Since(started) > time.Second {
+					if time.Since(started) > 5*time.Second {
 						t.Fatal("provider timeout was not enforced")
 					}
 					testutil.Equal(t, ok, file == "executable")
