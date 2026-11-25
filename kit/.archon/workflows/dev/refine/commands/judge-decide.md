@@ -20,11 +20,16 @@ Return exactly one criterion for each aspect:
   `language` in your input: the short title names this change; the summary explains what merging
   puts on the base and why, without approval instructions, versions or internal history.
   The machine appends these exact fields to the approval question and uses them as approved.
-- `bindings`: decisions that must bind agents are enforced by the edited mechanisms. Apply the
+- `bindings`: every binding edit is about how agents work: process, tools, conventions or verification.
+  A product data shape, invariant or feature rule in a binding edit is a blocking finding, even if
+  repeated in an Issue draft. Decisions about agent work that must bind agents use the edited mechanisms. Apply the
   standards' rules for changing standards and harness, including evidence and ongoing burden.
   A choice recorded only for people needs no binding edit. Delivery never consumes decision records.
 - `issues`: each unit fits one PR and has observable completion conditions without requiring a
-  decision record. Review the new `parent` title and body like every other Issue draft, against the
+  decision record. Every required product property appears as a testable completion condition in
+  the unit that builds it. For a shared property, check the first unit that builds it and repetition
+  of the condition in later units that touch it. Missing conditions are blocking findings.
+  Review the new `parent` title and body like every other Issue draft, against the
   owner's sources and the configured language. Parent/sub-issue and blocked-by structure expresses
   order; questions remain topics. The approval question includes the new parent's title and body.
 

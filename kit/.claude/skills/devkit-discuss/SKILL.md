@@ -54,12 +54,16 @@ correct it before passing it to refine.
 After confirmation, use `devkit-runs` to start `refine` on a `refine/<name>` branch with the confirmed memo
 verbatim as `memo`. A run handles one topic: pass its Issue number as `topic`, or leave it empty for
 a new request whose parent topic refine will create on approval. Refine proposes decision records,
-changes to mechanisms that must bind agents, and Issue drafts. Its workflow makes the proposal
+changes to mechanisms for how agents work, and Issue drafts. Product data shapes, invariants and
+feature rules go into the implementing unit Issue's testable completion conditions. Put a shared
+property in the first unit that builds it and repeat the condition in later units that touch it;
+do not put product rules into standards, agent instructions, skills or check settings. Its workflow makes the proposal
 edits; do not make them yourself in the conversation. Decision records are a log, not delivery
 instructions: the Issue drafts must contain everything delivery needs.
 
 Relay refine's questions and the owner's answers verbatim through `devkit-runs`, updating the memo
-as choices change. Show the full approval question and exact proposal version; the discussion memo
+as choices change. Show the full approval question, including the proposed PR title and summary,
+and exact proposal version; the discussion memo
 does not approve that proposal. Only the owner's approval of that version permits the approval run.
 Never supply answers, approval or `continue` for the owner.
 

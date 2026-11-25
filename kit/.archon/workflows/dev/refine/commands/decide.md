@@ -24,11 +24,18 @@ Write `$ARTIFACTS_DIR/refine/draft.json` using the supplied strict schema:
   choice, reason and uncertainty in the body; `decided_by`, `source`, `depends_on` and `supersedes`.
   These are a human-readable log. Supersede old choices explicitly; never edit their files yourself.
 - `bindings`: each checkout edit's `path`, the decision key or ID it enforces, and `reason`.
+  Use bindings only for how agents work: process, tools, conventions or verification; for example,
+  run the repository's configured checks before proposing a commit. Never put product data shapes,
+  invariants or feature rules in standards, CLAUDE.md, AGENTS.md, skills or check settings.
   Make the corresponding minimal edits to the configured standards, CLAUDE.md or AGENTS.md,
   configured skills, or only the checks in `.devkit/config.json`. Follow the standards' rules for
   changing standards and harness. A recorded choice that need not bind agents needs no binding.
   Put each binding rule in the relevant mechanism; delivery agents do not read decision records.
 - `units`: settled work, each with stable key, title, goal and observable `completion_conditions`.
+  Put every required product property here as a condition a test can check; for example, assigning
+  overlapping shifts to the same person is rejected. Put a shared property in the first unit that
+  builds it (such as the foundation unit); later units that touch it repeat the condition to preserve.
+  Code and tests then carry the product specification.
   Fit each unit in one PR. Copy every condition agents need into the Issue draft itself; never
   require delivery agents to read a decision record. `blocked_by` names other draft Issue keys.
   Units become sub-issues of the selected topic, or the approved `parent` draft.

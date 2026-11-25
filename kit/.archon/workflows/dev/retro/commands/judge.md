@@ -25,6 +25,9 @@ or internal history. The machine appends these exact fields to the approval ques
 as approved, followed by lists of approved changes, escape traces, cases and Issues.
 
 Apply the named criteria documents and return the aspects `traceability`, `evidence` and `mechanism`.
+Under `mechanism`, check that every standard or check-setting change concerns how agents work:
+process, tools, conventions or verification. A product data shape, invariant or feature rule in
+such a binding change is a blocking finding, even if repeated in an Issue draft.
 
 Return an object matching the supplied judgment schema and node output format: `criteria` contains
 exactly one row per aspect, with `aspect`, `verdict` (pass, fail, not_assessed), `checked` and
@@ -34,3 +37,6 @@ exactly one row per aspect, with `aspect`, `verdict` (pass, fail, not_assessed),
 Return every property in the output schema. Use `false` for `mechanical` when no mechanical check is proposed. Use empty strings or empty arrays for inapplicable text or lists.
 
 Each unit Issue draft must fit one PR, have observable completion conditions and include all delivery constraints without requiring decision records. Check the blocked-by order among drafts.
+Under `mechanism`, check that every required product property is a testable completion condition
+in the unit that builds it. A shared property belongs in the first unit that builds it, and later
+units that touch it repeat the condition they must preserve. Missing conditions are blocking findings.

@@ -140,25 +140,32 @@ archon workflow run <workflow> --branch <branch> --detach --input "answers=$(cat
 
 where the answers file holds `[{"question_id":"Q1","answer":"<owner answer verbatim>"}]`.
 
-For refine's or retro's single proposal approval question, show the full question and the exact version. Only
+For refine's or retro's single proposal approval question, show the full question, including the
+proposed `pr_title` and `pr_summary`, and the exact version. Only
 when the owner approves that version, start that workflow again on the same branch with
 `--input approve=<version>`. To request changes, restart it with the owner's words in `answers` for the
 approval question's ID. Never synthesize approval or use `approve` for an open-point question.
 
-Refine commits proposed decision records and binding edits to standards, agent instructions, skills
-or checks before fresh read-only judgment. It reads the full decision log; delivery never consumes
+Refine commits proposed decision records and binding edits about agent process, tools, conventions
+or verification to standards, agent instructions, skills or checks before fresh read-only judgment.
+Product data shapes, invariants and feature rules belong in the implementing unit Issue's testable
+completion conditions. Shared properties appear in the first unit that builds them and are repeated
+in later units that touch them; they do not go into binding edits. It reads the full decision log; delivery never consumes
 it. On approval, refine marks records agreed, commits that change, pushes and opens or updates its PR,
 then creates unit issues under
 the selected topic (creating a parent topic if absent), new topic issues and blocked-by links.
 It closes the parent with a comment when no new topics remain, otherwise comments without closing.
 Relay `decision_ids`, `issue_numbers`, `pr_number` and `pr_url`; keep `devkit-discuss` active until the discussion is in Issues.
-The machine reuses the approved summary and approval text for the PR and adds created Issue links.
+The machine uses the approved `pr_title` and `pr_summary` unchanged for the PR, followed by lists of
+approved changes, decision records and created Issues with blocked-by links. It does not reuse
+approval instructions or the general proposal summary as PR text.
 The owner merges it; units become ready after that merge and after their blockers close.
 When `publication` is `nothing_to_publish`, relay that no commits remain beyond the base.
 
 Run retro on a `retro/<name>` branch created from the base. It reads that branch's backlog, proposes
 unit Issue drafts, check additions and standard edits, commits the real files and consumed backlog
-deletions, then asks one approval question showing the version and commit after machine checks, fresh read-only
+deletions. Standards and check settings change only how agents work; product properties use unit
+completion conditions as in refine. It asks one approval question showing the version and commit after machine checks, fresh read-only
 judgment and escape verification. Approval requires that version's commit to remain the clean branch
 head; it pushes and opens or updates the PR, creates unit issues without a parent topic, connects
 blocked-by links and records `issue_numbers`, `pr_number` and `pr_url`, without creating another commit. Requested changes create the
@@ -166,6 +173,10 @@ next proposal commit on that history; withdrawn edits are undone by a new commit
 proposals must be restarted on a new retro branch.
 An empty backlog passes without an approval question. The approval run publishes the correction PR
 in a machine bash node. The owner merges it; units become ready after that merge and their blockers close.
+
+Both workflows reject approval of old proposals without valid PR title/summary before any agreement
+commit, push or PR/Issue write; make a new proposal for approval. Retrying an approved version updates
+the existing PR title and body from that approved content.
 
 Both workflows keep Issue drafts in the proposal record and create Issues only on approval. If an
 approval fails during publication or Issue creation, inspect the failure and restart the same workflow, branch and

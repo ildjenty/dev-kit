@@ -18,11 +18,18 @@ Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
 - `summary`: the proposed correction.
 - `units`: work for deferred or carried findings, or follow-up work traced to review entries, with stable draft `key`, `title`, `goal`,
   `completion_conditions`, `blocked_by` draft keys, and source `entries`. Each unit fits one PR and contains every constraint delivery needs.
+  Put required product data shapes, invariants and feature rules here as conditions a test can check;
+  for example, assigning overlapping shifts to the same person is rejected. Put a shared property in
+  the first unit that builds it; later units that touch it repeat the condition they must preserve.
+  Code and tests then carry the product specification.
 - `checks`: checks for mechanical findings, with the config check fields, `reason` and `entries`.
   Add precisely those checks to `.devkit/config.json`, retaining all existing settings and checks.
   An empty `paths` array selects no files; use applicable repository globs.
 - `standards`: edits for accepted objections or recurring findings, naming `path`, `reason`, `evidence`,
   and source `entries`. Make these edits in the checkout, and trace every changed standard document.
+  Standards and check settings change only how agents work: process, tools, conventions or verification;
+  for example, run the repository's configured checks before proposing a commit. Never encode product
+  properties in standards, agent instructions or skills, or check settings; use unit completion conditions.
 - `dismissed`: source `entries` and a reason for each entry that needs no correction.
 - `escapes`: one trace for every `kind: escape` entry, including dismissals: `entry`, `stage`
   (`requirements`, `plan`, `routing`, `quality`, `check`, or `none` for a genuine gap in the request),
