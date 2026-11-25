@@ -7,5 +7,5 @@ judge: {"criteria": [{"aspect": "traceability", "verdict": "pass", "checked": "T
 round: {"round": 1, "valid": true, "blocking_count": 0, "not_assessed_count": 0}
 verify: {"needed": true}
 verification: {"text": "Escape case: expected contract finding missed. The owner may still approve."}
-finish: {"outcome": "question", "proposal_version": 1, "issue_numbers": [], "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case: expected contract finding missed."}], "reasons": []}
-result: {"outcome": "question", "proposal_version": 1, "issue_numbers": [], "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case: expected contract finding missed."}], "reasons": []}
+finish: {"outcome": "question", "proposal_version": 1, "issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "", "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case: expected contract finding missed."}], "reasons": []}
+result: {"outcome": "question", "proposal_version": 1, "issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "", "questions": [{"id": "Q1", "text": "Approve with approve=1 or provide answers? Escape case: expected contract finding missed."}], "reasons": []}

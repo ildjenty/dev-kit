@@ -40,6 +40,11 @@ func Commands() []cli.Command {
 					}
 				}
 			}
+			for _, issue := range ready.Waiting {
+				if _, err := fmt.Fprintf(env.Stdout, "waiting unit #%d: %s (source PR #%d: %s)\n", issue.Number, issue.Title, issue.SourcePR.Number, issue.SourcePR.URL); err != nil {
+					return err
+				}
+			}
 			return nil
 		}},
 		{Area: "issues", Name: "show", Usage: "devkit issues show <number> [--json]", Run: func(args []string, env cli.Env) error {

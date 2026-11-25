@@ -57,6 +57,7 @@ func setup(t *testing.T, settings doc) *fixture {
 	r.put("docs/topic.md", "# Topic\nExisting prose\n")
 	r.commit()
 	r.git("checkout", "-qb", "refine/topic")
+	testutil.PublicationRemote(t, cwd)
 	testutil.OK(t, os.MkdirAll(file(r.artifacts, "."), 0755))
 	r.ctx = record.ContextData{Dir: record.RecordDir(filepath.Join(root, "state"), "refine/topic"), Cwd: cwd, RunID: "r1", Branch: "refine/topic", BaseBranch: "main"}
 	return r
@@ -301,6 +302,71 @@ func TestApprovalRetryCreatesOnlyMissingIssuesAfterPartialFailure(t *testing.T) 
 	testutil.Equal(t, strings.Count(calls, "issue create --title Deliver staff access"), 1)
 	testutil.Equal(t, readText(t, filepath.Join(log, "count")), "3")
 	testutil.Equal(t, r.latest("result")["issue_numbers"], []any{float64(101), float64(102), float64(103)})
+	testutil.Equal(t, strings.Count(calls, "pr create"), 1)
+	testutil.Equal(t, strings.Index(calls, "pr create") < strings.Index(calls, "issue create"), true)
+	testutil.Contains(t, readText(t, filepath.Join(log, "bodies")), "Source: #80")
+	testutil.Contains(t, readText(t, filepath.Join(log, "bodies")), "\nsource_pr: 80 -->")
+	testutil.Contains(t, readText(t, filepath.Join(log, "pr-bodies")), "#102 Deliver staff access")
+	testutil.Equal(t, r.latest("result")["pr_number"], float64(80))
+}
+
+func TestApprovalPushFailureStopsBeforeIssuesAndCanResume(t *testing.T) {
+	r := setup(t, nil)
+	log, _ := testutil.IssueCreationCLI(t)
+	r.begin()
+	r.writeDraft()
+	r.round(judgment())
+	r.finish()
+	r.ctx.RunID = "r2"
+	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))).Stopped, false)
+	remote := r.git("remote", "get-url", "origin")
+	testutil.Put(t, remote, "hooks/pre-receive", "#!/bin/sh\nexit 1\n")
+	testutil.OK(t, os.Chmod(filepath.Join(remote, "hooks/pre-receive"), 0755))
+	_, err := approve(r.ctx, "1")
+	testutil.Fails(t, err, "git push")
+	_, err = os.Stat(filepath.Join(log, "calls"))
+	testutil.Equal(t, os.IsNotExist(err), true)
+	testutil.Equal(t, r.data().Decisions[0]["status"], "agreed")
+	testutil.OK(t, os.Remove(filepath.Join(remote, "hooks/pre-receive")))
+	testutil.Equal(t, testutil.Must(approve(r.ctx, "1"))["pr_number"], 80)
+}
+
+func TestApprovalReusesPRAfterLostCreateResponse(t *testing.T) {
+	r := setup(t, nil)
+	log, _ := testutil.IssueCreationCLI(t)
+	r.begin()
+	r.writeDraft()
+	r.round(judgment())
+	r.finish()
+	r.ctx.RunID = "r2"
+	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))).Stopped, false)
+	testutil.Put(t, log, "pr-lost", "1")
+	_, err := approve(r.ctx, "1")
+	testutil.Fails(t, err, "gh pr create")
+	_, err = os.Stat(filepath.Join(log, "count"))
+	testutil.Equal(t, os.IsNotExist(err), true)
+	testutil.OK(t, os.Remove(filepath.Join(log, "pr-lost")))
+	testutil.Equal(t, testutil.Must(approve(r.ctx, "1"))["pr_number"], 80)
+	testutil.Equal(t, strings.Count(readText(t, filepath.Join(log, "calls")), "pr create"), 1)
+}
+
+func TestApprovalWithNothingToPublishStillCreatesIssues(t *testing.T) {
+	r := setup(t, nil)
+	log, _ := testutil.IssueCreationCLI(t)
+	r.begin()
+	d := draft()
+	d["decisions"] = []doc{}
+	r.writeDraft(d)
+	r.round(judgment())
+	r.finish()
+	r.git("branch", "-f", "main", "HEAD")
+	r.ctx.RunID = "r2"
+	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))).Stopped, false)
+	result := testutil.Must(approve(r.ctx, "1"))
+	testutil.Equal(t, result["publication"], "nothing_to_publish")
+	testutil.Equal(t, result["pr_number"], 0)
+	testutil.Equal(t, len(result["issue_numbers"].([]int)), 2)
+	testutil.Equal(t, strings.Contains(readText(t, filepath.Join(log, "calls")), "pr "), false)
 }
 
 func TestApprovalRejectsUnrecordedAnswerChangedHeadOrDirtyCheckout(t *testing.T) {

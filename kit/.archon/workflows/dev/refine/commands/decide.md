@@ -37,4 +37,7 @@ Write `$ARTIFACTS_DIR/refine/approval.txt` as one approval question. Show every 
 owner and provisional choices, every binding path and its decision, and all unit and topic keys.
 Explain the parent topic (created from the request if absent) and each blocked-by relationship.
 Include `approve=<next_proposal_version>` and explain `answers` for requesting changes.
+The approval run agrees decisions, pushes the branch, opens or updates a PR from this summary and
+approval text, then creates Issues with source PR metadata. The owner merges the PR; units wait for
+that merge. Do not run git, gh or Archon commands that change state.
 Return only `{"draft":"<absolute path to draft.json>"}`.

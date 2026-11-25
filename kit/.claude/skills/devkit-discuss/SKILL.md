@@ -63,10 +63,12 @@ as choices change. Show the full approval question and exact proposal version; t
 does not approve that proposal. Only the owner's approval of that version permits the approval run.
 Never supply answers, approval or `continue` for the owner.
 
-On approval, refine creates unit issues as sub-issues of the topic and open questions as topic
+On approval, refine's machine bash node pushes the branch and opens or updates its PR, then creates
+unit issues as sub-issues of the topic and open questions as topic
 issues, with blocked-by relationships expressing unit order and topics waiting for other topics.
 Check the returned `issue_numbers` with `devkit issues show`; an approval failure leaves the mode
 active, and `devkit-runs` handles retrying the same approved version. If part of the discussion is
 still unrepresented, resume from the memo and refine that part. Once all parts are represented,
-report the Issue numbers and end this mode. Use `devkit-runs` to publish and merge the refine PR
-through the repository's PR process before starting the ready unit issues it created.
+report the Issue numbers and `pr_url` and end this mode. The owner merges the PR published by the
+approval run. Units record their source PR and become ready after it merges and their blockers close.
+If `publication` is `nothing_to_publish`, report that no commits remain beyond the base.

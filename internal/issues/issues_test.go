@@ -210,7 +210,7 @@ func TestReadyEmptyListsAndUnknownBlockerState(t *testing.T) {
 	c := fake(t, listStep("work", `[]`), listStep("questions", `[]`))
 	ready, err := c.Ready(config.IssueLabels{Unit: "work", Topic: "questions"})
 	testutil.OK(t, err)
-	testutil.Equal(t, ready, Ready{Units: []ReadyIssue{}, Topics: []ReadyIssue{}})
+	testutil.Equal(t, ready, Ready{Units: []ReadyIssue{}, Topics: []ReadyIssue{}, Waiting: []WaitingIssue{}})
 	steps := []ghStep{listStep("work", `[{"number":1,"state":"OPEN","labels":[{"name":"work"}]}]`)}
 	steps = append(steps, readSteps(1, `{"number":1,"state":"OPEN","labels":[],"parent":null}`, `[[]]`, `[[{"number":2}]]`, `[[]]`)...)
 	steps = append(steps, listStep("questions", `[]`))
@@ -241,8 +241,9 @@ func TestReadyUsesEveryBlockerStateForUnitsAndTopics(t *testing.T) {
 	testutil.OK(t, err)
 	parent := &Reference{7, "Topic", "https://github.com/team/repo/issues/7", "open"}
 	testutil.Equal(t, ready, Ready{
-		Units:  []ReadyIssue{{1, "Unit 1", "https://github.com/team/repo/issues/1", parent}, {2, "Unit 2", "https://github.com/team/repo/issues/2", parent}},
-		Topics: []ReadyIssue{{7, "Topic 7", "https://github.com/team/repo/issues/7", nil}, {9, "Topic 9", "https://github.com/team/repo/issues/9", nil}},
+		Waiting: []WaitingIssue{},
+		Units:   []ReadyIssue{{1, "Unit 1", "https://github.com/team/repo/issues/1", parent}, {2, "Unit 2", "https://github.com/team/repo/issues/2", parent}},
+		Topics:  []ReadyIssue{{7, "Topic 7", "https://github.com/team/repo/issues/7", nil}, {9, "Topic 9", "https://github.com/team/repo/issues/9", nil}},
 	})
 }
 

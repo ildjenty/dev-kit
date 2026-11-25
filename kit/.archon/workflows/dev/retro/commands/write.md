@@ -52,8 +52,10 @@ Include the exact `approve=<next_proposal_version>` and explain `answers` for re
 After the machine checks pass, the machine commits the real config, standards and cases,
 together with consumed backlog deletions. Each proposal version names one commit; Issue drafts stay in its proposal record. Judgment and verification inspect that committed,
 clean checkout. The final approval question includes its version and commit, every unit Issue draft
-and its blocked-by order. Approval creates the unit Issues and records each creation for retry,
-then records the result; the proposal commit must remain the clean branch head.
+and its blocked-by order. Approval pushes the branch and opens or updates a PR from the summary and
+approval text before creating unit Issues with source PR metadata. It records the PR and each Issue
+creation for retry, then the result; the proposal commit must remain the clean branch head.
+The owner merges the PR; units wait for that merge. Do not run git, gh or Archon commands that change state.
 After checks and independent judgment pass, it evaluates new escape cases against a temporary copy
 of the proposed standards and concern map. Evaluation misses and provider failures are reported to
 the owner before approval and do not block the proposal.

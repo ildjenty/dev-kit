@@ -59,3 +59,23 @@ func TestIssueInputRequiresPositiveNumber(t *testing.T) {
 		testutil.Fails(t, err, "positive issue number")
 	}
 }
+
+func TestRequirementsStartWaitsForSourcePRMerge(t *testing.T) {
+	for _, state := range []string{"OPEN", "CLOSED", "MERGED"} {
+		t.Run(state, func(t *testing.T) {
+			repo, runState := testutil.Repo(t), t.TempDir()
+			gh := testutil.IssueCLI(t, "OPEN", "devkit:unit", "", state)
+			var stdout, stderr bytes.Buffer
+			env := commandEnv(repo, map[string]string{"STATE_DIR": runState, "WORKFLOW_ID": "r1", "INPUTS_ISSUE": "42", "DEVKIT_GH": gh}, &stdout, &stderr)
+			env.Environ = os.Environ()
+			testutil.Equal(t, cli.New("test", Commands()).Execute([]string{"record", "start", "requirements"}, env), 0)
+			var result StartOutput
+			testutil.OK(t, json.Unmarshal(stdout.Bytes(), &result))
+			testutil.Equal(t, result.Stopped, state != "MERGED")
+			if result.Stopped {
+				testutil.Contains(t, strings.Join(result.Remaining, "\n"), "source PR #80")
+				testutil.Equal(t, len(must(List(RecordDir(runState, "feature/x"), "run"))), 0)
+			}
+		})
+	}
+}

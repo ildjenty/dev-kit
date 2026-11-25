@@ -5,5 +5,5 @@ write: {"draft": "/tmp/retro/draft.json"}
 check: {"valid": false, "errors": ["Entry not handled"]}
 round: {"round": 3, "valid": false, "blocking_count": 0, "not_assessed_count": 0}
 verify: {"needed": false}
-finish: {"outcome": "stop", "proposal_version": 1, "issue_numbers": [], "questions": [], "reasons": ["The draft did not clear review"]}
-result: {"outcome": "stop", "proposal_version": 1, "issue_numbers": [], "questions": [], "reasons": ["The draft did not clear review"]}
+finish: {"outcome": "stop", "proposal_version": 1, "issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "", "questions": [], "reasons": ["The draft did not clear review"]}
+result: {"outcome": "stop", "proposal_version": 1, "issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "", "questions": [], "reasons": ["The draft did not clear review"]}

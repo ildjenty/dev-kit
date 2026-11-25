@@ -3,5 +3,5 @@ fixture:
   reached: ["not-started","result"]
   inputs: {"approve":"1"}
 start: {"stopped":true,"stage":"start","reason":"approve must name the latest proposal version","details":"/tmp/record","remaining":[],"start":"first","counted":false,"restarts":0}
-not-started: {"outcome":"not_started","proposal_version":0,"decision_ids":[],"issue_numbers": [],"questions":[],"reasons":["approve must name the latest proposal version"]}
-result: {"outcome":"not_started","proposal_version":0,"decision_ids":[],"issue_numbers": [],"questions":[],"reasons":["approve must name the latest proposal version"]}
+not-started: {"outcome":"not_started","proposal_version":0,"decision_ids":[],"issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "","questions":[],"reasons":["approve must name the latest proposal version"]}
+result: {"outcome":"not_started","proposal_version":0,"decision_ids":[],"issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "","questions":[],"reasons":["approve must name the latest proposal version"]}

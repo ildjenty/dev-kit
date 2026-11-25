@@ -10,6 +10,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/issues"
+	"github.com/ildjenty/dev-kit/internal/proposal"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
@@ -30,7 +31,7 @@ func output(result doc, version int) doc {
 	if numbers == nil {
 		numbers = []int{}
 	}
-	return doc{"outcome": result["outcome"], "proposal_version": version, "issue_numbers": numbers, "questions": qs, "reasons": stringsOf(obj(result["stop"])["unresolved"])}
+	return doc{"outcome": result["outcome"], "proposal_version": version, "issue_numbers": numbers, "pr_number": num(result["pr_number"]), "pr_url": str(result["pr_url"]), "publication": str(result["publication"]), "questions": qs, "reasons": stringsOf(obj(result["stop"])["unresolved"])}
 }
 func preflight(ctx record.ContextData) error {
 	o, e := resultOptions(ctx)
@@ -234,10 +235,17 @@ func approve(ctx record.ContextData, version string, environments ...cli.Env) (d
 			return nil, e
 		}
 	}
+	progress, e = proposal.PublishProposal(ctx, env, content, path)
+	if e != nil {
+		return nil, e
+	}
 	progress, e = (issues.Client{Env: env}).CreateDrafts(path, drafts, c.Issues.Labels, nil, 0, "")
 	if e != nil {
 		return nil, e
 	}
-	return saveResult(ctx, doc{"outcome": "pass", "issue_numbers": progress.Numbers()}, num(p["version"]))
+	if e = proposal.UpdateProposal(ctx, env, content, progress); e != nil {
+		return nil, e
+	}
+	return saveResult(ctx, doc{"outcome": "pass", "issue_numbers": progress.Numbers(), "pr_number": progress.PRNumber, "pr_url": progress.PRURL, "publication": progress.Publication}, num(p["version"]))
 
 }

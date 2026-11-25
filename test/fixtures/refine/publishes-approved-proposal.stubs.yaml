@@ -1,0 +1,6 @@
+exec-code: true
+fixture:
+  expect: completed
+  reached: [start, approve, result]
+  inputs:
+    approve: "1"

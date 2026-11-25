@@ -98,7 +98,7 @@
     "outcome": "stop",
     "proposal_version": 1,
     "decision_ids": [],
-    "issue_numbers": [],
+    "issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "",
     "questions": [],
     "reasons": [
       "The draft did not clear review"
@@ -108,7 +108,7 @@
     "outcome": "stop",
     "proposal_version": 1,
     "decision_ids": [],
-    "issue_numbers": [],
+    "issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "",
     "questions": [],
     "reasons": [
       "The draft did not clear review"

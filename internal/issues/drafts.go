@@ -13,13 +13,15 @@ import (
 	"github.com/ildjenty/dev-kit/internal/config"
 )
 
-var draftMarkerPattern = regexp.MustCompile(`\n\n<!-- devkit:draft [a-f0-9]{64} -->$`)
+var draftMarkerPattern = regexp.MustCompile(`\n\n<!-- devkit:draft [a-f0-9]{64}(?:\nsource_pr: [1-9][0-9]*)? -->$`)
+var sourcePRPattern = regexp.MustCompile(`\n\n<!-- devkit:draft [a-f0-9]{64}\nsource_pr: ([1-9][0-9]*) -->$`)
+var draftIdentityPattern = regexp.MustCompile(`<!-- devkit:draft ([a-f0-9]{64})(?:\nsource_pr: [1-9][0-9]*)? -->`)
 
 func StripDraftMarker(body string) string {
 	return draftMarkerPattern.ReplaceAllString(body, "")
 }
 
-func (c Client) createDraft(commit, version, kind string, draft TopicDraft, label string) (Created, error) {
+func (c Client) createDraft(commit, version, kind string, draft TopicDraft, label string, sourcePR int) (Created, error) {
 	key, err := json.Marshal([]string{commit, version, kind, draft.Key})
 	if err != nil {
 		return Created{}, err
@@ -28,6 +30,10 @@ func (c Client) createDraft(commit, version, kind string, draft TopicDraft, labe
 	created, found, err := c.findDraft(marker, label)
 	if err != nil || found {
 		return created, err
+	}
+	if sourcePR > 0 {
+		draft.Body += fmt.Sprintf("\n\nSource: #%d", sourcePR)
+		marker = strings.TrimSuffix(marker, " -->") + fmt.Sprintf("\nsource_pr: %d -->", sourcePR)
 	}
 	return c.Create(draft.Title, draft.Body+"\n\n"+marker, []string{label})
 }
@@ -48,8 +54,12 @@ func (c Client) findDraft(marker, label string) (Created, bool, error) {
 	}
 	for _, page := range pages {
 		for _, item := range page {
-			if len(item.PullRequest) == 0 && slices.Contains(item.issue().Labels, label) && strings.Contains(item.Body, marker) {
-				return Created{item.Number, item.HTMLURL}, true, nil
+			if len(item.PullRequest) == 0 && slices.Contains(item.issue().Labels, label) {
+				for _, match := range draftIdentityPattern.FindAllStringSubmatch(item.Body, -1) {
+					if "<!-- devkit:draft "+match[1]+" -->" == marker {
+						return Created{item.Number, item.HTMLURL}, true, nil
+					}
+				}
 			}
 		}
 	}
@@ -136,13 +146,16 @@ func (d Drafts) Errors() []string {
 }
 
 type Creation struct {
-	RunID     string             `json:"run_id"`
-	Commit    string             `json:"commit"`
-	Parent    *Created           `json:"parent"`
-	Created   map[string]Created `json:"created"`
-	SubIssues map[string]bool    `json:"sub_issues"`
-	BlockedBy map[string]bool    `json:"blocked_by"`
-	Commented bool               `json:"commented"`
+	PRNumber    int                `json:"pr_number,omitempty"`
+	PRURL       string             `json:"pr_url,omitempty"`
+	Publication string             `json:"publication,omitempty"`
+	RunID       string             `json:"run_id"`
+	Commit      string             `json:"commit"`
+	Parent      *Created           `json:"parent"`
+	Created     map[string]Created `json:"created"`
+	SubIssues   map[string]bool    `json:"sub_issues"`
+	BlockedBy   map[string]bool    `json:"blocked_by"`
+	Commented   bool               `json:"commented"`
 }
 
 func ReadCreation(path string) (Creation, error) {
@@ -198,7 +211,7 @@ func (c Client) CreateDrafts(path string, drafts Drafts, labels config.IssueLabe
 		if number > 0 {
 			progress.Parent = &Created{Number: number}
 		} else {
-			created, err := c.createDraft(progress.Commit, filepath.Base(path), "parent", *parent, labels.Topic)
+			created, err := c.createDraft(progress.Commit, filepath.Base(path), "parent", *parent, labels.Topic, 0)
 			if err != nil {
 				return progress, err
 			}
@@ -213,10 +226,12 @@ func (c Client) CreateDrafts(path string, drafts Drafts, labels config.IssueLabe
 			continue
 		}
 		label := labels.Unit
+		sourcePR := progress.PRNumber
 		if slices.ContainsFunc(drafts.Topics, func(t TopicDraft) bool { return t.Key == issue.Key }) {
 			label = labels.Topic
+			sourcePR = 0
 		}
-		created, err := c.createDraft(progress.Commit, filepath.Base(path), "draft", issue, label)
+		created, err := c.createDraft(progress.Commit, filepath.Base(path), "draft", issue, label, sourcePR)
 		if err != nil {
 			return progress, err
 		}

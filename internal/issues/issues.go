@@ -46,8 +46,14 @@ type ReadyIssue struct {
 }
 
 type Ready struct {
-	Units  []ReadyIssue `json:"units"`
-	Topics []ReadyIssue `json:"topics"`
+	Units   []ReadyIssue   `json:"units"`
+	Topics  []ReadyIssue   `json:"topics"`
+	Waiting []WaitingIssue `json:"waiting"`
+}
+
+type WaitingIssue struct {
+	ReadyIssue
+	SourcePR Reference `json:"source_pr"`
 }
 
 type Client struct {
@@ -194,6 +200,13 @@ func (c Client) ReadyUnit(number int, label string) (Issue, error) {
 	if !slices.Contains(issue.Labels, label) {
 		return Issue{}, fmt.Errorf("issue #%d does not carry unit label %q", number, label)
 	}
+	pr, err := c.waitingPR(issue.Body)
+	if err != nil {
+		return Issue{}, err
+	}
+	if pr != nil {
+		return Issue{}, fmt.Errorf("issue #%d is waiting for source PR #%d to merge (%s)", number, pr.Number, pr.URL)
+	}
 	for _, blocker := range issue.BlockedBy {
 		if blocker.State != "closed" {
 			return Issue{}, fmt.Errorf("issue #%d is blocked by issue #%d (%s)", number, blocker.Number, blocker.State)
@@ -276,7 +289,7 @@ func (c Client) ListOpen(label string) ([]Issue, error) {
 }
 
 func (c Client) Ready(labels config.IssueLabels) (Ready, error) {
-	result := Ready{Units: []ReadyIssue{}, Topics: []ReadyIssue{}}
+	result := Ready{Units: []ReadyIssue{}, Topics: []ReadyIssue{}, Waiting: []WaitingIssue{}}
 	for _, group := range []struct {
 		label string
 		into  *[]ReadyIssue
@@ -290,7 +303,20 @@ func (c Client) Ready(labels config.IssueLabels) (Ready, error) {
 			if err != nil {
 				return Ready{}, err
 			}
-			if issue.State != "open" || slices.ContainsFunc(issue.BlockedBy, func(blocker Reference) bool { return blocker.State != "closed" }) {
+			if issue.State != "open" {
+				continue
+			}
+			if group.label == labels.Unit {
+				pr, err := c.waitingPR(issue.Body)
+				if err != nil {
+					return Ready{}, err
+				}
+				if pr != nil {
+					result.Waiting = append(result.Waiting, WaitingIssue{ReadyIssue{issue.Number, issue.Title, issue.URL, issue.Parent}, *pr})
+					continue
+				}
+			}
+			if slices.ContainsFunc(issue.BlockedBy, func(blocker Reference) bool { return blocker.State != "closed" }) {
 				continue
 			}
 			*group.into = append(*group.into, ReadyIssue{issue.Number, issue.Title, issue.URL, issue.Parent})

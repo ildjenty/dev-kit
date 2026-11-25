@@ -963,7 +963,7 @@ func output(result doc, version int) doc {
 	if numbers == nil {
 		numbers = []int{}
 	}
-	return doc{"outcome": result["outcome"], "proposal_version": version, "decision_ids": stringsOf(result["decision_ids"]), "issue_numbers": numbers, "questions": qs, "reasons": stringsOf(obj(result["stop"])["unresolved"])}
+	return doc{"outcome": result["outcome"], "proposal_version": version, "decision_ids": stringsOf(result["decision_ids"]), "issue_numbers": numbers, "pr_number": num(result["pr_number"]), "pr_url": str(result["pr_url"]), "publication": str(result["publication"]), "questions": qs, "reasons": stringsOf(obj(result["stop"])["unresolved"])}
 }
 func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	artifacts = resolve(ctx.Cwd, artifacts)
@@ -1153,6 +1153,10 @@ func approve(ctx record.ContextData, version string, environments ...cli.Env) (d
 		env = environments[0]
 		env.Cwd = ctx.Cwd
 	}
+	progress, err = proposal.PublishProposal(ctx, env, content, path)
+	if err != nil {
+		return nil, err
+	}
 	topic := obj(content["topic"])
 	parent := &issues.TopicDraft{Title: str(topic["title"]), Body: str(topic["body"])}
 	comment := strings.Join(ids, "\n")
@@ -1160,12 +1164,15 @@ func approve(ctx record.ContextData, version string, environments ...cli.Env) (d
 	if err != nil {
 		return nil, err
 	}
+	if err = proposal.UpdateProposal(ctx, env, content, progress); err != nil {
+		return nil, err
+	}
 	options, err := resultOptions(ctx)
 	if err != nil {
 		return nil, err
 	}
 	v, _ := strconv.Atoi(version)
-	saved, err := record.WriteResult(ctx.Dir, "refine", doc{"outcome": "pass", "proposal_version": v, "decision_ids": ids, "issue_numbers": progress.Numbers()}, options)
+	saved, err := record.WriteResult(ctx.Dir, "refine", doc{"outcome": "pass", "proposal_version": v, "decision_ids": ids, "issue_numbers": progress.Numbers(), "pr_number": progress.PRNumber, "pr_url": progress.PRURL, "publication": progress.Publication}, options)
 	if err != nil {
 		return nil, err
 	}

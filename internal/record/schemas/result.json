@@ -4,6 +4,9 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "pr_number": {"type": "integer", "minimum": 0},
+    "pr_url": {"type": "string"},
+    "publication": {"type": "string", "enum": ["published", "nothing_to_publish"]},
     "outside_requirements": {
       "type": "array",
       "items": {

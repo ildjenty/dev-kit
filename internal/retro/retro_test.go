@@ -55,6 +55,7 @@ func setup(t *testing.T, b doc) *fixture {
 	}
 	r.commit()
 	r.git("switch", "-qc", "retro/topic")
+	testutil.PublicationRemote(t, cwd)
 	r.ctx = record.ContextData{Cwd: cwd, Dir: record.RecordDir(filepath.Join(root, "state"), "retro/topic"), RunID: "r1", Branch: "retro/topic", BaseBranch: "main"}
 	return r
 }

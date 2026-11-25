@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
+	"github.com/ildjenty/dev-kit/internal/issues"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
@@ -20,6 +22,7 @@ type doc = map[string]any
 func Commands() []cli.Command {
 	return []cli.Command{
 		{Area: "fixture", Name: "github", Usage: "devkit-fixture github <args>", Run: fixtureGitHub},
+		{Area: "fixture", Name: "git", Usage: "devkit-fixture git <args>", Run: fixtureGit},
 		{Area: "fixture", Name: "before", Usage: "devkit-fixture before <area> <subcommand> [args]", Run: before},
 		{Area: "fixture", Name: "after", Usage: "devkit-fixture after <area> <subcommand> [args]", Run: after},
 	}
@@ -74,6 +77,11 @@ func before(args []string, env cli.Env) error {
 		if err = save(marker, m); err != nil {
 			return err
 		}
+		if env.Getenv("INPUTS_APPROVE") != "" && (workflow == "refine" || workflow == "retro") {
+			if err = seedApproval(workflow, env); err != nil {
+				return err
+			}
+		}
 	} else if err != nil {
 		return err
 	}
@@ -126,6 +134,66 @@ func before(args []string, env cli.Env) error {
 				return fmt.Errorf("fixture report did not pass: %v", state)
 			}
 			return save(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "pr", "outcome.json"), doc{"outcome": "pass"})
+		}
+	}
+	return nil
+}
+
+func seedApproval(workflow string, env cli.Env) error {
+	remote := filepath.Join(env.Getenv("ARTIFACTS_DIR"), "origin.git")
+	if _, err := gitx.Run(env.Cwd, "init", "-q", "--bare", remote); err != nil {
+		return err
+	}
+	aspects := []string{"coverage", "additions", "open_points", "consistency", "sufficiency", "wording", "bindings", "issues"}
+	if workflow == "retro" {
+		aspects = []string{"traceability", "evidence", "mechanism"}
+	}
+	criteria := []doc{}
+	for _, aspect := range aspects {
+		criteria = append(criteria, doc{"aspect": aspect, "verdict": "pass", "checked": "Compared fixture proposal", "not_checked": ""})
+	}
+	judgment, err := json.Marshal(doc{"criteria": criteria, "findings": []doc{}})
+	if err != nil {
+		return err
+	}
+	seed := env
+	seed.LookupEnv = func(key string) (string, bool) {
+		switch key {
+		case "INPUTS_APPROVE":
+			return "", true
+		case "WORKFLOW_ID":
+			return env.Getenv(key) + "-proposal", true
+		case "INPUTS_JUDGMENT":
+			return string(judgment), true
+		case "INPUTS_OWNER_WORDS":
+			return "Update fixture.txt", true
+		}
+		return env.Getenv(key), true
+	}
+	for _, mode := range []string{"start", "prepare", "check", "round", "verify", "finish"} {
+		if mode == "verify" && workflow != "retro" {
+			continue
+		}
+		if mode == "check" {
+			if err = before([]string{workflow, mode}, seed); err != nil {
+				return err
+			}
+		}
+		cmd := exec.Command(env.Getenv("DEVKIT_FIXTURE_BINARY"), workflow, mode)
+		cmd.Dir, cmd.Stderr = env.Cwd, env.Stderr
+		cmd.Env = append(append([]string{}, env.Environ...), "INPUTS_APPROVE=", "WORKFLOW_ID="+seed.Getenv("WORKFLOW_ID"), "INPUTS_JUDGMENT="+string(judgment), "INPUTS_OWNER_WORDS=Update fixture.txt")
+		output, err := cmd.Output()
+		if err != nil {
+			return fmt.Errorf("seed %s %s: %w", workflow, mode, err)
+		}
+		if mode == "start" {
+			var started record.StartOutput
+			if err = json.Unmarshal(output, &started); err != nil {
+				return err
+			}
+			if started.Stopped {
+				return fmt.Errorf("seed %s start stopped: %s %v", workflow, started.Reason, started.Remaining)
+			}
 		}
 	}
 	return nil
@@ -356,6 +424,9 @@ func after(args []string, env cli.Env) error {
 			return err
 		}
 	}
+	if len(args) >= 2 && args[1] == "approve" && (args[0] == "refine" || args[0] == "retro") {
+		return verifyPublication(args[0], env)
+	}
 	if len(args) < 2 || args[1] != "finish" {
 		return nil
 	}
@@ -444,6 +515,35 @@ func after(args []string, env cli.Env) error {
 		}
 		if !strings.Contains(string(data), `"status":"pass"`) {
 			return fmt.Errorf("fixture check did not pass: %s", data)
+		}
+	}
+	return nil
+}
+
+func verifyPublication(workflow string, env cli.Env) error {
+	ctx, err := record.Context(env)
+	if err != nil {
+		return err
+	}
+	result, err := record.Latest(ctx.Dir, "result")
+	if err != nil {
+		return err
+	}
+	if result["workflow"] != workflow || result["outcome"] != "pass" || result["pr_number"] != float64(80) || result["pr_url"] != "https://github.example/team/repo/pull/80" {
+		return fmt.Errorf("approval publication result is missing: %v", result)
+	}
+	progress, err := issues.ReadCreation(filepath.Join(ctx.Dir, "issue-creation", env.Getenv("INPUTS_APPROVE")+".json"))
+	if err != nil {
+		return err
+	}
+	for _, issue := range progress.Created {
+		created, err := read(filepath.Join(env.Getenv("ARTIFACTS_DIR"), fmt.Sprintf("issue-%d.json", issue.Number)))
+		if err != nil {
+			return err
+		}
+		body, _ := created["body"].(string)
+		if !strings.Contains(body, "Source: #80") || !strings.Contains(body, "\nsource_pr: 80 -->") {
+			return fmt.Errorf("unit #%d lacks source PR metadata", issue.Number)
 		}
 	}
 	return nil

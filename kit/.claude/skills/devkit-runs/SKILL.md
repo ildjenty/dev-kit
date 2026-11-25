@@ -64,7 +64,7 @@ base branch. Retro traces the missed stage and adds and evaluates a judge case w
 Use a branch for each topic or work unit, and start workflows with `--branch <name> --detach`.
 
 - Unsettled request: `devkit-discuss` → `refine` one topic at a time → exact-version approval →
-  publish and merge the refine pull request → for each settled work unit, on its own branch:
+  approval run publishes the refine PR → owner merges it → for each ready unit, on its own branch:
   `requirements` (`issue=<n>`) → `plan` → `implement` → `judge` ⇄ `fix` → `pr`.
 - A settled request that needs the workflows: `requirements` → `plan` → `implement` → `judge` → `pr`.
   Once a request is in this flow it goes through `plan`; small requests are not put in it at all.
@@ -74,7 +74,7 @@ Use a branch for each topic or work unit, and start workflows with `--branch <na
   subject to the configured fix and restart limits.
 - Update against the base branch: `sync` → `judge` when `needs_judge` is true → `pr`.
 - Correct the process after backlog reaches the base branch: `retro` → exact-version approval →
-  publish and merge the correction pull request → eligible repair units through the same unit flow.
+  approval run publishes the correction PR → owner merges it → eligible units through the same flow.
 
 Workflows do not invoke one another; the session chooses the next one from the recorded result.
 
@@ -99,12 +99,13 @@ archon workflow run refine --branch refine/<name> --detach \
 ```
 
 Run `devkit issues ready` (or `--json`) to find open unit and topic issues whose blockers are all closed.
+Units with an unmerged source PR appear separately as waiting, with that PR; requirements refuses them.
 Read a selected issue with `devkit issues show <n>` and start a ready unit on its own branch with
 requirements' `issue`, for example `--input issue=42`. Prepare supplies its title and body and the
 parent topic's title and body as request data alongside owner words and supplement. Use `owner_words`
 for direct requests. The PR body ends with `Closes #42`; merging the PR closes the unit issue.
-Keep the branch and PR for later corrections unless the owner asks for another. After refine passes,
-publish its branch through the repository's PR process; refine does not publish a PR. Continue with the
+Keep the branch and PR for later corrections unless the owner asks for another. Refine's approval run
+publishes its branch through a machine bash node; the owner merges the PR. Continue with the
 next topic, using `devkit-discuss` when choices need discussion. Run `devkit issues ready` again after
 merging a unit PR to find work whose blockers are now closed.
 
@@ -146,25 +147,30 @@ approval question's ID. Never synthesize approval or use `approve` for an open-p
 
 Refine commits proposed decision records and binding edits to standards, agent instructions, skills
 or checks before fresh read-only judgment. It reads the full decision log; delivery never consumes
-it. On approval, refine marks records agreed, commits that change, then creates unit issues under
+it. On approval, refine marks records agreed, commits that change, pushes and opens or updates its PR,
+then creates unit issues under
 the selected topic (creating a parent topic if absent), new topic issues and blocked-by links.
 It closes the parent with a comment when no new topics remain, otherwise comments without closing.
-Relay `decision_ids` and `issue_numbers`; keep `devkit-discuss` active until the discussion is in Issues.
+Relay `decision_ids`, `issue_numbers`, `pr_number` and `pr_url`; keep `devkit-discuss` active until the discussion is in Issues.
+The machine reuses the approved summary and approval text for the PR and adds created Issue links.
+The owner merges it; units become ready after that merge and after their blockers close.
+When `publication` is `nothing_to_publish`, relay that no commits remain beyond the base.
 
 Run retro on a `retro/<name>` branch created from the base. It reads that branch's backlog, proposes
 unit Issue drafts, check additions and standard edits, commits the real files and consumed backlog
 deletions, then asks one approval question showing the version and commit after machine checks, fresh read-only
 judgment and escape verification. Approval requires that version's commit to remain the clean branch
-head; it creates unit issues without a parent topic, connects blocked-by links and records
-`issue_numbers`, without editing files or creating another commit. Requested changes create the
+head; it pushes and opens or updates the PR, creates unit issues without a parent topic, connects
+blocked-by links and records `issue_numbers`, `pr_number` and `pr_url`, without creating another commit. Requested changes create the
 next proposal commit on that history; withdrawn edits are undone by a new commit. Old snapshot
 proposals must be restarted on a new retro branch.
-An empty backlog passes without an approval question. Publish and merge the correction PR through
-the repository's PR process before starting its units.
+An empty backlog passes without an approval question. The approval run publishes the correction PR
+in a machine bash node. The owner merges it; units become ready after that merge and their blockers close.
 
 Both workflows keep Issue drafts in the proposal record and create Issues only on approval. If an
-approval fails during Issue creation, inspect the failure and restart the same workflow, branch and
-approved version when the cause is resolved. Creation progress is saved; stable hidden body markers
+approval fails during publication or Issue creation, inspect the failure and restart the same workflow, branch and
+approved version when the cause is resolved. The PR is found by head branch and reused; a push failure
+stops before Issue creation. Creation progress is saved; stable hidden body markers
 let a retry adopt even an Issue whose creation response or local save was lost, including closed
 issues, and complete missing sub-issue and blocked-by links. Do not manually recreate the drafts or
 reopen adopted issues. This does not prevent concurrent creation or duplicate parent comments after

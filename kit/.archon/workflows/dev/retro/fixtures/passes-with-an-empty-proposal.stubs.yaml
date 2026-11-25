@@ -1,5 +1,5 @@
 fixture: {"expect": "completed", "reached": ["start", "prepare", "empty", "result"], "inputs": {}}
 start: {"stopped": false, "stage": "start", "reason": "", "details": "/tmp/record", "remaining": [], "start": "first", "counted": false, "restarts": 0}
 prepare: {"input": "/tmp/retro/input.json", "criteria": "/tmp/criteria", "empty": true}
-empty: {"outcome": "pass", "proposal_version": 1, "issue_numbers": [], "questions": [], "reasons": []}
-result: {"outcome": "pass", "proposal_version": 1, "issue_numbers": [], "questions": [], "reasons": []}
+empty: {"outcome": "pass", "proposal_version": 1, "issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "", "questions": [], "reasons": []}
+result: {"outcome": "pass", "proposal_version": 1, "issue_numbers": [], "pr_number": 0, "pr_url": "", "publication": "", "questions": [], "reasons": []}

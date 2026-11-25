@@ -49,9 +49,50 @@ func TestUnitDraftsWaitForApprovalAndRetryOnlyMissingIssues(t *testing.T) {
 	testutil.Equal(t, strings.Count(calls, "issue create --title Repair defect"), 1)
 	testutil.Contains(t, calls, "/issues/102/dependencies/blocked_by")
 	testutil.Equal(t, strings.Contains(calls, "sub_issues"), false)
+	testutil.Equal(t, strings.Count(calls, "pr create"), 1)
+	testutil.Equal(t, strings.Index(calls, "pr create") < strings.Index(calls, "issue create"), true)
+	testutil.Equal(t, result["pr_number"], 80)
+	testutil.Contains(t, readFile(t, filepath.Join(log, "bodies")), "Source: #80")
+	testutil.Contains(t, readFile(t, filepath.Join(log, "bodies")), "\nsource_pr: 80 -->")
+	testutil.Contains(t, readFile(t, filepath.Join(log, "pr-bodies")), "#101 Repair defect")
+}
+
+func TestApprovalPushFailureStopsBeforeCreatingIssues(t *testing.T) {
+	r := setup(t, backlog())
+	log, _ := testutil.IssueCreationCLI(t)
+	r.begin()
+	r.write(r.draft())
+	testutil.Must(r.review(judgment()))
+	testutil.Must(finish(r.ctx, r.artifacts))
+	r.ctx.RunID = "r2"
+	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))).Stopped, false)
+	remote := r.git("remote", "get-url", "origin")
+	testutil.Put(t, remote, "hooks/pre-receive", "#!/bin/sh\nexit 1\n")
+	testutil.OK(t, os.Chmod(filepath.Join(remote, "hooks/pre-receive"), 0755))
+	_, err := approve(r.ctx, "1")
+	testutil.Fails(t, err, "git push")
+	_, err = os.Stat(filepath.Join(log, "calls"))
+	testutil.Equal(t, os.IsNotExist(err), true)
 }
 
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	return string(testutil.Must(os.ReadFile(path)))
+}
+
+func TestApprovalWithNoCommitsBeyondBaseCreatesIssuesWithoutPR(t *testing.T) {
+	r := setup(t, backlog())
+	log, _ := testutil.IssueCreationCLI(t)
+	r.begin()
+	r.write(r.draft())
+	testutil.Must(r.review(judgment()))
+	testutil.Must(finish(r.ctx, r.artifacts))
+	r.git("branch", "-f", "main", "HEAD")
+	r.ctx.RunID = "r2"
+	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))).Stopped, false)
+	result := testutil.Must(approve(r.ctx, "1"))
+	testutil.Equal(t, result["publication"], "nothing_to_publish")
+	testutil.Equal(t, result["pr_number"], 0)
+	testutil.Equal(t, strings.Contains(readFile(t, filepath.Join(log, "calls")), "pr "), false)
+	testutil.Equal(t, readFile(t, filepath.Join(log, "count")), "1")
 }

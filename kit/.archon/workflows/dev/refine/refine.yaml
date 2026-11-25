@@ -2,7 +2,7 @@ name: refine
 description: |
   Turn a topic Issue or owner request into decision records, binding changes and Issue drafts.
   Review at most three drafts and commit one proposal per version.
-  Restart with approve=<version> to agree the decisions and create the Issues without AI.
+  Restart with approve=<version> to agree decisions, publish the PR and create Issues without AI.
 worktree:
   enabled: true
 inputs:
@@ -57,6 +57,9 @@ nodes:
         proposal_version: { type: integer }
         decision_ids: { type: array, items: { type: string } }
         issue_numbers: { type: array, items: { type: integer } }
+        pr_number: { type: integer }
+        pr_url: { type: string }
+        publication: { type: string }
         questions:
           type: array
           items:
@@ -66,7 +69,7 @@ nodes:
               text: { type: string }
             required: [id, text]
         reasons: { type: array, items: { type: string } }
-      required: [outcome, proposal_version, decision_ids, issue_numbers, questions, reasons]
+      required: [outcome, proposal_version, decision_ids, issue_numbers, pr_number, pr_url, publication, questions, reasons]
 
   - id: approve
     depends_on: [start]

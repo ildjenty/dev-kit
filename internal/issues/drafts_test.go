@@ -103,7 +103,7 @@ func TestDraftIdentityDistinguishesProposalsAndParent(t *testing.T) {
 		t.Run(fmt.Sprint(identity), func(t *testing.T) {
 			marker := draftMarker(identity[0], identity[1], identity[2], "same-key")
 			c := fake(t, draftListStep(`[[]]`), ghStep{Args: []string{"issue", "create", "--title", "Same title", "--body-file", "-", "--label", "work"}, Input: "Same body\n\n" + marker, Output: "https://github.example/team/repo/issues/42"})
-			_, err := c.createDraft(identity[0], identity[1], identity[2], TopicDraft{Key: "same-key", Title: "Same title", Body: "Same body"}, "work")
+			_, err := c.createDraft(identity[0], identity[1], identity[2], TopicDraft{Key: "same-key", Title: "Same title", Body: "Same body"}, "work", 0)
 			testutil.OK(t, err)
 		})
 	}
@@ -172,7 +172,7 @@ func TestDraftLookupFailureDoesNotCreate(t *testing.T) {
 		if response == "failure" {
 			step.Code, step.Stderr = 1, "lookup failed"
 		}
-		_, err := fake(t, step).createDraft("proposal", "1.json", "draft", TopicDraft{Key: "first"}, "work")
+		_, err := fake(t, step).createDraft("proposal", "1.json", "draft", TopicDraft{Key: "first"}, "work", 0)
 		if err == nil {
 			t.Fatal("expected lookup failure")
 		}
