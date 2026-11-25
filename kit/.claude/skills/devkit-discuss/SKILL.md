@@ -17,7 +17,8 @@ summarised; do not treat an interruption or summarisation as completion.
 
 The aim is not to settle everything before anything becomes an Issue. Ask only what the next unit of
 work needs: a goal and completion conditions someone can observe. Put every other question into the
-memo as still open instead of asking it now; open points become topic issues and are discussed later.
+memo as still open instead of asking it now. Points that hold no unit stay open in the memo for
+refine to put into a non-blocking topic, to be decided when work needs them.
 As soon as one area is settled enough to cut at least one unit, propose handing the settled part to
 refine now, saying that the open points will remain as topic issues. Propose the same when a few
 questions in a row settle nothing new. Do not wait for the owner to declare the discussion finished.
@@ -38,6 +39,10 @@ explain the conflict so the owner can say whether to overturn it. Do not silentl
 
 Find ready open topics with `devkit issues ready` and read a selected topic and its relationships
 with `devkit issues show <number>`. Read another known topic by number when investigating a blocker.
+When the owner wants to start a unit, read its blocked-by relationships and choose the topic that
+holds that unit. Within a topic, ask only what its waiting units need. Its listed points are
+candidates, not a checklist to finish; leave points that hold no unit open in the memo for refine
+to put into a non-blocking topic.
 
 Offer candidates, a recommendation and the reason only when there is a choice to make. A factual
 question about the owner's situation has no recommendation. Keep what the owner said separate from
@@ -69,7 +74,8 @@ Never supply answers, approval or `continue` for the owner.
 
 On approval, refine's machine bash node pushes the branch and opens or updates its PR, then creates
 unit issues as sub-issues of the topic and open questions as topic
-issues, with blocked-by relationships expressing unit order and topics waiting for other topics.
+issues, with blocked-by relationships expressing unit order, units waiting for topics and topics
+waiting for other topics.
 Check the returned `issue_numbers` with `devkit issues show`; an approval failure leaves the mode
 active, and `devkit-runs` handles retrying the same approved version. If part of the discussion is
 still unrepresented, resume from the memo and refine that part. Once all parts are represented,

@@ -37,6 +37,8 @@ exactly one row per aspect, with `aspect`, `verdict` (pass, fail, not_assessed),
 Return every property in the output schema. Use `false` for `mechanical` when no mechanical check is proposed. Use empty strings or empty arrays for inapplicable text or lists.
 
 Each unit Issue draft must fit one PR, have observable completion conditions and include all delivery constraints without requiring decision records. Check the blocked-by order among drafts.
+Its work content is only its goal, observable completion conditions and product properties to
+preserve. An open question in a unit draft is a blocking finding.
 Under `mechanism`, check that every required product property is a testable completion condition
 in the unit that builds it. A shared property belongs in the first unit that builds it, and later
 units that touch it repeat the condition they must preserve. Missing conditions are blocking findings.

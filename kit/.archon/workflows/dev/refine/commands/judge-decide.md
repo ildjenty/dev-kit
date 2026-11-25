@@ -13,6 +13,11 @@ Return exactly one criterion for each aspect:
 - `coverage`: the request, confirmed memo and answers survive in the decisions and Issue drafts.
 - `additions`: each choice has its actual source and follows authority; derived choices are not owner choices.
 - `open_points`: unanswered questions become topic drafts, with the information needed to settle them.
+  Group questions holding the same units at the same time only when they cannot be decided apart;
+  require grouping by this rule rather than one Issue per question. Separate questions holding
+  different units or independently decidable questions. Questions holding no unit go in separate,
+  non-blocking topics; closely related ones may share a topic. Mixing questions that hold different
+  units, or including a question a waiting unit does not need in its blocking topic, is blocking.
 - `consistency`: decisions, bindings, supersession and Issue dependencies agree.
 - `sufficiency`: the decisions give background, candidates, choice and reason.
 - `wording`: the decision log and Issue drafts say precisely what the owner is being asked to approve.
@@ -32,6 +37,10 @@ Return exactly one criterion for each aspect:
   Review the new `parent` title and body like every other Issue draft, against the
   owner's sources and the configured language. Parent/sub-issue and blocked-by structure expresses
   order; questions remain topics. The approval question includes the new parent's title and body.
+  A unit draft's work content is only its goal, observable completion conditions and product
+  properties to preserve; an open question in a unit draft is blocking. Each topic body must name
+  the units it holds or explicitly say it holds none. Missing declarations or a mismatch with the
+  waiting units' `blocked_by` links, including any unit blocked by a topic holding none, are blocking.
 
 Use the supplied common rules, criteria and authority for verdicts and findings. Write in the
 language named by `language` in your input. Return every property required by the output schema.

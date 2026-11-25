@@ -18,6 +18,8 @@ Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
 - `summary`: the proposed correction.
 - `units`: work for deferred or carried findings, or follow-up work traced to review entries, with stable draft `key`, `title`, `goal`,
   `completion_conditions`, `blocked_by` draft keys, and source `entries`. Each unit fits one PR and contains every constraint delivery needs.
+  Keep open questions out of unit drafts; their work content is only the goal, observable completion
+  conditions and product properties they must preserve.
   Put required product data shapes, invariants and feature rules here as conditions a test can check;
   for example, assigning overlapping shifts to the same person is rejected. Put a shared property in
   the first unit that builds it; later units that touch it repeat the condition they must preserve.

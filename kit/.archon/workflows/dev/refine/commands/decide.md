@@ -32,6 +32,8 @@ Write `$ARTIFACTS_DIR/refine/draft.json` using the supplied strict schema:
   changing standards and harness. A recorded choice that need not bind agents needs no binding.
   Put each binding rule in the relevant mechanism; delivery agents do not read decision records.
 - `units`: settled work, each with stable key, title, goal and observable `completion_conditions`.
+  Keep open questions out of unit drafts; their work content is only the goal, observable completion
+  conditions and product properties they must preserve. Put unresolved questions in `topics`.
   Put every required product property here as a condition a test can check; for example, assigning
   overlapping shifts to the same person is rejected. Put a shared property in the first unit that
   builds it (such as the foundation unit); later units that touch it repeat the condition to preserve.
@@ -40,7 +42,16 @@ Write `$ARTIFACTS_DIR/refine/draft.json` using the supplied strict schema:
   require delivery agents to read a decision record. `blocked_by` names other draft Issue keys.
   Units become sub-issues of the selected topic, or the approved `parent` draft.
 - `topics`: unsettled questions with stable `TN1`, `TN2`, ... keys, title and body explaining the
-  question and what a settled answer needs. Include candidates and a reasoned recommendation for
+  questions and what settled answers need. Group questions into one topic when they hold the same
+  units at the same time and cannot be decided apart: stack, hosting and a monthly cost cap hold
+  the foundation unit together, and the cap shapes the hosting choice. Separate questions that hold
+  different units or can be decided apart. Questions holding no unit belong in separate, non-blocking
+  topics for when work needs them; closely related ones may share a topic, such as who signs contracts
+  and who administers accounts under "contracts and operating arrangements". Group related questions
+  by these rules to keep Issue counts manageable; do not create one Issue per question.
+  Each topic body names the unit draft keys it holds, or explicitly says it holds none. Each waiting
+  unit's `blocked_by` includes that topic's key; a topic holding no unit blocks none.
+  Include candidates and a reasoned recommendation for
   choices under authority rules, or ask for the missing fact. `blocked_by` names draft Issue keys
   when the topic must wait. Settled work may coexist with separate unsettled topics.
 

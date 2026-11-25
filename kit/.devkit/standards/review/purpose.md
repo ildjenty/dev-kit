@@ -9,14 +9,27 @@ Compare the request with requirements for coverage and unresolved requirements. 
 
 ## Topic proposals
 
-For refine's decide phase, assess coverage of the selected topic's question and required answer,
-additions under `authority.md`, open points, consistency with agreed decisions, and sufficiency of
-the proposed answer. Next topics carry their own question, required answer and decision dependencies;
-they do not substitute for an unresolved point needed to settle the selected topic. Compare candidates,
-including the simplest alternative, against the decision's evidence and reasons.
+For refine's single decide phase, assess request, confirmed memo and answer coverage in decision
+records, binding edits and Issue drafts; additions under `authority.md`; open points; consistency
+with agreed decisions; and sufficiency of background, candidates, choice and reasons. Compare
+candidates, including the simplest alternative, against the evidence. Apply the wording criteria
+mapped to refine to the decision records, Issue drafts and approval text. Settled work may coexist
+with separate unsettled topics.
 
-For the document phase, apply the wording criteria mapped to refine to documents and approval text.
-The machine checks dispositions of affected documents and units and cuts into work units only for settled areas.
+Group open questions into one topic when they hold the same work units at the same time and cannot
+be decided apart. Stack, hosting and a monthly cost cap can hold the foundation unit together,
+with the cap shaping the hosting choice. Questions holding different units or independently
+decidable questions belong in separate topics. Questions holding no unit go into separate,
+non-blocking topics for when work needs them; closely related ones may share a topic, such as
+contract signers and account administrators under "contracts and operating arrangements".
+Require grouping by this rule to keep Issue counts manageable, rather than one Issue per question.
+Each topic draft states which unit draft keys it holds, or explicitly that it holds none; the
+waiting units' `blocked_by` links must match. A unit draft contains no open question: its work
+content is only its goal, observable completion conditions and product properties to preserve.
+
+Violations are blocking, including a topic mixing questions that hold different units, a unit's
+blocking topic containing questions that unit does not need, an open question in a unit draft,
+or blocked-by links that do not match the units the topic holds (including topics holding none).
 
 Issue and parent topic titles and bodies are request data. Session supplement supplies
 facts and candidates; it does not by itself authorize additional requirements or owner choices.
