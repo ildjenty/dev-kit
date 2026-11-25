@@ -1,6 +1,6 @@
 # dev-kit
 
-dev-kit gives Archon a portable development process: the owner decides what matters, a change stays in one place, and the process corrects itself from observed failures. Nine workflows, three session skills, repository-owned standards and the Go binary `devkit` work together. AI sessions write and judge; the binary checks facts, enforces transitions and preserves evidence.
+dev-kit gives Archon a portable development process: the owner decides what matters, a change stays in one place, and the process corrects itself from observed failures. Ten workflows, three session skills, repository-owned standards and the Go binary `devkit` work together. AI sessions write and judge; the binary checks facts, enforces transitions and preserves evidence. [Workflow diagrams](docs/workflows.md) show every workflow's nodes, which run on AI and which on the machine, and their loops.
 
 ## Install
 
@@ -65,6 +65,8 @@ The supplied `.archon/config.yaml` disables bundled default workflows and comman
 Commands that consume run artifacts require `ARTIFACTS_DIR` before reading or writing. Provider CLI calls also require `PACK_DIR`; a missing required folder setting names the variable and stops instead of using checkout-relative files. Standalone `devkit checks` retains its temporary output folder when no artifacts folder is supplied.
 
 ## Use the flow
+
+Each workflow's nodes are drawn in [docs/workflows.md](docs/workflows.md).
 
 ```text
 devkit-discuss mode (discussion → refine → approval → Issues) → refine PR → owner merges
