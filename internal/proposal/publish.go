@@ -94,7 +94,11 @@ func proposalText(content map[string]any, progress issues.Creation) (string, str
 	title, _, _ := strings.Cut(strings.TrimSpace(proposal.Draft.Summary), "\n")
 	body := proposal.ApprovalText
 	if progress.Parent != nil {
-		body += fmt.Sprintf("\n\n- #%d %s", progress.Parent.Number, proposal.Topic.Title)
+		parentTitle := proposal.Topic.Title
+		if proposal.Draft.Parent != nil && proposal.Draft.Parent.Title != "" {
+			parentTitle = proposal.Draft.Parent.Title
+		}
+		body += fmt.Sprintf("\n\n- #%d %s", progress.Parent.Number, parentTitle)
 	}
 	for _, unit := range proposal.Draft.Units {
 		if created, ok := progress.Created[unit.Key]; ok {

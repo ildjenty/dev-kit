@@ -16,7 +16,7 @@ import (
 )
 
 func draft() doc {
-	return doc{"topics": []doc{}, "summary": "A service for employees", "decisions": []doc{{"key": "N1", "title": "Serve employees", "body": "Compare all users with employees only, the simplest scope. Choose employees as requested.", "decided_by": "owner", "depends_on": []string{}, "supersedes": []string{}, "source": "owner_words"}}, "units": []doc{{"key": "UN1", "title": "Deliver staff access", "goal": "Employees can sign in", "completion_conditions": []string{"An employee can sign in"}, "blocked_by": []string{}}}, "bindings": []doc{}}
+	return doc{"parent": doc{"title": "Serve employees", "body": "Who can use the service? Employees only."}, "topics": []doc{}, "summary": "A service for employees", "decisions": []doc{{"key": "N1", "title": "Serve employees", "body": "Compare all users with employees only, the simplest scope. Choose employees as requested.", "decided_by": "owner", "depends_on": []string{}, "supersedes": []string{}, "source": "owner_words"}}, "units": []doc{{"key": "UN1", "title": "Deliver staff access", "goal": "Employees can sign in", "completion_conditions": []string{"An employee can sign in"}, "blocked_by": []string{}}}, "bindings": []doc{}}
 }
 func judgment() doc {
 	cs := []doc{}
@@ -227,6 +227,9 @@ func TestApprovalCreatesParentSubIssuesDependenciesAndClosesOrComments(t *testin
 				testutil.Equal(t, started.Stopped, false)
 				testutil.Must(prepare(r.ctx, envVars(nil), r.artifacts, "Serve employees", "", "", topic))
 				d := draft()
+				if existing {
+					d["parent"] = doc{"title": "", "body": ""}
+				}
 				items(d["decisions"])[0]["supersedes"] = []string{"D-000001"}
 				second := clone(items(d["units"])[0])
 				second["key"], second["blocked_by"] = "UN2", []string{"UN1"}
@@ -298,7 +301,7 @@ func TestApprovalRetryCreatesOnlyMissingIssuesAfterPartialFailure(t *testing.T) 
 	testutil.Equal(t, testutil.Must(approve(r.ctx, "1"))["outcome"], "pass")
 	testutil.Equal(t, r.git("rev-parse", "HEAD"), head)
 	calls := readText(t, filepath.Join(log, "calls"))
-	testutil.Equal(t, strings.Count(calls, "issue create --title A service for employees"), 1)
+	testutil.Equal(t, strings.Count(calls, "issue create --title Serve employees"), 1)
 	testutil.Equal(t, strings.Count(calls, "issue create --title Deliver staff access"), 1)
 	testutil.Equal(t, readText(t, filepath.Join(log, "count")), "3")
 	testutil.Equal(t, r.latest("result")["issue_numbers"], []any{float64(101), float64(102), float64(103)})

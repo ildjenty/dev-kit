@@ -2,6 +2,20 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "parent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "body": {
+          "type": "string"
+        }
+      },
+      "required": ["title", "body"]
+    },
     "summary": {
       "type": "string",
       "minLength": 1
@@ -81,6 +95,7 @@
           },
           "title": {
             "type": "string",
+            "maxLength": 256,
             "minLength": 1
           },
           "goal": {
@@ -126,6 +141,7 @@
           },
           "title": {
             "type": "string",
+            "maxLength": 256,
             "minLength": 1
           },
           "body": {
@@ -177,6 +193,7 @@
     }
   },
   "required": [
+    "parent",
     "summary",
     "decisions",
     "units",

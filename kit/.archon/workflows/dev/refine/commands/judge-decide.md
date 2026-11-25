@@ -20,7 +20,9 @@ Return exactly one criterion for each aspect:
   standards' rules for changing standards and harness, including evidence and ongoing burden.
   A choice recorded only for people needs no binding edit. Delivery never consumes decision records.
 - `issues`: each unit fits one PR and has observable completion conditions without requiring a
-  decision record. Parent/sub-issue and blocked-by structure expresses order; questions remain topics.
+  decision record. Review the new `parent` title and body like every other Issue draft, against the
+  owner's sources and the configured language. Parent/sub-issue and blocked-by structure expresses
+  order; questions remain topics. The approval question includes the new parent's title and body.
 
 Use the supplied common rules, criteria and authority for verdicts and findings. Write in the
 language named by `language` in your input. Return every property required by the output schema.

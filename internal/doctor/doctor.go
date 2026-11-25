@@ -2,12 +2,14 @@ package doctor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -167,6 +169,16 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 	finding("needed for a part", "gh (issues, pr)", gh, "GitHub CLI available", "Issue operations and pr publishing need GitHub CLI; install gh from https://cli.github.com.")
 	_, auth := command(env, limit, ghExecutable, "auth", "status")
 	finding("needed for a part", "gh authentication (issues, pr)", auth, "authenticated", "Issue operations and pr publishing need authentication; run gh auth login.")
+	labelJSON, labelsOK := command(env, limit, ghExecutable, "label", "list", "--limit", strconv.Itoa(int(^uint(0)>>1)), "--json", "name")
+	type label struct {
+		Name string `json:"name"`
+	}
+	var labels []label
+	labelsOK = labelsOK && json.Unmarshal([]byte(labelJSON), &labels) == nil
+	for _, name := range []string{settings.Issues.Labels.Unit, settings.Issues.Labels.Topic} {
+		present := labelsOK && slices.ContainsFunc(labels, func(item label) bool { return item.Name == name })
+		finding("needed for a part", "issue label "+name, present, "available for Issue creation", "Issue operations need this label; approval creates it before creating Issues. If labels cannot be read, check gh authentication and repository access.")
+	}
 	origin, remote := command(env, limit, "git", "remote", "get-url", "origin")
 	finding("needed for a part", "origin (pr)", remote && origin != "", "origin configured", "The pr workflow needs origin; run git remote add origin <repository-url>.")
 	key := env.Getenv("TYPESAFE_API_KEY") != ""

@@ -195,6 +195,33 @@ esac`)
 	testutil.Equal(t, strings.Contains(out.String(), "private diagnostic"), false)
 }
 
+func TestIssueLabelsArePartSpecificAndApprovalCreatesMissingLabels(t *testing.T) {
+	for _, response := range []string{`[]`, `[{"name":"work"},{"name":"questions"}]`, `[{"name":"work"}]`, `invalid JSON`} {
+		t.Run(response, func(t *testing.T) {
+			env, bin, out := environment(t, "claude")
+			testutil.Put(t, env.Cwd, ".devkit/config.json", `{"issues":{"labels":{"unit":"work","topic":"questions"}}}`)
+			path := filepath.Join(bin, "fake-gh")
+			t.Setenv("DEVKIT_GH", path)
+			executable(t, bin, "fake-gh", `case "$1 $2" in
+ '--version '| 'auth status') exit 0 ;;
+ 'label list') printf '%s' '`+response+`' ;;
+ *) exit 19 ;;
+esac`)
+			testutil.Equal(t, Report(env), true)
+			for _, name := range []string{"work", "questions"} {
+				status := "MISSING"
+				if strings.Contains(response, `"`+name+`"`) {
+					status = "OK"
+				}
+				testutil.Contains(t, out.String(), "[needed for a part] issue label "+name+": "+status)
+				if status == "MISSING" {
+					testutil.Contains(t, out.String(), "approval creates it before creating Issues")
+				}
+			}
+		})
+	}
+}
+
 func TestShortTimeoutsAndExitCodes(t *testing.T) {
 	env, bin, out := environment(t, "claude")
 	executable(t, bin, "archon", "exec /bin/sleep 5")

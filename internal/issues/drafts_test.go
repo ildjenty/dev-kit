@@ -21,6 +21,32 @@ func draftMarker(commit, version, kind, key string) string {
 	return fmt.Sprintf("<!-- devkit:draft %x -->", sha256.Sum256(identity))
 }
 
+func TestEnsureConfiguredLabelsCanBeRepeated(t *testing.T) {
+	steps := []ghStep{{Args: []string{"label", "create", "work, unit", "--force"}}, {Args: []string{"label", "create", "open questions", "--force"}}}
+	c := fake(t, append(append([]ghStep{}, steps...), steps...)...)
+	labels := config.IssueLabels{Unit: "work, unit", Topic: "open questions"}
+	testutil.OK(t, c.EnsureLabels(labels))
+	testutil.OK(t, c.EnsureLabels(labels))
+}
+
+func TestLabelFailureStopsBeforeIssueCreation(t *testing.T) {
+	for _, label := range []string{"work", "questions"} {
+		path := filepath.Join(t.TempDir(), "1.json")
+		progress := testutil.Must(ReadCreation(path))
+		progress.Commit = "proposal"
+		testutil.OK(t, SaveCreation(path, progress))
+		steps := []ghStep{}
+		if label == "questions" {
+			steps = append(steps, ghStep{Args: []string{"label", "create", "work", "--force"}})
+		}
+		steps = append(steps, ghStep{Args: []string{"label", "create", label, "--force"}, Code: 1, Stderr: "label denied"})
+		c := fake(t, steps...)
+		_, err := c.CreateDrafts(path, Drafts{Topics: []TopicDraft{{Key: "first", Title: "Question", Body: "Owner text"}}}, config.IssueLabels{Unit: "work", Topic: "questions"}, nil, 0, "")
+		testutil.Fails(t, err, "label denied")
+		testutil.Equal(t, testutil.Must(ReadCreation(path)), progress)
+	}
+}
+
 func TestCreateDraftsAdoptsAfterUnrecordedCreation(t *testing.T) {
 	for _, kind := range []string{"unit", "topic", "parent"} {
 		for _, failure := range []string{"lost response", "invalid response", "record save"} {
@@ -54,7 +80,10 @@ func TestCreateDraftsAdoptsAfterUnrecordedCreation(t *testing.T) {
 					create.BlockSave = path
 				}
 				remote := testutil.Must(json.Marshal([][]map[string]any{{{"number": 42, "html_url": "https://github.example/team/repo/issues/42", "body": body, "state": "open", "labels": []map[string]string{{"name": label}}}}}))
-				steps := []ghStep{draftListStep(`[[]]`), create, draftListStep(string(remote))}
+				labelsSteps := []ghStep{{Args: []string{"label", "create", "devkit:unit", "--force"}}, {Args: []string{"label", "create", "devkit:topic", "--force"}}}
+				steps := append(append([]ghStep{}, labelsSteps...), draftListStep(`[[]]`), create)
+				steps = append(steps, labelsSteps...)
+				steps = append(steps, draftListStep(string(remote)))
 				if kind == "parent" {
 					steps = append(steps, ghStep{Args: []string{"issue", "close", "42", "--comment", "Approved"}})
 				}
@@ -121,9 +150,11 @@ func TestCreateDraftsAdoptsAndRepairsMissingRelationships(t *testing.T) {
 	progress.Commit, progress.Parent = "proposal", &Created{Number: 7}
 	progress.Created["first"] = Created{Number: 41}
 	testutil.OK(t, SaveCreation(path, progress))
-	drafts := Drafts{Units: []UnitDraft{{Key: "first", Title: "First"}, {Key: "second", Title: "Second", BlockedBy: []string{"first"}}}}
+	drafts := Drafts{Units: []UnitDraft{{Key: "first", Title: "First", Goal: "First goal"}, {Key: "second", Title: "Second", Goal: "Second goal", BlockedBy: []string{"first"}}}}
 	remote := [][]map[string]any{{{"number": 42, "body": draftMarker("proposal", "1.json", "draft", "second"), "labels": []map[string]string{{"name": "work"}}}}}
 	c := fake(t,
+		ghStep{Args: []string{"label", "create", "work", "--force"}},
+		ghStep{Args: []string{"label", "create", "questions", "--force"}},
 		draftListStep(string(testutil.Must(json.Marshal(remote)))),
 		relationStep(7, "sub_issues", `[[{"number":41}]]`),
 		relationStep(7, "sub_issues", `[[{"number":41}]]`),
@@ -134,7 +165,7 @@ func TestCreateDraftsAdoptsAndRepairsMissingRelationships(t *testing.T) {
 		ghStep{Args: append(restArgs("42/dependencies/blocked_by"), "--method", "POST", "--field", "issue_id=1041"), Output: `{}`},
 		ghStep{Args: []string{"issue", "close", "7", "--comment", "Approved\n- #41 First\n- #42 Second"}},
 	)
-	progress, err := c.CreateDrafts(path, drafts, config.IssueLabels{Unit: "work"}, &TopicDraft{}, 7, "Approved")
+	progress, err := c.CreateDrafts(path, drafts, config.IssueLabels{Unit: "work", Topic: "questions"}, &TopicDraft{}, 7, "Approved")
 	testutil.OK(t, err)
 	testutil.Equal(t, progress.Numbers(), []int{7, 41, 42})
 	testutil.Equal(t, progress.SubIssues, map[string]bool{"first": true, "second": true})

@@ -1,4 +1,5 @@
 {
+  "parent": {"title": "Update fixture result", "body": "How should the fixture result be updated?"},
   "summary": "Update fixture result",
   "decisions": [
     {

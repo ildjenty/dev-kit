@@ -107,6 +107,15 @@ func (c Client) Create(title, body string, labels []string) (Created, error) {
 	return Created{number, address}, nil
 }
 
+func (c Client) EnsureLabels(labels config.IssueLabels) error {
+	for _, name := range []string{labels.Unit, labels.Topic} {
+		if _, err := c.run(nil, "label", "create", name, "--force"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 const fields = "number,title,body,state,labels,url"
 
 type issueJSON struct {

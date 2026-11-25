@@ -11,6 +11,10 @@ Also read `harness.md`, `review/harness.md` and the rules for changing standards
 Write all owner-facing text in the language named by `language` in your input.
 
 Write `$ARTIFACTS_DIR/refine/draft.json` using the supplied strict schema:
+- `parent`: when the input has no topic Issue, write the new parent topic's `title` and `body`
+  in the language named by `language` in your input. Both are required and reviewed for approval.
+  When a topic Issue is selected, use empty strings for both. Every Issue title must be at most
+  256 characters. The machine never invents or shortens approved Issue text.
 - `decisions`: `N1`, `N2`, ... with title, background, candidates including the simplest alternative,
   choice, reason and uncertainty in the body; `decided_by`, `source`, `depends_on` and `supersedes`.
   These are a human-readable log. Supersede old choices explicitly; never edit their files yourself.
@@ -22,7 +26,7 @@ Write `$ARTIFACTS_DIR/refine/draft.json` using the supplied strict schema:
 - `units`: settled work, each with stable key, title, goal and observable `completion_conditions`.
   Fit each unit in one PR. Copy every condition agents need into the Issue draft itself; never
   require delivery agents to read a decision record. `blocked_by` names other draft Issue keys.
-  Units become sub-issues of the selected topic, or a topic created from the original request.
+  Units become sub-issues of the selected topic, or the approved `parent` draft.
 - `topics`: unsettled questions with stable `TN1`, `TN2`, ... keys, title and body explaining the
   question and what a settled answer needs. Include candidates and a reasoned recommendation for
   choices under authority rules, or ask for the missing fact. `blocked_by` names draft Issue keys
@@ -30,12 +34,15 @@ Write `$ARTIFACTS_DIR/refine/draft.json` using the supplied strict schema:
 
 Retain draft keys on revision and omit withdrawn drafts. Describe the whole revised proposal,
 reverting withdrawn binding edits in the checkout. Do not reset, amend or rewrite history.
+If a previous approval already agreed decisions before Issue creation failed, leave those agreed
+records in the existing log and omit them from new `decisions`; cite their IDs where needed.
 Do not write prose documents, decision files, unit files or topic files. Do not create Issues or
 commit. The machine writes proposed decisions and commits binding edits before the fresh judge.
 
 Write `$ARTIFACTS_DIR/refine/approval.txt` as one approval question. Show every decision key,
 owner and provisional choices, every binding path and its decision, and all unit and topic keys.
-Explain the parent topic (created from the request if absent) and each blocked-by relationship.
+Show the new parent as `new topic: <title>` with its body, or identify the selected topic Issue.
+Explain each blocked-by relationship. Never show an absent parent as `#0`.
 Include `approve=<next_proposal_version>` and explain `answers` for requesting changes.
 The approval run agrees decisions, pushes the branch, opens or updates a PR from this summary and
 approval text, then creates Issues with source PR metadata. The owner merges the PR; units wait for

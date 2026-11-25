@@ -16,6 +16,9 @@ func fixtureGitHub(args []string, env cli.Env) error {
 	if err := guard(env); err != nil {
 		return err
 	}
+	if len(args) == 4 && args[0] == "label" && args[1] == "create" && args[3] == "--force" {
+		return nil
+	}
 	if len(args) >= 2 && (args[0] == "pr" || args[0] == "issue" && args[1] == "create") {
 		path := filepath.Join(env.Getenv("ARTIFACTS_DIR"), "github.json")
 		state, err := read(path)

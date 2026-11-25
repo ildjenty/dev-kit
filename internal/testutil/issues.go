@@ -69,6 +69,7 @@ func IssueCreationCLI(t testing.TB) (string, string) {
 state='` + dir + `'
 printf '%s\n' "$*" >> "$state/calls"
 case "$1 $2" in
+ "label create") printf '%s\n' "$3" >> "$state/labels" ;;
  "pr list") test ! -f "$state/pr" || cat "$state/pr" ;;
  "pr create")
   branch=$(git symbolic-ref HEAD)
@@ -79,6 +80,7 @@ case "$1 $2" in
   cat "$state/pr" ;;
  "pr edit") cat >> "$state/pr-bodies" ;;
  "issue create")
+  test -f "$state/labels" || exit 96
   body=$(cat)
   printf '%s\n' "$body" >> "$state/bodies"
   count=0

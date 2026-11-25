@@ -326,16 +326,6 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	if e != nil {
 		return nil, e
 	}
-	if topic == nil {
-		text := ownerWords
-		if text == "" && len(rs) > 0 {
-			text = str(rs[0]["owner_words"])
-		}
-		if text == "" {
-			text = memo
-		}
-		topic = doc{"number": 0, "title": text, "body": text}
-	}
 	input := doc{"pending_proposal": pending, "previous_unapproved": pending != nil, "topic": topic, "requests": rs, "memo": memo, "answers": as, "previous": previous, "decisions": data.Decisions, "language": c.Language, "config": c, "criteria": fixed, "folders": doc{"decisions": c.Decisions, "standards": c.Standards}, "next_proposal_version": num(previous["version"]) + 1, "judge_materials": mapping.Materials(fixed, "judge:refine", "plan"), "writer_materials": mapping.Materials(fixed, "writer:refine", "plan")}
 	base, e := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
 	if e != nil {
@@ -426,7 +416,10 @@ func selectedTopic(ctx record.ContextData, env cli.Env, value string) (doc, erro
 			return nil, err
 		}
 		if result["outcome"] != "pass" {
-			return obj(obj(previous["content"])["topic"]), nil
+			topic := obj(obj(previous["content"])["topic"])
+			if num(topic["number"]) > 0 {
+				return topic, nil
+			}
 		}
 		return nil, nil
 	}
@@ -481,6 +474,20 @@ func approvalErrors(ctx record.ContextData, version string) ([]string, error) {
 	content := obj(p["content"])
 	if content["ready"] != true || r["workflow"] != "refine" || r["run_id"] != p["run_id"] || r["outcome"] != "question" || len(qs) != 1 || obj(qs[0]["target"])["kind"] != "proposal" || obj(qs[0]["target"])["ref"] != version {
 		return []string{"the latest proposal result did not ask for approval"}, nil
+	}
+	drafts, err := issues.ReadDrafts(content["draft"])
+	if err != nil {
+		return nil, err
+	}
+	if num(obj(content["topic"])["number"]) == 0 && (drafts.Parent == nil || strings.TrimSpace(drafts.Parent.Title) == "") {
+		return []string{"make the proposal again so the new parent topic title can be approved"}, nil
+	}
+	problems := drafts.Errors()
+	if num(obj(content["topic"])["number"]) == 0 && strings.TrimSpace(drafts.Parent.Body) == "" {
+		problems = append(problems, "new parent topic body is required")
+	}
+	if len(problems) > 0 {
+		return problems, nil
 	}
 	progress, err := issues.ReadCreation(creationPath(ctx, version))
 	if err != nil {
@@ -558,6 +565,9 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		return nil, err
 	}
 	errors = append(errors, ds.Errors()...)
+	if num(obj(input["topic"])["number"]) == 0 && (ds.Parent == nil || strings.TrimSpace(ds.Parent.Title) == "" || strings.TrimSpace(ds.Parent.Body) == "") {
+		errors = append(errors, "new parent topic title and body are required")
+	}
 	known := map[string]bool{}
 	graph := append([]doc{}, data.Decisions...)
 	pending := obj(obj(input["pending_proposal"])["content"])
@@ -776,8 +786,11 @@ func materialize(ctx record.ContextData, draft, input doc) (doc, error) {
 			continue
 		}
 		d := find(data.Decisions, id)
-		if d == nil || d["status"] != "proposed" {
+		if d == nil {
 			return nil, fmt.Errorf("cannot withdraw settled record %s", id)
+		}
+		if d["status"] != "proposed" {
+			continue
 		}
 		removals = append(removals, str(d["path"]))
 	}
@@ -999,7 +1012,14 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 		result = doc{"outcome": "stop", "stop": doc{"state": "The refine draft did not clear review", "unresolved": problems, "premise": ""}}
 	} else {
 		text := str(entry["approval_text"])
-		text += fmt.Sprintf("\n\nProposal version: %d\nCommit: %s\nParent: #%d %s", num(p["version"]), str(content["commit"]), num(obj(content["topic"])["number"]), str(obj(content["topic"])["title"]))
+		text += fmt.Sprintf("\n\nProposal version: %d\nCommit: %s", num(p["version"]), str(content["commit"]))
+		topic := obj(content["topic"])
+		if num(topic["number"]) > 0 {
+			text += fmt.Sprintf("\nParent: #%d %s", num(topic["number"]), str(topic["title"]))
+		} else {
+			parent := obj(obj(entry["draft"])["parent"])
+			text += "\nnew topic: " + str(parent["title"]) + "\n" + str(parent["body"])
+		}
 		for _, group := range []string{"mapping", "decisions", "bindings", "units", "topics"} {
 			value := obj(entry["draft"])[group]
 			if group == "mapping" {
@@ -1158,7 +1178,10 @@ func approve(ctx record.ContextData, version string, environments ...cli.Env) (d
 		return nil, err
 	}
 	topic := obj(content["topic"])
-	parent := &issues.TopicDraft{Title: str(topic["title"]), Body: str(topic["body"])}
+	parent := ds.Parent
+	if num(topic["number"]) > 0 {
+		parent = &issues.TopicDraft{Title: str(topic["title"]), Body: str(topic["body"])}
+	}
 	comment := strings.Join(ids, "\n")
 	progress, err = (issues.Client{Env: env}).CreateDrafts(path, ds, c.Issues.Labels, parent, num(topic["number"]), comment)
 	if err != nil {

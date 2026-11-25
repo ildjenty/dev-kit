@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/ildjenty/dev-kit/internal/config"
 )
@@ -82,6 +83,7 @@ type TopicDraft struct {
 }
 
 type Drafts struct {
+	Parent *TopicDraft  `json:"parent,omitempty"`
 	Units  []UnitDraft  `json:"units"`
 	Topics []TopicDraft `json:"topics"`
 }
@@ -111,6 +113,18 @@ func (d Drafts) topicsAndUnits() []TopicDraft {
 func (d Drafts) Errors() []string {
 	errors := []string{}
 	all := d.topicsAndUnits()
+	checked := all
+	if d.Parent != nil && (d.Parent.Title != "" || d.Parent.Body != "") {
+		checked = append(append([]TopicDraft{}, all...), *d.Parent)
+	}
+	for _, issue := range checked {
+		if strings.TrimSpace(issue.Title) == "" || strings.TrimSpace(issue.Body) == "" {
+			errors = append(errors, issue.Key+": issue title and body are required")
+		}
+		if utf8.RuneCountInString(issue.Title) > 256 {
+			errors = append(errors, issue.Key+": issue title exceeds 256 characters")
+		}
+	}
 	known := map[string]TopicDraft{}
 	for _, issue := range all {
 		if _, exists := known[issue.Key]; exists {
@@ -205,6 +219,14 @@ func (c Client) CreateDrafts(path string, drafts Drafts, labels config.IssueLabe
 	}
 	if progress.Commit == "" {
 		return progress, fmt.Errorf("issue creation requires a recorded proposal commit")
+	}
+	if parent != nil && number == 0 {
+		if errors := (Drafts{Parent: parent}).Errors(); len(errors) > 0 || strings.TrimSpace(parent.Title) == "" || strings.TrimSpace(parent.Body) == "" {
+			return progress, fmt.Errorf("invalid parent issue draft: title and body are required, with title at most 256 characters")
+		}
+	}
+	if err = c.EnsureLabels(labels); err != nil {
+		return progress, err
 	}
 	save := func() error { return SaveCreation(path, progress) }
 	if parent != nil && progress.Parent == nil {
