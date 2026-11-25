@@ -317,9 +317,9 @@ func next(b Branch, result record.Document) string {
 	}
 	switch b.Workflow {
 	case "refine":
-		return "The proposal is approved and committed. Publish " + b.Branch + " as a pull request; after it merges, start the units it created, or the next topic (`devkit issues ready`)."
+		return published("The proposal is approved", result) + " The units it created become ready when the owner merges that pull request; then find them, or the next topic, with `devkit issues ready`."
 	case "retro":
-		return "The corrections are approved and committed. Publish " + b.Branch + " as a pull request; start its units after it merges."
+		return published("The corrections are approved", result) + " Their units become ready when the owner merges that pull request (`devkit issues ready`)."
 	case "requirements":
 		return "Start plan on " + b.Branch + "."
 	case "plan":
@@ -516,4 +516,12 @@ func readPullRequest(env cli.Env, b *Branch) {
 	default:
 		b.PullRequest, b.PullRequestError = nil, "could not read gh pr view: unknown pull request state"
 	}
+}
+
+func published(approved string, result record.Document) string {
+	url, _ := result["pr_url"].(string)
+	if url == "" {
+		return approved + ", but no pull request is recorded for it: check `archon workflow get` for the approval run before going on."
+	}
+	return approved + " and published as " + url + "."
 }
