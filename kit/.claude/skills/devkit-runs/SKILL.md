@@ -87,8 +87,12 @@ interpreted again by the shell. Never edit the text to make it fit a command.
 
 For refine, use a `refine/<name>` branch. One run handles one topic in a single phase with at most
 three rounds. Pass the number of an open Issue with the configured topic label as `topic`; leave
-it empty for a new request. Pass the owner's words verbatim as `owner_words`, your research
-separately as `supplement`, and the owner-confirmed discussion memo verbatim as `memo`.
+it empty for a new request. Pass as `owner_words`, verbatim, only what the owner said about what to
+build or decide: the request and statements that add to or change requirements. Never pass
+instructions to the session ("run it again", "retry", "approve"), remarks about the process or
+the kit, or acknowledgements; they are not requirements. When rerunning with nothing new about the
+product, add nothing to `owner_words`. Pass your research separately as `supplement`, and the
+owner-confirmed discussion memo verbatim as `memo`.
 Pass `owner_decisions` as a JSON array copied without rewording from the memo: each item has `title`,
 `body` and `owner_words`, with optional `supersedes` and `depends_on` arrays of decision IDs.
 The machine records them verbatim as agreed and commits them before the writer. They are fixed

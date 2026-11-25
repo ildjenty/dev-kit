@@ -61,7 +61,7 @@ correct it before passing it to refine.
 
 After confirmation, use `devkit-runs` to start `refine` on a `refine/<name>` branch with the confirmed memo
 verbatim as `memo`. Write a JSON array to an owner decisions file outside the checkout, copying each
-memo entry's `title`, `body` and `owner_words` without rewording. Include `supersedes` for overturned
+memo entry's `title`, `body` and `owner_words` without rewording. `owner_words` holds only what the owner said about the product or the decision, never instructions to the session or remarks about the process. Include `supersedes` for overturned
 decision IDs and `depends_on` when recorded; both are optional arrays of decision IDs. Pass that file
 as `owner_decisions` using the file-input pattern in `devkit-runs`. The machine records these as
 agreed before any writer; they never go through rewriting, judgment or approval. Request AI additions
