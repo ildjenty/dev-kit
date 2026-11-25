@@ -1,8 +1,8 @@
-# ワークフローの図
+# Workflow diagrams
 
-`kit/.archon/workflows/dev/*/*.yaml` から生成した図です。ワークフローを変えたら `DEVKIT_UPDATE_DOCS=1 mise exec -- go test ./internal/workflowdoc` で作り直します。作り直さずにワークフローを変えると、このテストが失敗します。
+Generated from `kit/.archon/workflows/dev/*/*.yaml`. After changing a workflow, regenerate with `DEVKIT_UPDATE_DOCS=1 mise exec -- go test ./internal/workflowdoc`; the test fails while this file is out of date.
 
-灰色は機械(bash と devkit)、青は AI のノード、黄色の枠はループです。点線の矢印は、条件(`when`)付きで実行されるノードへの依存です。各ワークフローの役割と流れは [design.md](design.md) を参照してください。
+Gray nodes run on the machine (bash and devkit), blue nodes are AI nodes, and yellow frames are loops. A dotted arrow leads to a node that runs only under a condition (`when`). See the [design document](design.md) for each workflow's role.
 
 ## optimize
 
@@ -17,7 +17,7 @@ flowchart TD
   n_not_started["<b>not-started</b><br/><small>devkit optimize not-started</small>"]:::machine
   n_approve["<b>approve</b><br/><small>devkit optimize approve</small>"]:::machine
   n_prepare["<b>prepare</b><br/><small>devkit optimize prepare</small>"]:::machine
-  subgraph n_draft ["draft — loop: max 3"]
+  subgraph n_draft ["draft (loop, max 3)"]
     direction TB
     n_draft_write["<b>write</b><br/><small>AI: write</small>"]:::ai
     n_draft_check["<b>check</b><br/><small>devkit optimize check</small>"]:::machine
@@ -54,7 +54,7 @@ flowchart TD
   n_not_started["<b>not-started</b><br/><small>devkit refine not-started</small>"]:::machine
   n_approve["<b>approve</b><br/><small>devkit refine approve</small>"]:::machine
   n_prepare["<b>prepare</b><br/><small>devkit refine prepare</small>"]:::machine
-  subgraph n_decide ["decide — loop: max 3"]
+  subgraph n_decide ["decide (loop, max 3)"]
     direction TB
     n_decide_write_decide["<b>write-decide</b><br/><small>AI: decide</small>"]:::ai
     n_decide_check_decide["<b>check-decide</b><br/><small>devkit refine check</small>"]:::machine
@@ -90,7 +90,7 @@ flowchart TD
   n_start["<b>start</b><br/><small>devkit record start requirements</small>"]:::machine
   n_not_started["<b>not-started</b><br/><small>devkit requirements not-started '$value'</small>"]:::machine
   n_prepare["<b>prepare</b><br/><small>devkit requirements prepare</small>"]:::machine
-  subgraph n_draft ["draft — loop: max 3"]
+  subgraph n_draft ["draft (loop, max 3)"]
     direction TB
     n_draft_write["<b>write</b><br/><small>AI: write</small>"]:::ai
     n_draft_judge["<b>judge</b><br/><small>AI: judge</small>"]:::ai
@@ -122,7 +122,7 @@ flowchart TD
   n_not_started["<b>not-started</b><br/><small>devkit plan not-started '$value'</small>"]:::machine
   n_prepare["<b>prepare</b><br/><small>devkit plan prepare</small>"]:::machine
   n_facts["<b>facts</b><br/><small>devkit plan facts</small>"]:::machine
-  subgraph n_structure ["structure — loop: max 3"]
+  subgraph n_structure ["structure (loop, max 3)"]
     direction TB
     n_structure_structure_write["<b>structure-write</b><br/><small>AI: write-structure</small>"]:::ai
     n_structure_structure_check["<b>structure-check</b><br/><small>devkit plan check</small>"]:::machine
@@ -136,7 +136,7 @@ flowchart TD
   end
   class n_structure loop
   n_advance["<b>advance</b><br/><small>devkit plan advance</small>"]:::machine
-  subgraph n_detail ["detail — loop: max 3"]
+  subgraph n_detail ["detail (loop, max 3)"]
     direction TB
     n_detail_write["<b>write</b><br/><small>AI: write-detail</small>"]:::ai
     n_detail_check["<b>check</b><br/><small>devkit plan check</small>"]:::machine
@@ -190,7 +190,7 @@ flowchart TD
   n_start["<b>start</b><br/><small>devkit record start implement</small>"]:::machine
   n_start_stopped["<b>start-stopped</b><br/><small>printf '%s' '$value'</small>"]:::machine
   n_prepare["<b>prepare</b><br/><small>devkit implement prepare</small>"]:::machine
-  subgraph n_units ["units — loop: max 50"]
+  subgraph n_units ["units (loop, max 50)"]
     direction TB
     n_units_unit["<b>unit</b><br/><small>devkit implement next</small>"]:::machine
     n_units_tests["<b>tests</b><br/><small>AI: tests</small>"]:::ai
@@ -305,7 +305,7 @@ flowchart TD
   n_start_stopped["<b>start-stopped</b><br/><small>printf '%s' '$value'</small>"]:::machine
   n_prepare["<b>prepare</b><br/><small>devkit fix prepare</small>"]:::machine
   n_proceed["<b>proceed</b><br/><small>devkit fix proceed</small>"]:::machine
-  subgraph n_repair ["repair — loop: max 3"]
+  subgraph n_repair ["repair (loop, max 3)"]
     direction TB
     n_repair_fix_code["<b>fix-code</b><br/><small>AI: fix</small>"]:::ai
     n_repair_objections["<b>objections</b><br/><small>devkit fix objections</small>"]:::machine
@@ -352,7 +352,7 @@ flowchart TD
   n_allow["<b>allow</b><br/><small>devkit pr answers</small>"]:::machine
   n_facts["<b>facts</b><br/><small>devkit pr facts</small>"]:::machine
   n_questions["<b>questions</b><br/><small>AI: questions</small>"]:::ai
-  subgraph n_body ["body — loop: max 3"]
+  subgraph n_body ["body (loop, max 3)"]
     direction TB
     n_body_body_write["<b>body-write</b><br/><small>AI: write</small>"]:::ai
     n_body_body_assemble["<b>body-assemble</b><br/><small>devkit pr assemble</small>"]:::machine
@@ -395,7 +395,7 @@ flowchart TD
   n_start["<b>start</b><br/><small>devkit record start sync</small>"]:::machine
   n_not_started["<b>not-started</b><br/><small>printf '%s' '$value'</small>"]:::machine
   n_rebase["<b>rebase</b><br/><small>devkit sync start</small>"]:::machine
-  subgraph n_conflicts ["conflicts — loop: max 5"]
+  subgraph n_conflicts ["conflicts (loop, max 5)"]
     direction TB
     n_conflicts_resolve["<b>resolve</b><br/><small>AI: resolve</small>"]:::ai
     n_conflicts_continue["<b>continue</b><br/><small>devkit sync continue</small>"]:::machine
@@ -433,7 +433,7 @@ flowchart TD
   n_approve["<b>approve</b><br/><small>devkit retro approve</small>"]:::machine
   n_prepare["<b>prepare</b><br/><small>devkit retro prepare</small>"]:::machine
   n_empty["<b>empty</b><br/><small>devkit retro empty</small>"]:::machine
-  subgraph n_draft ["draft — loop: max 3"]
+  subgraph n_draft ["draft (loop, max 3)"]
     direction TB
     n_draft_write["<b>write</b><br/><small>AI: write</small>"]:::ai
     n_draft_check["<b>check</b><br/><small>devkit retro check</small>"]:::machine

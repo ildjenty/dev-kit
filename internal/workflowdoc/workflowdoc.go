@@ -73,7 +73,7 @@ func emit(nodes []node, out *strings.Builder, indent, prefix string) {
 	for _, n := range nodes {
 		nid := id(prefix + n.ID)
 		if n.Loop != nil {
-			fmt.Fprintf(out, "%ssubgraph %s [\"%s — loop: max %d\"]\n%s  direction TB\n", indent, nid, text(n.ID), n.Loop.MaxIterations, indent)
+			fmt.Fprintf(out, "%ssubgraph %s [\"%s (loop, max %d)\"]\n%s  direction TB\n", indent, nid, text(n.ID), n.Loop.MaxIterations, indent)
 			emit(n.Loop.Nodes, out, indent+"  ", prefix+n.ID+"_")
 			fmt.Fprintf(out, "%send\n%sclass %s loop\n", indent, indent, nid)
 			continue
@@ -105,9 +105,9 @@ func emit(nodes []node, out *strings.Builder, indent, prefix string) {
 // Render builds docs/workflows.md from the workflow definitions under dir in files.
 func Render(files fs.FS, dir string) (string, error) {
 	var out strings.Builder
-	out.WriteString("# ワークフローの図\n\n")
-	out.WriteString("`kit/.archon/workflows/dev/*/*.yaml` から生成した図です。ワークフローを変えたら `DEVKIT_UPDATE_DOCS=1 mise exec -- go test ./internal/workflowdoc` で作り直します。作り直さずにワークフローを変えると、このテストが失敗します。\n\n")
-	out.WriteString("灰色は機械(bash と devkit)、青は AI のノード、黄色の枠はループです。点線の矢印は、条件(`when`)付きで実行されるノードへの依存です。各ワークフローの役割と流れは [design.md](design.md) を参照してください。\n")
+	out.WriteString("# Workflow diagrams\n\n")
+	out.WriteString("Generated from `kit/.archon/workflows/dev/*/*.yaml`. After changing a workflow, regenerate with `DEVKIT_UPDATE_DOCS=1 mise exec -- go test ./internal/workflowdoc`; the test fails while this file is out of date.\n\n")
+	out.WriteString("Gray nodes run on the machine (bash and devkit), blue nodes are AI nodes, and yellow frames are loops. A dotted arrow leads to a node that runs only under a condition (`when`). See the [design document](design.md) for each workflow's role.\n")
 	for _, name := range Order {
 		data, err := fs.ReadFile(files, path.Join(dir, name, name+".yaml"))
 		if err != nil {
