@@ -432,8 +432,6 @@ func compare(root string, o options, language string) ([]*group, []byte, []byte,
 	}
 	if o.sessions != nil {
 		settings.Sessions = o.sessions
-	} else if _, exists := stored["sessions"]; !exists && o.provider != "" {
-		settings.Sessions = []string{o.provider}
 	}
 	validation, err := json.Marshal(settings)
 	if err != nil {

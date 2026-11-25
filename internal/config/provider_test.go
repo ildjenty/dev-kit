@@ -10,8 +10,8 @@ func TestProviderAndSessionDefaultsAndValidation(t *testing.T) {
 		json, provider string
 		sessions       []string
 	}{
-		{`{}`, "claude", []string{"claude"}},
-		{`{"provider":"codex"}`, "codex", []string{"codex"}},
+		{`{}`, "claude", []string{"claude", "codex"}},
+		{`{"provider":"codex"}`, "codex", []string{"claude", "codex"}},
 		{`{"provider":"codex","sessions":["claude","codex"]}`, "codex", []string{"claude", "codex"}},
 		{`{"sessions":[]}`, "claude", []string{}},
 		{`{"provider":"claude","sessions":["codex"]}`, "claude", []string{"codex"}},

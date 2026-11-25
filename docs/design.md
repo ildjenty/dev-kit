@@ -211,7 +211,7 @@ Codex の workflow 判定者は full access で動き、ツール制限で書き
 
 両 CLI へ渡す環境から `TYPESAFE_API_KEY` だけを除き、provider 自身の認証用環境は保持する。保存ログは書込みの分割位置をまたぐキーも保存前に伏せ字にする。回答は JSON のプロパティ名と文字列値を伏せ字にし、その最終回答もスキーマで検証する。伏せ字後の名前が衝突する場合やスキーマを満たせない場合は回答を返さず失敗とする。両 CLI とも、直接プロセスの終了または実行期限到達後のパイプ待機を100ミリ秒に制限する。kill 対象は子孫や無関係なプロセスへ広げない。
 
-`sessions` はスキルを導入するセッションツールの配列で、未指定なら provider 一つ。`devkit init --sessions claude,codex` で両方へ導入でき、空配列ならスキルは導入しない。Claude は `.claude/skills/<name>/`、Codex は `.agents/skills/<name>/` へ置き、内部参照も導入先に合わせる。明示された sessions は provider 変更時にも保持する。`--provider`・`--sessions` は `--skill` と同じく、設定全体の置換を断っても指定値だけ保存し、他の設定と書式を保つ。改名・差分確認・自分が導入したと確認できない旧フォルダーを削除候補にしない規則を、各配置先に適用する。
+`sessions` はスキルを導入するセッションツールの配列で、未指定なら `claude` と `codex` の両方。`devkit init --sessions claude` などで一方に絞れ、空配列ならスキルは導入しない。Claude は `.claude/skills/<name>/`、Codex は `.agents/skills/<name>/` へ置き、内部参照も導入先に合わせる。明示された sessions は provider 変更時にも保持する。`--provider`・`--sessions` は `--skill` と同じく、設定全体の置換を断っても指定値だけ保存し、他の設定と書式を保つ。改名・差分確認・自分が導入したと確認できない旧フォルダーを削除候補にしない規則を、各配置先に適用する。
 
 `devkit doctor [dir]` は required・needed for a part・optional の三段階で状態、不足で止まる用途、導入方法を出す。必須は Git とコミット済みリポジトリ、Archon とその版、設定 provider、PATH 上の devkit、導入ファイル、config と concerns 検査。部分利用は sessions の各 CLI、Issue と PR 用の gh 認証、PR 用の origin、キー未設定時の代替 CLI。任意は TypeSafe キーの有無と checks で、空なら検証が走らないことと設定された optimize 名を示す。キー自体は出さず、TypeSafe に送るルーティング用の差分を説明する。provider の導入は、最大20秒待つ `archon doctor` の `Installed providers:` 一覧で検査する。一覧がない、コマンドが失敗する、またはタイムアウトした場合は、`$ARCHON_HOME/plugins/archon-provider-<provider>`（既定 `~/.archon/plugins/`）に実行可能な通常ファイルがあるかで判定する。対象 provider の診断失敗行は警告として添え、導入済みの判定を失敗にはしない。他の外部コマンドは各3秒以内のままとする。必須不足だけ終了コード1。init はサマリー後に同じ診断を出すが、その結果では失敗せず、初回は続けて optimize 名を案内する。
 
@@ -222,7 +222,7 @@ Codex の workflow 判定者は full access で動き、ツール制限で書き
 リポジトリごとの差異は `.devkit/config.json` に置き、`devkit config` で有効値を確認する。設定の正本となる既定値と検証処理は `internal/config` にある。
 
 - `language` は人が読む文章の言語で、組み込みの既定は `en`。新規導入時は `--language` または環境のロケールから選ぶ。
-- `provider` は `claude`（既定）または `codex`。`sessions` は導入先のセッションツールで、未指定なら provider 一つ。
+- `provider` は `claude`（既定）または `codex`。`sessions` は skill を配るセッションツールで、未指定なら `claude` と `codex` の両方(`.claude/skills/` と `.agents/skills/`)。
 - `skills` は `devkit-runs`、`devkit-discuss`、`devkit-optimize` を実際の配置名に対応させ、既定は同名。省略したスキルは個別に補完する。
 - `standards`、`decisions`、`eval` はリポジトリ相対の保存先で、既定は順に `.devkit/standards`、`.devkit/decisions`、`.devkit/eval`。`eval` も他のフォルダーと同じ検証を行い、品質判定の評価ケースはその `judge/` 以下に置く。
 - `issues.labels.unit` と `issues.labels.topic` は作業単位と未決の問いのラベルで、既定は `devkit:unit` と `devkit:topic`。各値は空でない文字列とし、一方だけの指定では他方の既定を保つ。ラベルは自動作成しない。

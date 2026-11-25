@@ -108,7 +108,7 @@ func TestProviderSessionsFlagsPersistWhenConfigReplacementDeclined(t *testing.T)
 
 func TestSessionDefaultAndPerLocationDeletionOwnership(t *testing.T) {
 	root := t.TempDir()
-	invoke(t, root, "--provider", "codex")
+	invoke(t, root, "--provider", "codex", "--sessions", "codex")
 	settings := testutil.Must(config.Parse(testutil.Must(os.ReadFile(filepath.Join(root, ".devkit/config.json")))))
 	testutil.Equal(t, settings.Sessions, []string{"codex"})
 	_, err := os.Stat(filepath.Join(root, ".claude/skills"))
@@ -140,5 +140,16 @@ func TestInvalidProviderSessionFlagsWriteNothing(t *testing.T) {
 			t.Errorf("accepted %v", args)
 		}
 		testutil.Equal(t, snapshot(t, root), map[string]string{".": "directory"})
+	}
+}
+
+func TestSessionsDefaultToBothSkillFolders(t *testing.T) {
+	root := t.TempDir()
+	invoke(t, root, "--provider", "codex")
+	settings := testutil.Must(config.Parse(testutil.Must(os.ReadFile(filepath.Join(root, ".devkit/config.json")))))
+	testutil.Equal(t, settings.Sessions, []string{"claude", "codex"})
+	for _, folder := range []string{".claude/skills/devkit-runs/SKILL.md", ".agents/skills/devkit-runs/SKILL.md"} {
+		_, err := os.Stat(filepath.Join(root, folder))
+		testutil.OK(t, err)
 	}
 }

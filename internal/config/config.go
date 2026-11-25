@@ -172,9 +172,7 @@ func Parse(data []byte) (Config, error) {
 			merged[key] = value
 		}
 	}
-	if _, exists := supplied["sessions"]; !exists {
-		merged["sessions"] = []any{merged["provider"]}
-	}
+
 	if err := shape(merged); err != nil {
 		return Config{}, err
 	}

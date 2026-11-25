@@ -1,6 +1,6 @@
 {
   "provider": "claude",
-  "sessions": ["claude"],
+  "sessions": ["claude", "codex"],
   "language": "en",
   "skills": {
     "devkit-runs": "devkit-runs",

@@ -184,8 +184,8 @@ initiative; the fit to the repository is made in the settings and standards abov
   Codex is not prevented from writing to the checkout; a write is detected and fails the node. Every
   provider a node uses has to be installed in Archon and signed in. `provider` in
   `.devkit/config.json` still decides the CLI used when Jev cannot answer; it does not have to match
-  the nodes. Explicit `sessions` selects where skills are installed. Only when `sessions` is omitted
-  does it default to the configured `provider`.
+  the nodes. `sessions` selects where skills are installed; when it is omitted, skills go to both Claude
+  (`.claude/skills/`) and Codex (`.agents/skills/`).
 - **Other changes** the owner asks for (a loop limit, an added or removed node, a prompt) are edits
   to the same files. Keep what the Go side relies on: node ids that `devkit` commands or later nodes
   read, each node's `output_format`, and the `devkit` command lines.

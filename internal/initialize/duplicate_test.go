@@ -148,7 +148,7 @@ func TestDuplicateKeyCheckKeepsFullReplacementBehavior(t *testing.T) {
 			}
 			settings := testutil.Must(config.Parse(testutil.Must(os.ReadFile(filepath.Join(root, ".devkit/config.json")))))
 			testutil.Equal(t, settings.Provider, "codex")
-			testutil.Equal(t, settings.Sessions, []string{"codex"})
+			testutil.Equal(t, settings.Sessions, []string{"claude", "codex"})
 		})
 	}
 }

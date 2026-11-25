@@ -199,7 +199,7 @@ func TestIssueLabelsArePartSpecificAndApprovalCreatesMissingLabels(t *testing.T)
 	for _, response := range []string{`[]`, `[{"name":"work"},{"name":"questions"}]`, `[{"name":"work"}]`, `invalid JSON`} {
 		t.Run(response, func(t *testing.T) {
 			env, bin, out := environment(t, "claude")
-			testutil.Put(t, env.Cwd, ".devkit/config.json", `{"issues":{"labels":{"unit":"work","topic":"questions"}}}`)
+			testutil.Put(t, env.Cwd, ".devkit/config.json", `{"provider":"claude","sessions":["claude","codex"],"skills":{"devkit-optimize":"fit-checks"},"issues":{"labels":{"unit":"work","topic":"questions"}}}`)
 			path := filepath.Join(bin, "fake-gh")
 			t.Setenv("DEVKIT_GH", path)
 			executable(t, bin, "fake-gh", `case "$1 $2" in
