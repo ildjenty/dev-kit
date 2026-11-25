@@ -345,6 +345,7 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 		return nil, e
 	}
 	input := doc{"pending_proposal": pending, "previous_unapproved": pending != nil, "topic": topic, "requests": rs, "memo": memo, "answers": as, "previous": previous, "decisions": data.Decisions, "language": c.Language, "config": c, "criteria": fixed, "folders": doc{"decisions": c.Decisions, "standards": c.Standards}, "next_proposal_version": num(previous["version"]) + 1, "judge_materials": mapping.Materials(fixed, "judge:refine", "plan"), "writer_materials": mapping.Materials(fixed, "writer:refine", "plan")}
+	input["pending_decisions"] = pendingDecisions(input, data.Decisions)
 	base, e := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
 	if e != nil {
 		return nil, e
@@ -555,6 +556,19 @@ func bindingPath(path string, c config.Config) bool {
 	return false
 }
 
+func pendingDecisions(input doc, ds []doc) []doc {
+	result := []doc{}
+	content := obj(obj(input["pending_proposal"])["content"])
+	for _, d := range items(obj(content["draft"])["decisions"]) {
+		key := str(d["key"])
+		id := str(obj(content["mapping"])[key])
+		if old := find(ds, id); old != nil && old["status"] == "proposed" {
+			result = append(result, doc{"key": key, "id": id, "title": old["title"], "status": old["status"]})
+		}
+	}
+	return result
+}
+
 func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string, error) {
 	errors, err := schema("draft", value)
 	if err != nil || len(errors) > 0 {
@@ -625,6 +639,37 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		g["id"] = key
 		graph = append(graph, g)
 	}
+	aliases := map[string]string{}
+	withdrawnCitation := false
+	rawDraft, err := json.Marshal(draft)
+	if err != nil {
+		return nil, err
+	}
+	for _, old := range pendingDecisions(input, data.Decisions) {
+		id, key := str(old["id"]), str(old["key"])
+		if known[key] {
+			aliases[id] = key
+			known[id] = true
+		} else if slices.Contains(decisions.Citations(string(rawDraft)), id) {
+			errors = append(errors, fmt.Sprintf("citation of withdrawn decision %s (%s: %s); keep its draft key or remove the citation", id, key, old["title"]))
+			withdrawnCitation = true
+		}
+	}
+	if withdrawnCitation {
+		return errors, nil
+	}
+	for _, d := range graph {
+		if !strings.HasPrefix(str(d["id"]), "N") {
+			continue
+		}
+		deps := stringsOf(d["depends_on"])
+		for i, dep := range deps {
+			if key := aliases[dep]; key != "" {
+				deps[i] = key
+			}
+		}
+		d["depends_on"] = deps
+	}
 	errors = append(errors, decisions.GraphErrors(graph)...)
 	successors := map[string]bool{}
 	for _, d := range items(draft["decisions"]) {
@@ -672,6 +717,15 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 			errors = append(errors, "binding has no decision: "+path)
 		}
 	}
+	previousRound, err := readJSON(file(artifacts, "rounds/latest.json"))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+	withdrawn := map[string]bool{}
+	for _, binding := range append(items(obj(previousRound["draft"])["bindings"]), items(obj(pending["draft"])["bindings"])...) {
+		path := str(binding["path"])
+		withdrawn[path] = !traced[path] && bindingPath(path, original)
+	}
 	paths, err := gitx.Run(ctx.Cwd, "diff", "--name-only", "--no-renames", "-z", str(input["proposal_base"]), "--")
 	if err != nil {
 		return nil, err
@@ -701,6 +755,16 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 	for _, path := range edited {
 		if path == "" || slices.Contains(machinePaths, path) && !slices.Contains(working, path) {
 			continue
+		}
+		if withdrawn[path] && !slices.Contains(strings.Split(paths, "\x00"), path) {
+			basePath, err := gitx.Run(ctx.Cwd, "--literal-pathspecs", "ls-tree", "--name-only", str(input["proposal_base"]), "--", path)
+			if err != nil {
+				return nil, err
+			}
+			_, statErr := os.Lstat(filepath.Join(ctx.Cwd, path))
+			if basePath != "" || os.IsNotExist(statErr) {
+				continue
+			}
 		}
 		if !bindingPath(path, original) || !traced[path] {
 			errors = append(errors, "edited outside the traced binding changes: "+path)
@@ -850,11 +914,86 @@ func materialize(ctx record.ContextData, draft, input doc) (doc, error) {
 	}
 	return doc{"draft": draft, "mapping": mapping, "decision_ids": ids, "owner_decisions": input["fixed_owner_decisions"], "owner_decision_ids": ownerIDs, "topic": input["topic"], "memo": input["memo"], "base_commit": input["proposal_base"], "ready": false}, nil
 }
+func restoreWithdrawnBindings(ctx record.ContextData, artifacts string, draft doc) error {
+	input, err := readJSON(file(artifacts, "input.json"))
+	if err != nil {
+		return err
+	}
+	previous, err := readJSON(file(artifacts, "rounds/latest.json"))
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	bindings := append(items(obj(previous["draft"])["bindings"]), items(obj(obj(obj(input["pending_proposal"])["content"])["draft"])["bindings"])...)
+	raw, err := json.Marshal(input["config"])
+	if err != nil {
+		return err
+	}
+	var c config.Config
+	if err = json.Unmarshal(raw, &c); err != nil {
+		return err
+	}
+	kept := map[string]bool{}
+	for _, binding := range items(draft["bindings"]) {
+		kept[str(binding["path"])] = true
+	}
+	for _, binding := range bindings {
+		path := str(binding["path"])
+		if kept[path] || !bindingPath(path, c) {
+			continue
+		}
+		kept[path] = true
+		base, err := gitx.Run(ctx.Cwd, "--literal-pathspecs", "ls-tree", "--name-only", str(input["proposal_base"]), "--", path)
+		if err != nil {
+			return err
+		}
+		tracked, err := gitx.Run(ctx.Cwd, "--literal-pathspecs", "ls-files", "--", path)
+		if err != nil {
+			return err
+		}
+		if base != "" || tracked != "" {
+			if _, err = gitx.Run(ctx.Cwd, "--literal-pathspecs", "restore", "--source="+str(input["proposal_base"]), "--staged", "--worktree", "--", path); err != nil {
+				return err
+			}
+			head, err := gitx.Run(ctx.Cwd, "--literal-pathspecs", "ls-tree", "--name-only", "HEAD", "--", path)
+			if err != nil {
+				return err
+			}
+			if head != "" {
+				if _, err = gitx.Run(ctx.Cwd, "--literal-pathspecs", "restore", "--source=HEAD", "--staged", "--", path); err != nil {
+					return err
+				}
+			}
+		} else {
+			info, err := os.Lstat(filepath.Join(ctx.Cwd, path))
+			if os.IsNotExist(err) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if !info.Mode().IsRegular() {
+				return fmt.Errorf("withdrawn binding must be a regular file: %s", path)
+			}
+			if err = os.Remove(filepath.Join(ctx.Cwd, path)); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
 func check(ctx record.ContextData, artifacts string, env cli.Env) (doc, error) {
 	artifacts = resolve(ctx.Cwd, artifacts)
 	draft, err := readDraft(artifacts)
 	if err != nil {
 		return nil, err
+	}
+	if errors, err := schema("draft", draft); err != nil {
+		return nil, err
+	} else if len(errors) == 0 {
+		if err = restoreWithdrawnBindings(ctx, artifacts, obj(draft)); err != nil {
+			return nil, err
+		}
 	}
 	errors, err := draftErrors(ctx, artifacts, draft)
 	if err != nil {
@@ -934,10 +1073,7 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 	if e != nil {
 		return nil, e
 	}
-	errors, e := draftErrors(ctx, artifacts, d)
-	if e != nil {
-		return nil, e
-	}
+	errors := []string{}
 	checked, e := readJSON(file(artifacts, "check.json"))
 	if e != nil && !os.IsNotExist(e) {
 		return nil, e
@@ -947,19 +1083,35 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 		if len(problems) == 0 {
 			problems = append(problems, "machine check did not pass")
 		}
-		errors = append(errors, problems...)
+		errors = problems
+	} else {
+		errors, e = draftErrors(ctx, artifacts, d)
+		if e != nil {
+			return nil, e
+		}
 	}
-	committed, proposal, e := proposal.CommittedErrors(ctx, d)
+	judgeSkipped := checked["valid"] != true && len(errors) > 0
+	if judgeSkipped {
+		judgment = doc{}
+	}
+	p, e := record.Latest(ctx.Dir, "proposal")
 	if e != nil {
 		return nil, e
 	}
-	errors = append(errors, committed...)
-	je, e := schema("judgment", judgment)
-	if e != nil {
-		return nil, e
+	committed, je := []string{}, []string{}
+	if !judgeSkipped {
+		committed, p, e = proposal.CommittedErrors(ctx, d)
+		if e != nil {
+			return nil, e
+		}
+		errors = append(errors, committed...)
+		je, e = schema("judgment", judgment)
+		if e != nil {
+			return nil, e
+		}
 	}
 	j := obj(judgment)
-	if len(je) == 0 {
+	if !judgeSkipped && len(je) == 0 {
 		for _, aspect := range aspects {
 			n := 0
 			for _, c := range items(j["criteria"]) {
@@ -982,7 +1134,7 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 	}
 	errors = append(errors, je...)
 	blocking, missing := 0, 0
-	if len(je) > 0 {
+	if judgeSkipped || len(je) > 0 {
 		blocking, missing = 1, 1
 	} else {
 		for _, f := range items(j["findings"]) {
@@ -1003,8 +1155,8 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 	if e != nil && !os.IsNotExist(e) {
 		return nil, e
 	}
-	entry := doc{"approval_text": string(approval), "commit": obj(proposal["content"])["commit"], "proposal_version": proposal["version"], "round": n, "draft": d, "judgment": judgment, "errors": errors, "cleared": len(errors) == 0 && blocking == 0 && missing == 0}
-	if len(committed) > 0 {
+	entry := doc{"approval_text": string(approval), "commit": obj(p["content"])["commit"], "proposal_version": p["version"], "round": n, "draft": d, "judgment": judgment, "judge_skipped": judgeSkipped, "errors": errors, "cleared": len(errors) == 0 && blocking == 0 && missing == 0}
+	if judgeSkipped || len(committed) > 0 {
 		entry["proposal_version"], entry["commit"] = nil, nil
 	}
 	if _, e := record.ProposalRoundTarget(entry, file(artifacts, fmt.Sprintf("rounds/%d.json", n))); e != nil {
@@ -1020,10 +1172,15 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 	if e != nil {
 		return nil, e
 	}
-	input["next_proposal_version"] = num(proposal["version"]) + 1
-	if num(proposal["version"]) > 0 {
-		input["pending_proposal"], input["previous_unapproved"] = proposal, true
+	input["next_proposal_version"] = num(p["version"]) + 1
+	if num(p["version"]) > 0 {
+		input["pending_proposal"], input["previous_unapproved"] = p, true
 	}
+	data, e := decisions.List(ctx.Cwd)
+	if e != nil {
+		return nil, e
+	}
+	input["pending_decisions"] = pendingDecisions(input, data.Decisions)
 	if e = writeJSON(file(artifacts, "input.json"), input); e != nil {
 		return nil, e
 	}
@@ -1063,12 +1220,19 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	problems, p, err := proposal.CommittedErrors(ctx, entry["draft"])
+	p, err := record.Latest(ctx.Dir, "proposal")
 	if err != nil {
 		return nil, err
 	}
-	if entry["commit"] != obj(p["content"])["commit"] || num(entry["proposal_version"]) != num(p["version"]) {
-		problems = append(problems, "proposal commit changed after the judgment")
+	problems := []string{}
+	if entry["judge_skipped"] != true {
+		problems, p, err = proposal.CommittedErrors(ctx, entry["draft"])
+		if err != nil {
+			return nil, err
+		}
+		if entry["commit"] != obj(p["content"])["commit"] || num(entry["proposal_version"]) != num(p["version"]) {
+			problems = append(problems, "proposal commit changed after the judgment")
+		}
 	}
 	draft, err := readDraft(artifacts)
 	if err != nil {

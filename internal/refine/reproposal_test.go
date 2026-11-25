@@ -55,7 +55,7 @@ func TestReproposalChecksFinalDependencySet(t *testing.T) {
 		name, dependency, want string
 	}{
 		{"withdrawn key", "N2", "missing dependency N2"},
-		{"withdrawn id", "", "missing dependency"},
+		{"withdrawn id", "", "withdrawn decision"},
 		{"never existed", "D-ffffff", "missing dependency D-ffffff"},
 		{"agreed outside draft", "D-abcdef", ""},
 	} {
