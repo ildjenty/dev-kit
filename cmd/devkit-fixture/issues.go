@@ -16,6 +16,10 @@ func fixtureGitHub(args []string, env cli.Env) error {
 	if err := guard(env); err != nil {
 		return err
 	}
+	if len(args) >= 2 && args[0] == "repo" && args[1] == "view" {
+		_, err := fmt.Fprint(env.Stdout, "https://github.example/team/repo")
+		return err
+	}
 	if len(args) == 4 && args[0] == "label" && args[1] == "create" && args[3] == "--force" {
 		return nil
 	}
