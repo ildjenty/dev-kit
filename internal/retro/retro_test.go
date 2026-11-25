@@ -88,7 +88,7 @@ func (r *fixture) write(d doc) {
 	r.t.Helper()
 	testutil.OK(r.t, writeJSON(file(r.artifacts, "draft.json"), d))
 	input := testutil.Must(readJSON(file(r.artifacts, "input.json")))
-	testutil.OK(r.t, put(file(r.artifacts, "approval.txt"), fmt.Sprintf("Approve the traced correction with approve=%d, or provide answers for changes?", num(input["next_proposal_version"]))))
+	testutil.OK(r.t, put(file(r.artifacts, "approval.txt"), fmt.Sprintf("Everything else follows backlog evidence and owner's instructions. Details: devkit proposal show %s.\nReply approve=%d, or answers naming the key to change.", r.ctx.Branch, num(input["next_proposal_version"]))))
 }
 func judgment() doc {
 	cs := []doc{}
@@ -165,7 +165,9 @@ func TestProposalCommitsEverythingAndApprovalOnlyRecordsResult(t *testing.T) {
 	testutil.Equal(t, content["proposal_path"], nil)
 	head := r.git("rev-parse", "HEAD")
 	testutil.Equal(t, content["commit"], head)
-	testutil.Contains(t, str(items(out["questions"])[0]["text"]), head)
+	testutil.Equal(t, str(items(out["questions"])[0]["text"]), readFile(t, file(r.artifacts, "approval.txt")))
+	details := testutil.Must(readJSON(filepath.Join(r.ctx.Dir, "proposals/1.details.json")))
+	testutil.Equal(t, obj(details["content"])["commit"], head)
 	testutil.Equal(t, len(testutil.Must(record.List(r.ctx.Dir, "judgment"))), 1)
 	r.ctx.RunID = "r2"
 	s, e := start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))

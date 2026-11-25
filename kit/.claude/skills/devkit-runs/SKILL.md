@@ -141,8 +141,9 @@ archon workflow run <workflow> --branch <branch> --detach --input "answers=$(cat
 
 where the answers file holds `[{"question_id":"Q1","answer":"<owner answer verbatim>"}]`.
 
-For refine's, retro's or optimize's single proposal approval question, show the full question, including the
-proposed `pr_title` and `pr_summary`, and the exact version. Only
+For refine's, retro's or optimize's single proposal approval question, relay the question exactly as
+recorded. Do not append PR text, machine fields, version history or inventories. When the owner asks
+for details, run `devkit proposal show <branch>` and show its output. Only
 when the owner approves that version, start that workflow again on the same branch with
 `--input approve=<version>`. To request changes, restart it with the owner's words in `answers` for the
 approval question's ID. Never synthesize approval or use `approve` for an open-point question.
@@ -166,8 +167,8 @@ When `publication` is `nothing_to_publish`, relay that no commits remain beyond 
 Run optimize on an `optimize/<name>` branch. Pass the owner's verbatim instructions through a file
 as `instructions`, or empty for the full fit. The writer and fresh read-only judge review settings,
 standards, requested workflow edits and existing open Issue triage, with machine checks between them.
-After at most three rounds it asks one reviewed approval question; relay summary, owner-reserved
-points, pr_title/pr_summary, version and commit unchanged. On exact-version approval the machine
+After at most three rounds it asks one reviewed approval question; relay it unchanged.
+On exact-version approval the machine
 publishes the PR, then applies Issue labels, bodies and relationships with recorded retry progress.
 Relay pr_url and issue_numbers. The owner merges the PR. Use the same version to resume a failed
 publication; do not apply Issue edits in the session or invent approval.
@@ -175,7 +176,7 @@ publication; do not apply Issue edits in the session or invent approval.
 Run retro on a `retro/<name>` branch created from the base. It reads that branch's backlog, proposes
 unit Issue drafts, check additions and standard edits, commits the real files and consumed backlog
 deletions. Standards and check settings change only how agents work; product properties use unit
-completion conditions as in refine. It asks one approval question showing the version and commit after machine checks, fresh read-only
+completion conditions as in refine. It asks one short approval question after machine checks, fresh read-only
 judgment and escape verification. Approval requires that version's commit to remain the clean branch
 head; it pushes and opens or updates the PR, creates unit issues without a parent topic, connects
 blocked-by links and records `issue_numbers`, `pr_number` and `pr_url`, without creating another commit. Requested changes create the

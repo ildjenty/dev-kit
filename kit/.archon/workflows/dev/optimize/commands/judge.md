@@ -28,6 +28,18 @@ when necessary evidence is absent. The writer's explanation is a hypothesis, not
   and owner_points contains the decisions authority.md reserves for the owner. The owner approves
   a reviewed proposal, not an unreviewed inventory of changes. Check pr_title/pr_summary for
   meaning, configured language and standalone reader context.
+  Check that the approval question contains only every proposed change not mechanically implied by
+  repository/backlog evidence or the owner's instructions (including provisional choices, derived
+  agent rules and defaults), each keyed and summarised in one or two lines with a recommendation and
+  reason; every risk the owner must accept, keyed and summarised in one or two lines; one line saying
+  everything else follows the evidence and instructions with `devkit proposal show <branch>` for
+  details; and how to answer with `approve=<version>` or `answers` naming the key to change. A missing
+  item or risk is blocking. Repeating settled instructions or mechanically implied changes is a
+  nonblocking finding asking to cut it. Report other unnecessary content as nonblocking findings
+  asking to cut it: version history, provenance inventories, machine fields, JSON, full bodies,
+  exhaustive change/Issue lists and facts needing no decision (including cost estimates). The version
+  belongs only in the answer line.
+  When only these nonblocking cuts remain, keep the criterion `pass` and `needs_decision: false`.
 - triage: compare every existing open unlabelled Issue with its proposed classification or
   reasoned exclusion. Preserve the request and existing context. Unit completion conditions must
   follow from the request without invented requirements; unclear work remains a topic.

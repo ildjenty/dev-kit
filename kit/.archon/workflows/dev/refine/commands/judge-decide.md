@@ -24,7 +24,18 @@ Return exactly one criterion for each aspect:
   Check `pr_title` and `pr_summary` as text for this PR's reviewer in the language named by
   `language` in your input: the short title names this change; the summary explains what merging
   puts on the base and why, without approval instructions, versions or internal history.
-  The machine appends these exact fields to the approval question and uses them as approved.
+  These fields remain in the full proposal details and are used unchanged for the PR.
+  Check that the approval question contains only: every choice or rule added or derived beyond the
+  confirmed memo and owner's words (including provisional decisions, derived agent rules and defaults),
+  each keyed and summarised in one or two lines with a recommendation and reason; every risk the
+  owner must accept, keyed and summarised in one or two lines; one line saying everything else follows
+  the confirmed memo and owner's words with `devkit proposal show <branch>` for details; and how to
+  answer with `approve=<version>` or `answers` naming the key to change. A missing memo-external item
+  or risk is blocking. Repeating what the memo or owner already settled is a nonblocking finding
+  asking to cut it. Report other unnecessary content as nonblocking findings asking to cut it:
+  version history, provenance inventories, machine fields, JSON, full bodies, exhaustive binding/Issue
+  lists and facts needing no decision (including cost estimates). The version belongs only in the answer line.
+  When only these nonblocking cuts remain, keep the criterion `pass` and `needs_decision: false`.
 - `bindings`: every binding edit is about how agents work: process, tools, conventions or verification.
   A product data shape, invariant or feature rule in a binding edit is a blocking finding, even if
   repeated in an Issue draft. Decisions about agent work that must bind agents use the edited mechanisms. Apply the
@@ -36,7 +47,7 @@ Return exactly one criterion for each aspect:
   of the condition in later units that touch it. Missing conditions are blocking findings.
   Review the new `parent` title and body like every other Issue draft, against the
   owner's sources and the configured language. Parent/sub-issue and blocked-by structure expresses
-  order; questions remain topics. The approval question includes the new parent's title and body.
+  order; questions remain topics. The full proposal details include the new parent's title and body.
   A unit draft's work content is only its goal, observable completion conditions and product
   properties to preserve; an open question in a unit draft is blocking. Each topic body must name
   the units it holds or explicitly say it holds none. Missing declarations or a mismatch with the

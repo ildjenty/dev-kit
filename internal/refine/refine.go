@@ -335,6 +335,7 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 		base = str(obj(pending["content"])["base_commit"])
 	}
 	input["proposal_base"] = base
+	input["branch"] = ctx.Branch
 	for _, name := range []string{"draft", "judgment"} {
 		b, err := schemas.ReadFile("schemas/" + name + ".schema.json")
 		if err != nil {
@@ -710,18 +711,6 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		if !strings.Contains(text, fmt.Sprintf("approve=%d", num(input["next_proposal_version"]))) || !strings.Contains(text, "answers") {
 			errors = append(errors, "approval.txt must explain approve=<version> and answers")
 		}
-		for _, group := range []string{"decisions", "units", "topics"} {
-			for _, item := range items(draft[group]) {
-				if !strings.Contains(text, str(item["key"])) {
-					errors = append(errors, "approval.txt omits "+str(item["key"]))
-				}
-			}
-		}
-		for path := range traced {
-			if !strings.Contains(text, path) {
-				errors = append(errors, "approval.txt omits binding "+path)
-			}
-		}
 	}
 	return errors, nil
 }
@@ -1033,28 +1022,12 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 		}
 		result = doc{"outcome": "stop", "stop": doc{"state": "The refine draft did not clear review", "unresolved": problems, "premise": ""}}
 	} else {
-		text := str(entry["approval_text"]) + proposal.ApprovalPRText(obj(entry["draft"]), str(input["language"]))
-		text += fmt.Sprintf("\n\nProposal version: %d\nCommit: %s", num(p["version"]), str(content["commit"]))
-		topic := obj(content["topic"])
-		if num(topic["number"]) > 0 {
-			text += fmt.Sprintf("\nParent: #%d %s", num(topic["number"]), str(topic["title"]))
-		} else {
-			parent := obj(obj(entry["draft"])["parent"])
-			text += "\nnew topic: " + str(parent["title"]) + "\n" + str(parent["body"])
-		}
-		for _, group := range []string{"mapping", "decisions", "bindings", "units", "topics"} {
-			value := obj(entry["draft"])[group]
-			if group == "mapping" {
-				value = content["mapping"]
-			}
-			encoded, err := json.MarshalIndent(value, "", "  ")
-			if err != nil {
-				return nil, err
-			}
-			text += "\n\n" + group + ":\n" + string(encoded)
-		}
+		text := str(entry["approval_text"])
 		content["ready"], content["approval_text"] = true, text
 		if err = proposal.Save(ctx, p, content); err != nil {
+			return nil, err
+		}
+		if err = proposal.SaveDetails(ctx, p); err != nil {
 			return nil, err
 		}
 		result = doc{"outcome": "question", "decision_ids": content["decision_ids"], "questions": []doc{{"text": text, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"refine"}, "invalidates": []string{}}}}

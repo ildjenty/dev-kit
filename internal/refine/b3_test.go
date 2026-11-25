@@ -10,7 +10,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/testutil"
 )
 
-func TestPRDraftTextIsRequiredAndShownForApproval(t *testing.T) {
+func TestPRDraftTextIsRequiredAndSavedInDetails(t *testing.T) {
 	r := setup(t, nil)
 	r.begin()
 	r.writeDraft()
@@ -36,8 +36,16 @@ func TestPRDraftTextIsRequiredAndShownForApproval(t *testing.T) {
 	testutil.Equal(t, r.round(judgment())["valid"], true)
 	result := r.finish()
 	text := str(items(result["questions"])[0]["text"])
-	testutil.Contains(t, text, "PR title: "+str(d["pr_title"]))
-	testutil.Contains(t, text, "PR summary:\n"+str(d["pr_summary"]))
+	testutil.Equal(t, text, readText(t, file(r.artifacts, "approval.txt")))
+	for _, field := range []string{"PR title:", "PR summary:", "Proposal version:", "Commit:", "Parent:", "mapping", "blocked_by", "{", "}"} {
+		testutil.Equal(t, strings.Contains(text, field), false)
+	}
+	testutil.Equal(t, strings.Count(text, "approve=1"), 1)
+	noApprovalErrors(t, r.ctx, "1")
+	rejectsApproval(t, r.ctx, "2")
+	details := testutil.Must(readJSON(filepath.Join(r.ctx.Dir, "proposals/1.details.json")))
+	testutil.Equal(t, details, r.latest("proposal"))
+	testutil.Equal(t, obj(details["content"])["draft"], testutil.Must(readJSON(file(r.artifacts, "draft.json"))))
 }
 
 func TestOldProposalWithoutPRTextRefusesBeforeExternalWrites(t *testing.T) {

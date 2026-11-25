@@ -11,7 +11,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/testutil"
 )
 
-func TestPRDraftTextIsRequiredAndShownForApproval(t *testing.T) {
+func TestPRDraftTextIsRequiredAndSavedInDetails(t *testing.T) {
 	r := setup(t, backlog())
 	r.put(".devkit/config.json", `{"language":"ja"}`)
 	r.commit()
@@ -39,8 +39,14 @@ func TestPRDraftTextIsRequiredAndShownForApproval(t *testing.T) {
 	testutil.Equal(t, testutil.Must(r.review(judgment()))["valid"], true)
 	result := testutil.Must(finish(r.ctx, r.artifacts))
 	text := str(items(result["questions"])[0]["text"])
-	testutil.Contains(t, text, "PR タイトル: "+str(d["pr_title"]))
-	testutil.Contains(t, text, "PR の概要:\n"+str(d["pr_summary"]))
+	testutil.Equal(t, text, readFile(t, file(r.artifacts, "approval.txt")))
+	for _, field := range []string{"PR タイトル:", "PR の概要:", "Proposal version:", "Commit:", "Parent:", "mapping", "blocked_by", "{", "}"} {
+		testutil.Equal(t, strings.Contains(text, field), false)
+	}
+	testutil.Equal(t, strings.Count(text, "approve=1"), 1)
+	details := testutil.Must(readJSON(filepath.Join(r.ctx.Dir, "proposals/1.details.json")))
+	testutil.Equal(t, details, testutil.Must(record.Latest(r.ctx.Dir, "proposal")))
+	testutil.Equal(t, obj(details["content"])["draft"], testutil.Must(readJSON(file(r.artifacts, "draft.json"))))
 	log, _ := testutil.IssueCreationCLI(t)
 	r.ctx.RunID = "r2"
 	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))).Stopped, false)

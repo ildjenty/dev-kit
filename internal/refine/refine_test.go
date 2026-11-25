@@ -110,7 +110,7 @@ func (r *fixture) writeDraft(ds ...doc) {
 		d = ds[0]
 	}
 	r.artifact("draft.json", d)
-	r.artifact("approval.txt", "Owner decisions: N1 Serve employees. Provisional decisions: none. Unit UN1 Deliver access. Start refine with approve=1, or answers to request changes.")
+	r.artifact("approval.txt", "Everything else follows the confirmed memo and owner's words. Details: devkit proposal show refine/topic.\nReply approve=1, or answers naming the key to change.")
 }
 func (r *fixture) decision(id string, fields doc) {
 	r.t.Helper()
@@ -190,7 +190,6 @@ func TestProposalCommitContainsProposedDecisionsAndBindingOnly(t *testing.T) {
 	d["bindings"] = []doc{{"path": "CLAUDE.md", "decision": "N1", "reason": "Enforce the staff audience"}}
 	r.put("CLAUDE.md", "Serve employees only.\n")
 	r.writeDraft(d)
-	r.artifact("approval.txt", "N1 CLAUDE.md UN1 parent from request, blocked-by: none. approve=1 or answers.")
 	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts))["valid"], true)
 	head := r.git("rev-parse", "HEAD")
 	testutil.Equal(t, r.git("rev-parse", "HEAD^"), before)
@@ -205,7 +204,9 @@ func TestProposalCommitContainsProposedDecisionsAndBindingOnly(t *testing.T) {
 	testutil.Equal(t, r.round(judgment())["valid"], true)
 	out := r.finish()
 	testutil.Equal(t, out["outcome"], "question")
-	testutil.Contains(t, str(items(out["questions"])[0]["text"]), "blocked_by")
+	testutil.Equal(t, str(items(out["questions"])[0]["text"]), readText(t, file(r.artifacts, "approval.txt")))
+	details := testutil.Must(readJSON(filepath.Join(r.ctx.Dir, "proposals/1.details.json")))
+	testutil.Equal(t, obj(details["content"]), obj(r.latest("proposal")["content"]))
 	testutil.Equal(t, len(items(obj(obj(r.latest("proposal")["content"])["draft"])["units"])), 1)
 	_, err := os.Stat(filepath.Join(log, "calls"))
 	testutil.Equal(t, os.IsNotExist(err), true)

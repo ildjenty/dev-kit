@@ -109,7 +109,7 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	if content != nil {
 		content["ready"] = false
 	}
-	approvalText := str(entry["approval_text"]) + proposal.ApprovalPRText(obj(entry["draft"]), str(input["language"]))
+	approvalText := str(entry["approval_text"])
 	if entry["cleared"] == true && len(errors) == 0 && len(items(obj(entry["draft"])["cases"])) > 0 {
 		verification, e := readJSON(file(artifacts, "verification.json"))
 		if e != nil || verification["review"] != reviewHash(entry) {
@@ -120,7 +120,7 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 				errors = append(errors, "escape evaluation report is required in the configured language")
 			} else {
 				content["verification"] = verification
-				approvalText += "\n\n" + str(report["text"])
+				content["verification_report"] = report["text"]
 			}
 		}
 	}
@@ -131,7 +131,6 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 		}
 		result = doc{"outcome": "stop", "stop": doc{"state": "The retro draft did not clear review", "unresolved": errors, "premise": ""}}
 	} else {
-		approvalText = fmt.Sprintf("%s\n\nProposal version: %d\nCommit: %s", strings.TrimSpace(approvalText), num(p["version"]), str(obj(p["content"])["commit"]))
 		content["approval_text"], content["judgment"], content["ready"] = approvalText, entry["judgment"], true
 		result = doc{"outcome": "question", "questions": []doc{{"text": approvalText, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"retro"}, "invalidates": []string{}}}}
 	}
@@ -144,6 +143,11 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	} else if p["run_id"] == ctx.RunID {
 		if e = finishProposal(ctx, p, content); e != nil {
 			return nil, e
+		}
+		if content["ready"] == true {
+			if e = proposal.SaveDetails(ctx, p); e != nil {
+				return nil, e
+			}
 		}
 	}
 	records := []doc{}

@@ -36,14 +36,6 @@ func japanese(language string) bool {
 	return language == "ja" || strings.HasPrefix(language, "ja-")
 }
 
-func ApprovalPRText(draft map[string]any, language string) string {
-	title, summary := "PR title", "PR summary"
-	if japanese(language) {
-		title, summary = "PR タイトル", "PR の概要"
-	}
-	return fmt.Sprintf("\n\n%s: %s\n\n%s:\n%s", title, draft["pr_title"], summary, draft["pr_summary"])
-}
-
 func branchLink(repository, kind, branch, path string) string {
 	parts := strings.Split(path, "/")
 	for i, part := range parts {

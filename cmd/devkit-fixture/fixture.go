@@ -117,17 +117,18 @@ func before(args []string, env cli.Env) error {
 			if workflow == "plan" {
 				return os.WriteFile(filepath.Join(env.Cwd, "fixture.txt"), []byte("fixture result\nPlan skeleton.\n"), 0644)
 			}
+			branch := workflow + "/" + filepath.Base(env.Cwd)
 			if workflow == "optimize" {
 				if err = os.WriteFile(filepath.Join(env.Cwd, "CLAUDE.md"), []byte("Route development through the devkit-runs skill. Relay owner questions verbatim.\n"), 0644); err != nil {
 					return err
 				}
-				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte("Approve with approve=1, or answers for changes."), 0644)
+				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte(fmt.Sprintf("Everything else follows repository evidence and owner's instructions. Details: devkit proposal show %s.\nReply approve=1, or answers naming the key to change.", branch)), 0644)
 			}
 			if workflow == "retro" {
-				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte("Approve the traced repair with approve=1, or provide answers for changes?"), 0644)
+				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte(fmt.Sprintf("Everything else follows backlog evidence and owner's instructions. Details: devkit proposal show %s.\nReply approve=1, or answers naming the key to change.", branch)), 0644)
 			}
 			if workflow == "refine" {
-				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte("Owner decision: N1. Provisional decisions: none. Unit: UN1. Start refine with approve=1, or answers to request changes."), 0644)
+				return os.WriteFile(filepath.Join(filepath.Dir(path), "approval.txt"), []byte(fmt.Sprintf("Everything else follows the confirmed memo and owner's words. Details: devkit proposal show %s.\nReply approve=1, or answers naming the key to change.", branch)), 0644)
 			}
 		case "sync continue":
 			return os.WriteFile(filepath.Join(env.Cwd, "fixture.txt"), []byte("fixture result\nBase and topic changes.\n"), 0644)
@@ -499,6 +500,49 @@ func after(args []string, env cli.Env) error {
 	}
 	if result["run_id"] != ctx.RunID || result["workflow"] != args[0] || result["outcome"] != expected || result["commit"] != head {
 		return fmt.Errorf("unexpected executed fixture result: %v", result)
+	}
+	if expected == "question" {
+		approval, err := os.ReadFile(filepath.Join(env.Getenv("ARTIFACTS_DIR"), args[0], "approval.txt"))
+		if err != nil {
+			return err
+		}
+		questions, _ := result["questions"].([]any)
+		if len(questions) != 1 || questions[0].(map[string]any)["text"] != string(approval) {
+			return fmt.Errorf("approval question was not relayed unchanged: %v", questions)
+		}
+		p, err := record.Latest(ctx.Dir, "proposal")
+		if err != nil {
+			return err
+		}
+		path := filepath.Join(ctx.Dir, "proposals", fmt.Sprintf("%v.details.json", p["version"]))
+		details, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		var full doc
+		if err = json.Unmarshal(details, &full); err != nil {
+			return err
+		}
+		want, err := json.Marshal(p)
+		if err != nil {
+			return err
+		}
+		got, err := json.Marshal(full)
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(got, want) {
+			return fmt.Errorf("proposal details omitted content: %s", path)
+		}
+		command := exec.Command(env.Getenv("DEVKIT_FIXTURE_BINARY"), "proposal", "show", ctx.Branch)
+		command.Dir, command.Env = env.Cwd, env.Environ
+		shown, err := command.Output()
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(shown, details) {
+			return fmt.Errorf("proposal show did not print full details: %s", ctx.Branch)
+		}
 	}
 	if args[0] == "sync" {
 		state, err := read(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "sync/state.json"))

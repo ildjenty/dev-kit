@@ -5,7 +5,6 @@ import (
 	"os"
 	"reflect"
 	"strconv"
-	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/proposal"
@@ -218,15 +217,12 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 		return saveResult(ctx, doc{"outcome": "stop", "stop": doc{"state": "The optimize draft did not clear review", "unresolved": problems, "premise": ""}}, num(p["version"]))
 	}
 	content := obj(p["content"])
-	d := obj(entry["draft"])
-	text := str(d["summary"])
-	for _, point := range stringsOf(d["owner_points"]) {
-		text += "\n\n" + point
-	}
-	text += "\n\n" + strings.TrimSpace(string(approval)) + proposal.ApprovalPRText(d, str(input["language"]))
-	text += fmt.Sprintf("\n\nProposal version: %d\nCommit: %s", num(p["version"]), str(content["commit"]))
+	text := string(approval)
 	content["ready"], content["approval_text"], content["judgment"] = true, text, entry["judgment"]
 	if err = proposal.Save(ctx, p, content); err != nil {
+		return nil, err
+	}
+	if err = proposal.SaveDetails(ctx, p); err != nil {
 		return nil, err
 	}
 	return saveResult(ctx, doc{"outcome": "question", "questions": []doc{{"text": text, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"optimize"}, "invalidates": []string{}}}}, num(p["version"]))

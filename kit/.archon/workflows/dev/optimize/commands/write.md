@@ -210,9 +210,22 @@ summary; use the machine's verification.json and logs on the next round.
 The PR title is a nonblank single line of at most 100 characters; the summary describes what merges
 and why, for PR readers without this conversation.
 
-Also write `$ARTIFACTS_DIR/optimize/approval.txt` with the concise approval instructions for the
-current next_proposal_version: approve=<version>, or answers for requested changes. The machine
-adds summary, owner_points, the PR title/summary, version and commit unchanged to the question.
+Also write `$ARTIFACTS_DIR/optimize/approval.txt` as one short approval question in the language named
+by `language` in your input, containing only these four parts:
+1. Every proposed change not mechanically implied by the supplied repository/backlog evidence or
+   the owner's instructions. Give each a key and one or two lines with a recommendation and reason;
+   include provisional choices, derived agent rules and chosen defaults. Do not repeat settled
+   instructions or mechanically implied changes.
+2. Every risk the owner must accept, keyed and summarised in one or two lines each. Omit this list
+   when there are no such risks.
+3. One line saying everything else follows the evidence and owner's instructions, with
+   `devkit proposal show <branch>` for details; substitute input's `branch`.
+4. How to answer: `approve=<next_proposal_version>`, or `answers` naming the key to change.
+Put the version only in the answer line. Include no version history, provenance inventory, machine
+fields, JSON, full bodies or exhaustive lists of changes and Issues. Keep facts needing no decision,
+such as cost estimates and verification reports, in the full draft and details. Still write all
+changes, triage, evidence, owner_points, `pr_title` and `pr_summary` in full in the draft.
+The machine relays approval.txt unchanged and saves the full proposal separately as details.
 The fresh judge reads all of these before approval. Resolve blocking findings with a new proposal
 commit; never erase history. Never weaken blocking for security, data loss or owner authority.
 A requested change cannot authorize such weakening implicitly.

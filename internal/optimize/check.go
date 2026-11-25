@@ -192,7 +192,7 @@ func machineCheck(ctx record.ContextData, artifacts string, env cli.Env) (doc, e
 		return nil, err
 	}
 	if strings.TrimSpace(string(approval)) == "" || !strings.Contains(string(approval), fmt.Sprintf("approve=%d", num(input["next_proposal_version"]))) || !strings.Contains(string(approval), "answers") {
-		problems = append(problems, "approval.txt must give the reviewed summary, owner points, approve=<version> and answers")
+		problems = append(problems, "approval.txt must explain approve=<version> and answers")
 	}
 	if err = validateArchonConfig(ctx.Cwd); err != nil {
 		problems = append(problems, "Archon config: "+err.Error())

@@ -1,11 +1,11 @@
 ## Purpose
 
-Report the measured escape results to the owner before approval; verify each status against the
+Report the measured escape results in the proposal details before approval; verify each status against the
 evaluation output. The retro judge already reviewed the correction; this handoff adds its measured evidence.
 
 Read `$ARTIFACTS_DIR/retro/input.json` and `$ARTIFACTS_DIR/retro/verification.json`.
-Return `{"text":"..."}` in the language named by `language` in your input, to append to the
-already reviewed approval question. Do not edit the checkout or change the proposal.
+Return `{"text":"..."}` in the language named by `language` in your input, to save in the
+proposal details. Do not edit the checkout or change the approval question or proposal.
 
 Describe the evaluation against the committed proposal's standards and `concerns.json`. For each case and
 each expected finding, give its ID, quality, file, summary and whether it was found or missed.

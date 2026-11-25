@@ -23,7 +23,9 @@ func agreedWithoutIssues(t *testing.T, old bool) (*fixture, string) {
 	testutil.Equal(t, r.round(judgment())["valid"], true)
 	out := r.finish()
 	text := str(items(out["questions"])[0]["text"])
-	testutil.Contains(t, text, "new topic: Serve employees\nWho can use the service? Employees only.")
+	testutil.Equal(t, text, readText(t, file(r.artifacts, "approval.txt")))
+	details := testutil.Must(readJSON(filepath.Join(r.ctx.Dir, "proposals/1.details.json")))
+	testutil.Equal(t, obj(obj(obj(details["content"])["draft"])["parent"])["body"], "Who can use the service? Employees only.")
 	testutil.Equal(t, strings.Contains(text, "#0"), false)
 	r.ctx.RunID = "r2"
 	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "1"}))).Stopped, false)
@@ -106,7 +108,7 @@ func TestRefineReproposesParentAfterOldApprovalAgreedDecisions(t *testing.T) {
 	result := r.finish()
 	testutil.Equal(t, result["outcome"], "question")
 	testutil.Equal(t, result["proposal_version"], 2)
-	testutil.Contains(t, str(items(result["questions"])[0]["text"]), "new topic: Serve employees")
+	testutil.Equal(t, str(items(result["questions"])[0]["text"]), readText(t, file(r.artifacts, "approval.txt")))
 	r.ctx.RunID = "r4"
 	testutil.Equal(t, testutil.Must(start(r.ctx, envVars(map[string]string{"INPUTS_APPROVE": "2"}))).Stopped, false)
 	approved := testutil.Must(approve(r.ctx, "2"))

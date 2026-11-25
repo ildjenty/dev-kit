@@ -15,7 +15,7 @@ Write `$ARTIFACTS_DIR/refine/draft.json` using the supplied strict schema:
   `language` in your input. Write it for a reviewer of this PR, not as a proposal summary.
 - `pr_summary`: a few sentences in the language named by `language` in your input explaining
   what merging this PR puts on the base and why. This is the opening of the PR body.
-  The machine uses both fields exactly as approved and appends them to the approval question.
+  Keep both fields in the full draft; the machine uses them unchanged for the PR and saves them in the details.
 - `parent`: when the input has no topic Issue, write the new parent topic's `title` and `body`
   in the language named by `language` in your input. Both are required and reviewed for approval.
   When a topic Issue is selected, use empty strings for both. Every Issue title must be at most
@@ -62,11 +62,20 @@ records in the existing log and omit them from new `decisions`; cite their IDs w
 Do not write prose documents, decision files, unit files or topic files. Do not create Issues or
 commit. The machine writes proposed decisions and commits binding edits before the fresh judge.
 
-Write `$ARTIFACTS_DIR/refine/approval.txt` as one approval question. Show every decision key,
-owner and provisional choices, every binding path and its decision, and all unit and topic keys.
-Show the new parent as `new topic: <title>` with its body, or identify the selected topic Issue.
-Explain each blocked-by relationship. Never show an absent parent as `#0`.
-Include `approve=<next_proposal_version>` and explain `answers` for requesting changes.
+Write `$ARTIFACTS_DIR/refine/approval.txt` as one short approval question in the language named by
+`language` in your input, containing only these four parts:
+1. Every choice or rule you added or derived beyond the confirmed memo and the owner's words:
+   provisional decisions, derived rules for agents and chosen defaults. Give each a key and one or
+   two lines with a recommendation and reason. Do not repeat choices already settled by the owner.
+2. Every risk the owner must accept, one or two lines each with a key, such as personal data stored
+   abroad or data recoverable only for six hours. Omit this list when there are no such risks.
+3. One line saying everything else follows the confirmed memo and owner's words, with
+   `devkit proposal show <branch>` for details; substitute input's `branch`.
+4. How to answer: `approve=<next_proposal_version>`, or `answers` naming the key to change.
+Put the version only in the answer line. Include no version history, provenance inventory, machine
+fields, JSON, full decision bodies or exhaustive lists of bindings and Issues. Keep facts needing
+no decision, such as cost estimates, in the full draft and details. Still write every decision,
+binding, Issue draft, `pr_title` and `pr_summary` in full in the draft.
 The approval run agrees decisions, pushes the branch, opens or updates a PR using `pr_title`,
 `pr_summary` and lists of approved facts, then creates Issues with source PR metadata.
 The owner merges the PR; units wait for that merge. Do not run git, gh or Archon commands that change state.

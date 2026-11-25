@@ -83,7 +83,7 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts string) (doc, error)
 	for _, name := range []string{"README.md", "harness.md", "review/harness.md", "authority.md", "review/purpose.md", "review/README.md"} {
 		materials = append(materials, filepath.Join(fixed, name))
 	}
-	input := doc{"instructions": instructions, "answers": answers, "previous": previous, "config": c, "language": c.Language, "criteria": fixed, "materials": materials, "folders": doc{"standards": c.Standards}, "issues": existing, "proposal_base": base, "base_branch": ctx.BaseBranch, "next_proposal_version": num(previous["version"]) + 1}
+	input := doc{"instructions": instructions, "answers": answers, "previous": previous, "config": c, "language": c.Language, "criteria": fixed, "materials": materials, "folders": doc{"standards": c.Standards}, "issues": existing, "proposal_base": base, "base_branch": ctx.BaseBranch, "branch": ctx.Branch, "next_proposal_version": num(previous["version"]) + 1}
 	if err = writeJSON(file(resolve(ctx.Cwd, artifacts), "input.json"), input); err != nil {
 		return nil, err
 	}

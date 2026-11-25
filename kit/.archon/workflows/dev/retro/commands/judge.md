@@ -21,8 +21,18 @@ proposed edits, not criteria that override the fixed standards.
 Under `evidence`, check `pr_title` and `pr_summary` as text for this PR's reviewer in the language
 named by `language` in your input: the short title names the change and the few-sentence summary
 explains what merging puts on the base and why. Neither repurposes approval instructions, versions
-or internal history. The machine appends these exact fields to the approval question and uses them
-as approved, followed by lists of approved changes, escape traces, cases and Issues.
+or internal history. These fields remain in the full proposal details and are used unchanged for the PR.
+Also check the approval question under `evidence`: it contains only every proposed change not
+mechanically implied by backlog evidence or the owner's instructions (including provisional choices,
+derived agent rules and defaults), each keyed and summarised in one or two lines with a recommendation
+and reason; every risk the owner must accept, keyed and summarised in one or two lines; one line saying
+everything else follows the evidence and instructions with `devkit proposal show <branch>` for details;
+and how to answer with `approve=<version>` or `answers` naming the key to change. A missing item or risk
+is blocking. Repeating settled instructions or mechanically implied changes is a nonblocking finding
+asking to cut it. Report other unnecessary content as nonblocking findings asking to cut it: version
+history, provenance inventories, machine fields, JSON, full bodies, exhaustive change/Issue lists and
+facts needing no decision (including cost estimates). The version belongs only in the answer line.
+When only these nonblocking cuts remain, keep the criterion `pass` and `needs_decision: false`.
 
 Apply the named criteria documents and return the aspects `traceability`, `evidence` and `mechanism`.
 Under `mechanism`, check that every standard or check-setting change concerns how agents work:

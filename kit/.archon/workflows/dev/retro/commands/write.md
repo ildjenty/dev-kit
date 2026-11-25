@@ -14,7 +14,7 @@ Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
   `language` in your input. Write it for a reviewer of this PR, not as a proposal summary.
 - `pr_summary`: a few sentences in the language named by `language` in your input explaining
   what merging this PR puts on the base and why. This is the opening of the PR body.
-  The machine uses both fields exactly as approved and appends them to the approval question.
+  Keep both fields in the full draft; the machine uses them unchanged for the PR and saves them in the details.
 - `summary`: the proposed correction.
 - `units`: work for deferred or carried findings, or follow-up work traced to review entries, with stable draft `key`, `title`, `goal`,
   `completion_conditions`, `blocked_by` draft keys, and source `entries`. Each unit fits one PR and contains every constraint delivery needs.
@@ -60,19 +60,31 @@ Write units only in the draft; they stay in the proposal record until approval. 
 configured standards folder and the new cases named in the draft. Do not edit existing cases.
 Remove withdrawn draft cases when revising. Do not commit. Revisions must address the previous round and answers.
 
-Write `$ARTIFACTS_DIR/retro/approval.txt` in `language`: one approval question describing the entire
-proposal, including dismissals, source entries, failure prevented, evidence and ongoing burden.
-Include the exact `approve=<next_proposal_version>` and explain `answers` for requesting changes.
+Write `$ARTIFACTS_DIR/retro/approval.txt` as one short approval question in the language named by
+`language` in your input, containing only these four parts:
+1. Every proposed change that is not mechanically implied by backlog evidence or the owner's
+   instructions. Give each a key and one or two lines with a recommendation and reason; include
+   provisional choices, derived agent rules and chosen defaults. Do not repeat settled instructions
+   or mechanically implied changes.
+2. Every risk the owner must accept, keyed and summarised in one or two lines each. Omit this list
+   when there are no such risks.
+3. One line saying everything else follows the backlog evidence and owner's instructions, with
+   `devkit proposal show <branch>` for details; substitute input's `branch`.
+4. How to answer: `approve=<next_proposal_version>`, or `answers` naming the key to change.
+Put the version only in the answer line. Include no version history, provenance inventory, machine
+fields, JSON, full bodies or exhaustive lists of changes and Issues. Keep facts needing no decision,
+such as cost estimates and evaluation results, in the full draft and details. Still write all
+changes, evidence, Issue drafts, `pr_title` and `pr_summary` in full in the draft.
 After the machine checks pass, the machine commits the real config, standards and cases,
 together with consumed backlog deletions. Each proposal version names one commit; Issue drafts stay in its proposal record. Judgment and verification inspect that committed,
-clean checkout. The final approval question includes its version and commit, every unit Issue draft
-and its blocked-by order. Approval pushes the branch and opens or updates a PR using `pr_title`,
+clean checkout. The details include the version, commit, every unit Issue draft and its blocked-by
+order. Approval pushes the branch and opens or updates a PR using `pr_title`,
 `pr_summary` and lists of approved facts before creating unit Issues with source PR metadata.
 It records the PR and each Issue creation for retry, then the result; the proposal commit must
 remain the clean branch head.
 The owner merges the PR; units wait for that merge. Do not run git, gh or Archon commands that change state.
 After checks and independent judgment pass, it evaluates new escape cases against a temporary copy
-of the proposed standards and concern map. Evaluation misses and provider failures are reported to
-the owner before approval and do not block the proposal.
+of the proposed standards and concern map. Evaluation misses and provider failures remain in the
+details available before approval and do not block the proposal.
 
 Return only `{"draft":"<ARTIFACTS_DIR>/retro/draft.json"}`.

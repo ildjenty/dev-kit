@@ -54,7 +54,7 @@ func (r *fixture) write(d doc) {
 	r.t.Helper()
 	testutil.OK(r.t, writeJSON(file(r.artifacts, "draft.json"), d))
 	input := testutil.Must(readJSON(file(r.artifacts, "input.json")))
-	testutil.OK(r.t, put(file(r.artifacts, "approval.txt"), fmt.Sprintf("Use approve=%d, or answers for changes.", num(input["next_proposal_version"]))))
+	testutil.OK(r.t, put(file(r.artifacts, "approval.txt"), fmt.Sprintf("Everything else follows repository evidence and owner's instructions. Details: devkit proposal show %s.\nReply approve=%d, or answers naming the key to change.", r.ctx.Branch, num(input["next_proposal_version"]))))
 }
 func (r *fixture) changeConfig(d doc, text string) {
 	r.t.Helper()
@@ -140,7 +140,16 @@ func TestReviewApprovalAndPublication(t *testing.T) {
 	result := testutil.Must(finish(r.ctx, r.artifacts))
 	testutil.Equal(t, result["outcome"], "question")
 	question := str(items(result["questions"])[0]["text"])
-	testutil.Contains(t, question, str(d["pr_title"]))
+	testutil.Equal(t, question, string(testutil.Must(os.ReadFile(file(r.artifacts, "approval.txt")))))
+	for _, field := range []string{str(d["pr_title"]), str(d["summary"]), "Proposal version:", "Commit:", "Parent:", "mapping", "blocked_by", "{", "}"} {
+		testutil.Equal(t, strings.Contains(question, field), false)
+	}
+	testutil.Equal(t, strings.Count(question, "approve=1"), 1)
+	problems := testutil.Must(proposal.ApprovalErrors(r.ctx, "2", "optimize"))
+	testutil.Contains(t, strings.Join(problems, "\n"), "latest proposal version")
+	details := testutil.Must(readJSON(filepath.Join(r.ctx.Dir, "proposals/1.details.json")))
+	testutil.Equal(t, details, testutil.Must(record.Latest(r.ctx.Dir, "proposal")))
+	testutil.Equal(t, obj(details["content"])["draft"], testutil.Must(readJSON(file(r.artifacts, "draft.json"))))
 	calls := string(testutil.Must(os.ReadFile(filepath.Join(r.ghlog, "calls"))))
 	for _, write := range []string{"issue create", "issue edit", "label create", "pr create"} {
 		testutil.Equal(t, strings.Contains(calls, write), false)

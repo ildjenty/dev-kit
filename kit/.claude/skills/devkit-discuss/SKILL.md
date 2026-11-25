@@ -67,8 +67,9 @@ edits; do not make them yourself in the conversation. Decision records are a log
 instructions: the Issue drafts must contain everything delivery needs.
 
 Relay refine's questions and the owner's answers verbatim through `devkit-runs`, updating the memo
-as choices change. Show the full approval question, including the proposed PR title and summary,
-and exact proposal version; the discussion memo
+as choices change. Relay the approval question exactly as recorded, without adding PR text,
+machine fields, history or inventories. When the owner asks for details, run
+`devkit proposal show <branch>` and show its output. The discussion memo
 does not approve that proposal. Only the owner's approval of that version permits the approval run.
 Never supply answers, approval or `continue` for the owner.
 

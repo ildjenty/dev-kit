@@ -15,7 +15,9 @@ archon workflow run optimize --branch optimize/<name> --detach   --input "instru
 ```
 
 The writer drafts the repository fit and issue triage; machine checks and a fresh read-only judge
-review up to three rounds. Relay recorded questions verbatim. For changes, pass the owner's answer
+review up to three rounds. Relay recorded questions verbatim without adding PR text, machine fields,
+history or inventories. When the owner asks for details, run `devkit proposal show <branch>` and
+show its output. For changes, pass the owner's answer
 through an answers file. Only after the owner approves the exact reviewed version, restart optimize
 on the same branch with `approve=<version>`. Never synthesize approval.
 The machine publishes the branch as a PR and applies the approved Issue triage. Relay the PR URL

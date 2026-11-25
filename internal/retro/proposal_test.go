@@ -78,7 +78,9 @@ func TestProposalCommitPreservesBytesExecutableModesAndDeletions(t *testing.T) {
 	code, proposed, _ := r.command("finish", nil)
 	testutil.Equal(t, code, 0)
 	testutil.Equal(t, proposed["outcome"], "question")
-	testutil.Contains(t, str(items(proposed["questions"])[0]["text"]), head)
+	testutil.Equal(t, str(items(proposed["questions"])[0]["text"]), readFile(t, file(r.artifacts, "approval.txt")))
+	details := testutil.Must(readJSON(filepath.Join(r.ctx.Dir, "proposals/1.details.json")))
+	testutil.Equal(t, obj(details["content"])["commit"], head)
 	r.ctx.RunID = "r2"
 	code, started, _ := r.command("start", map[string]string{"INPUTS_APPROVE": "1"})
 	testutil.Equal(t, code, 0)
