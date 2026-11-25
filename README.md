@@ -346,7 +346,17 @@ mise exec -- go test ./...
 scripts/test-kit.sh
 ```
 
-`scripts/test-kit.sh [workflow ...]` builds both executables, initializes fresh Claude and Codex repositories under `.local/tmp/`, requires workflow validation without warnings, checks principle ownership, tests fresh installations, then copies source-only executed fixtures and tests them for both providers and runs `go test ./...`. Its isolated Archon home uses `$HOME/.archon/plugins`, overridable with `KIT_ARCHON_PLUGINS`. Every workflow has an executed main path: bash runs for real and AI is stubbed. PR publication is stubbed; sync exercises a real local rebase conflict. `cmd/devkit-fixture` supplies test-only setup and file writes and is absent from the shipped binary. The plumbing test rejects YAML/prompt calls to unregistered commands. Go tests cover the evaluation with fake CLIs. Fake gh and local bare remotes verify refine/retro PR creation and updates, approved title/summary use, change/decision/Issue/dependency and retro trace/case lists, Japanese/English fixed text, the 100-character title boundary and rejection of old proposals before external writes.
+While working on one part, run only that part, for example:
+
+```sh
+scripts/test-kit.sh --provider claude --go ./internal/refine/... refine   # one workflow, one provider, one package
+scripts/test-kit.sh --no-workflows --go ./internal/status                 # Go tests only
+scripts/test-kit.sh --no-go judge                                         # workflow fixtures only
+```
+
+Workflow names limit both the fresh-install and the executed fixtures; `--provider` (repeatable) limits validation and fixtures to that provider; `--go` (repeatable) limits Go tests to those packages; `--no-go` and `--no-workflows` skip a part. Run it without arguments before committing.
+
+`scripts/test-kit.sh` with no arguments builds both executables, initializes fresh Claude and Codex repositories under `.local/tmp/`, requires workflow validation without warnings, checks principle ownership, tests fresh installations, then copies source-only executed fixtures and tests them for both providers and runs `go test ./...`. Its isolated Archon home uses `$HOME/.archon/plugins`, overridable with `KIT_ARCHON_PLUGINS`. Every workflow has an executed main path: bash runs for real and AI is stubbed. PR publication is stubbed; sync exercises a real local rebase conflict. `cmd/devkit-fixture` supplies test-only setup and file writes and is absent from the shipped binary. The plumbing test rejects YAML/prompt calls to unregistered commands. Go tests cover the evaluation with fake CLIs. Fake gh and local bare remotes verify refine/retro PR creation and updates, approved title/summary use, change/decision/Issue/dependency and retro trace/case lists, Japanese/English fixed text, the 100-character title boundary and rejection of old proposals before external writes.
 
 See the [workflow guide](kit/.archon/workflows/dev/README.md) for artifacts and execution contracts, and [design rationale](docs/design.md) in Japanese. Update these explanations alongside their authoritative code, YAML, schemas and standards.
 

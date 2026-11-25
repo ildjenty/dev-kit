@@ -1,9 +1,30 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-# Usage: scripts/test-kit.sh [workflow ...]  (no names: every fixture)
+# Usage: scripts/test-kit.sh [--provider claude|codex]... [--go <package>]... [--no-go] [--no-workflows] [workflow ...]
+#   No arguments run everything. Workflow names limit the fixtures; --provider limits validation and
+#   fixtures to that provider; --go limits Go tests to those packages; --no-go and --no-workflows skip a part.
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
+providers=()
+packages=()
+workflows=()
+run_go=1
+run_workflows=1
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --provider) [ "$#" -ge 2 ] || { echo "--provider needs claude or codex" >&2; exit 2; }
+      case "$2" in claude|codex) providers+=("$2") ;; *) echo "unknown provider: $2" >&2; exit 2 ;; esac
+      shift 2 ;;
+    --go) [ "$#" -ge 2 ] || { echo "--go needs a package" >&2; exit 2; }; packages+=("$2"); shift 2 ;;
+    --no-go) run_go=0; shift ;;
+    --no-workflows) run_workflows=0; shift ;;
+    -*) echo "unknown option: $1" >&2; exit 2 ;;
+    *) workflows+=("$1"); shift ;;
+  esac
+done
+[ "${#providers[@]}" -gt 0 ] || providers=(claude codex)
+[ "${#packages[@]}" -gt 0 ] || packages=(./...)
 mkdir -p "$root/.local/tmp"
 temp="$(mktemp -d "$root/.local/tmp/test-kit.XXXXXX")"
 trap 'rm -rf "$temp"' EXIT
@@ -138,11 +159,22 @@ test_provider() {
     status=1
   fi
   printf '\nFresh devkit init workflow fixtures\n'
-  if archon workflow test; then
-    printf 'PASS: fresh devkit init archon workflow test\n'
+  if [ "$#" -eq 0 ]; then
+    if archon workflow test; then
+      printf 'PASS: fresh devkit init archon workflow test\n'
+    else
+      printf 'FAIL: fresh devkit init archon workflow test\n'
+      status=1
+    fi
   else
-    printf 'FAIL: fresh devkit init archon workflow test\n'
-    status=1
+    for name in "$@"; do
+      if archon workflow test "$name"; then
+        printf 'PASS: fresh devkit init archon workflow test %s\n' "$name"
+      else
+        printf 'FAIL: fresh devkit init archon workflow test %s\n' "$name"
+        status=1
+      fi
+    done
   fi
   for fixtures in "$root"/test/fixtures/*; do
     name="$(basename "$fixtures")"
@@ -170,16 +202,20 @@ test_provider() {
   fi
 }
 
-for provider in claude codex; do
-  if ! test_provider "$provider" "$@"; then
+if [ "$run_workflows" -eq 1 ]; then
+  for provider in "${providers[@]}"; do
+    if ! test_provider "$provider" ${workflows[@]+"${workflows[@]}"}; then
+      status=1
+    fi
+  done
+fi
+if [ "$run_go" -eq 1 ]; then
+  printf '\nGo tests\n'
+  if (cd "$root" && mise exec -- go test "${packages[@]}"); then
+    printf 'PASS: go test %s\n' "${packages[*]}"
+  else
+    printf 'FAIL: go test %s\n' "${packages[*]}"
     status=1
   fi
-done
-printf '\nGo tests\n'
-if (cd "$root" && mise exec -- go test ./...); then
-  printf 'PASS: go test ./...\n'
-else
-  printf 'FAIL: go test ./...\n'
-  status=1
 fi
 exit "$status"
