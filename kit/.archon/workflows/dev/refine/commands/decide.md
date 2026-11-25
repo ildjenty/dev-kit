@@ -11,6 +11,11 @@ Also read `harness.md`, `review/harness.md` and the rules for changing standards
 Write all owner-facing text in the language named by `language` in your input.
 
 Write `$ARTIFACTS_DIR/refine/draft.json` using the supplied strict schema:
+- `pr_title`: the short PR title (at most 100 characters, one line), in the language named by
+  `language` in your input. Write it for a reviewer of this PR, not as a proposal summary.
+- `pr_summary`: a few sentences in the language named by `language` in your input explaining
+  what merging this PR puts on the base and why. This is the opening of the PR body.
+  The machine uses both fields exactly as approved and appends them to the approval question.
 - `parent`: when the input has no topic Issue, write the new parent topic's `title` and `body`
   in the language named by `language` in your input. Both are required and reviewed for approval.
   When a topic Issue is selected, use empty strings for both. Every Issue title must be at most
@@ -44,7 +49,7 @@ owner and provisional choices, every binding path and its decision, and all unit
 Show the new parent as `new topic: <title>` with its body, or identify the selected topic Issue.
 Explain each blocked-by relationship. Never show an absent parent as `#0`.
 Include `approve=<next_proposal_version>` and explain `answers` for requesting changes.
-The approval run agrees decisions, pushes the branch, opens or updates a PR from this summary and
-approval text, then creates Issues with source PR metadata. The owner merges the PR; units wait for
-that merge. Do not run git, gh or Archon commands that change state.
+The approval run agrees decisions, pushes the branch, opens or updates a PR using `pr_title`,
+`pr_summary` and lists of approved facts, then creates Issues with source PR metadata.
+The owner merges the PR; units wait for that merge. Do not run git, gh or Archon commands that change state.
 Return only `{"draft":"<absolute path to draft.json>"}`.

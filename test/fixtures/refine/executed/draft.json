@@ -1,4 +1,6 @@
 {
+  "pr_title": "Record the fixture decision",
+  "pr_summary": "Record the agreed fixture location on the base. Follow-up work can use the agreed scope.",
   "parent": {"title": "Update fixture result", "body": "How should the fixture result be updated?"},
   "summary": "Update fixture result",
   "decisions": [

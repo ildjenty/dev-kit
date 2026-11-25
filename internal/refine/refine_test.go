@@ -16,7 +16,7 @@ import (
 )
 
 func draft() doc {
-	return doc{"parent": doc{"title": "Serve employees", "body": "Who can use the service? Employees only."}, "topics": []doc{}, "summary": "A service for employees", "decisions": []doc{{"key": "N1", "title": "Serve employees", "body": "Compare all users with employees only, the simplest scope. Choose employees as requested.", "decided_by": "owner", "depends_on": []string{}, "supersedes": []string{}, "source": "owner_words"}}, "units": []doc{{"key": "UN1", "title": "Deliver staff access", "goal": "Employees can sign in", "completion_conditions": []string{"An employee can sign in"}, "blocked_by": []string{}}}, "bindings": []doc{}}
+	return doc{"pr_title": "Record employee access", "pr_summary": "Record the employee access decision on the base. This preserves the agreed audience for follow-up delivery.", "parent": doc{"title": "Serve employees", "body": "Who can use the service? Employees only."}, "topics": []doc{}, "summary": "A service for employees", "decisions": []doc{{"key": "N1", "title": "Serve employees", "body": "Compare all users with employees only, the simplest scope. Choose employees as requested.", "decided_by": "owner", "depends_on": []string{}, "supersedes": []string{}, "source": "owner_words"}}, "units": []doc{{"key": "UN1", "title": "Deliver staff access", "goal": "Employees can sign in", "completion_conditions": []string{"An employee can sign in"}, "blocked_by": []string{}}}, "bindings": []doc{}}
 }
 func judgment() doc {
 	cs := []doc{}
@@ -290,6 +290,8 @@ func TestApprovalRetryCreatesOnlyMissingIssuesAfterPartialFailure(t *testing.T) 
 	testutil.Put(t, log, "fail", "3")
 	_, err := approve(r.ctx, "1")
 	testutil.Fails(t, err, "gh issue create failed")
+	testutil.Put(t, log, "pr-title", "Stale PR title")
+	testutil.Put(t, log, "pr-body", "Stale PR body")
 	head := r.git("rev-parse", "HEAD")
 	testutil.Equal(t, r.data().Decisions[0]["status"], "agreed")
 	progress := testutil.Must(issues.ReadCreation(creationPath(r.ctx, "1")))
@@ -311,6 +313,12 @@ func TestApprovalRetryCreatesOnlyMissingIssuesAfterPartialFailure(t *testing.T) 
 	testutil.Contains(t, readText(t, filepath.Join(log, "bodies")), "\nsource_pr: 80 -->")
 	testutil.Contains(t, readText(t, filepath.Join(log, "pr-bodies")), "#102 Deliver staff access")
 	testutil.Equal(t, r.latest("result")["pr_number"], float64(80))
+	testutil.Equal(t, readText(t, filepath.Join(log, "pr-title")), str(d["pr_title"]))
+	body := readText(t, filepath.Join(log, "pr-body"))
+	testutil.Equal(t, strings.HasPrefix(body, str(d["pr_summary"])+"\n\n"), true)
+	testutil.Equal(t, strings.Contains(body, "Stale PR body"), false)
+	testutil.Equal(t, strings.Contains(body, "approve="), false)
+	testutil.Equal(t, strings.Count(calls, "pr edit"), 2)
 }
 
 func TestApprovalPushFailureStopsBeforeIssuesAndCanResume(t *testing.T) {
@@ -327,8 +335,7 @@ func TestApprovalPushFailureStopsBeforeIssuesAndCanResume(t *testing.T) {
 	testutil.OK(t, os.Chmod(filepath.Join(remote, "hooks/pre-receive"), 0755))
 	_, err := approve(r.ctx, "1")
 	testutil.Fails(t, err, "git push")
-	_, err = os.Stat(filepath.Join(log, "calls"))
-	testutil.Equal(t, os.IsNotExist(err), true)
+	testutil.Equal(t, readText(t, filepath.Join(log, "calls")), "repo view --json url --jq .url\n")
 	testutil.Equal(t, r.data().Decisions[0]["status"], "agreed")
 	testutil.OK(t, os.Remove(filepath.Join(remote, "hooks/pre-receive")))
 	testutil.Equal(t, testutil.Must(approve(r.ctx, "1"))["pr_number"], 80)

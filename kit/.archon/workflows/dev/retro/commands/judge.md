@@ -18,6 +18,12 @@ evaluation case: it must reproduce the entering defect with minimal code and mea
 findings, not the fixing change. Genuine gaps in the request must be justified. These files are
 proposed edits, not criteria that override the fixed standards.
 
+Under `evidence`, check `pr_title` and `pr_summary` as text for this PR's reviewer in the language
+named by `language` in your input: the short title names the change and the few-sentence summary
+explains what merging puts on the base and why. Neither repurposes approval instructions, versions
+or internal history. The machine appends these exact fields to the approval question and uses them
+as approved, followed by lists of approved changes, escape traces, cases and Issues.
+
 Apply the named criteria documents and return the aspects `traceability`, `evidence` and `mechanism`.
 
 Return an object matching the supplied judgment schema and node output format: `criteria` contains

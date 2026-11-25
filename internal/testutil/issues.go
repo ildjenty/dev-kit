@@ -68,17 +68,28 @@ func IssueCreationCLI(t testing.TB) (string, string) {
 	script := `#!/bin/sh
 state='` + dir + `'
 printf '%s\n' "$*" >> "$state/calls"
+save_pr() {
+ next=''
+ for arg in "$@"; do
+  if test "$next" = title; then printf '%s' "$arg" > "$state/pr-title"; fi
+  next=''
+  if test "$arg" = --title; then next=title; fi
+ done
+ cat > "$state/pr-body"
+ cat "$state/pr-body" >> "$state/pr-bodies"
+}
 case "$1 $2" in
+ "repo view") printf 'https://github.example/team/repo' ;;
  "label create") printf '%s\n' "$3" >> "$state/labels" ;;
  "pr list") test ! -f "$state/pr" || cat "$state/pr" ;;
  "pr create")
   branch=$(git symbolic-ref HEAD)
   test "$(git rev-parse HEAD)" = "$(git ls-remote origin "$branch" | cut -f1)" || exit 98
-  cat >> "$state/pr-bodies"
+  save_pr "$@"
   printf 'https://github.example/team/repo/pull/80' > "$state/pr"
   test ! -f "$state/pr-lost" || exit 1
   cat "$state/pr" ;;
- "pr edit") cat >> "$state/pr-bodies" ;;
+ "pr edit") save_pr "$@" ;;
  "issue create")
   test -f "$state/labels" || exit 96
   body=$(cat)

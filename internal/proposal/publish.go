@@ -1,13 +1,13 @@
 package proposal
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
+	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/issues"
 	"github.com/ildjenty/dev-kit/internal/record"
@@ -37,7 +37,7 @@ func PublishProposal(ctx record.ContextData, env cli.Env, content map[string]any
 	if branch != ctx.Branch || branch == ctx.BaseBranch || clean != "" {
 		return progress, fmt.Errorf("proposal publication requires its clean branch head")
 	}
-	title, body, err := proposalText(content, progress)
+	title, body, err := publicationText(ctx, env, content, progress)
 	if err != nil {
 		return progress, err
 	}
@@ -73,51 +73,29 @@ func PublishProposal(ctx record.ContextData, env cli.Env, content map[string]any
 	return progress, issues.SaveCreation(path, progress)
 }
 
-func proposalText(content map[string]any, progress issues.Creation) (string, string, error) {
-	var proposal struct {
-		ApprovalText string `json:"approval_text"`
-		Topic        struct {
-			Title string `json:"title"`
-		} `json:"topic"`
-		Draft struct {
-			Summary string `json:"summary"`
-			issues.Drafts
-		} `json:"draft"`
-	}
-	data, err := json.Marshal(content)
+func publicationText(ctx record.ContextData, env cli.Env, content map[string]any, progress issues.Creation) (string, string, error) {
+	cfg, err := config.Load(ctx.Cwd)
 	if err != nil {
 		return "", "", err
 	}
-	if err = json.Unmarshal(data, &proposal); err != nil {
-		return "", "", err
+	repository := ""
+	if i := strings.LastIndex(progress.PRURL, "/pull/"); i >= 0 {
+		repository = progress.PRURL[:i]
 	}
-	title, _, _ := strings.Cut(strings.TrimSpace(proposal.Draft.Summary), "\n")
-	body := proposal.ApprovalText
-	if progress.Parent != nil {
-		parentTitle := proposal.Topic.Title
-		if proposal.Draft.Parent != nil && proposal.Draft.Parent.Title != "" {
-			parentTitle = proposal.Draft.Parent.Title
-		}
-		body += fmt.Sprintf("\n\n- #%d %s", progress.Parent.Number, parentTitle)
-	}
-	for _, unit := range proposal.Draft.Units {
-		if created, ok := progress.Created[unit.Key]; ok {
-			body += fmt.Sprintf("\n\n- #%d %s", created.Number, unit.Title)
+	if repository == "" {
+		repository, err = gitx.PublicationCommand(ctx.Cwd, env, "", "gh", "repo", "view", "--json", "url", "--jq", ".url")
+		if err != nil {
+			return "", "", err
 		}
 	}
-	for _, topic := range proposal.Draft.Topics {
-		if created, ok := progress.Created[topic.Key]; ok {
-			body += fmt.Sprintf("\n\n- #%d %s", created.Number, topic.Title)
-		}
-	}
-	return title, body, nil
+	return proposalText(content, progress, ctx.Branch, repository, cfg)
 }
 
 func UpdateProposal(ctx record.ContextData, env cli.Env, content map[string]any, progress issues.Creation) error {
 	if progress.PRNumber == 0 {
 		return nil
 	}
-	title, body, err := proposalText(content, progress)
+	title, body, err := publicationText(ctx, env, content, progress)
 	if err != nil {
 		return err
 	}

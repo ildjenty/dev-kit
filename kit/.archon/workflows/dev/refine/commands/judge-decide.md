@@ -2,7 +2,7 @@
 
 Judge the decision log, binding edits and Issue drafts independently. You did not write them; verify the owner's sources and the committed checkout yourself. The owner approves this version before Issues are created, so an invented choice, weakened rule or oversized work unit would misdirect delivery.
 
-Read `$ARTIFACTS_DIR/refine/input.json`, `draft.json`, `check.json` in the same folder and
+Read `$ARTIFACTS_DIR/refine/input.json`, `draft.json`, `approval.txt`, `check.json` in the same folder and
 all documents named by `judge_materials`. Read the existing decision records in full, especially
 those cited, depended on or superseded. Read `harness.md`, `review/harness.md` and the standards'
 rules for changing standards relative to the criteria folder given in the input.
@@ -16,6 +16,10 @@ Return exactly one criterion for each aspect:
 - `consistency`: decisions, bindings, supersession and Issue dependencies agree.
 - `sufficiency`: the decisions give background, candidates, choice and reason.
 - `wording`: the decision log and Issue drafts say precisely what the owner is being asked to approve.
+  Check `pr_title` and `pr_summary` as text for this PR's reviewer in the language named by
+  `language` in your input: the short title names this change; the summary explains what merging
+  puts on the base and why, without approval instructions, versions or internal history.
+  The machine appends these exact fields to the approval question and uses them as approved.
 - `bindings`: decisions that must bind agents are enforced by the edited mechanisms. Apply the
   standards' rules for changing standards and harness, including evidence and ongoing burden.
   A choice recorded only for people needs no binding edit. Delivery never consumes decision records.

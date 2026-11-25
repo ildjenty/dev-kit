@@ -10,6 +10,11 @@ Read the fixed documents named by `writer_materials`: criteria, common rules, au
 numbered principle references (path before `#`), including `harness.md` and `review/harness.md`.
 
 Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
+- `pr_title`: the short PR title (at most 100 characters, one line), in the language named by
+  `language` in your input. Write it for a reviewer of this PR, not as a proposal summary.
+- `pr_summary`: a few sentences in the language named by `language` in your input explaining
+  what merging this PR puts on the base and why. This is the opening of the PR body.
+  The machine uses both fields exactly as approved and appends them to the approval question.
 - `summary`: the proposed correction.
 - `units`: work for deferred or carried findings, or follow-up work traced to review entries, with stable draft `key`, `title`, `goal`,
   `completion_conditions`, `blocked_by` draft keys, and source `entries`. Each unit fits one PR and contains every constraint delivery needs.
@@ -52,9 +57,10 @@ Include the exact `approve=<next_proposal_version>` and explain `answers` for re
 After the machine checks pass, the machine commits the real config, standards and cases,
 together with consumed backlog deletions. Each proposal version names one commit; Issue drafts stay in its proposal record. Judgment and verification inspect that committed,
 clean checkout. The final approval question includes its version and commit, every unit Issue draft
-and its blocked-by order. Approval pushes the branch and opens or updates a PR from the summary and
-approval text before creating unit Issues with source PR metadata. It records the PR and each Issue
-creation for retry, then the result; the proposal commit must remain the clean branch head.
+and its blocked-by order. Approval pushes the branch and opens or updates a PR using `pr_title`,
+`pr_summary` and lists of approved facts before creating unit Issues with source PR metadata.
+It records the PR and each Issue creation for retry, then the result; the proposal commit must
+remain the clean branch head.
 The owner merges the PR; units wait for that merge. Do not run git, gh or Archon commands that change state.
 After checks and independent judgment pass, it evaluates new escape cases against a temporary copy
 of the proposed standards and concern map. Evaluation misses and provider failures are reported to

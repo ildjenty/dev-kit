@@ -1,4 +1,6 @@
 {
+  "pr_title": "Track the deferred repair",
+  "pr_summary": "Consume the reviewed backlog on the base. Track the deferred repair as follow-up work.",
   "summary": "Repair deferred defect",
   "units": [
     {

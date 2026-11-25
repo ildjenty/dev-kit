@@ -16,6 +16,8 @@
       },
       "required": ["title", "body"]
     },
+    "pr_title": {"type": "string", "pattern": "^[^\\r\\n]*\\S[^\\r\\n]*$", "minLength": 1, "maxLength": 100},
+    "pr_summary": {"type": "string", "pattern": "\\S", "minLength": 1},
     "summary": {
       "type": "string",
       "minLength": 1
@@ -193,6 +195,8 @@
     }
   },
   "required": [
+    "pr_title",
+    "pr_summary",
     "parent",
     "summary",
     "decisions",

@@ -11,6 +11,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/issues"
+	"github.com/ildjenty/dev-kit/internal/proposal"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
@@ -135,6 +136,9 @@ func approvalErrors(ctx record.ContextData, version string) ([]string, error) {
 	qs := items(r["questions"])
 	if obj(p["content"])["ready"] != true || r["workflow"] != "retro" || r["run_id"] != p["run_id"] || r["outcome"] != "question" || len(qs) != 1 || obj(qs[0]["target"])["kind"] != "proposal" || obj(qs[0]["target"])["ref"] != version {
 		return []string{"the latest proposal result did not ask for approval"}, nil
+	}
+	if problems := proposal.PRTextErrors(obj(p["content"])["draft"]); len(problems) > 0 {
+		return problems, nil
 	}
 	head, e := gitx.Run(ctx.Cwd, "rev-parse", "HEAD")
 	if e != nil {

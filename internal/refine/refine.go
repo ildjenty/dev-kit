@@ -475,6 +475,9 @@ func approvalErrors(ctx record.ContextData, version string) ([]string, error) {
 	if content["ready"] != true || r["workflow"] != "refine" || r["run_id"] != p["run_id"] || r["outcome"] != "question" || len(qs) != 1 || obj(qs[0]["target"])["kind"] != "proposal" || obj(qs[0]["target"])["ref"] != version {
 		return []string{"the latest proposal result did not ask for approval"}, nil
 	}
+	if problems := proposal.PRTextErrors(content["draft"]); len(problems) > 0 {
+		return problems, nil
+	}
 	drafts, err := issues.ReadDrafts(content["draft"])
 	if err != nil {
 		return nil, err
@@ -560,6 +563,7 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		errors = append(errors, "writer edited decision records directly")
 	}
 	draft := obj(value)
+	errors = append(errors, proposal.PRTextErrors(value)...)
 	ds, err := issues.ReadDrafts(draft)
 	if err != nil {
 		return nil, err
@@ -1029,7 +1033,7 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 		}
 		result = doc{"outcome": "stop", "stop": doc{"state": "The refine draft did not clear review", "unresolved": problems, "premise": ""}}
 	} else {
-		text := str(entry["approval_text"])
+		text := str(entry["approval_text"]) + proposal.ApprovalPRText(obj(entry["draft"]), str(input["language"]))
 		text += fmt.Sprintf("\n\nProposal version: %d\nCommit: %s", num(p["version"]), str(content["commit"]))
 		topic := obj(content["topic"])
 		if num(topic["number"]) > 0 {

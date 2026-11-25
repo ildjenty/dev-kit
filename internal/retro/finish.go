@@ -109,7 +109,7 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	if content != nil {
 		content["ready"] = false
 	}
-	approvalText := str(entry["approval_text"])
+	approvalText := str(entry["approval_text"]) + proposal.ApprovalPRText(obj(entry["draft"]), str(input["language"]))
 	if entry["cleared"] == true && len(errors) == 0 && len(items(obj(entry["draft"])["cases"])) > 0 {
 		verification, e := readJSON(file(artifacts, "verification.json"))
 		if e != nil || verification["review"] != reviewHash(entry) {

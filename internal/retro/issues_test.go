@@ -35,6 +35,8 @@ func TestUnitDraftsWaitForApprovalAndRetryOnlyMissingIssues(t *testing.T) {
 	testutil.Put(t, log, "fail", "2")
 	_, err = approve(r.ctx, "1")
 	testutil.Fails(t, err, "gh issue create failed")
+	testutil.Put(t, log, "pr-title", "Stale PR title")
+	testutil.Put(t, log, "pr-body", "Stale PR body")
 	path := filepath.Join(r.ctx.Dir, "issue-creation", "1.json")
 	progress := testutil.Must(issues.ReadCreation(path))
 	testutil.Equal(t, progress.RunID, "r2")
@@ -55,6 +57,14 @@ func TestUnitDraftsWaitForApprovalAndRetryOnlyMissingIssues(t *testing.T) {
 	testutil.Contains(t, readFile(t, filepath.Join(log, "bodies")), "Source: #80")
 	testutil.Contains(t, readFile(t, filepath.Join(log, "bodies")), "\nsource_pr: 80 -->")
 	testutil.Contains(t, readFile(t, filepath.Join(log, "pr-bodies")), "#101 Repair defect")
+	testutil.Equal(t, readFile(t, filepath.Join(log, "pr-title")), str(d["pr_title"]))
+	body := readFile(t, filepath.Join(log, "pr-body"))
+	testutil.Equal(t, strings.HasPrefix(body, str(d["pr_summary"])+"\n\n"), true)
+	testutil.Contains(t, body, "## Issues created")
+	testutil.Contains(t, body, "[#101 Repair defect](https://github.example/team/repo/issues/101)")
+	testutil.Contains(t, body, "[#102 Second repair](https://github.example/team/repo/issues/102) — blocked by: [#101](https://github.example/team/repo/issues/101)")
+	testutil.Equal(t, strings.Contains(body, "approve="), false)
+	testutil.Equal(t, strings.Contains(body, "Proposal version"), false)
 }
 
 func TestApprovalPushFailureStopsBeforeCreatingIssues(t *testing.T) {
@@ -71,8 +81,7 @@ func TestApprovalPushFailureStopsBeforeCreatingIssues(t *testing.T) {
 	testutil.OK(t, os.Chmod(filepath.Join(remote, "hooks/pre-receive"), 0755))
 	_, err := approve(r.ctx, "1")
 	testutil.Fails(t, err, "git push")
-	_, err = os.Stat(filepath.Join(log, "calls"))
-	testutil.Equal(t, os.IsNotExist(err), true)
+	testutil.Equal(t, readFile(t, filepath.Join(log, "calls")), "repo view --json url --jq .url\n")
 }
 
 func readFile(t *testing.T, path string) string {

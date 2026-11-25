@@ -13,6 +13,7 @@ import (
 	"github.com/ildjenty/dev-kit/internal/config"
 	"github.com/ildjenty/dev-kit/internal/gitx"
 	"github.com/ildjenty/dev-kit/internal/issues"
+	"github.com/ildjenty/dev-kit/internal/proposal"
 	"github.com/ildjenty/dev-kit/internal/record"
 )
 
@@ -85,6 +86,7 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 		errors = append(errors, "writer changed HEAD; only retro check may commit")
 	}
 	draft := obj(value)
+	errors = append(errors, proposal.PRTextErrors(value)...)
 	ds, e := issues.ReadDrafts(draft)
 	if e != nil {
 		return nil, e
