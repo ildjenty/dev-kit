@@ -64,7 +64,14 @@ func (g *Git) Publish(env cli.Env, p Publication, beforePush func() (string, err
 	if fields := strings.Fields(remoteOutput); len(fields) > 0 {
 		remote = fields[0]
 	}
-	kind := PushKind(remote, head, g.IsAncestor, p.Recorded)
+	ancestor := false
+	if remote != "" && remote != head {
+		ancestor, err = g.IsAncestor(remote, head)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	kind := PushKind(remote, head, func(string, string) bool { return ancestor }, p.Recorded)
 	if kind == "" {
 		return "", "", fmt.Errorf("origin/%s is at %s, which HEAD does not contain and this request did not record", p.Branch, remote)
 	}

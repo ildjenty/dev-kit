@@ -23,7 +23,7 @@ const usage = "devkit status [--json] [branch]"
 const archonTimeout = 20 * time.Second
 
 func Commands() []cli.Command {
-	return []cli.Command{{Area: "status", Usage: usage, Run: run}}
+	return []cli.Command{{Area: "status", Usage: usage, Run: run}, {Area: "watch", Usage: "devkit watch <run-id> [<run-id> ...]", Run: watch}}
 }
 
 type Branch struct {
@@ -108,7 +108,16 @@ func run(args []string, env cli.Env) error {
 	}
 
 	if asJSON {
-		return env.JSON(map[string]any{"state_dir": state, "branches": branches})
+		value := map[string]any{"state_dir": state, "branches": branches}
+		if why != "" {
+			value["note"] = why
+		}
+		return env.JSON(value)
+	}
+	if why != "" {
+		if _, err := fmt.Fprintln(env.Stdout, why); err != nil {
+			return err
+		}
 	}
 	return show(env, state, branch, branches)
 }
@@ -132,6 +141,10 @@ func StateDir(env cli.Env, root string) (string, string) {
 	if dir := env.Getenv("STATE_DIR"); dir != "" {
 		return dir, ""
 	}
+	want, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Sprintf("Could not resolve repository path %s: %v", root, err)
+	}
 	home := env.Getenv("ARCHON_HOME")
 	if home == "" {
 		home = filepath.Join(env.Getenv("HOME"), ".archon")
@@ -151,23 +164,31 @@ func StateDir(env cli.Env, root string) (string, string) {
 			DefaultCwd string `json:"default_cwd"`
 		} `json:"projects"`
 	}
-	if json.Unmarshal(out, &listed) != nil {
-		return "", "Could not read `archon project list --json`; set STATE_DIR to the project's state folder."
+	if err := json.Unmarshal(out, &listed); err != nil {
+		return "", fmt.Sprintf("Could not read `archon project list --json`: %v; set STATE_DIR to the project's state folder.", err)
 	}
-	want := canonical(root)
-	for _, p := range listed.Projects {
-		if p.Key != "" && canonical(p.DefaultCwd) == want {
-			return filepath.Join(home, "workspaces", filepath.FromSlash(p.Key), "state"), ""
+	if listed.Projects == nil {
+		return "", "Could not read `archon project list --json`: projects must be an array; set STATE_DIR to the project's state folder."
+	}
+	notes := []string{}
+	for i, p := range listed.Projects {
+		if strings.TrimSpace(p.Key) == "" || strings.TrimSpace(p.DefaultCwd) == "" {
+			return "", fmt.Sprintf("Could not read `archon project list --json`: projects[%d] requires non-empty key and default_cwd", i)
+		}
+		path, err := filepath.EvalSymlinks(p.DefaultCwd)
+		if os.IsNotExist(err) {
+			notes = append(notes, fmt.Sprintf("Skipped Archon project %s: %v", p.DefaultCwd, err))
+			continue
+		}
+		if err != nil {
+			return "", fmt.Sprintf("Could not resolve Archon project path %s: %v", p.DefaultCwd, err)
+		}
+		if filepath.Clean(path) == filepath.Clean(want) {
+			return filepath.Join(home, "workspaces", filepath.FromSlash(p.Key), "state"), strings.Join(notes, "\n")
 		}
 	}
-	return "", "No workflow has run in this repository yet (Archon has no project for " + root + ")."
-}
-
-func canonical(path string) string {
-	if resolved, err := filepath.EvalSymlinks(path); err == nil {
-		return filepath.Clean(resolved)
-	}
-	return filepath.Clean(path)
+	notes = append(notes, "No workflow has run in this repository yet (Archon has no project for "+root+").")
+	return "", strings.Join(notes, "\n")
 }
 
 func Read(records, only string, limit int) ([]Branch, error) {
@@ -185,7 +206,7 @@ func Read(records, only string, limit int) ([]Branch, error) {
 		}
 		name, err := url.PathUnescape(entry.Name())
 		if err != nil {
-			name = entry.Name()
+			return nil, fmt.Errorf("%s: invalid encoded branch name: %w", filepath.Join(records, entry.Name()), err)
 		}
 		if only != "" && name != only {
 			continue
@@ -350,39 +371,63 @@ func show(env cli.Env, state, only string, branches []Branch) error {
 	}
 	for i, b := range branches {
 		if i > 0 {
-			fmt.Fprintln(w)
+			if _, err := fmt.Fprintln(w); err != nil {
+				return err
+			}
 		}
-		fmt.Fprintf(w, "%s: %s %s (%s)\n", b.Branch, b.Workflow, b.Outcome, b.At)
+		if _, err := fmt.Fprintf(w, "%s: %s %s (%s)\n", b.Branch, b.Workflow, b.Outcome, b.At); err != nil {
+			return err
+		}
 		if b.Issue != 0 {
-			fmt.Fprintf(w, "  issue: #%d %s\n", b.Issue, b.IssueURL)
+			if _, err := fmt.Fprintf(w, "  issue: #%d %s\n", b.Issue, b.IssueURL); err != nil {
+				return err
+			}
 		}
 		for _, err := range b.Errors {
-			fmt.Fprintf(w, "  unreadable: %s\n", err)
+			if _, err := fmt.Fprintf(w, "  unreadable: %s\n", err); err != nil {
+				return err
+			}
 		}
 		if pr := b.PullRequest; pr != nil {
-			fmt.Fprintf(w, "  pull request: %s %s\n", pr.State, pr.URL)
+			if _, err := fmt.Fprintf(w, "  pull request: %s %s\n", pr.State, pr.URL); err != nil {
+				return err
+			}
 			if pr.ReviewDecision != "" {
-				fmt.Fprintf(w, "  review decision: %s\n", pr.ReviewDecision)
+				if _, err := fmt.Fprintf(w, "  review decision: %s\n", pr.ReviewDecision); err != nil {
+					return err
+				}
 			}
 			for _, check := range pr.FailingChecks {
-				fmt.Fprintf(w, "  failing check: %s\n", check)
+				if _, err := fmt.Fprintf(w, "  failing check: %s\n", check); err != nil {
+					return err
+				}
 			}
 		}
 		if b.PullRequestError != "" {
-			fmt.Fprintf(w, "  pull request: %s\n", b.PullRequestError)
+			if _, err := fmt.Fprintf(w, "  pull request: %s\n", b.PullRequestError); err != nil {
+				return err
+			}
 		}
 		for _, q := range b.Questions {
-			fmt.Fprintf(w, "  %s: %s\n", q.ID, indent(q.Text))
+			if _, err := fmt.Fprintf(w, "  %s: %s\n", q.ID, indent(q.Text)); err != nil {
+				return err
+			}
 		}
 		if s := asMap(b.Stop); s != nil {
 			for _, u := range listOf(s["unresolved"]) {
-				fmt.Fprintf(w, "  - %s\n", u)
+				if _, err := fmt.Fprintf(w, "  - %s\n", u); err != nil {
+					return err
+				}
 			}
 		}
 		if bk := asMap(b.Back); bk != nil {
-			fmt.Fprintf(w, "  premise: %s\n  observation: %s\n", text(bk["premise"]), text(bk["observation"]))
+			if _, err := fmt.Fprintf(w, "  premise: %s\n  observation: %s\n", text(bk["premise"]), text(bk["observation"])); err != nil {
+				return err
+			}
 		}
-		fmt.Fprintf(w, "  next: %s\n", b.Next)
+		if _, err := fmt.Fprintf(w, "  next: %s\n", b.Next); err != nil {
+			return err
+		}
 	}
 	_, err := fmt.Fprintf(w, "\nRecords: %s\n", filepath.Join(state, "records"))
 	return err

@@ -480,9 +480,7 @@ func commitPrefixes(text string) ([]string, error) {
 	return prefixes, nil
 }
 
-func firstSentence(text string) string { return strings.TrimSpace(strings.SplitN(text, "\n", 2)[0]) }
-
-func commitSubject(written any, u unit, requirements, plan record.Document, prefixes []string) string {
+func commitSubject(written any, u unit, prefixes []string) (string, error) {
 	line := strings.TrimSpace(text(written))
 	match := regexp.MustCompile(`(?i)^([a-z][a-z0-9_-]*): `).FindStringSubmatch(line)
 	if match != nil {
@@ -495,20 +493,20 @@ func commitSubject(written any, u unit, requirements, plan record.Document, pref
 			}
 		}
 		if slices.Contains(prefixes, match[1]) && !strings.Contains(line, "\n") && strings.TrimSpace(body) != "" && !namesID {
-			return line
+			return line, nil
 		}
 	}
-	goal := firstSentence(text(requirements["goal"]))
-	if plan != nil {
-		goal += "; " + firstSentence(u.Summary)
-	}
-	return prefixes[0] + ": " + goal
+	return "", fmt.Errorf("CODE.commit_message: expected one non-empty line with a prefix from fixed git.md (%s) and no unit or criterion IDs; rewrite commit_message", strings.Join(prefixes, ", "))
 }
 
 func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *codeOutput, back *stepBack) (record.Document, error) {
 	dir := filepath.Join(artifacts, "implement")
 	file := filepath.Join(dir, "state.json")
 	s, err := readJSON[state](file)
+	if err != nil {
+		return nil, err
+	}
+	c, err := config.Load(ctx.Cwd)
 	if err != nil {
 		return nil, err
 	}
@@ -567,11 +565,7 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 	}
 	committed := false
 	if gate != nil && gate.Passed && len(errors) == 0 && len(s.OwnerDecisions) == 0 && s.StepBack == nil {
-		if _, err := gitx.Run(ctx.Cwd, "add", "-A"); err != nil {
-			return nil, err
-		}
-		requirements, err := readJSON[record.Document](filepath.Join(dir, "requirements.json"))
-		if err != nil {
+		if _, err := readJSON[record.Document](filepath.Join(dir, "requirements.json")); err != nil {
 			return nil, err
 		}
 		input, err := readJSON[record.Document](filepath.Join(dir, "input.json"))
@@ -585,7 +579,13 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 		if u == nil {
 			return nil, fmt.Errorf("Cannot read properties of undefined (reading 'id')")
 		}
-		subject := commitSubject(message, *u, requirements, plan, stringsOf(input["commit_prefixes"]))
+		subject, err := commitSubject(message, *u, stringsOf(input["commit_prefixes"]))
+		if err != nil {
+			return nil, err
+		}
+		if _, err := gitx.Run(ctx.Cwd, "add", "-A"); err != nil {
+			return nil, err
+		}
 		message = fmt.Sprintf("%s\n\nArchon-Run: %s\nArchon-Unit: %s\nArchon-Inputs: %s\n", subject, ctx.RunID, u.ID, s.Key)
 		if _, err := gitx.Run(ctx.Cwd, "commit", "--allow-empty", "-q", "-m", text(message)); err != nil {
 			return nil, err
@@ -601,11 +601,7 @@ func end(ctx record.ContextData, artifacts string, gate *checks.Gate, code *code
 		s.LastFailing = gate.Failing
 	}
 	if !committed && u != nil && s.Stuck == nil && len(s.OwnerDecisions) == 0 && s.StepBack == nil {
-		passes := 3
-		if c, err := config.Load(ctx.Cwd); err == nil && c.Limits.Passes > 0 {
-			passes = c.Limits.Passes
-		}
-		if u.Passes >= passes {
+		if u.Passes >= c.Limits.Passes {
 			s.Exhausted = u.ID
 		}
 	}

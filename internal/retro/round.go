@@ -72,6 +72,12 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 		return nil, e
 	}
 	entry := doc{"approval_text": string(approval), "commit": obj(proposal["content"])["commit"], "proposal_version": proposal["version"], "round": n, "draft": d, "judgment": judgment, "errors": errors, "cleared": len(errors) == 0 && blocking == 0 && missing == 0}
+	if len(committed) > 0 {
+		entry["proposal_version"], entry["commit"] = nil, nil
+	}
+	if _, e := record.ProposalRoundTarget(entry, file(artifacts, fmt.Sprintf("rounds/%d.json", n))); e != nil {
+		return nil, e
+	}
 	if e = writeJSON(file(artifacts, fmt.Sprintf("rounds/%d.json", n)), entry); e != nil {
 		return nil, e
 	}

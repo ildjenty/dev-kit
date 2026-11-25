@@ -11,7 +11,7 @@ import (
 
 func TestRepositoryQueriesAndRefs(t *testing.T) {
 	repo := testutil.Repo(t)
-	g := testutil.Must(New(repo, ""))
+	g := testutil.Must(New(repo, "main"))
 	testutil.Equal(t, g.Refs, []string{"main"})
 	head := testutil.Must(g.Head())
 	testutil.Equal(t, head, testutil.Git(t, repo, "rev-parse", "HEAD"))
@@ -19,7 +19,7 @@ func TestRepositoryQueriesAndRefs(t *testing.T) {
 	base := testutil.Git(t, repo, "rev-parse", "main")
 	testutil.Equal(t, testutil.Must(g.MergeBase("")), base)
 	testutil.Equal(t, testutil.Must(g.MergeBases("HEAD")), []string{base})
-	testutil.Equal(t, g.IsAncestor(base, head), true)
+	testutil.Equal(t, testutil.Must(g.IsAncestor(base, head)), true)
 	testutil.Equal(t, testutil.Must(g.Clean()), true)
 	testutil.Equal(t, len(*testutil.Must(g.ChangeID("HEAD"))), 64)
 	testutil.Put(t, repo, "untracked.txt", "untracked\n")

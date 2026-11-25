@@ -24,6 +24,9 @@ type fixture struct {
 func envVars(vars map[string]string) cli.Env {
 	return cli.Env{LookupEnv: func(k string) (string, bool) {
 		v, ok := vars[k]
+		if !ok && k == "BASE_BRANCH" {
+			return "main", true
+		}
 		if !ok && k == "DEVKIT_GH" {
 			return os.LookupEnv(k)
 		}
@@ -337,6 +340,10 @@ func TestFinishRechecksEditsAndMissingDraftStops(t *testing.T) {
 	r.begin()
 	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts))["valid"], false)
 	testutil.OK(t, put(file(r.artifacts, "draft.json"), "{broken"))
+	_, err := r.review(judgment())
+	testutil.Fails(t, err, file(r.artifacts, "draft.json"))
+	testutil.Fails(t, err, "invalid character")
+	testutil.OK(t, os.Remove(file(r.artifacts, "draft.json")))
 	testutil.Must(r.review(judgment()))
 	testutil.Equal(t, testutil.Must(finish(r.ctx, r.artifacts))["outcome"], "stop")
 	r = setup(t, backlog())
@@ -539,13 +546,19 @@ func TestStopPreservesCheckoutWithoutRestoringFiles(t *testing.T) {
 }
 func TestRestartLimitRequiresRecordedContinuation(t *testing.T) {
 	r := setup(t, backlog())
-	r.json(".devkit/config.json", doc{"language": "en", "limits": doc{"restarts": 0}})
+	r.json(".devkit/config.json", doc{"language": "en", "limits": doc{"restarts": 1}})
 	r.commit()
 	r.begin()
 	testutil.Must(r.review(judgment()))
 	testutil.Equal(t, testutil.Must(finish(r.ctx, r.artifacts))["outcome"], "stop")
 	r.ctx.RunID = "r2"
 	s, e := start(r.ctx, envVars(nil))
+	testutil.OK(t, e)
+	testutil.Equal(t, s.Stopped, false)
+	testutil.Must(r.review(judgment()))
+	testutil.Equal(t, testutil.Must(finish(r.ctx, r.artifacts))["outcome"], "stop")
+	r.ctx.RunID = "r3"
+	s, e = start(r.ctx, envVars(nil))
 	testutil.OK(t, e)
 	testutil.Equal(t, s.Stopped, true)
 	s, e = start(r.ctx, envVars(map[string]string{"INPUTS_CONTINUE": "Proceed with another attempt"}))

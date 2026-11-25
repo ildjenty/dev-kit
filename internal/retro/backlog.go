@@ -12,7 +12,7 @@ import (
 )
 
 func readBacklog(cwd string) ([]doc, doc, error) {
-	paths, e := filepath.Glob(filepath.Join(cwd, ".devkit/backlog/*.json"))
+	paths, e := backlogPaths(filepath.Join(cwd, ".devkit/backlog"))
 	if e != nil {
 		return nil, nil, e
 	}
@@ -63,7 +63,7 @@ func readBacklog(cwd string) ([]doc, doc, error) {
 			}
 		}
 	}
-	paths, e = filepath.Glob(filepath.Join(cwd, ".devkit/backlog/escapes/*.json"))
+	paths, e = backlogPaths(filepath.Join(cwd, ".devkit/backlog/escapes"))
 	if e != nil {
 		return nil, nil, e
 	}
@@ -94,4 +94,21 @@ func readBacklog(cwd string) ([]doc, doc, error) {
 		entries = append(entries, doc{"id": rel + "#escape/0", "path": rel, "kind": "escape", "content": value})
 	}
 	return entries, files, nil
+}
+
+func backlogPaths(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return []string{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	paths := []string{}
+	for _, entry := range entries {
+		if strings.HasSuffix(entry.Name(), ".json") {
+			paths = append(paths, filepath.Join(dir, entry.Name()))
+		}
+	}
+	return paths, nil
 }

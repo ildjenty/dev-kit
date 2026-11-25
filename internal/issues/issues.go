@@ -150,6 +150,27 @@ func apiArgs(path string) []string {
 	return []string{"api", path, "--header", "Accept: application/vnd.github+json", "--header", "X-GitHub-Api-Version: 2026-03-10"}
 }
 
+func parseList(data []byte, into any, paged bool) error {
+	var entries []json.RawMessage
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return err
+	}
+	if entries == nil {
+		return fmt.Errorf("expected an array, got null")
+	}
+	for i, entry := range entries {
+		if paged {
+			var page []json.RawMessage
+			if err := parseList(entry, &page, false); err != nil {
+				return fmt.Errorf("page %d: %w", i+1, err)
+			}
+		} else if bytes.Equal(bytes.TrimSpace(entry), []byte("null")) {
+			return fmt.Errorf("item %d: expected an object, got null", i+1)
+		}
+	}
+	return json.Unmarshal(data, into)
+}
+
 func (c Client) references(path string) ([]Reference, error) {
 	data, err := c.run(nil, append(apiArgs(path+"?per_page=100"), "--paginate", "--slurp")...)
 	if err != nil {
@@ -159,7 +180,7 @@ func (c Client) references(path string) ([]Reference, error) {
 		Reference
 		HTMLURL string `json:"html_url"`
 	}
-	if err := json.Unmarshal(data, &pages); err != nil {
+	if err := parseList(data, &pages, true); err != nil {
 		return nil, fmt.Errorf("parse gh api %s: %w", path, err)
 	}
 	result := []Reference{}
@@ -284,7 +305,7 @@ func (c Client) ListOpen(label string) ([]Issue, error) {
 		return nil, err
 	}
 	var raw []issueJSON
-	if err := json.Unmarshal(data, &raw); err != nil {
+	if err := parseList(data, &raw, false); err != nil {
 		return nil, fmt.Errorf("parse gh issue list: %w", err)
 	}
 	result := []Issue{}

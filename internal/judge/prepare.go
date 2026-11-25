@@ -156,7 +156,7 @@ func prepare(ctx record.ContextData, artifacts, shownArtifacts string) (doc, err
 	if err != nil {
 		return nil, err
 	}
-	target := doc{"base_branch": ctx.BaseBranch, "base": base, "commit": commit, "tree": tree, "change_id": id, "criteria_commit": request["criteria_commit"], "requirements_version": requirements["version"], "plan_version": plan["version"], "language": c.Language, "standards": standards}
+	target := doc{"base_branch": ctx.BaseBranch, "base_branch_source": ctx.BaseBranchSource, "base": base, "commit": commit, "tree": tree, "change_id": id, "criteria_commit": request["criteria_commit"], "requirements_version": requirements["version"], "plan_version": plan["version"], "language": c.Language, "standards": standards}
 	if err = save(filepath.Join(out, "target.json"), target); err != nil {
 		return nil, err
 	}

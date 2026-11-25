@@ -15,12 +15,26 @@ import (
 
 func write(t *testing.T, dir, kind string, n int, value any) {
 	t.Helper()
+	if kind == "request" {
+		d := value.(map[string]any)
+		for k, v := range map[string]any{"owner_words": "Request", "supplement": "", "criteria_commit": strings.Repeat("a", 40), "run_id": "r1", "recorded_at": "t"} {
+			if _, ok := d[k]; !ok {
+				d[k] = v
+			}
+		}
+	}
 	data, err := json.Marshal(value)
 	testutil.OK(t, err)
 	testutil.Put(t, dir, filepath.Join(kind, itoa(n)+".json"), string(data))
 }
 
 func itoa(n int) string { return strconv.Itoa(n) }
+
+func writeAnswer(t *testing.T, dir, id string) {
+	t.Helper()
+	d := map[string]any{"question_id": id, "answer": "yes", "run_id": "r2", "workflow": "requirements", "answered_at": "t", "question": "Question", "target": map[string]any{"kind": "open_point", "ref": "O1"}, "versions": map[string]any{"requirements_version": nil, "plan_version": nil}, "commit": strings.Repeat("a", 40)}
+	testutil.Put(t, dir, "answers/"+id+".json", string(testutil.Must(json.Marshal(d))))
+}
 
 func branch(t *testing.T, records, name string) string {
 	dir := filepath.Join(records, strings.ReplaceAll(name, "/", "%2F"))
@@ -33,6 +47,24 @@ func run1(t *testing.T, dir, workflow string, n int, result map[string]any) {
 	write(t, dir, "runs", n, map[string]any{"run_id": id, "workflow": workflow, "started_at": "2026-11-24T00:0" + itoa(n) + ":00Z", "start": "first", "counted": false, "answers": []string{}})
 	if result != nil {
 		result["run_id"], result["workflow"], result["recorded_at"] = id, workflow, "2026-11-24T00:0"+itoa(n)+":30Z"
+		for k, v := range map[string]any{"inputs": map[string]any{"requirements_version": nil, "plan_version": nil}, "base": strings.Repeat("a", 40), "commit": strings.Repeat("b", 40), "criteria_commit": strings.Repeat("a", 40), "loops": []any{}} {
+			if _, ok := result[k]; !ok {
+				result[k] = v
+			}
+		}
+		if result["outcome"] == "stop" && result["stop"] == nil {
+			result["stop"] = map[string]any{"state": "Stopped", "unresolved": []string{}, "premise": ""}
+		}
+		if stop, ok := result["stop"].(map[string]any); ok {
+			if _, ok := stop["premise"]; !ok {
+				stop["premise"] = ""
+			}
+		}
+		if qs, ok := result["questions"].([]any); ok {
+			for _, raw := range qs {
+				raw.(map[string]any)["invalidates"] = []int{}
+			}
+		}
 		write(t, dir, "results", n, result)
 	}
 }
@@ -44,7 +76,7 @@ func TestReadsEveryBranchAndNamesTheNextStep(t *testing.T) {
 		map[string]any{"id": "Q1", "text": "Which shops?", "target": map[string]any{"kind": "open_point", "ref": "O1"}, "next_workflows": []any{"requirements"}},
 		map[string]any{"id": "Q2", "text": "Already answered", "target": map[string]any{"kind": "open_point", "ref": "O2"}, "next_workflows": []any{"requirements"}},
 	}})
-	testutil.Put(t, q, "answers/Q2.json", `{"question_id":"Q2","answer":"yes"}`)
+	writeAnswer(t, q, "Q2")
 	approval := branch(t, records, "refine/attendance")
 	run1(t, approval, "refine", 1, map[string]any{"outcome": "question", "questions": []any{map[string]any{"id": "Q1", "text": "Approve version 2?", "target": map[string]any{"kind": "proposal", "ref": "2"}, "next_workflows": []any{"refine"}}}})
 	back := branch(t, records, "feature/back")
@@ -82,7 +114,7 @@ func TestReadsEveryBranchAndNamesTheNextStep(t *testing.T) {
 func TestStateDirFromArchonProjectsAndOverrides(t *testing.T) {
 	repo := testutil.Repo(t)
 	bin, home := t.TempDir(), t.TempDir()
-	listing := `{"projects":[{"key":"other/repo","default_cwd":"/elsewhere"},{"key":"owner/name","default_cwd":"` + repo + `"}]}`
+	listing := `{"projects":[{"key":"other/repo","default_cwd":"` + t.TempDir() + `"},{"key":"owner/name","default_cwd":"` + repo + `"}]}`
 	testutil.Put(t, bin, "archon", "#!/bin/sh\nprintf '%s' '"+listing+"'\n")
 	testutil.OK(t, os.Chmod(filepath.Join(bin, "archon"), 0755))
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))

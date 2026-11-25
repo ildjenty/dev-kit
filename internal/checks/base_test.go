@@ -57,7 +57,7 @@ func TestBaseComparisonRunsOnlyFailuresAtDetachedMergeBase(t *testing.T) {
 	testutil.Git(t, repo, "checkout", "-q", "feature/x")
 	testutil.Put(t, repo, ".archon/config.yaml", "worktree:\n  postCreate:\n    - test -z \"$(git branch --show-current)\" && test \"$(cat value)\" = base && touch prepared\n  postCreateTimeout: 1000\n")
 	before := testutil.Git(t, repo, "worktree", "list", "--porcelain")
-	options := Options{Cwd: repo, ArtifactsDir: t.TempDir()}
+	options := Options{Cwd: repo, ArtifactsDir: t.TempDir(), BaseBranch: "main"}
 	gate := testutil.Must(RunChecks(options))
 	testutil.Equal(t, gate.Preexisting, []string{"existing"})
 	testutil.Equal(t, gate.Regressed, []string{"regression"})
@@ -85,7 +85,7 @@ func TestBaseOnRepeatComparesOnlyChecksThatFailedInThePreviousRound(t *testing.T
 	checks := []config.Check{{Name: "existing", Command: "exit 1", TimeoutSeconds: 2}}
 	repo := baseRepository(t, checks)
 	testutil.Put(t, repo, ".archon/config.yaml", "worktree:\n  postCreate:\n    - printf x >> '"+marker+"'\n")
-	options := Options{Cwd: repo, ArtifactsDir: t.TempDir(), BaseOnRepeat: true}
+	options := Options{Cwd: repo, ArtifactsDir: t.TempDir(), BaseBranch: "main", BaseOnRepeat: true}
 	first := testutil.Must(RunChecks(options))
 	testutil.Equal(t, readResults(t, first.Results)[0].Base, "not_compared")
 	testutil.Equal(t, first.OnlyPreexisting(), false)
@@ -104,7 +104,7 @@ func TestBasePreparationFailureAndTimeoutAreUnavailableAndCleaned(t *testing.T) 
 			path := filepath.Join(t.TempDir(), "worktree-path")
 			testutil.Put(t, repo, ".archon/config.yaml", fmt.Sprintf("worktree:\n  postCreate:\n    - pwd > '%s'\n    - %s\n    - touch should-not-run\n  postCreateTimeout: 200\n", path, command))
 			before := testutil.Git(t, repo, "worktree", "list", "--porcelain")
-			gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir()}))
+			gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir(), BaseBranch: "main"}))
 			testutil.Equal(t, readResults(t, gate.Results)[0].Base, "unavailable")
 			testutil.Equal(t, gate.Preexisting, []string{})
 			testutil.Equal(t, gate.Regressed, []string{})
@@ -122,7 +122,7 @@ func TestBasePreparationCommandsRunInOrderWithEnvironment(t *testing.T) {
 	repo := baseRepository(t, []config.Check{{Name: "check", Command: "test -f ready && exit 1; exit 75", TimeoutSeconds: 2}})
 	testutil.Put(t, repo, "ready", "")
 	testutil.Put(t, repo, ".archon/config.yaml", "worktree:\n  postCreate:\n    - test \"$PREPARE\" = value && touch first\n    - test -f first && touch ready\n")
-	gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir(), Env: append(os.Environ(), "PREPARE=value")}))
+	gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir(), BaseBranch: "main", Env: append(os.Environ(), "PREPARE=value")}))
 	testutil.Equal(t, gate.OnlyPreexisting(), true)
 }
 
@@ -130,7 +130,7 @@ func TestBaseEnvironmentSkipAndTimeoutAreUnavailable(t *testing.T) {
 	for _, command := range []string{"exit 75", "exit 77", "sleep 10"} {
 		t.Run(command, func(t *testing.T) {
 			repo := baseRepository(t, []config.Check{{Name: "check", Command: "if [ \"$(cat value)\" = change ]; then exit 1; fi; " + command, TimeoutSeconds: 0.2}})
-			gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir()}))
+			gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir(), BaseBranch: "main"}))
 			testutil.Equal(t, readResults(t, gate.Results)[0].Base, "unavailable")
 			testutil.Equal(t, gate.OnlyPreexisting(), false)
 		})
@@ -155,6 +155,9 @@ func TestEnvironmentFailuresAndNoBaseNeverPrepareComparison(t *testing.T) {
 			env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr, LookupEnv: func(key string) (string, bool) {
 				if key == "ARTIFACTS_DIR" {
 					return artifacts, true
+				}
+				if key == "BASE_BRANCH" {
+					return "main", true
 				}
 				return "", false
 			}}
@@ -194,7 +197,7 @@ func TestPreexistingGateStopsWithoutStuckAndMixedFailuresDoNot(t *testing.T) {
 func TestReplacedCheckCommandsKeepTheirOwnBaseResultAndLogs(t *testing.T) {
 	repo := baseRepository(t, []config.Check{{Name: "check", Command: "exit 1", TimeoutSeconds: 2}})
 	testutil.Put(t, repo, ".devkit/config.json", `{"checks":[{"name":"check","command":"test \"$(cat value)\" = base","timeout_seconds":2}]}`)
-	gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir()}))
+	gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir(), BaseBranch: "main"}))
 	testutil.Equal(t, gate.Failing, []string{"check", "check"})
 	testutil.Equal(t, gate.Preexisting, []string{"check"})
 	testutil.Equal(t, gate.Regressed, []string{"check"})

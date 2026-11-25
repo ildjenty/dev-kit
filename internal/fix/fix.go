@@ -495,17 +495,13 @@ func commitPrefixes(text string) ([]string, error) {
 	return prefixes, nil
 }
 
-func commitSubject(written any, prefixes []string) string {
+func commitSubject(written any, prefixes []string) (string, error) {
 	line := strings.TrimSpace(text(written))
 	match := regexp.MustCompile(`(?i)^([a-z][a-z0-9_-]*): `).FindStringSubmatch(line)
 	if match != nil && slices.Contains(prefixes, match[1]) && !strings.Contains(line, "\n") && strings.TrimSpace(line[len(match[1])+2:]) != "" {
-		return line
+		return line, nil
 	}
-	prefix := prefixes[0]
-	if slices.Contains(prefixes, "fix") {
-		prefix = "fix"
-	}
-	return prefix + ": address blocking findings"
+	return "", fmt.Errorf("CODE.commit_message: expected one non-empty line with a prefix from fixed git.md (%s); rewrite commit_message", strings.Join(prefixes, ", "))
 }
 
 func takeObjections(artifacts string) (record.Document, error) {
@@ -520,7 +516,25 @@ func takeObjections(artifacts string) (record.Document, error) {
 	if _, err := os.Stat(source); err == nil {
 		written, err = readJSON[record.Document](source)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s: %w", source, err)
+		}
+		if written == nil {
+			return nil, fmt.Errorf("%s: expected an object with an objections array", source)
+		}
+		items, ok := written["objections"].([]any)
+		if !ok {
+			return nil, fmt.Errorf("%s: objections must be an array", source)
+		}
+		for i, item := range items {
+			objection, ok := item.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("%s: objections[%d] must be an object", source, i)
+			}
+			for _, field := range []string{"finding", "evidence"} {
+				if _, ok := objection[field].(string); !ok {
+					return nil, fmt.Errorf("%s: objections[%d].%s must be a string", source, i, field)
+				}
+			}
 		}
 		if err := os.MkdirAll(filepath.Join(dir, "objections"), 0755); err != nil {
 			return nil, err
@@ -632,7 +646,10 @@ func roundEnd(ctx record.ContextData, artifacts string, gate *checks.Gate, code 
 		if code != nil {
 			written = code.CommitMessage
 		}
-		subject := commitSubject(written, stringsOf(input["commit_prefixes"]))
+		subject, err := commitSubject(written, stringsOf(input["commit_prefixes"]))
+		if err != nil {
+			return nil, err
+		}
 		if _, err := gitx.Run(ctx.Cwd, "add", "-A"); err != nil {
 			return nil, err
 		}

@@ -93,7 +93,9 @@ devkit-discuss モード（壁打ち → refine → 承認 → Issue 化）→ r
 
 `structure` の routing はモジュール配置だけでなく、関数内の責務分割、繰り返す検査、保証の迂回、呼び出し順や状態の前提、振る舞いを切り替える引数、複数層を通る値も含む。`data` は保存データだけでなく、有効な状態や値を決める型・フィールド、複数箇所の分岐で表したドメイン規則も含む。差分だけでは分からない既存処理の再実装は、ソース変更で必ず起動する `readability` が判定ツリー全体を検索して調べる。
 
-Jev の HTTP クライアントは `internal/jev` に置き、judge のルーティングだけに使う。
+Jev の HTTP クライアントは `internal/jev` に置き、judge のルーティングだけに使う。`judge/route-jev.json` の保存失敗はパスと原因を返してルーティングを停止する。Jev が利用できない場合も監査用成果物の保存は必須であり、保存の失敗を別の選択経路で隠さない。
+
+judge の target に `plan_version` があれば、changes・launch・completion・finish は同じ版の `judge/plan.json` を必須とする。欠落や版の不一致は prepare のやり直しを求める。初めから計画のない独立レビューだけは不在を認める。ゲートが checks 結果のパスを持つ場合も、判定・結果の保存前に読めることを必須とし、読める空の JSONL はチェック0件として扱う。
 
 判定対象コミットの全ツリーは `$STATE_DIR/trees/<符号化したブランチ名>/` にブランチごとに一つ保持する。記録フォルダー内には置かない。`judge/target.json` と品質ごとの材料の `tree` に絶対パスを渡す。判定者は同時実行するチェックが変更し得るチェックアウトを使わず、このツリーを Read・Grep・Glob で読む。Claude の読み取りツールにはパスを限定せず、Codex のノードも状態フォルダーを読める。
 
@@ -105,7 +107,9 @@ Jev の HTTP クライアントは `internal/jev` に置き、judge のルーテ
 
 `fix` は停止対象の指摘を修正する。誤った指摘には証拠付きで異議を出し、指摘にも修正にも関わっていない判定者が判断する。指摘の参照は `<judge-run>/<judge>/<finding-id>` とし、別の判定で同じローカル ID が使われても、以前の異議採用では消えない。
 
-`fix objections` は、存在する `objections.json` の読込・JSON 解析に失敗した場合、ファイルを消費済みへ移動せず、ラウンド状態を保存せずにエラーを返す。ファイル不在または正常な空の異議配列は、異議0件として扱う。
+`fix objections` は、存在する `objections.json` の読込・JSON 解析・形状の検証に失敗した場合、ファイルを消費済みへ移動せず、ラウンド状態を保存せずにパスと原因を返す。オブジェクトには `objections` 配列が必須で、各要素は文字列の `finding` と `evidence` を持つ。ファイル不在または正常な空の異議配列は、異議0件として扱う。
+
+implement・fix は、空・複数行・固定した `git.md` の prefix に合わない `CODE.commit_message` を拒否し、執筆者に書き直しを求める。implement は単位・完了条件の ID を含む題名も拒否する。機械は代わりの本文を作文せず、出典の trailer だけを加える。
 
 PR 作成後のコメントや CI 失敗は、出典を含む原文を `review` 入力として同じブランチの `fix` に渡す。例は `Review comment by <login> on path:line: ...`、`CI job <name> failed: <log excerpt>` である。入力は開始に成功した run の `review.text` と `review.commit` に保存し、その fix の指摘は `source: review` とする。開始には合格した要件・計画と、有効な最新 judge の判定済み変更が HEAD と同一であることが必要で、blocking 指摘は要求しない。PR と同じ変更同一性を使うため、backlog だけのコミット後も開始できる。`review` のない fix の開始条件は従来どおりである。
 
@@ -121,7 +125,9 @@ PR 本文の判定は、コードの commit・要件版・計画版とは別に�
 
 backlog の保存先と checkout 内の祖先にシンボリックリンクがある場合、PR 公開を拒否する。保存は checkout を起点とする `os.Root` 内で通常ファイルを排他作成し、書込みと close の成功後に rename して確定する。祖先リンクの検査後の差し替えによる checkout 外へのパス解決は `os.Root` で防ぎ、既存宛先のリンク先やハードリンク元には直接書き込まない。保存に失敗した場合、backlog の commit、push、gh 呼出しには進まない。
 
-計画・refine・retro の全ラウンドを記録し、後のラウンドで解消した指摘も機械化候補として収集する。各項目は `finding` と `source` を持ち、`source` は実行、判定番号、判定者、対象を保持する。
+計画・refine・retro の全ラウンドを記録し、後のラウンドで解消した指摘も機械化候補として収集する。各項目は `finding` と `source` を持ち、`source` は実行、判定番号、判定者、対象を保持する。plan の完了には各ラウンドの番号・run・phase・judgments が対応する `settled.json` が必要で、欠けた履歴を最新状態で代用しない。refine・retro の提案コミット成立前の失敗は、判定の `target.proposal_version` を明示的な null、`verdict` を `not_assessed` とし、版が成立していない理由を `observations` に残す。成立済みの版は正の整数とし、欠落や0を最新の版で補わない。
+
+retro の空 backlog は、フォルダーが実際に不在か、正常に列挙できた一覧が空の場合に限る。列挙不能はパスと原因を返して停止する。refine・retro の既存ドラフトの JSON 解析失敗も不在として扱わず、パスと原因を返す。
 
 retro は backlog の各配列を正規の backlog スキーマで検査する。指摘の `id` と空でない文字列の `text` は必須とし、判定由来の `source.judgment` は1以上の整数に限る。既存の外側メタデータと `review` 配列の省略は引き続き受け入れ、入力ファイルの内容と出典は保持する。
 
@@ -139,13 +145,25 @@ retro はこのファイルを `kind: escape`、ID `<path>#escape/0` の項目�
 
 sync では、pre-rebase hook による拒否など、競合停止に至らない rebase の失敗をエラーとし、完了にはしない。rebase の完了時は、記録した取り込み先コミットが HEAD の祖先であることを検証する。競合パスは Git の NUL 区切り出力から取得し、日本語、改行、前後の空白を保持する。競合マーカーが残っていれば stage と rebase の続行を行わない。
 
+Git の参照・パスの不存在、無関係な履歴、origin の未設定は、正常な否定結果を確認した場合だけ認める。実行・オブジェクト・設定の障害は元の診断を返す。sync は失敗した `rebase --continue` を暗黙に繰り返さず、空の競合を作らない。競合時に `REBASE_HEAD` を読めない場合もエラーにする。
+
 ## 実行をまたぐ記録
 
-記録は Git の外の `$STATE_DIR/records/<エンコードしたブランチ>/` に置く。依頼、提案、要件、計画、判定、開始、結果、質問、回答、許可、続行許可を保存する。機械が必要な内容を `$ARTIFACTS_DIR` に取り出し、AI に記録フォルダーを直接渡さない。スキーマは `internal/record/schemas/` を正本としてバイナリへ埋め込み、書き込みごとに検証する。計画の執筆用スキーマも準備処理が成果物へ書き出す。小さな変更(誤字、原因の明らかな小さな不具合、テストや設定の修正)はワークフローを通さず、セッションが規範に従って直接直し、`devkit checks` で確かめる。`devkit checks` は実行の外でも動く。ワークフローを使うのは、人が決める判断、構造・データ・契約・セキュリティ・費用の変更、決まっていないトピックのときだけにする。セッションからは `devkit status` で読む。テキスト・JSON の両方で各ブランチの依頼の `issue` 番号と `issue_url` も示す。`archon project list --json` から状態のフォルダーを見つけ(`STATE_DIR` があればそれを使う)、ブランチごとに最後の結果、未回答の質問、停止や差し戻しの中身、次に起動するワークフローを示す。
+記録は Git の外の `$STATE_DIR/records/<エンコードしたブランチ>/` に置く。依頼、提案、要件、計画、判定、開始、結果、質問、回答、許可、続行許可を保存する。機械が必要な内容を `$ARTIFACTS_DIR` に取り出し、AI に記録フォルダーを直接渡さない。スキーマは `internal/record/schemas/` を正本としてバイナリへ埋め込み、書込時と読込時に検証する。計画の執筆用スキーマも準備処理が成果物へ書き出す。小さな変更(誤字、原因の明らかな小さな不具合、テストや設定の修正)はワークフローを通さず、セッションが規範に従って直接直し、`devkit checks` で確かめる。`devkit checks` は実行の外でも動く。ワークフローを使うのは、人が決める判断、構造・データ・契約・セキュリティ・費用の変更、決まっていないトピックのときだけにする。セッションからは `devkit status` で読む。テキスト・JSON の両方で各ブランチの依頼の `issue` 番号と `issue_url` も示す。`archon project list --json` から状態のフォルダーを見つけ(`STATE_DIR` があればそれを使う)、ブランチごとに最後の結果、未回答の質問、停止や差し戻しの中身、次に起動するワークフローを示す。
 
-`devkit status --json` の各ブランチは文字列配列 `errors` を持つ。回答の読み取りに失敗すると、対象の質問 ID、回答ファイルのパス、失敗理由を格納する。設定の読み取り・検証に失敗すると、設定ファイル名、失敗理由、再開始上限が不明である旨を各ブランチに格納し、`restart_limit` は不明を表す `-1` とする。失敗がなければ `errors` は `[]` を返す。テキストではブランチの下に `unreadable: ...` と表示する。読めなかった回答を通常の未回答として扱わず、`next` は回答を読める状態にしてから status を再確認するよう案内する。設定が読めない場合は、設定を先に解決してから status を再確認するよう案内する。設定を読めた場合の `restart_limit` は、0 を含めて設定の有効値をそのまま示す。0 は再開始上限に達していることを意味し、通常の停止からの再開始には所有者の言葉を `continue` に渡す必要がある。記録と設定は変更しない。
+番号付き記録と質問・回答の読込では、実ファイルの null・不足キー・不正型、途中の質問番号の欠落はパスと原因を返す。初回の記録不在と未回答は区別し、保存済み `request.issue` の正当な省略と既存スキーマが認める0は維持する。
+
+成果物を扱う judge・pr・sync のコマンドは、`ARTIFACTS_DIR` がなければ読書きの前に停止する。プロバイダー CLI も `ARTIFACTS_DIR` と `PACK_DIR` を必須とし、不足名を返す。任意パス用の `Env.Path` の契約は変えず、必須パスをチェックアウトで補わない。単独の `devkit checks` は従来どおり新しい一時フォルダーを使える。
+
+checks は、round 索引がなく番号付き履歴もない場合だけ初回とする。空・不正な索引、索引が指す結果の欠落、次番号の既存結果では履歴の修復を求め、初回扱いや上書きで復旧しない。
+
+`devkit status --json` の各ブランチは文字列配列 `errors` を持つ。回答の読み取りに失敗すると、対象の質問 ID、回答ファイルのパス、失敗理由を格納する。設定の読み取り・検証に失敗すると、設定ファイル名、失敗理由、再開始上限が不明である旨を各ブランチに格納し、`restart_limit` は不明を表す `-1` とする。失敗がなければ `errors` は `[]` を返す。テキストではブランチの下に `unreadable: ...` と表示する。読めなかった回答を通常の未回答として扱わず、`next` は回答を読める状態にしてから status を再確認するよう案内する。設定が読めない場合は、設定を先に解決してから status を再確認するよう案内する。設定を読めた場合の `restart_limit` は1以上の有効値をそのまま示す。0・負数・不正な型は設定の検証エラーとして `errors` に含める。記録と設定は変更しない。
 
 最後の結果が `judge` の `pass` で、その結果の `inputs.requirements_version` が null なら、`next` は独立レビューの完了と所有者への報告伝達を案内する。要件を入力した judge の合格では `pr` の開始を案内する。
+
+Issue の一覧・ページ一覧と Archon の `projects` は正常な空配列を認め、null・非配列・不正なページを空一覧に変換しない。status の状態発見は、削除済みプロジェクトのパス不在だけを理由付きでスキップする。それ以外のパス解決失敗は診断に示し、不正なブランチ符号化は対象パスと原因を返す。doctor・status・eval judge の標準出力への書込失敗も、診断の合否や採点結果とは別に呼出し元へ返す。
+
+配布スキルの watcher は `devkit watch <run-id> [<run-id> ...]` を呼ぶ。状態の変化だけを表示し、全 run が終端なら終了し、それ以外は従来どおり30秒間隔で確認する。`archon workflow get` の失敗や Status 欠落は、run ID と終了エラー・標準エラーなどの理由を示して非0で終了し、自動再試行しない。失敗前に出た部分的な Status は採用しない。
 
 最後の結果が合格した `pr` のブランチでは、`devkit status` が gh を利用可能な場合に `gh pr view <branch> --json state,url,reviewDecision,statusCheckRollup` を15秒の制限で実行し、open・merged・closed、URL、レビュー判断、失敗した検査をテキストと JSON に示す。実行・タイムアウト・JSON 読み取りの失敗は表示し、status 自体は失敗させない。`next` は open で検査失敗ならログを `review` とした fix、変更要求ならコメントを `review` とした fix または依頼変更時の requirements、merged なら `archon complete <branch>` と `devkit issues ready`、closed なら未マージで閉じた旨を示す。検査失敗と変更要求が両方あれば検査失敗の案内を優先する。
 
@@ -173,7 +191,7 @@ workflows がバイナリの配布内容と一致する新規導入・Yes・差�
 
 `standards` はパスを正規化したうえで、workflow・導入するスキル・旧スキルの配置先、`.devkit/config.json`、`.archon/config.yaml`、設定された `decisions`・`eval` と所有範囲が重ならないことを検査する。同一先と祖先・子孫の関係は、比較結果の表示・質問・書込みより前に具体的なパスを示して拒否する。`docs/standards` など、これらと衝突しない文書配下への配置は許可する。
 
-Archon、Git、`devkit` と、設定チェック用のツールが必要になる。執筆・判定には設定した Archon provider、ルーティングの代替経路には同じ provider の認証済み CLI、Issue 操作と PR 公開には認証済みの `gh`、PR 公開には `origin` を使う。Issue を使うにはリポジトリで GitHub Issues、sub-issues、issue dependencies が利用でき、設定したラベルが存在し、`gh issue view --json parent` に対応した CLI が必要になる。不足時は機能の有効化、CLI 更新、ラベルの作成を人に依頼してからこの流れを使う。Go と mise は dev-kit 自体の開発に使い、対象リポジトリにはビルド済みバイナリを置ける。基点ブランチは Archon の `worktree.baseBranch` で指定する。
+Archon、Git、`devkit` と、設定チェック用のツールが必要になる。執筆・判定には設定した Archon provider、ルーティングの代替経路には同じ provider の認証済み CLI、Issue 操作と PR 公開には認証済みの `gh`、PR 公開には `origin` を使う。Issue を使うにはリポジトリで GitHub Issues、sub-issues、issue dependencies が利用でき、設定したラベルが存在し、`gh issue view --json parent` に対応した CLI が必要になる。不足時は機能の有効化、CLI 更新、ラベルの作成を人に依頼してからこの流れを使う。Go と mise は dev-kit 自体の開発に使い、対象リポジトリにはビルド済みバイナリを置ける。基点ブランチは `internal/gitx` の同じ関数で、Archon が渡す `BASE_BRANCH`、リポジトリの `.archon/config.yaml` の `worktree.baseBranch`、`git symbolic-ref refs/remotes/origin/HEAD` が返す origin の既定ブランチの順に解決する。設定ファイルの不在や基点の未指定では次の出典へ進み、既存設定の読込・解析エラーはそのパスと原因を返す。どれにも基点がなければ三つの出典を示して停止し、`main` は推測しない。採用した名前と出典は、開始の run 記録、judge の target、checks のゲート出力、sync の状態に `base_branch` と `base_branch_source` として残す。
 
 `.devkit/config.json` の `provider` は `claude`（既定）または `codex`。`devkit init --provider <name>` が保存し、workflow の AI ノードを描画する。ソースは Claude のままにし、Codex 導入時は全 AI ノードを Codex にし、未対応の `allowed_tools`・`denied_tools`・`settingSources` を除く。変更後の再導入は通常の workflow フォルダー差分として y/N を尋ねる。全 AI 出力スキーマは、入れ子を含め全プロパティを required に列挙し、`additionalProperties: false` にする。適用しない値は空文字・空配列・false で表し、プロンプトと読み取り側もそれを扱う。
 
@@ -200,7 +218,7 @@ Codex の workflow 判定者は full access で動き、ツール制限で書き
 - `skeleton_check` はスケルトンに実行するチェック名で、既定は空。
 - `qualities` は品質判定の起動パスを定める。判定するフェーズは関心マップが、差分からの追加選択はルーティングが担う。
 - `decision_paths` は判断を伴う変更の `paths`、`quality`、`ask` を定める。既定では依存、マイグレーション、インフラ、CI、環境変数サンプル、ワークフロー、規範、設定自身を含む。基点の設定と現在の設定のチェックを合わせて実行するため、チェックを削除しても検査を回避できない。
-- `limits.restarts` と `limits.fixes` は再開始と修正の上限で、既定はそれぞれ3。`limits.passes` は `implement` がリリース単位1つに使える回数で、既定は3。ある単位が使い切ると、その単位の名前と落ちたチェックを示して止まる。単位の数に関係なく、ほかの単位の回数は減らない。
+- `limits.restarts` と `limits.fixes` は再開始と修正の上限で、既定はそれぞれ3。三つの上限はすべて1以上の整数とし、省略時だけ3を使う。不正な設定を別の上限で補わない。`limits.passes` は `implement` がリリース単位1つに使える回数で、既定は3。ある単位が使い切ると、その単位の名前と落ちたチェックを示して止まる。単位の数に関係なく、ほかの単位の回数は減らない。
 
 廃止した `docs`・`units`・`topics` と `refine.relevance_threshold` は既存設定に残っていても受け入れて無視し、有効設定には出力しない。旧単位・トピックファイルの自動移行や削除、旧依頼の `unit` や計画行の `ref` の自動変換は行わず、新しい依頼は Issue 番号で requirements から作る。
 

@@ -93,9 +93,10 @@ func TestTakesPrefixesFromFixedCriteriaAndAvoidsIDsOrMultilineSubjects(t *testin
 	testutil.Equal(t, prefixes, []string{"change", "repair"})
 	testutil.Equal(t, testutil.Must(commitPrefixes("Use change: or repair: for a subject.")), prefixes)
 	u := unitsOf(requirementsFixture(), planFixture())[0]
-	testutil.Equal(t, commitSubject("repair: preserve cancellation", u, requirementsFixture(), planFixture(), prefixes), "repair: preserve cancellation")
+	testutil.Equal(t, testutil.Must(commitSubject("repair: preserve cancellation", u, prefixes)), "repair: preserve cancellation")
 	for _, value := range []string{"feat: wrong prefix", "repair: U1: cancellation", "repair: C1 cancellation", "repair: first\nsecond"} {
-		testutil.Equal(t, commitSubject(value, u, requirementsFixture(), nil, prefixes), "change: Allow cancellation")
+		_, err := commitSubject(value, u, prefixes)
+		testutil.Fails(t, err, "CODE.commit_message")
 	}
 	_, err := commitPrefixes("No prefixes")
 	testutil.Fails(t, err, "git.md does not name any commit prefixes")
@@ -236,7 +237,7 @@ func TestPassingStepsDoNotUseUpTheNextStepsPasses(t *testing.T) {
 	failing.Failing = []string{"lint"}
 	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing, &codeOutput{}, nil))["finished"], false)
 	testutil.Equal(t, testutil.Must(end(ctx, artifacts, failing, &codeOutput{}, nil))["finished"], false)
-	passed := testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "feat: first step"}, nil))
+	passed := testutil.Must(end(ctx, artifacts, gateFixture(), &codeOutput{CommitMessage: "change: first step"}, nil))
 	testutil.Equal(t, passed["committed"], true)
 	s := testutil.Must(readJSON[state](filepath.Join(artifacts, "implement/state.json")))
 	testutil.Equal(t, s.Exhausted, "")

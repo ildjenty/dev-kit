@@ -54,7 +54,7 @@ func TestCriteriaCLI(t *testing.T) {
 	state := t.TempDir()
 	artifacts := t.TempDir()
 	testutil.Must(record.Append(record.RecordDir(state, "feature/x"), "request", record.Document{"owner_words": "Request", "supplement": "", "criteria_commit": commit, "run_id": "r0", "recorded_at": "t"}))
-	vars := map[string]string{"STATE_DIR": state, "ARTIFACTS_DIR": artifacts, "WORKFLOW_ID": "r1"}
+	vars := map[string]string{"BASE_BRANCH": "main", "STATE_DIR": state, "ARTIFACTS_DIR": artifacts, "WORKFLOW_ID": "r1"}
 	var out, stderr bytes.Buffer
 	r := cli.New("test", Commands())
 	testutil.Equal(t, r.Execute([]string{"criteria"}, cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr, LookupEnv: func(key string) (string, bool) { v, ok := vars[key]; return v, ok }}), 0)
@@ -71,7 +71,7 @@ func TestCriteriaCLIPreservesRelativePaths(t *testing.T) {
 	commit := testutil.Git(t, repo, "rev-parse", "HEAD")
 	state := "state"
 	testutil.Must(record.Append(filepath.Join(repo, record.RecordDir(state, "feature/x")), "request", record.Document{"owner_words": "Request", "supplement": "", "criteria_commit": commit, "run_id": "r0", "recorded_at": "t"}))
-	vars := map[string]string{"STATE_DIR": state, "ARTIFACTS_DIR": "artifacts", "WORKFLOW_ID": "r1"}
+	vars := map[string]string{"BASE_BRANCH": "main", "STATE_DIR": state, "ARTIFACTS_DIR": "artifacts", "WORKFLOW_ID": "r1"}
 	var out, stderr bytes.Buffer
 	code := cli.New("test", Commands()).Execute([]string{"criteria"}, cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr, LookupEnv: func(key string) (string, bool) { value, ok := vars[key]; return value, ok }})
 	testutil.Equal(t, code, 0)

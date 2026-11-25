@@ -133,7 +133,7 @@ func TestCommandsKeepRelativePathsAndOneFinishTime(t *testing.T) {
 	relativeState := must(filepath.Rel(repo, state))
 	dir := record.RecordDir(state, "feature/x")
 	run(dir, "r1")
-	vars := map[string]string{"STATE_DIR": relativeState, "WORKFLOW_ID": "r1", "ARTIFACTS_DIR": relative, "INPUTS_OWNER_WORDS": "Filter the list", "INPUTS_REQUIREMENTS": string(must(json.Marshal(requirements()))), "INPUTS_JUDGMENT": string(must(json.Marshal(judgment())))}
+	vars := map[string]string{"BASE_BRANCH": "main", "STATE_DIR": relativeState, "WORKFLOW_ID": "r1", "ARTIFACTS_DIR": relative, "INPUTS_OWNER_WORDS": "Filter the list", "INPUTS_REQUIREMENTS": string(must(json.Marshal(requirements()))), "INPUTS_JUDGMENT": string(must(json.Marshal(judgment())))}
 	var out, stderr bytes.Buffer
 	env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr, LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
 	registry := cli.New("test", Commands())

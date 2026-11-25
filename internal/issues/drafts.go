@@ -50,7 +50,7 @@ func (c Client) findDraft(marker, label string) (Created, bool, error) {
 		HTMLURL     string          `json:"html_url"`
 		PullRequest json.RawMessage `json:"pull_request"`
 	}
-	if err := json.Unmarshal(data, &pages); err != nil {
+	if err := parseList(data, &pages, true); err != nil {
 		return Created{}, false, fmt.Errorf("parse gh api issue drafts: %w", err)
 	}
 	for _, page := range pages {

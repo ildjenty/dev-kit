@@ -309,6 +309,7 @@ func StartConditions(dir, workflow string, options ConditionOptions) ([]string, 
 }
 
 type StartOptions struct {
+	BaseBranchSource string
 	Review           string
 	Cwd              string
 	BaseBranch       string
@@ -420,6 +421,9 @@ func Start(dir, workflow string, o StartOptions) (StartOutput, error) {
 		}
 	}
 	run := Document{"run_id": o.RunID, "workflow": workflow, "started_at": now, "start": state.Start, "counted": state.Counted, "answers": answered}
+	if o.BaseBranchSource != "" {
+		run["base_branch"], run["base_branch_source"] = o.BaseBranch, o.BaseBranchSource
+	}
 	if workflow == "fix" && o.Review != "" {
 		run["review"] = Document{"text": o.Review, "commit": o.Commit}
 	}

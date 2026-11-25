@@ -372,8 +372,12 @@ func run(args []string, env cli.Env) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintln(env.Stdout, limitation)
-	fmt.Fprintln(env.Stdout, "Results:", out)
+	if _, err := fmt.Fprintln(env.Stdout, limitation); err != nil {
+		return err
+	}
+	if _, err := fmt.Fprintln(env.Stdout, "Results:", out); err != nil {
+		return err
+	}
 	source, err := folder(root, ".archon/workflows/dev", ".archon/workflows/dev")
 	if err != nil {
 		return err
@@ -399,27 +403,39 @@ func run(args []string, env cli.Env) error {
 	}
 	result := Result{Limitation: limitation, Provider: settings.Provider, Cases: []CaseResult{}, Qualities: []QualityTotal{}}
 	for _, c := range cases {
-		fmt.Fprintln(env.Stdout, "\nCase:", c.Name, "-", c.Description)
+		if _, err := fmt.Fprintln(env.Stdout, "\nCase:", c.Name, "-", c.Description); err != nil {
+			return err
+		}
 		item, err := runCase(env, c, settings, standards, pack, out, formats)
 		if err != nil {
 			item.Name, item.Description, item.Error = c.Name, c.Description, err.Error()
-			fmt.Fprintln(env.Stdout, "  ERROR (not scored):", err)
+			if _, err := fmt.Fprintln(env.Stdout, "  ERROR (not scored):", err); err != nil {
+				return err
+			}
 		} else {
-			printCase(env.Stdout, item)
+			if err := printCase(env.Stdout, item); err != nil {
+				return err
+			}
 		}
 		result.Cases = append(result.Cases, item)
 	}
 	result.total()
 	if len(result.Errored) > 0 {
-		fmt.Fprintln(env.Stdout, "\nNot scored because of errors:", strings.Join(result.Errored, ", "))
+		if _, err := fmt.Fprintln(env.Stdout, "\nNot scored because of errors:", strings.Join(result.Errored, ", ")); err != nil {
+			return err
+		}
 	}
 	if err = save(filepath.Join(out, "result.json"), result); err != nil {
 		return err
 	}
-	printTotals(env.Stdout, "Total", result.Totals)
-	for _, q := range result.Qualities {
-		printTotals(env.Stdout, "Total "+q.Quality, q.Totals)
+	if err := printTotals(env.Stdout, "Total", result.Totals); err != nil {
+		return err
 	}
-	fmt.Fprintln(env.Stdout, "Result JSON:", filepath.Join(out, "result.json"))
-	return nil
+	for _, q := range result.Qualities {
+		if err := printTotals(env.Stdout, "Total "+q.Quality, q.Totals); err != nil {
+			return err
+		}
+	}
+	_, err = fmt.Fprintln(env.Stdout, "Result JSON:", filepath.Join(out, "result.json"))
+	return err
 }

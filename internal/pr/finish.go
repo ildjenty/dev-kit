@@ -13,6 +13,9 @@ import (
 )
 
 func finish(args []string, env cli.Env) error {
+	if err := env.Require("ARTIFACTS_DIR"); err != nil {
+		return err
+	}
 	ctx, err := context(env)
 	if err != nil {
 		return err

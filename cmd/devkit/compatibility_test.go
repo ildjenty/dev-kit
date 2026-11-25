@@ -26,7 +26,7 @@ func TestWorkflowStartsRefuseMissingCommandsBeforeRecording(t *testing.T) {
 				if source == "prompt" {
 					testutil.Put(t, pack, kitinfo.StampName, `{"devkit_version":"v-old","kit_digest":"old"}`)
 				}
-				values := map[string]string{"PACK_DIR": pack, "STATE_DIR": state, "WORKFLOW_ID": "mismatched", "INPUTS_ANSWERS": `[{"question_id":"Q1","answer":"Yes"}]`, "ARTIFACTS_DIR": t.TempDir()}
+				values := map[string]string{"BASE_BRANCH": "main", "PACK_DIR": pack, "STATE_DIR": state, "WORKFLOW_ID": "mismatched", "INPUTS_ANSWERS": `[{"question_id":"Q1","answer":"Yes"}]`, "ARTIFACTS_DIR": t.TempDir()}
 				var out, stderr bytes.Buffer
 				env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr, LookupEnv: func(key string) (string, bool) { value, ok := values[key]; return value, ok }}
 				args := []string{"record", "start", workflow}
@@ -76,7 +76,7 @@ func TestCompatibleStartChecksOnlyItsWorkflowAndIgnoresDigestAndFixtures(t *test
 	testutil.Put(t, pack, "plan/commands/write.md", "devkit future missing")
 	testutil.Put(t, pack, kitinfo.StampName, `{"devkit_version":"older","kit_digest":"different"}`)
 	state := t.TempDir()
-	values := map[string]string{"PACK_DIR": pack, "STATE_DIR": state, "WORKFLOW_ID": "compatible"}
+	values := map[string]string{"BASE_BRANCH": "main", "PACK_DIR": pack, "STATE_DIR": state, "WORKFLOW_ID": "compatible"}
 	var out, stderr bytes.Buffer
 	env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr, LookupEnv: func(key string) (string, bool) { value, ok := values[key]; return value, ok }}
 	testutil.Equal(t, newRegistry().Execute([]string{"record", "start", "requirements"}, env), 0)

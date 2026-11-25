@@ -3,6 +3,7 @@ package plan
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"github.com/ildjenty/dev-kit/internal/concerns"
 	"os"
 	"path/filepath"
@@ -28,7 +29,7 @@ func draft() document {
 	return document{"decisions": []document{decision("structure")}, "increments": []document{{"id": "U1", "summary": "Reach an observable result", "criteria": []string{"C1"}}}, "tests": []document{{"criterion": "C1", "method": "test", "file": "tests/entry.ext", "name": "reaches the result"}}, "kept_behaviors": []string{}}
 }
 func settled() document {
-	return document{"requirements_version": 1, "round": 3, "valid": true, "errors": []string{}, "skeleton_commit": sha("a"), "draft": draft(), "changes": []document{}, "prototype": "", "structure_question": "May work proceed with this structure?", "judgments": document{}, "needs_decision": []document{}, "not_assessed": []document{}, "fixable": []document{}, "back": nil}
+	return document{"requirements_version": 1, "round": 1, "valid": true, "errors": []string{}, "skeleton_commit": sha("a"), "draft": draft(), "changes": []document{}, "prototype": "", "structure_question": "May work proceed with this structure?", "judgments": document{}, "needs_decision": []document{}, "not_assessed": []document{}, "fixable": []document{}, "back": nil}
 }
 func finding(extra document) document {
 	d := document{"row": "D1", "blocking": true, "needs_decision": false, "deferred": false, "mechanical": false, "failure_scenario": "The entry point does not reach the result", "evidence": "src/entry.ext", "fix": "Wire the entry point"}
@@ -393,7 +394,7 @@ func TestCommandsKeepRelativePathsAndCheckEnvironment(t *testing.T) {
 	inputFiles(t, a)
 	testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), structureDraft()))
 	relative := must(filepath.Rel(ctx.Cwd, a))
-	vars := map[string]string{"PLAN_PHASE": "structure", "STATE_DIR": t.TempDir(), "WORKFLOW_ID": "p1", "ARTIFACTS_DIR": relative}
+	vars := map[string]string{"BASE_BRANCH": "main", "PLAN_PHASE": "structure", "STATE_DIR": t.TempDir(), "WORKFLOW_ID": "p1", "ARTIFACTS_DIR": relative}
 	var out, stderr bytes.Buffer
 	env := cli.Env{Cwd: ctx.Cwd, Stdout: &out, Stderr: &stderr, Environ: append(os.Environ(), "EXPECTED_ARTIFACTS="+relative, "ARTIFACTS_DIR=wrong", "BASE_BRANCH=wrong", "PRESERVED=value"), LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
 	registry := cli.New("test", Commands())
@@ -587,5 +588,6 @@ func finishTestPlan(t *testing.T, ctx record.ContextData, artifacts string, opti
 	fixed["judgments"] = document{"structure": judgment(nil)}
 	testutil.OK(t, write(filepath.Join(artifacts, "plan/structure.json"), fixed))
 	testutil.OK(t, write(filepath.Join(rounds(artifacts), "latest.json"), state))
+	testutil.OK(t, write(filepath.Join(rounds(artifacts), fmt.Sprint(number(state["round"])), "settled.json"), state))
 	return finish(ctx, artifacts, options)
 }

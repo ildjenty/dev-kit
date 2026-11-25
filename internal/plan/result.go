@@ -287,6 +287,24 @@ func finish(ctx record.ContextData, artifacts string, o record.ResultOptions) (d
 	if _, ok := state["judgments"]; !ok {
 		return nil, fmt.Errorf("the last round was not settled")
 	}
+	if n, ok := state["round"].(float64); !ok || n < 1 || n != float64(int(n)) {
+		return nil, fmt.Errorf("%s: round must be a positive integer", filepath.Join(rounds(artifacts), "latest.json"))
+	}
+	history := []document{}
+	for n := 1; n <= number(state["round"]); n++ {
+		path := filepath.Join(rounds(artifacts), fmt.Sprint(n), "settled.json")
+		round, e := read(path)
+		if e != nil {
+			return nil, fmt.Errorf("%s: %w", path, e)
+		}
+		if round == nil {
+			return nil, fmt.Errorf("%s: settled round must be an object", path)
+		}
+		if number(round["round"]) != n || round["run_id"] != ctx.RunID || round["phase"] != "structure" && round["phase"] != "detail" || object(round["judgments"]) == nil {
+			return nil, fmt.Errorf("%s: a settled round with matching round number, run_id, phase and judgments is required", path)
+		}
+		history = append(history, round)
+	}
 	answers, err := record.ListKeyed(ctx.Dir, "answer")
 	if err != nil {
 		return nil, err
@@ -341,19 +359,6 @@ func finish(ctx record.ContextData, artifacts string, o record.ResultOptions) (d
 		}
 		state["skeleton_commit"] = commit
 		o.Commit = commit
-	}
-	history := []document{}
-	for n := 1; n <= number(state["round"]); n++ {
-		round, e := readOr(filepath.Join(rounds(artifacts), fmt.Sprint(n), "settled.json"), nil)
-		if e != nil {
-			return nil, e
-		}
-		if round != nil {
-			history = append(history, round)
-		}
-	}
-	if len(history) == 0 {
-		history = append(history, state)
 	}
 	var recorded document
 	for _, round := range history {

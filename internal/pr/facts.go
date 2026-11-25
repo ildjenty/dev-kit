@@ -164,6 +164,9 @@ func checkpoints(requirements, plan doc, answers, items, judgments, carried []do
 	return doc{"changed": changed, "checked": checked, "judgments": jj, "remaining": remaining, "not_checked": notChecked, "decisions": decisions, "answers": answers}
 }
 func facts(args []string, env cli.Env) error {
+	if err := env.Require("ARTIFACTS_DIR"); err != nil {
+		return err
+	}
 	ctx, err := context(env)
 	if err != nil {
 		return err

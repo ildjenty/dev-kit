@@ -249,7 +249,10 @@ After starting, attach the session's background monitor, when available, to:
 bash .claude/skills/devkit-runs/scripts/watch.sh <run-id> [<run-id> ...]
 ```
 
-It prints a line when statuses change and exits when all runs end. Do not filter
+It delegates to `devkit watch`, prints a line when statuses change, checks unfinished runs every
+30 seconds and exits when all runs end. A retrieval failure or missing Status field exits nonzero
+with the run ID and reason, including stderr; it does not retry automatically or adopt partial
+Status output from a failed command. Inspect and resolve that failure before reattaching. Do not filter
 `archon workflow attention --watch` through grep; that can hide requests for a decision. Do not poll
 repeatedly alongside the watcher. If the monitor times out (some sessions stop it after 30 minutes),
 reattach it to runs that have not ended.

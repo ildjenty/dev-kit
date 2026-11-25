@@ -85,6 +85,18 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	if e != nil {
 		return nil, e
 	}
+	roundEntries := []doc{}
+	for n := 1; n <= num(entry["round"]); n++ {
+		path := file(artifacts, fmt.Sprintf("rounds/%d.json", n))
+		roundEntry, e := readJSON(path)
+		if e != nil {
+			return nil, e
+		}
+		if _, e := record.ProposalRoundTarget(roundEntry, path); e != nil {
+			return nil, e
+		}
+		roundEntries = append(roundEntries, roundEntry)
+	}
 	errors, e := reviewedErrors(ctx, artifacts, entry)
 	if e != nil {
 		return nil, e
@@ -135,14 +147,11 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 		}
 	}
 	records := []doc{}
-	for n := 1; n <= num(entry["round"]); n++ {
-		roundEntry, e := readJSON(file(artifacts, fmt.Sprintf("rounds/%d.json", n)))
+	for i, roundEntry := range roundEntries {
+		n := i + 1
+		target, e := record.ProposalRoundTarget(roundEntry, file(artifacts, fmt.Sprintf("rounds/%d.json", n)))
 		if e != nil {
 			return nil, e
-		}
-		version := roundEntry["proposal_version"]
-		if num(version) == 0 {
-			version = p["version"]
 		}
 		judgmentErrors, e := schema("judgment", roundEntry["judgment"])
 		if e != nil {
@@ -181,9 +190,16 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 				verdict = "not_assessed"
 				observations = append(observations, errors...)
 			}
-			records = append(records, doc{"judge": "retro", "phase": "retro", "round": n, "kind": "proposal", "target": doc{"proposal_version": version}, "materials": []string{file(artifacts, "input.json"), file(artifacts, fmt.Sprintf("rounds/%d.json", n)), str(input["criteria"])}, "observations": observations, "verdict": verdict, "findings": findings})
+			if target["proposal_version"] == nil {
+				verdict = "not_assessed"
+				observations = append([]string{"No committed proposal exists for this round."}, observations...)
+			}
+			records = append(records, doc{"judge": "retro", "phase": "retro", "round": n, "kind": "proposal", "target": target, "materials": []string{file(artifacts, "input.json"), file(artifacts, fmt.Sprintf("rounds/%d.json", n)), str(input["criteria"])}, "observations": observations, "verdict": verdict, "findings": findings})
 		} else {
-			records = append(records, doc{"judge": "retro", "phase": "retro", "round": n, "kind": "proposal", "target": doc{"proposal_version": version}, "materials": []string{file(artifacts, fmt.Sprintf("rounds/%d.json", n))}, "observations": judgmentErrors, "verdict": "not_assessed", "findings": []doc{}})
+			if target["proposal_version"] == nil {
+				judgmentErrors = append([]string{"No committed proposal exists for this round."}, judgmentErrors...)
+			}
+			records = append(records, doc{"judge": "retro", "phase": "retro", "round": n, "kind": "proposal", "target": target, "materials": []string{file(artifacts, fmt.Sprintf("rounds/%d.json", n))}, "observations": judgmentErrors, "verdict": "not_assessed", "findings": []doc{}})
 		}
 	}
 	if e = record.WriteLoopJudgments(ctx, records, ""); e != nil {

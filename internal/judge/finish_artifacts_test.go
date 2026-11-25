@@ -29,6 +29,8 @@ func finishFixture(t *testing.T) (string, string, map[string]string) {
 	started := must(record.Start(dir, "judge", record.StartOptions{RunID: "judge-1", Commit: testutil.Git(t, repo, "rev-parse", "HEAD"), BaseCommit: base}))
 	testutil.Equal(t, started.Stopped, false)
 	vars := map[string]string{"STATE_DIR": state, "WORKFLOW_ID": "judge-1", "ARTIFACTS_DIR": artifacts, "BASE_BRANCH": "main"}
+	testutil.Put(t, repo, "checks/1.jsonl", "")
+	testutil.Put(t, repo, ".git/info/exclude", "checks/\n")
 	return repo, dir, vars
 }
 

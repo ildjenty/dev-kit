@@ -83,7 +83,13 @@ func TestVersionsKeepRestartCount(t *testing.T) {
 	testutil.Equal(t, must(LimitState(must(History(dir)), "plan", nil, 3)).Restarts, 1)
 }
 func commandEnv(repo string, vars map[string]string, out, stderr *bytes.Buffer) cli.Env {
-	return cli.Env{Cwd: repo, Stdout: out, Stderr: stderr, LookupEnv: func(key string) (string, bool) { v, ok := vars[key]; return v, ok }}
+	return cli.Env{Cwd: repo, Stdout: out, Stderr: stderr, LookupEnv: func(key string) (string, bool) {
+		v, ok := vars[key]
+		if key == "BASE_BRANCH" && !ok {
+			return "main", true
+		}
+		return v, ok
+	}}
 }
 func TestLimitCLIUsesBranchRecord(t *testing.T) {
 	repo := testutil.Repo(t)

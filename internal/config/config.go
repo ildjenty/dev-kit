@@ -101,14 +101,19 @@ func Load(cwd string) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	data, err := os.ReadFile(filepath.Join(root, ".devkit/config.json"))
+	path := filepath.Join(root, ".devkit/config.json")
+	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return Defaults(""), nil
 	}
 	if err != nil {
 		return Config{}, err
 	}
-	return Parse(data)
+	c, err := Parse(data)
+	if err != nil {
+		return Config{}, fmt.Errorf("%s: %w", path, err)
+	}
+	return c, nil
 }
 func Parse(data []byte) (Config, error) {
 	var supplied map[string]any
@@ -195,14 +200,18 @@ func ChecksAcrossBase(cwd, baseBranch string) ([]Check, error) {
 		return nil, err
 	}
 	previous := Defaults("")
-	if g.OK("cat-file", "-e", base+":.devkit/config.json") {
+	exists, err := g.PathExists(base, ".devkit/config.json")
+	if err != nil {
+		return nil, err
+	}
+	if exists {
 		data, err := g.Run("show", base+":.devkit/config.json")
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s:.devkit/config.json: %w", base, err)
 		}
 		previous, err = Parse([]byte(data))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%s:.devkit/config.json: %w", base, err)
 		}
 	}
 	result := append([]Check{}, previous.Checks...)
@@ -360,8 +369,8 @@ func shape(c map[string]any) error {
 	}
 	for _, key := range []string{"restarts", "fixes", "passes"} {
 		n, ok := c["limits"].(map[string]any)[key].(float64)
-		if !ok || n < 0 || math.Trunc(n) != n {
-			return invalid("limits." + key + " must be a non-negative integer")
+		if !ok || n < 1 || math.Trunc(n) != n {
+			return invalid("limits." + key + " must be an integer of at least 1")
 		}
 	}
 	return nil

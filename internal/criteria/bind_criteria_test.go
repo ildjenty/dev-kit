@@ -28,7 +28,7 @@ func TestCriteriaCLIUsesFixedConfigurationAfterRelocation(t *testing.T) {
 			testutil.Must(record.Append(dir, "request", record.Document{"owner_words": "Request", "supplement": "", "criteria_commit": base, "run_id": "r0", "recorded_at": "t"}))
 			request := testutil.Must(record.List(dir, "request"))
 			artifacts := t.TempDir()
-			vars := map[string]string{"STATE_DIR": state, "ARTIFACTS_DIR": artifacts, "WORKFLOW_ID": "r1"}
+			vars := map[string]string{"BASE_BRANCH": "main", "STATE_DIR": state, "ARTIFACTS_DIR": artifacts, "WORKFLOW_ID": "r1"}
 			var out, stderr bytes.Buffer
 			env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr, LookupEnv: func(key string) (string, bool) { v, ok := vars[key]; return v, ok }}
 			run := func() Source {
@@ -90,7 +90,7 @@ func TestCriteriaCLIRejectsInvalidFixedSourceWithoutWriting(t *testing.T) {
 			testutil.Must(record.Append(dir, "request", record.Document{"owner_words": "Request", "supplement": "", "criteria_commit": base, "run_id": "r0", "recorded_at": "t"}))
 			request := testutil.Must(record.List(dir, "request"))
 			testutil.Put(t, artifacts, "criteria/keep", "unchanged\n")
-			vars := map[string]string{"STATE_DIR": state, "ARTIFACTS_DIR": artifacts, "WORKFLOW_ID": "r1"}
+			vars := map[string]string{"BASE_BRANCH": "main", "STATE_DIR": state, "ARTIFACTS_DIR": artifacts, "WORKFLOW_ID": "r1"}
 			var out, stderr bytes.Buffer
 			env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr, LookupEnv: func(key string) (string, bool) { v, ok := vars[key]; return v, ok }}
 			testutil.Equal(t, cli.New("test", Commands()).Execute([]string{"criteria"}, env), 1)

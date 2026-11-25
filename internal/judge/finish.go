@@ -204,6 +204,9 @@ func decide(inputs doc) ([]doc, doc) {
 	return judgments, doc{"outcome": "pass"}
 }
 func finish(args []string, env cli.Env) error {
+	if err := env.Require("ARTIFACTS_DIR"); err != nil {
+		return err
+	}
 	ctx, err := context(env)
 	if err != nil {
 		return err
@@ -231,16 +234,23 @@ func finish(args []string, env cli.Env) error {
 				}
 				var check doc
 				if err = json.Unmarshal([]byte(line), &check); err != nil {
-					return err
+					return fmt.Errorf("%s: %w", env.Path(path), err)
 				}
 				checks = append(checks, check)
 			}
 			gate["checks"] = checks
-		} else if !os.IsNotExist(err) {
+		} else {
 			return err
 		}
 	}
 	if !truth(object(inputs["prepare"])["stopped"]) {
+		target, err := read(filepath.Join(dir, "target.json"))
+		if err != nil {
+			return err
+		}
+		if _, err := expectedPlan(dir, target, truth(object(inputs["prepare"])["has_plan"])); err != nil {
+			return err
+		}
 		changes, err := read(filepath.Join(dir, "changes.json"))
 		if err != nil {
 			return err

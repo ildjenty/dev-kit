@@ -71,7 +71,7 @@ func TestPermissionIdentityChangesWithContentAtSamePath(t *testing.T) {
 	testutil.Put(t, repo, "infra/service.json", "one")
 	testutil.Git(t, repo, "add", ".")
 	testutil.Git(t, repo, "commit", "-qm", "first")
-	g := must(gitx.New(repo, ""))
+	g := must(gitx.New(repo, "main"))
 	base := must(g.MergeBase(must(g.Head())))
 	asked := func() doc {
 		head := must(g.Head())
@@ -179,7 +179,7 @@ func TestFactsCLIUsesCustomLanguageStandardsAndAsksBeforeDraftingWithoutAllowanc
 	testutil.Put(t, repo, "infra/service.json", "capacity: 1")
 	git("add", ".")
 	git("commit", "-qm", "work")
-	g := must(gitx.New(repo, ""))
+	g := must(gitx.New(repo, "main"))
 	head := must(g.Head())
 	state, artifacts := t.TempDir(), t.TempDir()
 	dir := record.RecordDir(state, "feature/x")

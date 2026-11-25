@@ -192,7 +192,7 @@ func runStart(args []string, env cli.Env) error {
 			}
 		}
 	}
-	out, err := Start(env.Path(ctx.Dir), args[0], StartOptions{Cwd: ctx.Cwd, BaseBranch: ctx.BaseBranch, Review: env.Getenv("INPUTS_REVIEW"), IssueReasons: issueReasons, RunID: ctx.RunID, Commit: commit, ChangeID: func() (*string, error) {
+	out, err := Start(env.Path(ctx.Dir), args[0], StartOptions{Cwd: ctx.Cwd, BaseBranch: ctx.BaseBranch, BaseBranchSource: ctx.BaseBranchSource, Review: env.Getenv("INPUTS_REVIEW"), IssueReasons: issueReasons, RunID: ctx.RunID, Commit: commit, ChangeID: func() (*string, error) {
 		g, err := gitx.New(ctx.Cwd, ctx.BaseBranch, env.Path(ctx.Dir))
 		if err != nil {
 			return nil, err

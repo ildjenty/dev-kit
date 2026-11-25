@@ -2,6 +2,7 @@ package record
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -98,6 +99,21 @@ func readBody(file string) (Document, error) {
 	return object(value), nil
 }
 
+func readRecord(path, kind string) (Document, error) {
+	doc, err := readJSON(path)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	problems, err := Validate(kind, doc)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	if len(problems) > 0 {
+		return nil, &RecordError{Message: path + ": not a valid " + kind, Errors: problems}
+	}
+	return doc, nil
+}
+
 func List(dir, kind string) ([]Document, error) {
 	folder, ok := folders[kind]
 	if !ok {
@@ -109,7 +125,7 @@ func List(dir, kind string) ([]Document, error) {
 	}
 	docs := []Document{}
 	for _, n := range ns {
-		doc, err := readJSON(filepath.Join(dir, folder, strconv.Itoa(n)+".json"))
+		doc, err := readRecord(filepath.Join(dir, folder, strconv.Itoa(n)+".json"), kind)
 		if err != nil {
 			return nil, err
 		}
@@ -209,8 +225,8 @@ func Append(dir, kind string, value Document) (Appended, error) {
 }
 func QuestionPath(dir, kind, id string) string { return filepath.Join(dir, folders[kind], id+".json") }
 func ReadKeyed(dir, kind, id string) (Document, error) {
-	doc, err := readJSON(QuestionPath(dir, kind, id))
-	if os.IsNotExist(err) {
+	doc, err := readRecord(QuestionPath(dir, kind, id), kind)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	return doc, err
@@ -239,13 +255,23 @@ func QuestionCount(dir string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	count := 0
+	numbers := []int{}
 	for _, entry := range entries {
 		if regexp.MustCompile(`^Q\d+\.json$`).MatchString(entry.Name()) {
-			count++
+			n, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(entry.Name(), "Q"), ".json"))
+			if err != nil || n < 1 || entry.Name() != fmt.Sprintf("Q%d.json", n) {
+				return 0, fmt.Errorf("%s: invalid question ID", filepath.Join(dir, folders["question"], entry.Name()))
+			}
+			numbers = append(numbers, n)
 		}
 	}
-	return count, nil
+	sort.Ints(numbers)
+	for i, n := range numbers {
+		if n != i+1 {
+			return 0, fmt.Errorf("%s: missing question record", QuestionPath(dir, "question", fmt.Sprintf("Q%d", i+1)))
+		}
+	}
+	return len(numbers), nil
 }
 func ListKeyed(dir, kind string) ([]Document, error) {
 	count, err := QuestionCount(dir)
@@ -254,6 +280,11 @@ func ListKeyed(dir, kind string) ([]Document, error) {
 	}
 	docs := []Document{}
 	for n := 1; n <= count; n++ {
+		if kind != "question" {
+			if _, err := ReadKeyed(dir, "question", fmt.Sprintf("Q%d", n)); err != nil {
+				return nil, err
+			}
+		}
 		doc, err := ReadKeyed(dir, kind, fmt.Sprintf("Q%d", n))
 		if err != nil {
 			return nil, err
@@ -336,11 +367,12 @@ func ValidResults(h HistoryData, starting string) ([]Document, error) {
 }
 
 type ContextData struct {
-	Dir        string
-	Branch     string
-	RunID      string
-	Cwd        string
-	BaseBranch string
+	Dir              string
+	Branch           string
+	RunID            string
+	Cwd              string
+	BaseBranch       string
+	BaseBranchSource string
 }
 
 func Context(env cli.Env) (ContextData, error) {
@@ -354,11 +386,11 @@ func Context(env cli.Env) (ContextData, error) {
 	if branch == "HEAD" {
 		return ContextData{}, &RecordError{Message: "HEAD is detached; the record is kept per branch"}
 	}
-	base := env.Getenv("BASE_BRANCH")
-	if base == "" {
-		base = "main"
+	base, source, err := gitx.BaseBranch(env.Cwd, env.Getenv("BASE_BRANCH"))
+	if err != nil {
+		return ContextData{}, err
 	}
-	return ContextData{RecordDir(env.Getenv("STATE_DIR"), branch), branch, env.Getenv("WORKFLOW_ID"), env.Cwd, base}, nil
+	return ContextData{Dir: RecordDir(env.Getenv("STATE_DIR"), branch), Branch: branch, RunID: env.Getenv("WORKFLOW_ID"), Cwd: env.Cwd, BaseBranch: base, BaseBranchSource: source}, nil
 }
 
 type Answer struct {

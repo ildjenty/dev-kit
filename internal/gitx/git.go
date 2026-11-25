@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/ildjenty/dev-kit/internal/backlog"
 	"io"
@@ -13,6 +14,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type File struct {
@@ -28,9 +31,11 @@ type Changes struct {
 	Excluded           []string `json:"-"`
 }
 type Git struct {
-	Cwd       string
-	Refs      []string
-	RecordDir string
+	Cwd              string
+	Refs             []string
+	RecordDir        string
+	BaseBranch       string
+	BaseBranchSource string
 }
 
 func raw(cwd string, args []string, input string, env []string) (string, error) {
@@ -44,7 +49,7 @@ func raw(cwd string, args []string, input string, env []string) (string, error) 
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("Command failed: git %s\n%s", strings.Join(args, " "), strings.TrimRight(stderr.String(), "\n"))
+		return "", fmt.Errorf("Command failed in %s: git %s: %w\n%s", cwd, strings.Join(args, " "), err, strings.TrimRight(stderr.String(), "\n"))
 	}
 	return string(out), nil
 }
@@ -53,11 +58,44 @@ func Run(cwd string, args ...string) (string, error) {
 	out, err := raw(cwd, args, "", nil)
 	return strings.TrimSpace(out), err
 }
-func New(cwd, baseBranch string, recordDirs ...string) (*Git, error) {
-	if baseBranch == "" {
-		baseBranch = "main"
+func BaseBranch(cwd, explicit string) (string, string, error) {
+	if explicit != "" {
+		return explicit, "BASE_BRANCH", nil
 	}
-	g := &Git{Cwd: cwd, Refs: []string{}}
+	root, err := Run(cwd, "rev-parse", "--show-toplevel")
+	if err != nil {
+		return "", "", err
+	}
+	path := filepath.Join(root, ".archon/config.yaml")
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return "", "", fmt.Errorf("%s: %w", path, err)
+	}
+	var settings struct {
+		Worktree struct {
+			BaseBranch string `yaml:"baseBranch"`
+		} `yaml:"worktree"`
+	}
+	if err == nil {
+		if err := yaml.Unmarshal(data, &settings); err != nil {
+			return "", "", fmt.Errorf("%s: %w", path, err)
+		}
+	}
+	if strings.TrimSpace(settings.Worktree.BaseBranch) != "" {
+		return settings.Worktree.BaseBranch, ".archon/config.yaml worktree.baseBranch", nil
+	}
+	ref, err := Run(root, "symbolic-ref", "refs/remotes/origin/HEAD")
+	if err == nil && strings.HasPrefix(ref, "refs/remotes/origin/") && ref != "refs/remotes/origin/HEAD" {
+		return strings.TrimPrefix(ref, "refs/remotes/origin/"), "origin/HEAD", nil
+	}
+	return "", "", fmt.Errorf("cannot resolve base branch from BASE_BRANCH, worktree.baseBranch in %s, or origin/HEAD (git symbolic-ref refs/remotes/origin/HEAD): %v", path, err)
+}
+func New(cwd, baseBranch string, recordDirs ...string) (*Git, error) {
+	baseBranch, source, err := BaseBranch(cwd, baseBranch)
+	if err != nil {
+		return nil, err
+	}
+	g := &Git{Cwd: cwd, Refs: []string{}, BaseBranch: baseBranch, BaseBranchSource: source}
 	if len(recordDirs) > 0 {
 		g.RecordDir = recordDirs[0]
 		if g.RecordDir != "" && !filepath.IsAbs(g.RecordDir) {
@@ -65,7 +103,18 @@ func New(cwd, baseBranch string, recordDirs ...string) (*Git, error) {
 		}
 	}
 	for _, ref := range []string{"origin/" + baseBranch, baseBranch} {
-		if g.OK("rev-parse", "--verify", "--quiet", ref+"^{commit}") {
+		full := "refs/heads/" + baseBranch
+		if ref != baseBranch {
+			full = "refs/remotes/" + ref
+		}
+		_, exists, err := g.query("show-ref", "--verify", "--quiet", full)
+		if err != nil {
+			return nil, err
+		}
+		if exists {
+			if _, err := g.Run("rev-parse", "--verify", ref+"^{commit}"); err != nil {
+				return nil, err
+			}
 			g.Refs = append(g.Refs, ref)
 		}
 	}
@@ -80,15 +129,43 @@ func (g *Git) OK(args ...string) bool {
 	cmd.Dir = g.Cwd
 	return cmd.Run() == nil
 }
+func (g *Git) query(args ...string) (string, bool, error) {
+	cmd := exec.Command("git", args...)
+	cmd.Dir = g.Cwd
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err == nil {
+		return strings.TrimSpace(string(out)), true, nil
+	}
+	var exit *exec.ExitError
+	if errors.As(err, &exit) && exit.ExitCode() == 1 && stderr.Len() == 0 {
+		return "", false, nil
+	}
+	return "", false, fmt.Errorf("Command failed in %s: git %s: %w\n%s", g.Cwd, strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+}
+func (g *Git) PathExists(commit, path string) (bool, error) {
+	out, err := g.Bytes("ls-tree", "--full-tree", "-z", commit, "--", ":(literal)"+path)
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range strings.Split(string(out), "\x00") {
+		_, name, ok := strings.Cut(entry, "\t")
+		if ok && name == path {
+			return true, nil
+		}
+	}
+	return false, nil
+}
 func (g *Git) MergeBases(commit string) ([]string, error) {
 	bases := []string{}
 	seen := map[string]bool{}
 	for _, ref := range g.Refs {
-		if g.OK("merge-base", commit, ref) {
-			base, err := g.Run("merge-base", commit, ref)
-			if err != nil {
-				return nil, err
-			}
+		base, related, err := g.query("merge-base", commit, ref)
+		if err != nil {
+			return nil, err
+		}
+		if related {
 			if !seen[base] {
 				bases = append(bases, base)
 				seen[base] = true
@@ -215,7 +292,10 @@ func (g *Git) WorkingChanges(from string) (Changes, error) {
 	}
 	return g.snapshot(from, strings.TrimSpace(tree), env)
 }
-func (g *Git) IsAncestor(a, b string) bool { return g.OK("merge-base", "--is-ancestor", a, b) }
+func (g *Git) IsAncestor(a, b string) (bool, error) {
+	_, ancestor, err := g.query("merge-base", "--is-ancestor", a, b)
+	return ancestor, err
+}
 func (g *Git) excludedPaths(commit string) ([]string, error) {
 	branch, err := g.Branch()
 	if err != nil {

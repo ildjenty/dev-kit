@@ -65,6 +65,27 @@ func optional(file string) (doc, error) {
 	}
 	return d, err
 }
+func expectedPlan(dir string, target doc, required bool) (doc, error) {
+	file := filepath.Join(dir, "plan.json")
+	version := target["plan_version"]
+	if required && version == nil {
+		return nil, fmt.Errorf("%s: prepare requires a plan but target.json has no plan_version", file)
+	}
+	var plan doc
+	var err error
+	if version != nil {
+		plan, err = read(file)
+	} else {
+		plan, err = optional(file)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", file, err)
+	}
+	if version != nil && (plan == nil || plan["version"] != version) {
+		return nil, fmt.Errorf("%s: expected plan version %v, got %v; run judge prepare again", file, version, plan["version"])
+	}
+	return plan, nil
+}
 func save(file string, v any) error {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -90,6 +111,9 @@ func envDoc(env cli.Env, key string) (doc, error) {
 func Commands() []cli.Command {
 	return []cli.Command{
 		{Area: "judge", Name: "prepare", Usage: "devkit judge prepare", Run: func(args []string, env cli.Env) error {
+			if err := env.Require("ARTIFACTS_DIR"); err != nil {
+				return err
+			}
 			ctx, err := context(env)
 			if err != nil {
 				return err
@@ -101,6 +125,9 @@ func Commands() []cli.Command {
 			return env.JSON(result)
 		}},
 		{Area: "judge", Name: "changes", Usage: "devkit judge changes", Run: func(args []string, env cli.Env) error {
+			if err := env.Require("ARTIFACTS_DIR"); err != nil {
+				return err
+			}
 			result, err := writeChanges(env.Cwd, env.Path(env.Getenv("ARTIFACTS_DIR")))
 			if err != nil {
 				return err
@@ -109,6 +136,9 @@ func Commands() []cli.Command {
 		}},
 		{Area: "judge", Name: "route", Usage: "devkit judge route", Run: runRoute},
 		{Area: "judge", Name: "launch", Usage: "devkit judge launch", Run: func(args []string, env cli.Env) error {
+			if err := env.Require("ARTIFACTS_DIR"); err != nil {
+				return err
+			}
 			routed, err := envDoc(env, "ROUTE")
 			if err != nil {
 				return err
@@ -138,7 +168,11 @@ func completion(plan doc, commit string, g *gitx.Git) (doc, error) {
 	for _, t := range tests {
 		ref := commit + ":" + text(t["file"])
 		status := "missing_file"
-		if g.OK("cat-file", "-e", ref) {
+		exists, err := g.PathExists(commit, text(t["file"]))
+		if err != nil {
+			return nil, err
+		}
+		if exists {
 			kind, err := g.Run("cat-file", "-t", ref)
 			if err != nil {
 				return nil, err
@@ -161,12 +195,15 @@ func completion(plan doc, commit string, g *gitx.Git) (doc, error) {
 	return doc{"proceed": len(missing) == 0, "checked_count": len(tests), "missing_count": len(missing), "missing": missing}, nil
 }
 func runCompletion(args []string, env cli.Env) error {
+	if err := env.Require("ARTIFACTS_DIR"); err != nil {
+		return err
+	}
 	dir := filepath.Join(env.Getenv("ARTIFACTS_DIR"), "judge")
 	target, err := read(env.Path(filepath.Join(dir, "target.json")))
 	if err != nil {
 		return err
 	}
-	plan, err := optional(env.Path(filepath.Join(dir, "plan.json")))
+	plan, err := expectedPlan(env.Path(dir), target, false)
 	if err != nil {
 		return err
 	}
@@ -236,6 +273,9 @@ func gather(outputs, launch doc, materials ...doc) ([]doc, error) {
 	return judges, nil
 }
 func collect(args []string, env cli.Env) error {
+	if err := env.Require("ARTIFACTS_DIR"); err != nil {
+		return err
+	}
 	launch, err := envDoc(env, "CHANGES")
 	if err != nil {
 		return err

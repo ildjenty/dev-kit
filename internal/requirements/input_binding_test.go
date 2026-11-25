@@ -56,7 +56,7 @@ func TestFinishCLIRejectsUnboundRoundsBeforeWriting(t *testing.T) {
 			if change == "question-draft" {
 				draft["open_points"] = []document{{"id": "O1", "text": "Which filter should be used?"}}
 			}
-			vars := map[string]string{"STATE_DIR": state, "WORKFLOW_ID": "r1", "ARTIFACTS_DIR": artifacts, "INPUTS_OWNER_WORDS": "Filter the list", "INPUTS_REQUIREMENTS": string(must(json.Marshal(draft))), "INPUTS_JUDGMENT": string(must(json.Marshal(judgment())))}
+			vars := map[string]string{"BASE_BRANCH": "main", "STATE_DIR": state, "WORKFLOW_ID": "r1", "ARTIFACTS_DIR": artifacts, "INPUTS_OWNER_WORDS": "Filter the list", "INPUTS_REQUIREMENTS": string(must(json.Marshal(draft))), "INPUTS_JUDGMENT": string(must(json.Marshal(judgment())))}
 			var out, stderr bytes.Buffer
 			env := cli.Env{Cwd: repo, Stdout: &out, Stderr: &stderr, LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
 			registry := cli.New("test", Commands())

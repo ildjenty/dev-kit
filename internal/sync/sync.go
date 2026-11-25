@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/ildjenty/dev-kit/internal/cli"
@@ -19,13 +20,15 @@ import (
 )
 
 type State struct {
-	Previous      string     `json:"previous"`
-	Onto          *string    `json:"onto"`
-	Ref           *string    `json:"ref"`
-	Rounds        int        `json:"rounds"`
-	Conflicts     [][]string `json:"conflicts"`
-	Contradiction string     `json:"contradiction"`
-	State         string     `json:"state"`
+	BaseBranch       string     `json:"base_branch,omitempty"`
+	BaseBranchSource string     `json:"base_branch_source,omitempty"`
+	Previous         string     `json:"previous"`
+	Onto             *string    `json:"onto"`
+	Ref              *string    `json:"ref"`
+	Rounds           int        `json:"rounds"`
+	Conflicts        [][]string `json:"conflicts"`
+	Contradiction    string     `json:"contradiction"`
+	State            string     `json:"state"`
 }
 type Resolution struct {
 	Resolved      bool   `json:"resolved"`
@@ -55,7 +58,7 @@ func (g git) run(args ...string) (string, error) {
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("Command failed: git %s\n%s", strings.Join(args, " "), strings.TrimRight(stderr.String(), "\n"))
+		return "", fmt.Errorf("Command failed in %s: git %s: %w\n%s", g.cwd, strings.Join(args, " "), err, strings.TrimRight(stderr.String(), "\n"))
 	}
 	return strings.TrimSpace(string(out)), nil
 }
@@ -84,7 +87,7 @@ func (g git) unmerged() ([]string, error) {
 	out, err := cmd.Output()
 	files := []string{}
 	if err != nil {
-		return files, fmt.Errorf("Command failed: git diff --name-only --diff-filter=U -z\n%s", strings.TrimRight(stderr.String(), "\n"))
+		return files, fmt.Errorf("Command failed in %s: git diff --name-only --diff-filter=U -z: %w\n%s", g.cwd, err, strings.TrimRight(stderr.String(), "\n"))
 	}
 	seen := map[string]bool{}
 	for _, f := range strings.Split(string(out), "\x00") {
@@ -94,6 +97,24 @@ func (g git) unmerged() ([]string, error) {
 		}
 	}
 	return files, nil
+}
+func rebaseFailure(g git, s State, failure error) (State, error) {
+	active, err := g.rebasing()
+	if err != nil {
+		return s, fmt.Errorf("%w; inspect rebase state: %w", failure, err)
+	}
+	if active {
+		files, err := g.unmerged()
+		if err != nil {
+			return s, fmt.Errorf("%w; inspect conflicts: %w", failure, err)
+		}
+		if len(files) > 0 {
+			s.State = "conflict"
+			s.Conflicts = append(s.Conflicts, files)
+			return s, nil
+		}
+	}
+	return s, failure
 }
 func afterRebase(g git, s State) (State, error) {
 	for {
@@ -120,16 +141,8 @@ func afterRebase(g git, s State) (State, error) {
 			s.Conflicts = append(s.Conflicts, files)
 			return s, nil
 		}
-		if !g.ok("rebase", "--continue") {
-			files, err = g.unmerged()
-			if err != nil {
-				return s, err
-			}
-			if len(files) == 0 {
-				s.State = "conflict"
-				s.Conflicts = append(s.Conflicts, []string{})
-				return s, nil
-			}
+		if _, err := g.run("rebase", "--continue"); err != nil {
+			return rebaseFailure(g, s, err)
 		}
 	}
 }
@@ -148,7 +161,14 @@ func start(g git, base string) (State, error) {
 		return s, nil
 	}
 	ref := base
-	if g.ok("remote", "get-url", "origin") {
+	remotes, err := g.run("remote")
+	if err != nil {
+		return s, err
+	}
+	if slices.Contains(strings.Split(remotes, "\n"), "origin") {
+		if _, err := g.run("remote", "get-url", "origin"); err != nil {
+			return s, err
+		}
 		if _, err = g.run("fetch", "--quiet", "origin", base); err != nil {
 			return s, err
 		}
@@ -160,25 +180,16 @@ func start(g git, base string) (State, error) {
 	}
 	s.Ref = &ref
 	s.Onto = &onto
-	if g.ok("merge-base", "--is-ancestor", onto, previous) {
+	ancestor, err := (&gitx.Git{Cwd: g.cwd}).IsAncestor(onto, previous)
+	if err != nil {
+		return s, err
+	}
+	if ancestor {
 		s.State = "current"
 		return s, nil
 	}
 	if _, err = g.run("rebase", "--quiet", onto); err != nil {
-		active, stateErr := g.rebasing()
-		if stateErr != nil {
-			return s, stateErr
-		}
-		if !active {
-			return s, err
-		}
-		files, stateErr := g.unmerged()
-		if stateErr != nil {
-			return s, stateErr
-		}
-		if len(files) == 0 {
-			return s, err
-		}
+		return rebaseFailure(g, s, err)
 	}
 	return afterRebase(g, s)
 }
@@ -209,7 +220,9 @@ func proceed(g git, s State, r Resolution, read func(string) (*string, error)) (
 	if _, err := g.run("add", "-A"); err != nil {
 		return s, err
 	}
-	g.ok("rebase", "--continue")
+	if _, err := g.run("rebase", "--continue"); err != nil {
+		return rebaseFailure(g, s, err)
+	}
 	return afterRebase(g, s)
 }
 func settle(g git, s State) (State, error) {
@@ -302,6 +315,9 @@ func Commands() []cli.Command {
 	return append(commands, cli.Command{Area: "sync", Name: "finish", Usage: "devkit sync finish", Run: finish}, cli.Command{Area: "sync", Name: "output", Usage: "devkit sync output <not-started> <result>", Run: output})
 }
 func rebase(mode string, env cli.Env) error {
+	if err := env.Require("ARTIFACTS_DIR"); err != nil {
+		return err
+	}
 	childEnv := env.Environ
 	if childEnv == nil {
 		childEnv = os.Environ()
@@ -339,14 +355,11 @@ func rebase(mode string, env cli.Env) error {
 		}
 		resolver = record.Document{"language": c.Language, "standards": standards, "writer_materials": mapping.Materials(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "criteria", standards), "writer:sync", "code")}
 
-		base := env.Getenv("BASE_BRANCH")
-		if base == "" {
-			base = "main"
-		}
-		s, err = start(g, base)
+		s, err = start(g, ctx.BaseBranch)
 		if err != nil {
 			return err
 		}
+		s.BaseBranch, s.BaseBranchSource = ctx.BaseBranch, ctx.BaseBranchSource
 	} else {
 		if err = readJSON(file, &s); err != nil {
 			return err
@@ -393,12 +406,9 @@ func rebase(mode string, env cli.Env) error {
 		if err = readJSON(env.Path(filepath.Join(out, "input.json")), &resolver); err != nil {
 			return err
 		}
-		replaying := ""
-		if g.ok("rev-parse", "--verify", "--quiet", "REBASE_HEAD") {
-			replaying, err = g.run("log", "-1", "--format=%H %s", "REBASE_HEAD")
-			if err != nil {
-				return err
-			}
+		replaying, err := g.run("log", "-1", "--format=%H %s", "REBASE_HEAD")
+		if err != nil {
+			return err
 		}
 		if err = saveJSON(env.Path(filepath.Join(out, "conflict.json")), record.Document{"language": resolver["language"], "standards": resolver["standards"], "writer_materials": resolver["writer_materials"], "files": files, "replaying": replaying, "onto": s.Onto}); err != nil {
 			return err
@@ -411,6 +421,9 @@ func rebase(mode string, env cli.Env) error {
 	return env.JSON(record.Document{"previous": s.Previous, "onto": s.Onto, "ref": s.Ref, "rounds": s.Rounds, "contradiction": s.Contradiction, "state": s.State, "files": files, "commit": head})
 }
 func finish(args []string, env cli.Env) error {
+	if err := env.Require("ARTIFACTS_DIR"); err != nil {
+		return err
+	}
 	ctx, err := record.Context(env)
 	if err != nil {
 		return err

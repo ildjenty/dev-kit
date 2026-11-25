@@ -4,6 +4,8 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "base_branch": {"type": "string", "minLength": 1},
+    "base_branch_source": {"type": "string", "enum": ["BASE_BRANCH", ".archon/config.yaml worktree.baseBranch", "origin/HEAD"]},
     "review": {
       "type": "object",
       "additionalProperties": false,

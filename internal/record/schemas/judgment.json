@@ -35,7 +35,10 @@
       "additionalProperties": false,
       "properties": {
         "proposal_version": {
-          "$ref": "common.json#/$defs/version"
+          "anyOf": [
+            { "$ref": "common.json#/$defs/version" },
+            { "type": "null" }
+          ]
         },
         "requirements_version": {
           "$ref": "common.json#/$defs/version"
@@ -168,6 +171,24 @@
     "findings"
   ],
   "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": { "const": "proposal" },
+          "target": {
+            "required": ["proposal_version"],
+            "properties": { "proposal_version": { "type": "null" } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "judge": { "enum": ["refine", "retro"] },
+          "verdict": { "const": "not_assessed" },
+          "observations": { "minItems": 1 }
+        }
+      }
+    },
     {
       "if": {
         "properties": {

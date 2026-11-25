@@ -31,7 +31,9 @@ func TestRequirementsIssueStartConditions(t *testing.T) {
 				dir := RecordDir(state, "feature/x")
 				input := "42"
 				if source == "request" {
-					testutil.Put(t, dir, "request/1.json", `{"issue":42}`)
+					req := request(newRecord(t)).Entry
+					req["issue"] = 42
+					must(Append(dir, "request", req))
 					input = ""
 				}
 				var out, stderr bytes.Buffer

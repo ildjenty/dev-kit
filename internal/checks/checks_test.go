@@ -71,7 +71,7 @@ func TestSnapshotsAndRounds(t *testing.T) {
 	testutil.Put(t, repo, "src/new.txt", "untracked content\n")
 	before := testutil.Git(t, repo, "status", "--porcelain")
 	index := testutil.Must(os.ReadFile(filepath.Join(repo, ".git/index")))
-	o := Options{Cwd: repo, ArtifactsDir: artifacts}
+	o := Options{Cwd: repo, ArtifactsDir: artifacts, BaseBranch: "main"}
 	first := testutil.Must(RunChecks(o))
 	testutil.Equal(t, first.Round, 1)
 	testutil.Equal(t, first.Passed, false)
@@ -111,7 +111,7 @@ func TestGitRenameDirectories(t *testing.T) {
 	testutil.OK(t, os.Mkdir(filepath.Join(repo, "new"), 0755))
 	testutil.OK(t, os.Rename(filepath.Join(repo, "old/file.txt"), filepath.Join(repo, "new/file.txt")))
 	testutil.OK(t, os.Remove(filepath.Join(repo, "old")))
-	g := testutil.Must(gitx.New(repo, ""))
+	g := testutil.Must(gitx.New(repo, "main"))
 	changes := testutil.Must(g.WorkingChanges(from))
 	testutil.Equal(t, changes.Files, []gitx.File{{Status: "R100", OldPath: "old/file.txt", Path: "new/file.txt"}})
 	testutil.Equal(t, changes.AddedDirectories, []string{"new"})
@@ -167,7 +167,7 @@ func TestBaseChecksStillRunWhenRemovedOrReplaced(t *testing.T) {
 		testutil.Git(t, repo, "commit", "-qm", "base check")
 		testutil.Git(t, repo, "branch", "-f", "main", "HEAD")
 		testutil.Put(t, repo, ".devkit/config.json", current)
-		gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir()}))
+		gate := testutil.Must(RunChecks(Options{Cwd: repo, ArtifactsDir: t.TempDir(), BaseBranch: "main"}))
 		testutil.Equal(t, gate.Passed, false)
 		testutil.Equal(t, gate.Failing, []string{"required"})
 		lines := bytes.Split(bytes.TrimSpace(testutil.Must(os.ReadFile(gate.Results))), []byte("\n"))

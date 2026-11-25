@@ -188,14 +188,19 @@ func (r *Result) total() {
 	}
 }
 
-func printTotals(out io.Writer, label string, counts Counts) {
-	fmt.Fprintf(out, "%s: expected %d, found %d, missed %d (routing %d), not-expected reported %d/%d, other %d (not scored as wrong)\n", label, counts.Expected, counts.Found, counts.Missed, counts.RoutingMissed, counts.NotExpectedReported, counts.NotExpected, counts.Other)
+func printTotals(out io.Writer, label string, counts Counts) error {
+	_, err := fmt.Fprintf(out, "%s: expected %d, found %d, missed %d (routing %d), not-expected reported %d/%d, other %d (not scored as wrong)\n", label, counts.Expected, counts.Found, counts.Missed, counts.RoutingMissed, counts.NotExpectedReported, counts.NotExpected, counts.Other)
+	return err
 }
 
-func printCase(out io.Writer, c CaseResult) {
-	fmt.Fprintf(out, "  Routing source: %v; launched: %v; expected qualities: %v\n", c.Route["source"], c.LaunchedQualities, c.ExpectedQualities)
+func printCase(out io.Writer, c CaseResult) error {
+	if _, err := fmt.Fprintf(out, "  Routing source: %v; launched: %v; expected qualities: %v\n", c.Route["source"], c.LaunchedQualities, c.ExpectedQualities); err != nil {
+		return err
+	}
 	for _, q := range c.Qualities {
-		printTotals(out, "  "+q.Quality, q.Totals)
+		if err := printTotals(out, "  "+q.Quality, q.Totals); err != nil {
+			return err
+		}
 		for _, finding := range q.Expected {
 			status := "FOUND " + finding.ReportedID
 			if finding.ReportedID == "" {
@@ -204,16 +209,22 @@ func printCase(out io.Writer, c CaseResult) {
 			if finding.RoutingMiss {
 				status += " (routing: quality not launched)"
 			}
-			fmt.Fprintf(out, "    %s %s %s: %s\n", status, finding.ID, finding.File, finding.Summary)
+			if _, err := fmt.Fprintf(out, "    %s %s %s: %s\n", status, finding.ID, finding.File, finding.Summary); err != nil {
+				return err
+			}
 		}
 		for _, finding := range q.NotExpected {
 			if finding.ReportedID != "" {
-				fmt.Fprintf(out, "    NOT-EXPECTED REPORTED %s (%s) %s: %s\n", finding.ID, finding.ReportedID, finding.File, finding.Summary)
+				if _, err := fmt.Fprintf(out, "    NOT-EXPECTED REPORTED %s (%s) %s: %s\n", finding.ID, finding.ReportedID, finding.File, finding.Summary); err != nil {
+					return err
+				}
 			}
 		}
 		for _, finding := range q.Other {
-			fmt.Fprintf(out, "    OTHER %s %s:%s: %s; evidence: %s\n", finding.ID, finding.File, finding.Line, finding.FailureScenario, finding.Evidence)
+			if _, err := fmt.Fprintf(out, "    OTHER %s %s:%s: %s; evidence: %s\n", finding.ID, finding.File, finding.Line, finding.FailureScenario, finding.Evidence); err != nil {
+				return err
+			}
 		}
 	}
-	printTotals(out, "  Case total", c.Totals)
+	return printTotals(out, "  Case total", c.Totals)
 }

@@ -2,6 +2,7 @@ package retro
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -72,8 +73,8 @@ func readDraft(artifacts string) (any, error) {
 		return nil, e
 	}
 	var d any
-	if json.Unmarshal(b, &d) != nil {
-		return nil, nil
+	if e := json.Unmarshal(b, &d); e != nil {
+		return nil, fmt.Errorf("%s: %w", file(artifacts, "draft.json"), e)
 	}
 	return d, nil
 }

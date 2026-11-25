@@ -19,10 +19,13 @@ func runRoute(args []string, env cli.Env) error {
 }
 
 func runRouteTimeout(env cli.Env, timeout time.Duration) error {
+	if err := env.Require("ARTIFACTS_DIR"); err != nil {
+		return err
+	}
 	artifacts := env.Path(env.Getenv("ARTIFACTS_DIR"))
 	result := routeJevClient(artifacts, jev.New(env))
-	if err := save(filepath.Join(artifacts, "judge/route-jev.json"), result); err != nil && truth(result["available"]) {
-		result = jevUnavailable("Could not write Jev route artifact")
+	if err := save(filepath.Join(artifacts, "judge/route-jev.json"), result); err != nil {
+		return err
 	}
 	delete(result, "probabilities")
 	if truth(result["available"]) {

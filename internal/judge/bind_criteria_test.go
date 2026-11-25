@@ -75,7 +75,8 @@ func TestJudgeCLIUsesFixedSourcePathsAfterRelocation(t *testing.T) {
 					testutil.Equal(t, material["authority"], selected.Authority)
 				}
 				vars["ARTIFACTS_DIR"] = artifacts
-				vars["GATE"] = `{"passed":true,"failing":[],"results":"checks/1.jsonl"}`
+				testutil.Put(t, artifacts, "checks/1.jsonl", "")
+				vars["GATE"] = jsonText(doc{"passed": true, "failing": []string{}, "results": filepath.Join(artifacts, "checks/1.jsonl")})
 				vars["COMPLETION"] = jsonText(runCLI(t, repo, vars, "completion"))
 				collectPassingJudges(t, repo, vars)
 				testutil.Equal(t, runCLI(t, repo, vars, "finish")["outcome"], "pass")

@@ -143,6 +143,9 @@ func reportMaterials(title, body []byte) []string {
 }
 
 func report(mode string, env cli.Env) error {
+	if err := env.Require("ARTIFACTS_DIR"); err != nil {
+		return err
+	}
 	out := filepath.Join(env.Getenv("ARTIFACTS_DIR"), "pr")
 	stateFile := env.Path(filepath.Join(out, "report-state.json"))
 	switch mode {

@@ -91,7 +91,7 @@ func TestPlanCheckRejectsChangesLeftBySkeletonCheck(t *testing.T) {
 				} else {
 					testutil.OK(t, write(filepath.Join(a, "plan/draft.json"), structureDraft()))
 				}
-				vars := map[string]string{"STATE_DIR": t.TempDir(), "WORKFLOW_ID": ctx.RunID, "ARTIFACTS_DIR": a, "PLAN_PHASE": phase}
+				vars := map[string]string{"BASE_BRANCH": "main", "STATE_DIR": t.TempDir(), "WORKFLOW_ID": ctx.RunID, "ARTIFACTS_DIR": a, "PLAN_PHASE": phase}
 				var out, stderr bytes.Buffer
 				env := cli.Env{Cwd: ctx.Cwd, Stdout: &out, Stderr: &stderr, Environ: append(os.Environ(), "DEVKIT_PLAN_TEST_MUTATION="+mutation), LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
 				testutil.Equal(t, cli.New("test", Commands()).Execute([]string{"plan", "check"}, env), 0)
@@ -143,7 +143,7 @@ func TestPlanFinishBindsPassToJudgedSkeleton(t *testing.T) {
 			t.Run(fmt.Sprintf("%s/materialize=%t", mutation, materialize), func(t *testing.T) {
 				ctx, a := repository(t, document{})
 				var out, stderr bytes.Buffer
-				vars := map[string]string{"STATE_DIR": t.TempDir(), "WORKFLOW_ID": ctx.RunID, "ARTIFACTS_DIR": a}
+				vars := map[string]string{"BASE_BRANCH": "main", "STATE_DIR": t.TempDir(), "WORKFLOW_ID": ctx.RunID, "ARTIFACTS_DIR": a}
 				env := cli.Env{Cwd: ctx.Cwd, Stdout: &out, Stderr: &stderr, LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
 				ctx = must(record.Context(env))
 				request(ctx.Dir)

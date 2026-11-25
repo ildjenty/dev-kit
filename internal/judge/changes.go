@@ -181,7 +181,7 @@ func writeChanges(root, artifacts string) (doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	plan, err := optional(filepath.Join(dir, "plan.json"))
+	plan, err := expectedPlan(dir, target, false)
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +270,11 @@ func writeChanges(root, artifacts string) (doc, error) {
 		}
 		for _, side := range []struct{ name, ref, path string }{{"base", text(target["base"]), old}, {"commit", text(target["commit"]), f.Path}} {
 			ref := side.ref + ":" + side.path
-			if !g.OK("cat-file", "-e", ref) {
+			exists, err := g.PathExists(side.ref, side.path)
+			if err != nil {
+				return nil, err
+			}
+			if !exists {
 				continue
 			}
 			file := filepath.Join(dir, "source", side.name, side.path)
@@ -313,7 +317,7 @@ func routeChanges(root, artifacts string, routed doc) (doc, error) {
 	if err != nil {
 		return nil, err
 	}
-	plan, err := optional(filepath.Join(dir, "plan.json"))
+	plan, err := expectedPlan(dir, target, false)
 	if err != nil {
 		return nil, err
 	}

@@ -31,7 +31,11 @@ func Commands() []cli.Command {
 		if len(args) == 1 {
 			env.Cwd = env.Path(args[0])
 		}
-		if !Report(env) {
+		valid, err := reportOutput(env, timeout, 20*time.Second)
+		if err != nil {
+			return err
+		}
+		if !valid {
 			return &cli.ExitError{Code: 1}
 		}
 		return nil
@@ -51,7 +55,13 @@ func command(env cli.Env, limit time.Duration, name string, args ...string) (str
 }
 
 func report(env cli.Env, limit, providerLimit time.Duration) bool {
+	valid, err := reportOutput(env, limit, providerLimit)
+	return valid && err == nil
+}
+
+func reportOutput(env cli.Env, limit, providerLimit time.Duration) (bool, error) {
 	valid := true
+	var outputErr error
 	finding := func(level, item string, ok bool, present, missing string) {
 		status, detail := "OK", present
 		if !ok {
@@ -64,7 +74,9 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 		if key := env.Getenv("TYPESAFE_API_KEY"); key != "" {
 			line = strings.ReplaceAll(line, key, "[redacted]")
 		}
-		fmt.Fprint(env.Stdout, line)
+		if outputErr == nil {
+			_, outputErr = fmt.Fprint(env.Stdout, line)
+		}
 	}
 	_, git := command(env, limit, "git", "--version")
 	finding("required", "git", git, "available", "All workflows need Git; install Git from https://git-scm.com/downloads.")
@@ -188,7 +200,7 @@ func report(env cli.Env, limit, providerLimit time.Duration) bool {
 	}
 	finding("optional", "TYPESAFE_API_KEY", key, "set; TypeSafe receives changed-file diffs for routing", "Not set; the configured provider CLI performs routing. Set TYPESAFE_API_KEY to use TypeSafe (changed-file diffs are sent).")
 	finding("optional", "checks", len(settings.Checks) > 0, fmt.Sprintf("%d configured; command availability is checked when they run", len(settings.Checks)), "No verification runs; run the "+settings.Skills["devkit-optimize"]+" skill to configure repository checks.")
-	return valid
+	return valid, outputErr
 }
 
 func usedProviders(root, configured string) ([]string, error) {

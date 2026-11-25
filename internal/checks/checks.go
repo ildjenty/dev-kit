@@ -28,15 +28,17 @@ type Result struct {
 	BaseLog string  `json:"base_log,omitempty"`
 }
 type Gate struct {
-	Preexisting []string `json:"preexisting"`
-	Regressed   []string `json:"regressed"`
-	Round       int      `json:"round"`
-	Passed      bool     `json:"passed"`
-	Stuck       bool     `json:"stuck"`
-	Failing     []string `json:"failing"`
-	StuckChecks []string `json:"stuck_checks"`
-	Skipped     []string `json:"skipped"`
-	Results     string   `json:"results,omitempty"`
+	BaseBranch       string   `json:"base_branch,omitempty"`
+	BaseBranchSource string   `json:"base_branch_source,omitempty"`
+	Preexisting      []string `json:"preexisting"`
+	Regressed        []string `json:"regressed"`
+	Round            int      `json:"round"`
+	Passed           bool     `json:"passed"`
+	Stuck            bool     `json:"stuck"`
+	Failing          []string `json:"failing"`
+	StuckChecks      []string `json:"stuck_checks"`
+	Skipped          []string `json:"skipped"`
+	Results          string   `json:"results,omitempty"`
 }
 
 func Judge(round int, now, before []Result, required []string) Gate {
@@ -305,22 +307,35 @@ func RunChecks(o Options) (Gate, error) {
 	data, err := os.ReadFile(roundFile)
 	if err == nil {
 		number := strings.TrimSpace(string(data))
-		n := float64(0)
-		if number != "" {
-			n, err = strconv.ParseFloat(number, 64)
+		n, err := strconv.Atoi(number)
+		if err != nil || n < 1 {
+			return Gate{}, fmt.Errorf("%s: invalid checks round %q; expected a positive integer", roundFile, number)
 		}
-		if err != nil || n < 0 || n != float64(int(n)) {
-			return Gate{}, fmt.Errorf("invalid checks round")
-		}
-		previous = int(n)
+		previous = n
 	} else if !os.IsNotExist(err) {
 		return Gate{}, err
+	} else {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return Gate{}, err
+		}
+		for _, entry := range entries {
+			if strings.HasSuffix(entry.Name(), ".jsonl") {
+				if n, err := strconv.Atoi(strings.TrimSuffix(entry.Name(), ".jsonl")); err == nil && n > 0 {
+					return Gate{}, fmt.Errorf("%s: round index is missing but %s exists; restore the checks history before continuing", roundFile, filepath.Join(dir, entry.Name()))
+				}
+			}
+		}
 	}
 	round := previous + 1
 	before := []Result{}
-	data, err = os.ReadFile(filepath.Join(dir, fmt.Sprintf("%d.jsonl", previous)))
-	if err != nil && !os.IsNotExist(err) {
-		return Gate{}, err
+	data = nil
+	previousPath := filepath.Join(dir, fmt.Sprintf("%d.jsonl", previous))
+	if previous > 0 {
+		data, err = os.ReadFile(previousPath)
+		if err != nil {
+			return Gate{}, err
+		}
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		if line == "" {
@@ -328,12 +343,19 @@ func RunChecks(o Options) (Gate, error) {
 		}
 		var r Result
 		if err := json.Unmarshal([]byte(line), &r); err != nil {
-			return Gate{}, err
+			return Gate{}, fmt.Errorf("%s: %w", previousPath, err)
 		}
 		before = append(before, r)
 	}
 	resultsPath := filepath.Join(dir, fmt.Sprintf("%d.jsonl", round))
-	for _, file := range []struct{ path, text string }{{roundFile, strconv.Itoa(round)}, {resultsPath, ""}, {filepath.Join(dir, fmt.Sprintf("%d-diff.patch", round)), changes.Patch}, {filepath.Join(artifacts, "diff.patch"), changes.Patch}} {
+	f, err := os.OpenFile(resultsPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		return Gate{}, fmt.Errorf("%s: cannot create checks history; restore the round index before continuing: %w", resultsPath, err)
+	}
+	if err := f.Close(); err != nil {
+		return Gate{}, err
+	}
+	for _, file := range []struct{ path, text string }{{roundFile, strconv.Itoa(round)}, {filepath.Join(dir, fmt.Sprintf("%d-diff.patch", round)), changes.Patch}, {filepath.Join(artifacts, "diff.patch"), changes.Patch}} {
 		if err := os.WriteFile(file.path, []byte(file.text), 0644); err != nil {
 			return Gate{}, err
 		}
@@ -398,6 +420,7 @@ func RunChecks(o Options) (Gate, error) {
 		}
 	}
 	gate := Judge(round, results, before, names)
+	gate.BaseBranch, gate.BaseBranchSource = g.BaseBranch, g.BaseBranchSource
 	gate.Results = resultsPath
 	return gate, nil
 }

@@ -17,6 +17,9 @@ import (
 )
 
 func Run(env cli.Env, area, promptPath, schema string, timeout time.Duration, readDirs ...string) (map[string]any, error) {
+	if err := env.Require("ARTIFACTS_DIR", "PACK_DIR"); err != nil {
+		return nil, err
+	}
 	prompt, err := os.ReadFile(env.Path(filepath.Join(env.Getenv("PACK_DIR"), promptPath)))
 	if err != nil {
 		return nil, fmt.Errorf("could not read Claude prompt")

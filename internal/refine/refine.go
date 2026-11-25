@@ -104,8 +104,8 @@ func readDraft(artifacts string) (any, error) {
 		return nil, e
 	}
 	var d any
-	if json.Unmarshal(b, &d) != nil {
-		return nil, nil
+	if e := json.Unmarshal(b, &d); e != nil {
+		return nil, fmt.Errorf("%s: %w", file(artifacts, "draft.json"), e)
 	}
 	return d, nil
 }
@@ -230,7 +230,7 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 		}
 		return strings.Split(s, "\n")
 	}
-	return record.Start(ctx.Dir, "refine", record.StartOptions{RunID: ctx.RunID, Commit: head, BaseCommit: base, ChangeID: func() (*string, error) {
+	return record.Start(ctx.Dir, "refine", record.StartOptions{BaseBranch: ctx.BaseBranch, BaseBranchSource: ctx.BaseBranchSource, RunID: ctx.RunID, Commit: head, BaseCommit: base, ChangeID: func() (*string, error) {
 		g, e := gitx.New(ctx.Cwd, ctx.BaseBranch, ctx.Dir)
 		if e != nil {
 			return nil, e
@@ -947,6 +947,12 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 		return nil, e
 	}
 	entry := doc{"approval_text": string(approval), "commit": obj(proposal["content"])["commit"], "proposal_version": proposal["version"], "round": n, "draft": d, "judgment": judgment, "errors": errors, "cleared": len(errors) == 0 && blocking == 0 && missing == 0}
+	if len(committed) > 0 {
+		entry["proposal_version"], entry["commit"] = nil, nil
+	}
+	if _, e := record.ProposalRoundTarget(entry, file(artifacts, fmt.Sprintf("rounds/%d.json", n))); e != nil {
+		return nil, e
+	}
 	if e = writeJSON(file(artifacts, fmt.Sprintf("rounds/%d.json", n)), entry); e != nil {
 		return nil, e
 	}
@@ -983,6 +989,18 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 	entry, err := readJSON(file(artifacts, "rounds/latest.json"))
 	if err != nil {
 		return nil, err
+	}
+	roundEntries := []doc{}
+	for n := 1; n <= num(entry["round"]); n++ {
+		path := file(artifacts, fmt.Sprintf("rounds/%d.json", n))
+		roundEntry, err := readJSON(path)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := record.ProposalRoundTarget(roundEntry, path); err != nil {
+			return nil, err
+		}
+		roundEntries = append(roundEntries, roundEntry)
 	}
 	input, err := readJSON(file(artifacts, "input.json"))
 	if err != nil {
@@ -1038,11 +1056,8 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 		result = doc{"outcome": "question", "decision_ids": content["decision_ids"], "questions": []doc{{"text": text, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"refine"}, "invalidates": []string{}}}}
 	}
 	records := []doc{}
-	for n := 1; n <= num(entry["round"]); n++ {
-		roundEntry, err := readJSON(file(artifacts, fmt.Sprintf("rounds/%d.json", n)))
-		if err != nil {
-			return nil, err
-		}
+	for i, roundEntry := range roundEntries {
+		n := i + 1
 		observations, findings, verdict := []string{}, []doc{}, "pass"
 		for _, c := range items(obj(roundEntry["judgment"])["criteria"]) {
 			observations = append(observations, str(c["aspect"])+": "+str(c["checked"]))
@@ -1062,11 +1077,15 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 			verdict = "not_assessed"
 			observations = append(observations, stringsOf(roundEntry["errors"])...)
 		}
-		version := roundEntry["proposal_version"]
-		if num(version) == 0 {
-			version = max(1, num(p["version"]))
+		target, err := record.ProposalRoundTarget(roundEntry, file(artifacts, fmt.Sprintf("rounds/%d.json", n)))
+		if err != nil {
+			return nil, err
 		}
-		records = append(records, doc{"judge": "refine", "phase": "decide", "round": n, "kind": "proposal", "target": doc{"proposal_version": version}, "materials": []string{file(artifacts, "input.json"), file(artifacts, fmt.Sprintf("rounds/%d.json", n)), str(input["criteria"])}, "observations": observations, "verdict": verdict, "findings": findings})
+		if target["proposal_version"] == nil {
+			verdict = "not_assessed"
+			observations = append([]string{"No committed proposal exists for this round."}, observations...)
+		}
+		records = append(records, doc{"judge": "refine", "phase": "decide", "round": n, "kind": "proposal", "target": target, "materials": []string{file(artifacts, "input.json"), file(artifacts, fmt.Sprintf("rounds/%d.json", n)), str(input["criteria"])}, "observations": observations, "verdict": verdict, "findings": findings})
 	}
 	if err = record.WriteLoopJudgments(ctx, records, ""); err != nil {
 		return nil, err

@@ -45,6 +45,8 @@ func TestStatusDistinguishesUnreadableAnswersFromMissingAndAnswered(t *testing.T
 		{name: "missing", questions: []string{"Q1"}},
 		{name: "answered", answer: "valid", questions: []string{}},
 		{name: "malformed", answer: "malformed", cause: "unexpected end of JSON input", questions: []string{}},
+		{name: "empty object", answer: "{}", cause: "required property answer", questions: []string{}},
+		{name: "null", answer: "null", cause: "must be object", questions: []string{}},
 		{name: "read failure", answer: "directory", cause: "is a directory", questions: []string{}},
 		{name: "malformed with pending", answer: "malformed", extra: "open_point", cause: "unexpected end of JSON input", questions: []string{"Q2"}},
 		{name: "malformed with approval", answer: "malformed", extra: "proposal", cause: "unexpected end of JSON input", questions: []string{"Q2"}},
@@ -61,11 +63,13 @@ func TestStatusDistinguishesUnreadableAnswersFromMissingAndAnswered(t *testing.T
 			answerPath := filepath.Join(dir, "answers/Q1.json")
 			switch tc.answer {
 			case "valid":
-				testutil.Put(t, dir, "answers/Q1.json", `{"question_id":"Q1","answer":"yes"}`)
+				writeAnswer(t, dir, "Q1")
 			case "malformed":
 				testutil.Put(t, dir, "answers/Q1.json", "{")
 			case "directory":
 				testutil.OK(t, os.MkdirAll(answerPath, 0755))
+			case "{}", "null":
+				testutil.Put(t, dir, "answers/Q1.json", tc.answer)
 			}
 			healthy := branch(t, records, "feature/healthy")
 			run1(t, healthy, "plan", 2, map[string]any{"outcome": "pass"})

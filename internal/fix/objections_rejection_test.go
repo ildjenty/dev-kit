@@ -13,7 +13,7 @@ import (
 )
 
 func TestObjectionsCLIPreservesUnreadableInputAndState(t *testing.T) {
-	for _, input := range []string{"malformed", "read-error", "missing", "empty", "objection"} {
+	for _, input := range []string{"malformed", "read-error", "null", "{}", `{"objections":"broken"}`, `{"objections":null}`, `{"objections":[null]}`, `{"objections":[{}]}`, `{"objections":[{"finding":1,"evidence":"proof"}]}`, `{"objections":[{"finding":"F1","evidence":1}]}`, "missing", "empty", "objection"} {
 		t.Run(input, func(t *testing.T) {
 			ctx, artifacts, _, head := setup(t, 3)
 			testutil.Must(prepare(ctx, artifacts))
@@ -27,6 +27,10 @@ func TestObjectionsCLIPreservesUnreadableInputAndState(t *testing.T) {
 				putJSON(t, source, record.Document{"objections": []record.Document{}})
 			case "objection":
 				putJSON(t, source, record.Document{"objections": []record.Document{{"finding": "j1/contract/F1", "evidence": "The guard rejects it"}}})
+			default:
+				if input != "missing" {
+					testutil.OK(t, os.WriteFile(source, []byte(input), 0644))
+				}
 			}
 			file := filepath.Join(artifacts, "fix/state.json")
 			before := testutil.Must(os.ReadFile(file))
@@ -35,18 +39,19 @@ func TestObjectionsCLIPreservesUnreadableInputAndState(t *testing.T) {
 			vars := map[string]string{"ARTIFACTS_DIR": artifacts}
 			env := cli.Env{Cwd: ctx.Cwd, Stdout: &stdout, Stderr: &stderr, LookupEnv: func(k string) (string, bool) { v, ok := vars[k]; return v, ok }}
 			code := cli.New("test", Commands()).Execute([]string{"fix", "objections"}, env)
-			if input == "malformed" || input == "read-error" {
+			if input != "missing" && input != "empty" && input != "objection" {
 				testutil.Equal(t, code, 1)
 				testutil.Equal(t, stdout.String(), "")
 				if stderr.Len() == 0 {
 					t.Fatal("objection read failure was not reported")
 				}
 				testutil.Equal(t, string(testutil.Must(os.ReadFile(file))), string(before))
-				if input == "malformed" {
-					testutil.Equal(t, string(testutil.Must(os.ReadFile(source))), `{"objections":[`)
-				} else {
+				if input == "read-error" {
 					testutil.Equal(t, testutil.Must(os.Stat(source)).IsDir(), true)
+				} else {
+					testutil.Must(os.Stat(source))
 				}
+				testutil.Contains(t, stderr.String(), source)
 				_, err := os.Stat(filepath.Join(artifacts, "fix/objections"))
 				if !os.IsNotExist(err) {
 					t.Fatalf("rejected objections were consumed: %v", err)

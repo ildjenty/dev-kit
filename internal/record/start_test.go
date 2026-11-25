@@ -330,12 +330,13 @@ func TestConfiguredLimitAndBaseBranchCLI(t *testing.T) {
 	repo := testutil.Repo(t)
 	testutil.Git(t, repo, "branch", "trunk", "main")
 	testutil.Git(t, repo, "branch", "-D", "main")
-	testutil.Put(t, repo, ".devkit/config.json", `{"limits":{"restarts":0}}`)
+	testutil.Put(t, repo, ".devkit/config.json", `{"limits":{"restarts":1}}`)
 	testutil.Git(t, repo, "add", ".devkit")
 	testutil.Git(t, repo, "commit", "-qm", "settings")
 	state := t.TempDir()
 	dir := RecordDir(state, "feature/x")
 	run(dir, "r1", "requirements", nil)
+	run(dir, "retry", "requirements", Document{"start": "retry_after_error", "counted": true})
 	vars := map[string]string{"STATE_DIR": state, "WORKFLOW_ID": "r2", "INPUTS_ANSWERS": "", "INPUTS_CONTINUE": "", "BASE_BRANCH": "trunk"}
 	r := cli.New("test", Commands())
 	var out, stderr bytes.Buffer
@@ -343,16 +344,17 @@ func TestConfiguredLimitAndBaseBranchCLI(t *testing.T) {
 	testutil.Equal(t, r.Execute([]string{"record", "limit", "requirements"}, env), 0)
 	var limited LimitStatus
 	testutil.OK(t, json.Unmarshal(out.Bytes(), &limited))
-	testutil.Equal(t, []any{limited.Limit, limited.Reached}, []any{0, true})
+	testutil.Equal(t, []any{limited.Limit, limited.Reached}, []any{1, true})
 	out.Reset()
 	testutil.Equal(t, r.Execute([]string{"record", "start", "requirements"}, env), 0)
 	var started StartOutput
 	testutil.OK(t, json.Unmarshal(out.Bytes(), &started))
 	testutil.Equal(t, started.Stopped, true)
-	testutil.Equal(t, runIDs(dir), []string{"r1"})
+	testutil.Equal(t, runIDs(dir), []string{"r1", "retry"})
 	testutil.Equal(t, must(Context(env)).BaseBranch, "trunk")
 	vars["BASE_BRANCH"] = ""
-	testutil.Equal(t, must(Context(env)).BaseBranch, "main")
+	testutil.Put(t, repo, ".archon/config.yaml", "worktree:\n  baseBranch: trunk\n")
+	testutil.Equal(t, must(Context(env)).BaseBranch, "trunk")
 }
 
 func TestImplementationDerivedPlansUseTheirPassedAncestor(t *testing.T) {

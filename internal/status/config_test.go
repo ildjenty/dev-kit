@@ -19,10 +19,10 @@ func TestStatusReportsConfiguredRestartLimitAndUnreadableConfiguration(t *testin
 	}{
 		{name: "missing", limit: 3},
 		{name: "defaults", config: `{}`, limit: 3},
-		{name: "zero", config: `{"limits":{"restarts":0}}`, limit: 0},
+		{name: "zero", config: `{"limits":{"restarts":0}}`, cause: "limits.restarts must be an integer of at least 1", limit: -1},
 		{name: "positive", config: `{"limits":{"restarts":2}}`, limit: 2},
-		{name: "negative", config: `{"limits":{"restarts":-1}}`, cause: "limits.restarts must be a non-negative integer", limit: -1},
-		{name: "wrong type", config: `{"limits":{"restarts":"0"}}`, cause: "limits.restarts must be a non-negative integer", limit: -1},
+		{name: "negative", config: `{"limits":{"restarts":-1}}`, cause: "limits.restarts must be an integer of at least 1", limit: -1},
+		{name: "wrong type", config: `{"limits":{"restarts":"0"}}`, cause: "limits.restarts must be an integer of at least 1", limit: -1},
 		{name: "malformed", config: `{`, cause: "unexpected end of JSON input", limit: -1},
 		{name: "read failure", cause: "is a directory", limit: -1},
 	} {
@@ -79,10 +79,7 @@ func TestStatusReportsConfiguredRestartLimitAndUnreadableConfiguration(t *testin
 					switch b.Branch {
 					case "feature/x":
 						testutil.Equal(t, b.Outcome, "stop")
-						testutil.Equal(t, strings.Contains(b.Next, "--input continue=..."), tc.limit == 0)
-						if tc.limit == 0 {
-							testutil.Contains(t, b.Next, "restart limit (0 of 0)")
-						}
+						testutil.Equal(t, strings.Contains(b.Next, "--input continue=..."), false)
 					case "feature/running":
 						testutil.Equal(t, b.Outcome, "no result")
 						testutil.Contains(t, b.Next, "archon workflow get implement-1")

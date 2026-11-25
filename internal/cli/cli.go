@@ -43,6 +43,15 @@ func (e Env) Path(path string) string {
 	return e.Cwd + "/" + path
 }
 
+func (e Env) Require(keys ...string) error {
+	for _, key := range keys {
+		if e.Getenv(key) == "" {
+			return fmt.Errorf("%s must be set", key)
+		}
+	}
+	return nil
+}
+
 func (e Env) JSON(value any) error { return json.NewEncoder(e.Stdout).Encode(value) }
 
 type Command struct {

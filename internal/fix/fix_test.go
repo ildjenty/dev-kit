@@ -162,15 +162,16 @@ func TestStopsAfterThreePassesForPendingRejectionsOrFailuresOtherwisePasses(t *t
 }
 func TestUsesRepositoryCommitPrefixes(t *testing.T) {
 	prefixes := testutil.Must(commitPrefixes("Use `repair:` or `change:`."))
-	testutil.Equal(t, commitSubject("repair: validate input", prefixes), "repair: validate input")
-	testutil.Equal(t, commitSubject("fix: validate input", prefixes), "repair: address blocking findings")
+	testutil.Equal(t, testutil.Must(commitSubject("repair: validate input", prefixes)), "repair: validate input")
+	_, err := commitSubject("fix: validate input", prefixes)
+	testutil.Fails(t, err, "CODE.commit_message")
 }
 func TestReadsConfiguredFixLimitAndLanguageForReviewOnlyRequest(t *testing.T) {
-	ctx, artifacts, _, _ := setup(t, 0)
+	ctx, artifacts, _, _ := setup(t, 1)
 	result := testutil.Must(prepare(ctx, artifacts))
-	testutil.Equal(t, result.Limit, 0)
-	testutil.Equal(t, result.LimitReached, true)
-	testutil.Equal(t, testutil.Must(proceed(artifacts))["proceed"], false)
+	testutil.Equal(t, result.Limit, 1)
+	testutil.Equal(t, result.LimitReached, false)
+	testutil.Equal(t, testutil.Must(proceed(artifacts))["proceed"], true)
 	testutil.Equal(t, testutil.Must(readJSON[record.Document](filepath.Join(artifacts, "fix/input.json")))["language"], "fr")
 	if testutil.Must(readJSON[record.Document](filepath.Join(artifacts, "fix/requirements.json"))) != nil {
 		t.Fatal("unexpected requirements")

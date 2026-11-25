@@ -88,7 +88,7 @@ func TestCompletionChecksCommittedFilesAndNamesRatherThanCheckoutOrDirectories(t
 	testutil.Put(t, repo, "tests/a.test.js", `test("stores an order", () => {})`)
 	testutil.Git(t, repo, "add", ".")
 	testutil.Git(t, repo, "commit", "-qm", "test")
-	g := must(gitx.New(repo, ""))
+	g := must(gitx.New(repo, "main"))
 	commit := must(g.Head())
 	testutil.Put(t, repo, "tests/a.test.js", "test removed from checkout")
 	entry := doc{"criterion": "C1", "method": "test", "file": "tests/a.test.js", "name": "stores an order"}
@@ -239,6 +239,8 @@ func TestPrepareAndChangesPinCustomCriteriaChecksLanguageAndGitFacts(t *testing.
 	testutil.OK(t, err)
 	testutil.Equal(t, must(record.List(ctx.Dir, "request"))[0]["criteria_commit"], base)
 	vars := map[string]string{"STATE_DIR": state, "WORKFLOW_ID": "judge-1", "ARTIFACTS_DIR": artifacts, "BASE_BRANCH": "trunk", "PREPARE": jsonText(must(prepare(ctx, artifacts, artifacts))), "CHANGES": jsonText(out), "GATE": `{"passed":true,"failing":[],"results":"checks/1.jsonl"}`, "COMPLETION": "{}", "COLLECT": "{}"}
+	testutil.Put(t, artifacts, "checks/1.jsonl", "")
+	vars["GATE"] = jsonText(doc{"passed": true, "failing": []string{}, "results": filepath.Join(artifacts, "checks/1.jsonl")})
 	vars["ROUTE"] = `{"qualities":[]}`
 	collectPassingJudges(t, repo, vars)
 	testutil.Equal(t, runCLI(t, repo, vars, "completion")["missing_count"], 0)
