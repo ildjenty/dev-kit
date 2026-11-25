@@ -43,7 +43,7 @@ flowchart TD
 
 ## refine
 
-Turn a topic Issue or owner request into decision records, binding changes and Issue drafts. Review at most three drafts and commit one proposal per version. Restart with approve=<version> to agree decisions, publish the PR and create Issues without AI.
+Turn a topic Issue or owner request into decision records, binding changes and Issue drafts. Review at most three drafts and commit one proposal per version. Owner decisions are recorded as agreed before AI; ai=none publishes them without AI or approval. Restart with approve=<version> to agree AI additions, publish the PR and create Issues without AI.
 
 ```mermaid
 flowchart TD
@@ -54,6 +54,7 @@ flowchart TD
   n_not_started["<b>not-started</b><br/><small>devkit refine not-started</small>"]:::machine
   n_approve["<b>approve</b><br/><small>devkit refine approve</small>"]:::machine
   n_prepare["<b>prepare</b><br/><small>devkit refine prepare</small>"]:::machine
+  n_publish_owner["<b>publish-owner</b><br/><small>devkit refine publish-owner</small>"]:::machine
   subgraph n_decide ["decide (loop, max 3)"]
     direction TB
     n_decide_write_decide["<b>write-decide</b><br/><small>AI: decide</small>"]:::ai
@@ -67,14 +68,16 @@ flowchart TD
   end
   class n_decide loop
   n_finish["<b>finish</b><br/><small>devkit refine finish</small>"]:::machine
-  n_result["<b>result</b><br/><small>printf '%s' '${finished:-${approved:-$skipped}}'</small>"]:::machine
+  n_result["<b>result</b><br/><small>printf '%s' '${finished:-${approved:-${owner:-$ski</small>"]:::machine
   n_start -.-> n_not_started
   n_start -.-> n_approve
   n_start -.-> n_prepare
-  n_prepare --> n_decide
+  n_prepare -.-> n_publish_owner
+  n_prepare -.-> n_decide
   n_decide --> n_finish
   n_not_started --> n_result
   n_approve --> n_result
+  n_publish_owner --> n_result
   n_finish --> n_result
 ```
 

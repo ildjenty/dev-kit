@@ -8,10 +8,10 @@
       "key": "N1",
       "title": "Keep fixture result",
       "body": "Compare keeping the existing file with moving it. Keep the simplest existing location, following D-abcdef.",
-      "decided_by": "owner",
+      "decided_by": "provisional",
       "depends_on": [],
       "supersedes": [],
-      "source": "owner_words"
+      "source": "derived"
     }
   ],
   "units": [

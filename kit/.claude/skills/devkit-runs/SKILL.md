@@ -89,6 +89,12 @@ For refine, use a `refine/<name>` branch. One run handles one topic in a single 
 three rounds. Pass the number of an open Issue with the configured topic label as `topic`; leave
 it empty for a new request. Pass the owner's words verbatim as `owner_words`, your research
 separately as `supplement`, and the owner-confirmed discussion memo verbatim as `memo`.
+Pass `owner_decisions` as a JSON array copied without rewording from the memo: each item has `title`,
+`body` and `owner_words`, with optional `supersedes` and `depends_on` arrays of decision IDs.
+The machine records them verbatim as agreed and commits them before the writer. They are fixed
+input for writer and judge, excluded from judgment and approval. Use `ai=none` explicitly when only
+recording these decisions; use `ai=additions` (the default) when Issue drafts, provisional choices or
+binding edits are needed. Never infer no-AI mode from an empty memo or missing open points.
 Do not add unsaid requirements to owner words. An Issue's body is owner words; related Issue/PR bodies,
 comments and researched facts belong in supplement so the read-only judges have the materials.
 For example, with each text written to a file first:
@@ -96,8 +102,14 @@ For example, with each text written to a file first:
 ```sh
 archon workflow run refine --branch refine/<name> --detach \
   --input "owner_words=$(cat <owner words file>)" --input "supplement=$(cat <supplement file>)" \
-  --input "memo=$(cat <memo file>)" --input topic=<issue number or empty>
+  --input "memo=$(cat <memo file>)" --input topic=<issue number or empty> \
+  --input "owner_decisions=$(cat <owner decisions JSON file>)" --input ai=none
 ```
+
+This example records owner decisions and publishes the PR without writer, judge or approval and
+without creating or closing Issues. Change `ai=none` to `ai=additions` to request AI additions.
+If no-AI publication fails, resolve the failure and restart on the same branch with the same owner
+decisions file and `ai=none`; the machine reuses its records, proposal and PR. Do not use `approve`.
 
 Run `devkit issues ready` (or `--json`) to find open unit and topic issues whose blockers are all closed.
 Units with an unmerged source PR appear separately as waiting, with that PR; requirements refuses them.
@@ -148,12 +160,12 @@ when the owner approves that version, start that workflow again on the same bran
 `--input approve=<version>`. To request changes, restart it with the owner's words in `answers` for the
 approval question's ID. Never synthesize approval or use `approve` for an open-point question.
 
-Refine commits proposed decision records and binding edits about agent process, tools, conventions
+Refine commits owner records as agreed first, then only AI provisional decision records and binding edits about agent process, tools, conventions
 or verification to standards, agent instructions, skills or checks before fresh read-only judgment.
 Product data shapes, invariants and feature rules belong in the implementing unit Issue's testable
 completion conditions. Shared properties appear in the first unit that builds them and are repeated
 in later units that touch them; they do not go into binding edits. It reads the full decision log; delivery never consumes
-it. On approval, refine marks records agreed, commits that change, pushes and opens or updates its PR,
+it. On approval of AI additions, refine marks only their records agreed, commits that change, pushes and opens or updates its PR,
 then creates unit issues under
 the selected topic (creating a parent topic if absent), new topic issues and blocked-by links.
 It closes the parent with a comment when no new topics remain, otherwise comments without closing.

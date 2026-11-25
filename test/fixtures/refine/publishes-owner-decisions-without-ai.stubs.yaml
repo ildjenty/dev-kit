@@ -1,0 +1,7 @@
+exec-code: true
+fixture:
+  expect: completed
+  reached: [start, prepare, publish-owner, result]
+  inputs:
+    owner_decisions: '[{"title":"Keep the current location","body":"Keep the current location.","owner_words":"Keep the current location."}]'
+    ai: none

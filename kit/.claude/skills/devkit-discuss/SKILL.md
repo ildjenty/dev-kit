@@ -10,7 +10,8 @@ these skills under the session tool selected by `sessions`, independently of the
 
 Enter this mode when invoked. Stay in it until the discussion has become Issues: settled work as
 unit issues under its topic, and remaining questions as topic issues. Starting refine, relaying its
-questions and obtaining approval of its proposal are part of this mode. A confirmed memo alone does
+questions and obtaining approval of its AI additions are part of this mode. When only recording
+owner decisions is requested, a published decision PR completes the handoff without Issues or approval. A confirmed memo alone does
 not finish it. If the owner makes an unrelated request, handle it, then resume the discussion where
 it was, restating the current memo. Preserve the memo and pending handoff when the conversation is
 summarised; do not treat an interruption or summarisation as completion.
@@ -50,15 +51,24 @@ your suggestions; do not answer your own questions for them or guess a fact that
 Do not turn a reversible implementation suggestion into an owner's decision.
 
 Do not edit repository files during the discussion. Keep a running memo in the conversation, in the
-configured language, with three parts: decided, overturned (include existing decision IDs), and still
-open. Update it whenever a point is settled or revised. Do not label items as the owner's words;
-mark only an item that is your suggestion the owner has not confirmed. Include the selected topic number and any pending refine branch, question or proposal
+configured language, with separate parts for owner decisions, overturned decisions (include existing
+decision IDs), AI suggestions, and still-open points. Keep each owner decision's title, exact decision
+text and the owner's words it comes from. Use the owner's verbatim words or wording the owner explicitly
+confirmed in the memo; never promote an unconfirmed AI suggestion to an owner decision. Update it
+whenever a point is settled or revised. Include the selected topic number and any pending refine branch, question or proposal
 version so the next session can resume. Restate the memo on resuming and ask the owner to confirm or
 correct it before passing it to refine.
 
 After confirmation, use `devkit-runs` to start `refine` on a `refine/<name>` branch with the confirmed memo
-verbatim as `memo`. A run handles one topic: pass its Issue number as `topic`, or leave it empty for
-a new request whose parent topic refine will create on approval. Refine proposes decision records,
+verbatim as `memo`. Write a JSON array to an owner decisions file outside the checkout, copying each
+memo entry's `title`, `body` and `owner_words` without rewording. Include `supersedes` for overturned
+decision IDs and `depends_on` when recorded; both are optional arrays of decision IDs. Pass that file
+as `owner_decisions` using the file-input pattern in `devkit-runs`. The machine records these as
+agreed before any writer; they never go through rewriting, judgment or approval. Request AI additions
+with `ai=additions` only when unit/topic Issue drafts, provisional choices or binding edits are needed.
+When the owner asks only to record their decisions, pass `ai=none`; refine publishes the records and
+ends with pass without writer, judge or approval. A run handles one topic: pass its Issue number as `topic`, or leave it empty for
+a new request whose parent topic refine will create on approval when drafting Issues. Refine proposes only AI provisional decision records,
 changes to mechanisms for how agents work, and Issue drafts. Product data shapes, invariants and
 feature rules go into the implementing unit Issue's testable completion conditions. Put a shared
 property in the first unit that builds it and repeat the condition in later units that touch it;
@@ -70,7 +80,8 @@ Relay refine's questions and the owner's answers verbatim through `devkit-runs`,
 as choices change. Relay the approval question exactly as recorded, without adding PR text,
 machine fields, history or inventories. When the owner asks for details, run
 `devkit proposal show <branch>` and show its output. The discussion memo
-does not approve that proposal. Only the owner's approval of that version permits the approval run.
+does not approve the AI additions. Owner decisions are already agreed and excluded from that question.
+Only the owner's approval of that version permits the approval run.
 Never supply answers, approval or `continue` for the owner.
 
 On approval, refine's machine bash node pushes the branch and opens or updates its PR, then creates

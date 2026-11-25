@@ -1,0 +1,19 @@
+fixture:
+  expect: completed
+  reached: [start, prepare, publish-owner, result]
+  inputs:
+    owner_decisions: '[{"title":"Keep the current location","body":"Keep the current location.","owner_words":"Keep the current location."}]'
+    ai: none
+start: {stopped: false, stage: start, reason: "", details: /tmp/record, remaining: [], start: first, counted: false, restarts: 0}
+prepare: {input: /tmp/refine/input.json, criteria: /tmp/criteria, ai: none}
+publish-owner: &published
+  outcome: pass
+  proposal_version: 1
+  decision_ids: [D-abcdef]
+  issue_numbers: []
+  pr_number: 80
+  pr_url: https://github.example/team/repo/pull/80
+  publication: published
+  questions: []
+  reasons: []
+result: *published

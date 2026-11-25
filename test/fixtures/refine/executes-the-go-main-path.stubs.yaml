@@ -13,7 +13,8 @@
       "result"
     ],
     "inputs": {
-      "owner_words": "Update fixture.txt"
+      "owner_words": "Update fixture.txt",
+      "owner_decisions": "[{\"title\":\"Keep the fixture filename\",\"body\":\"Keep fixture.txt.\",\"owner_words\":\"Keep fixture.txt.\"}]"
     }
   },
   "write-decide": {

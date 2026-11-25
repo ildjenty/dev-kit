@@ -9,8 +9,10 @@ Compare the request with requirements for coverage and unresolved requirements. 
 
 ## Topic proposals
 
-For refine's single decide phase, assess request, confirmed memo and answer coverage in decision
-records, binding edits and Issue drafts; additions under `authority.md`; open points; consistency
+For refine's single decide phase, assess only AI additions: provisional decision records, binding
+edits and Issue drafts. Owner decisions are fixed, already agreed context, excluded from wording,
+sufficiency, attribution judgment and approval; never require their rewriting or re-decision.
+Check request, confirmed memo and answer coverage in the additions; authority under `authority.md`; open points; consistency
 with agreed decisions; and sufficiency of background, candidates, choice and reasons. Compare
 candidates, including the simplest alternative, against the evidence. Apply the wording criteria
 mapped to refine to the decision records, Issue drafts and approval text. Settled work may coexist

@@ -2,7 +2,8 @@ name: refine
 description: |
   Turn a topic Issue or owner request into decision records, binding changes and Issue drafts.
   Review at most three drafts and commit one proposal per version.
-  Restart with approve=<version> to agree decisions, publish the PR and create Issues without AI.
+  Owner decisions are recorded as agreed before AI; ai=none publishes them without AI or approval.
+  Restart with approve=<version> to agree AI additions, publish the PR and create Issues without AI.
 worktree:
   enabled: true
 inputs:
@@ -18,6 +19,12 @@ inputs:
   memo:
     default: ""
     description: The discussion memo confirmed by the owner.
+  owner_decisions:
+    default: ""
+    description: 'JSON array of {"title":"...","body":"...","owner_words":"...","supersedes":[],"depends_on":[]}; owner text is recorded verbatim as agreed.'
+  ai:
+    default: additions
+    description: 'additions drafts AI additions; none records owner_decisions and publishes without AI or approval.'
   answers:
     default: ""
     description: 'Owner answers as a JSON array of {"question_id":"Q1","answer":"..."}.'
@@ -86,10 +93,18 @@ nodes:
       properties:
         input: { type: string }
         criteria: { type: string }
-      required: [input, criteria]
+        ai: { type: string, enum: [additions, none] }
+      required: [input, criteria, ai]
+
+  - id: publish-owner
+    depends_on: [prepare]
+    when: "$prepare.output.ai == 'none'"
+    bash: devkit refine publish-owner
+    output_format: *result
 
   - id: decide
     depends_on: [prepare]
+    when: "$prepare.output.ai == 'additions'"
     loop_group:
       max_iterations: 3
       on_exhausted: complete
@@ -135,11 +150,12 @@ nodes:
     output_format: *result
 
   - id: result
-    depends_on: [not-started, approve, finish]
+    depends_on: [not-started, approve, publish-owner, finish]
     trigger_rule: none_failed_min_one_success
     bash: |
       finished=$finish.output
       approved=$approve.output
+      owner=$publish-owner.output
       skipped=$not-started.output
-      printf '%s' "${finished:-${approved:-$skipped}}"
+      printf '%s' "${finished:-${approved:-${owner:-$skipped}}}"
     output_format: *result

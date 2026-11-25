@@ -9,7 +9,7 @@ import (
 )
 
 func fixtureGit(args []string, env cli.Env) error {
-	if env.Getenv("INPUTS_APPROVE") != "" && guard(env) == nil {
+	if (env.Getenv("INPUTS_APPROVE") != "" || env.Getenv("INPUTS_AI") == "none") && guard(env) == nil {
 		for i, arg := range args {
 			if arg == "origin" {
 				args[i] = filepath.Join(env.Getenv("ARTIFACTS_DIR"), "origin.git")

@@ -43,8 +43,6 @@
           "decided_by": {
             "type": "string",
             "enum": [
-              "owner",
-              "principle",
               "provisional"
             ]
           },
@@ -67,9 +65,6 @@
           "source": {
             "type": "string",
             "enum": [
-              "owner_words",
-              "answer",
-              "memo",
               "derived"
             ]
           }

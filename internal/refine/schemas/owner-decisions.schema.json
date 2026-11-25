@@ -1,0 +1,16 @@
+{
+  "type": "array",
+  "uniqueItems": true,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "title": {"type": "string", "pattern": "\\S"},
+      "body": {"type": "string", "pattern": "\\S"},
+      "owner_words": {"type": "string", "pattern": "\\S"},
+      "supersedes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^D-[0-9a-f]{6,64}$"}},
+      "depends_on": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^D-[0-9a-f]{6,64}$"}}
+    },
+    "required": ["title", "body", "owner_words"]
+  }
+}

@@ -234,6 +234,11 @@ func setup(workflow string, env cli.Env) error {
 		return err
 	}
 	if workflow == "refine" {
+		if env.Getenv("INPUTS_AI") == "none" {
+			if err := run("init", "-q", "--bare", filepath.Join(env.Getenv("ARTIFACTS_DIR"), "origin.git")); err != nil {
+				return err
+			}
+		}
 		path := filepath.Join(env.Cwd, ".devkit/decisions/D-abcdef.md")
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 			return err
@@ -437,6 +442,17 @@ func after(args []string, env cli.Env) error {
 	if len(args) >= 2 && args[1] == "approve" && (args[0] == "refine" || args[0] == "retro" || args[0] == "optimize") {
 		return verifyPublication(args[0], env)
 	}
+	if len(args) >= 2 && args[0] == "refine" && args[1] == "publish-owner" {
+		if err := verifyPublication("refine", env); err != nil {
+			return err
+		}
+		for _, name := range []string{"draft.json", "review.json", "approval.txt", "rounds/latest.json"} {
+			if _, err := os.Stat(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "refine", name)); !os.IsNotExist(err) {
+				return fmt.Errorf("no-AI fixture unexpectedly produced %s: %v", name, err)
+			}
+		}
+		return nil
+	}
 	if len(args) < 2 || args[1] != "finish" {
 		return nil
 	}
@@ -487,7 +503,24 @@ func after(args []string, env cli.Env) error {
 			return err
 		}
 		records, ok := input["decisions"].([]any)
-		if !ok || len(records) != 1 || records[0].(map[string]any)["body"] == "" {
+		count := 1
+		if env.Getenv("INPUTS_OWNER_DECISIONS") != "" {
+			count++
+			fixed, _ := input["fixed_owner_decisions"].([]any)
+			if len(fixed) != 1 || fixed[0].(map[string]any)["status"] != "agreed" || input["owner_decisions_fixed"] != true {
+				return fmt.Errorf("owner decisions were not fixed before writing: %v", input)
+			}
+			review, err := read(filepath.Join(env.Getenv("ARTIFACTS_DIR"), "refine/review.json"))
+			if err != nil {
+				return err
+			}
+			for _, id := range review["decision_ids"].([]any) {
+				if id == fixed[0].(map[string]any)["id"] {
+					return fmt.Errorf("owner decision reached judge targets: %v", review)
+				}
+			}
+		}
+		if !ok || len(records) != count || records[0].(map[string]any)["body"] == "" {
 			return fmt.Errorf("refine decision log is missing: %v", input)
 		}
 		if _, exists := input["relevant_decisions"]; exists {

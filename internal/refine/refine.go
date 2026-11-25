@@ -158,6 +158,9 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 	if !strings.HasPrefix(ctx.Branch, "refine/") {
 		return stopped("refine requires a refine/<name> branch"), nil
 	}
+	if _, err := ownerInput(env); err != nil {
+		return stopped(err.Error()), nil
+	}
 	if env.Getenv("INPUTS_APPROVE") == "" {
 		if _, e := selectedTopic(ctx, env, env.Getenv("INPUTS_TOPIC")); e != nil {
 			return stopped(e.Error()), nil
@@ -167,7 +170,7 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 	if e != nil {
 		return record.StartOutput{}, e
 	}
-	if latest["outcome"] == "pass" && env.Getenv("INPUTS_TOPIC") == "" && env.Getenv("INPUTS_APPROVE") == "" && strings.TrimSpace(env.Getenv("INPUTS_OWNER_WORDS")) == "" && strings.TrimSpace(env.Getenv("INPUTS_MEMO")) == "" {
+	if latest["outcome"] == "pass" && env.Getenv("INPUTS_TOPIC") == "" && env.Getenv("INPUTS_APPROVE") == "" && strings.TrimSpace(env.Getenv("INPUTS_OWNER_WORDS")) == "" && strings.TrimSpace(env.Getenv("INPUTS_MEMO")) == "" && env.Getenv("INPUTS_OWNER_DECISIONS") == "" {
 		return stopped("select a topic, or provide a new request"), nil
 	}
 	approve := env.Getenv("INPUTS_APPROVE")
@@ -183,8 +186,8 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 		if len(problems) > 0 {
 			return stopped(strings.Join(problems, "; ")), nil
 		}
-		if len(answers) > 0 || env.Getenv("INPUTS_OWNER_WORDS") != "" || env.Getenv("INPUTS_SUPPLEMENT") != "" || env.Getenv("INPUTS_MEMO") != "" || env.Getenv("INPUTS_TOPIC") != "" {
-			return stopped("approve cannot be combined with a topic, request, memo or answers"), nil
+		if len(answers) > 0 || env.Getenv("INPUTS_OWNER_WORDS") != "" || env.Getenv("INPUTS_SUPPLEMENT") != "" || env.Getenv("INPUTS_MEMO") != "" || env.Getenv("INPUTS_TOPIC") != "" || env.Getenv("INPUTS_OWNER_DECISIONS") != "" || env.Getenv("INPUTS_AI") == "none" {
+			return stopped("approve cannot be combined with a topic, request, memo, owner_decisions, ai=none or answers"), nil
 		}
 		r, e := record.Latest(ctx.Dir, "result")
 		if e != nil {
@@ -239,6 +242,14 @@ func start(ctx record.ContextData, env cli.Env) (record.StartOutput, error) {
 	}, Answers: answers, Continuation: env.Getenv("INPUTS_CONTINUE"), Limit: &c.Limits.Restarts, WorkflowsChanged: lines(workflows), WorktreeChanged: lines(worktree)})
 }
 func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplement, memo string, topicID ...string) (doc, error) {
+	ownerDecisions, e := ownerInput(env)
+	if e != nil {
+		return nil, e
+	}
+	ai := env.Getenv("INPUTS_AI")
+	if ai == "" {
+		ai = "additions"
+	}
 	displayArtifacts := artifacts
 	artifacts = resolve(ctx.Cwd, artifacts)
 	c, e := config.Load(ctx.Cwd)
@@ -273,6 +284,9 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 			break
 		}
 	}
+	if ai == "none" && pending != nil && obj(pending["content"])["ai"] != "none" {
+		return nil, fmt.Errorf("ai=none cannot publish a pending AI proposal; finish it or use a new refine branch")
+	}
 
 	selected := ""
 	if len(topicID) > 0 {
@@ -282,7 +296,7 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	if e != nil {
 		return nil, e
 	}
-	if strings.TrimSpace(ownerWords) != "" || strings.TrimSpace(supplement) != "" || strings.TrimSpace(memo) != "" || topic != nil && previous == nil {
+	if strings.TrimSpace(ownerWords) != "" || strings.TrimSpace(supplement) != "" || strings.TrimSpace(memo) != "" || len(ownerDecisions) > 0 || topic != nil && previous == nil {
 		if _, e = record.Write(ctx, "request", doc{"owner_words": ownerWords, "supplement": supplement}, ""); e != nil {
 			return nil, e
 		}
@@ -298,10 +312,14 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	for _, r := range requests {
 		owner = owner || strings.TrimSpace(str(r["owner_words"])) != ""
 	}
-	if len(requests) == 0 || (!owner && strings.TrimSpace(memo) == "" && topic == nil) {
-		return nil, fmt.Errorf("refine needs owner_words or a discussion memo")
+	if len(requests) == 0 || (!owner && strings.TrimSpace(memo) == "" && topic == nil && len(ownerDecisions) == 0 && len(items(obj(previous["content"])["owner_decisions"])) == 0) {
+		return nil, fmt.Errorf("refine needs owner_words, owner_decisions or a discussion memo")
 	}
 	source, e := criteria.CopyCriteria(criteria.Options{Root: ctx.Cwd, Base: str(requests[0]["criteria_commit"]), Dir: filepath.Join(artifacts, "criteria")})
+	if e != nil {
+		return nil, e
+	}
+	fixedOwner, e := materializeOwner(ctx, ownerDecisions)
 	if e != nil {
 		return nil, e
 	}
@@ -334,6 +352,8 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	if pending != nil {
 		base = str(obj(pending["content"])["base_commit"])
 	}
+	input["ai"], input["fixed_owner_decisions"] = ai, fixedOwner
+	input["owner_decisions_fixed"] = true
 	input["proposal_base"] = base
 	input["branch"] = ctx.Branch
 	for _, name := range []string{"draft", "judgment"} {
@@ -355,7 +375,7 @@ func prepare(ctx record.ContextData, env cli.Env, artifacts, ownerWords, supplem
 	if e = writeJSON(file(artifacts, "baseline.json"), doc{"commit": head, "decisions_hash": decisionHash(data.Decisions)}); e != nil {
 		return nil, e
 	}
-	return doc{"input": file(displayArtifacts, "input.json"), "criteria": input["criteria"]}, nil
+	return doc{"input": file(displayArtifacts, "input.json"), "criteria": input["criteria"], "ai": ai}, nil
 }
 func approvalStart(ctx record.ContextData, version string) error {
 	h, err := record.History(ctx.Dir)
@@ -608,10 +628,10 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 	errors = append(errors, decisions.GraphErrors(graph)...)
 	successors := map[string]bool{}
 	for _, d := range items(draft["decisions"]) {
-		if d["decided_by"] == "owner" && d["source"] == "derived" {
-			errors = append(errors, str(d["key"])+": a derived choice cannot be attributed to the owner")
-		}
 		for _, old := range stringsOf(d["supersedes"]) {
+			if find(items(input["fixed_owner_decisions"]), old) != nil {
+				errors = append(errors, "AI additions cannot re-decide fixed owner decision "+old)
+			}
 			if find(data.Decisions, old) == nil {
 				errors = append(errors, "missing superseded decision "+old)
 			}
@@ -662,6 +682,14 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 	}
 	edited := append(strings.Split(paths, "\x00"), working...)
 	machinePaths := []string{}
+	for _, d := range items(input["fixed_owner_decisions"]) {
+		machinePaths = append(machinePaths, str(d["path"]))
+		for _, id := range stringsOf(d["supersedes"]) {
+			if old := find(data.Decisions, id); old != nil {
+				machinePaths = append(machinePaths, str(old["path"]))
+			}
+		}
+	}
 	for _, id := range stringsOf(pending["decision_ids"]) {
 		machinePaths = append(machinePaths, str(obj(input["folders"])["decisions"])+"/"+id+".md")
 	}
@@ -816,7 +844,11 @@ func materialize(ctx record.ContextData, draft, input doc) (doc, error) {
 			return nil, err
 		}
 	}
-	return doc{"draft": draft, "mapping": mapping, "decision_ids": ids, "topic": input["topic"], "memo": input["memo"], "base_commit": input["proposal_base"], "ready": false}, nil
+	ownerIDs := []string{}
+	for _, d := range items(input["fixed_owner_decisions"]) {
+		ownerIDs = append(ownerIDs, str(d["id"]))
+	}
+	return doc{"draft": draft, "mapping": mapping, "decision_ids": ids, "owner_decisions": input["fixed_owner_decisions"], "owner_decision_ids": ownerIDs, "topic": input["topic"], "memo": input["memo"], "base_commit": input["proposal_base"], "ready": false}, nil
 }
 func check(ctx record.ContextData, artifacts string, env cli.Env) (doc, error) {
 	artifacts = resolve(ctx.Cwd, artifacts)
@@ -878,6 +910,16 @@ func check(ctx record.ContextData, artifacts string, env cli.Env) (doc, error) {
 			if err = writeJSON(file(artifacts, "baseline.json"), doc{"commit": obj(p["content"])["commit"], "decisions_hash": decisionHash(data.Decisions)}); err != nil {
 				return nil, err
 			}
+		}
+	}
+	if len(errors) == 0 {
+		p, err := record.Latest(ctx.Dir, "proposal")
+		if err != nil {
+			return nil, err
+		}
+		content := obj(p["content"])
+		if err := writeJSON(file(artifacts, "review.json"), doc{"draft": draft, "decision_ids": content["decision_ids"], "commit": content["commit"]}); err != nil {
+			return nil, err
 		}
 	}
 	out := doc{"valid": len(errors) == 0, "errors": errors}
@@ -1052,7 +1094,7 @@ func finish(ctx record.ContextData, artifacts string) (doc, error) {
 		if err = proposal.SaveDetails(ctx, p); err != nil {
 			return nil, err
 		}
-		result = doc{"outcome": "question", "decision_ids": content["decision_ids"], "questions": []doc{{"text": text, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"refine"}, "invalidates": []string{}}}}
+		result = doc{"outcome": "question", "decision_ids": decisionIDs(content), "questions": []doc{{"text": text, "target": doc{"kind": "proposal", "ref": strconv.Itoa(num(p["version"]))}, "next_workflows": []string{"refine"}, "invalidates": []string{}}}}
 	}
 	records := []doc{}
 	for i, roundEntry := range roundEntries {
@@ -1159,7 +1201,11 @@ func approve(ctx record.ContextData, version string, environments ...cli.Env) (d
 		}
 		for _, d := range data.Decisions {
 			if slices.Contains(paths, str(d["path"])) {
-				if err = put(filepath.Join(ctx.Cwd, str(d["path"])), decisionText(d)); err != nil {
+				text, err := statusText(ctx, d, str(d["status"]))
+				if err != nil {
+					return nil, err
+				}
+				if err = put(filepath.Join(ctx.Cwd, str(d["path"])), text); err != nil {
 					return nil, err
 				}
 			}
@@ -1200,6 +1246,7 @@ func approve(ctx record.ContextData, version string, environments ...cli.Env) (d
 	if num(topic["number"]) > 0 {
 		parent = &issues.TopicDraft{Title: str(topic["title"]), Body: str(topic["body"])}
 	}
+	ids = decisionIDs(content)
 	comment := strings.Join(ids, "\n")
 	progress, err = (issues.Client{Env: env}).CreateDrafts(path, ds, c.Issues.Labels, parent, num(topic["number"]), comment)
 	if err != nil {
@@ -1221,7 +1268,7 @@ func approve(ctx record.ContextData, version string, environments ...cli.Env) (d
 }
 func Commands() []cli.Command {
 	commands := []cli.Command{}
-	for _, mode := range []string{"start", "prepare", "check", "round", "finish", "approve", "not-started"} {
+	for _, mode := range []string{"start", "prepare", "check", "round", "finish", "approve", "publish-owner", "not-started"} {
 		commands = append(commands, cli.Command{Area: "refine", Name: mode, Usage: "devkit refine " + mode, Run: func(args []string, env cli.Env) error {
 			ctx, err := record.Context(env)
 			if err != nil {
@@ -1259,6 +1306,8 @@ func Commands() []cli.Command {
 					}
 				case "finish":
 					out, err = finish(ctx, artifacts)
+				case "publish-owner":
+					out, err = publishOwner(ctx, artifacts, env)
 				case "not-started":
 					var stopped doc
 					err = json.Unmarshal([]byte(env.Getenv("INPUTS_START")), &stopped)
@@ -1271,14 +1320,14 @@ func Commands() []cli.Command {
 			return env.JSON(out)
 		}})
 	}
-	commands = append(commands, cli.Command{Area: "refine", Usage: "devkit refine start | prepare | check | round | finish | approve | not-started", Run: func(args []string, env cli.Env) error {
+	commands = append(commands, cli.Command{Area: "refine", Usage: "devkit refine start | prepare | check | round | finish | approve | publish-owner | not-started", Run: func(args []string, env cli.Env) error {
 		if _, err := record.Context(env); err != nil {
 			return err
 		}
 		if env.Getenv("ARTIFACTS_DIR") == "" {
 			return fmt.Errorf("ARTIFACTS_DIR must be set")
 		}
-		return &cli.ExitError{Code: 1, Message: "Usage: devkit refine start | prepare | check | round | finish | approve | not-started"}
+		return &cli.ExitError{Code: 1, Message: "Usage: devkit refine start | prepare | check | round | finish | approve | publish-owner | not-started"}
 
 	}})
 	return commands

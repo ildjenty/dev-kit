@@ -16,7 +16,7 @@ import (
 )
 
 func draft() doc {
-	return doc{"pr_title": "Record employee access", "pr_summary": "Record the employee access decision on the base. This preserves the agreed audience for follow-up delivery.", "parent": doc{"title": "Serve employees", "body": "Who can use the service? Employees only."}, "topics": []doc{}, "summary": "A service for employees", "decisions": []doc{{"key": "N1", "title": "Serve employees", "body": "Compare all users with employees only, the simplest scope. Choose employees as requested.", "decided_by": "owner", "depends_on": []string{}, "supersedes": []string{}, "source": "owner_words"}}, "units": []doc{{"key": "UN1", "title": "Deliver staff access", "goal": "Employees can sign in", "completion_conditions": []string{"An employee can sign in"}, "blocked_by": []string{}}}, "bindings": []doc{}}
+	return doc{"pr_title": "Record employee access", "pr_summary": "Record the employee access decision on the base. This preserves the agreed audience for follow-up delivery.", "parent": doc{"title": "Serve employees", "body": "Who can use the service? Employees only."}, "topics": []doc{}, "summary": "A service for employees", "decisions": []doc{{"key": "N1", "title": "Serve employees", "body": "Compare all users with employees only, the simplest scope. Choose employees as requested.", "decided_by": "provisional", "depends_on": []string{}, "supersedes": []string{}, "source": "derived"}}, "units": []doc{{"key": "UN1", "title": "Deliver staff access", "goal": "Employees can sign in", "completion_conditions": []string{"An employee can sign in"}, "blocked_by": []string{}}}, "bindings": []doc{}}
 }
 func judgment() doc {
 	cs := []doc{}
@@ -408,19 +408,20 @@ func TestApprovalRejectsUnrecordedAnswerChangedHeadOrDirtyCheckout(t *testing.T)
 	}
 }
 
-func TestDraftGatesRejectCyclesMissingReferencesUntracedEditsAndDerivedOwnerChoice(t *testing.T) {
+func TestDraftGatesRejectCyclesMissingReferencesUntracedEditsAndOwnerChoice(t *testing.T) {
 	r := setup(t, nil)
 	r.begin()
 	d := draft()
 	items(d["decisions"])[0]["depends_on"] = []string{"N1", "D-ffffff"}
-	items(d["decisions"])[0]["source"] = "derived"
 	items(d["units"])[0]["blocked_by"] = []string{"UN1", "missing"}
 	r.writeDraft(d)
 	r.put("docs/topic.md", "Not a binding")
 	problems := r.errors(d)
-	for _, part := range []string{"cycle", "missing dependency", "missing blocker", "derived choice", "outside the traced"} {
+	for _, part := range []string{"cycle", "missing dependency", "missing blocker", "outside the traced"} {
 		testutil.Contains(t, problems, part)
 	}
+	items(d["decisions"])[0]["decided_by"] = "owner"
+	testutil.Contains(t, r.errors(d), "decided_by must be one of the allowed values")
 }
 
 func TestFreshJudgeUnassessedAndPostReviewChangesCannotPass(t *testing.T) {

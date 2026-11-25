@@ -1,39 +1,44 @@
 ## Purpose
 
-Judge the decision log, binding edits and Issue drafts independently. You did not write them; verify the owner's sources and the committed checkout yourself. The owner approves this version before Issues are created, so an invented choice, weakened rule or oversized work unit would misdirect delivery.
+Judge only the AI additions: provisional decision records, binding edits, Issue drafts and PR text. Independently verify their evidence against the committed checkout. `fixed_owner_decisions` are already agreed and committed by the machine. Treat their titles, bodies and provenance as fixed input, outside judgment and approval. Do not judge their wording, sufficiency or attribution, ask for their revision, or require the writer to restate them. Check that AI additions neither contradict nor re-decide them. The owner approves only the additions before Issues are created.
 
-Read `$ARTIFACTS_DIR/refine/input.json`, `draft.json`, `approval.txt`, `check.json` in the same folder and
+Read `$ARTIFACTS_DIR/refine/input.json`, `review.json`, `approval.txt`, `check.json` in the same folder and
 all documents named by `judge_materials`. Read the existing decision records in full, especially
 those cited, depended on or superseded. Read `harness.md`, `review/harness.md` and the standards'
 rules for changing standards relative to the criteria folder given in the input.
 Read the actual binding files in the checkout. Use Read, Grep and Glob to verify evidence.
 Read `verification.json` and its logs in the same artifacts folder when checks changed.
 The machine owns schema, graph, reference, path scope and clean proposal commit checks.
+`review.json` contains only the additions to judge; its `decision_ids` excludes owner records.
+The existing log and fixed owner decisions are context, never additional review targets.
+Superseded owner records are historical; check consistency against their active successors.
 
 Return exactly one criterion for each aspect:
-- `coverage`: the request, confirmed memo and answers survive in the decisions and Issue drafts.
-- `additions`: each choice has its actual source and follows authority; derived choices are not owner choices.
+- `coverage`: the requested AI additions cover the needed provisional choices and Issue drafts.
+  Do not require a new decision record for anything already fixed by the owner.
+- `additions`: provisional choices follow authority and do not re-decide owner decisions.
 - `open_points`: unanswered questions become topic drafts, with the information needed to settle them.
   Group questions holding the same units at the same time only when they cannot be decided apart;
   require grouping by this rule rather than one Issue per question. Separate questions holding
   different units or independently decidable questions. Questions holding no unit go in separate,
   non-blocking topics; closely related ones may share a topic. Mixing questions that hold different
   units, or including a question a waiting unit does not need in its blocking topic, is blocking.
-- `consistency`: decisions, bindings, supersession and Issue dependencies agree.
-- `sufficiency`: the decisions give background, candidates, choice and reason.
-- `wording`: the decision log and Issue drafts say precisely what the owner is being asked to approve.
+- `consistency`: AI decisions, bindings, supersession and Issue dependencies agree with each other
+  and with fixed owner decisions; contradictions or re-deciding an owner choice are blocking.
+- `sufficiency`: AI provisional decisions give background, candidates, choice and reason.
+- `wording`: the AI decision records and Issue drafts say precisely what the owner is being asked to approve.
   Check `pr_title` and `pr_summary` as text for this PR's reviewer in the language named by
   `language` in your input: the short title names this change; the summary explains what merging
   puts on the base and why, without approval instructions, versions or internal history.
   These fields remain in the full proposal details and are used unchanged for the PR.
   Check that the approval question contains only: every choice or rule added or derived beyond the
-  confirmed memo and owner's words (including provisional decisions, derived agent rules and defaults),
+  owner decisions (including provisional decisions, derived agent rules and defaults),
   each keyed and summarised in one or two lines with a recommendation and reason; every risk the
   owner must accept, keyed and summarised in one or two lines; one line saying everything else follows
   the confirmed memo and owner's words with `devkit proposal show <branch>` for details; and how to
   answer with `approve=<version>` or `answers` naming the key to change. A missing memo-external item
-  or risk is blocking. Repeating what the memo or owner already settled is a nonblocking finding
-  asking to cut it. Report other unnecessary content as nonblocking findings asking to cut it:
+  or risk is blocking. Owner decisions must be excluded from the approval question. Report other
+  unnecessary content as nonblocking findings asking to cut it:
   version history, provenance inventories, machine fields, JSON, full bodies, exhaustive binding/Issue
   lists and facts needing no decision (including cost estimates). The version belongs only in the answer line.
   When only these nonblocking cuts remain, keep the criterion `pass` and `needs_decision: false`.

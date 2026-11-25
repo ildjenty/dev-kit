@@ -50,8 +50,9 @@ func proposalText(content map[string]any, progress issues.Creation, branch, repo
 			Number int    `json:"number"`
 			Title  string `json:"title"`
 		} `json:"topic"`
-		Mapping map[string]string `json:"mapping"`
-		Draft   struct {
+		Mapping        map[string]string            `json:"mapping"`
+		OwnerDecisions []struct{ ID, Title string } `json:"owner_decisions"`
+		Draft          struct {
 			prText
 			issues.Drafts
 			Changes   []struct{ Path, Reason, Evidence string } `json:"changes"`
@@ -103,6 +104,11 @@ func proposalText(content map[string]any, progress issues.Creation, branch, repo
 				return id + " " + d.Title
 			}
 		}
+		for _, d := range approved.OwnerDecisions {
+			if d.ID == id {
+				return id + " " + d.Title
+			}
+		}
 		return id
 	}
 	rows := []string{}
@@ -120,6 +126,10 @@ func proposalText(content map[string]any, progress issues.Creation, branch, repo
 	}
 	section(review, rows)
 	rows = nil
+	for _, d := range approved.OwnerDecisions {
+		path := cfg.Decisions + "/" + d.ID + ".md"
+		rows = append(rows, fmt.Sprintf("- [%s](%s) %s", d.ID, branchLink(repository, "blob", branch, path), d.Title))
+	}
 	for _, d := range draft.Decisions {
 		id := approved.Mapping[d.Key]
 		path := cfg.Decisions + "/" + id + ".md"
