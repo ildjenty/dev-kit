@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/decisions"
 	"github.com/ildjenty/dev-kit/internal/proposal"
 	"github.com/ildjenty/dev-kit/internal/testutil"
@@ -36,7 +37,7 @@ func TestReproposalKeepsDependenciesAcrossVersions(t *testing.T) {
 	testutil.Must(prepare(r.ctx, envVars(nil), r.artifacts, "", "", ""))
 	r.writeDraft(d)
 	r.artifact("approval.txt", "N2 N3 N5 N7 N8 N9 N10 N12 N19 approve=2 or answers")
-	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts))["valid"], true)
+	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts, cli.Env{Environ: os.Environ()}))["valid"], true)
 	testutil.Equal(t, obj(obj(r.latest("proposal")["content"])["mapping"]), mapping)
 	testutil.Equal(t, find(r.data().Decisions, str(mapping["N10"]))["depends_on"], []any{"D-3ce450", "D-3b6399", "D-5e6493"})
 	expected := testutil.Must(decisions.Parse(readText(t, "testdata/reproposal/decisions/D-f0c65e.md")))

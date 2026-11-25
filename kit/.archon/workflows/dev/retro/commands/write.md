@@ -27,11 +27,18 @@ Write `$ARTIFACTS_DIR/retro/draft.json` matching the supplied draft schema:
 - `checks`: checks for mechanical findings, with the config check fields, `reason` and `entries`.
   Add precisely those checks to `.devkit/config.json`, retaining all existing settings and checks.
   An empty `paths` array selects no files; use applicable repository globs.
+  A command or file/config fact that decides compliance makes a rule mechanically checkable: never
+  write it as prose in standards, AGENTS.md, CLAUDE.md or skills. Register existing commands with
+  `name`, `command`, `timeout_seconds` and applicable `paths`. If a command does not exist yet, put
+  its creation and registration in the creating unit's completion conditions. For example, the
+  foundation unit registers the type check and automated tests as checks in `.devkit/config.json`,
+  with tests using only local PostgreSQL and running without external credentials or network.
+  Prose binding changes are only for work rules needing judgment.
 - `standards`: edits for accepted objections or recurring findings, naming `path`, `reason`, `evidence`,
   and source `entries`. Make these edits in the checkout, and trace every changed standard document.
-  Standards and check settings change only how agents work: process, tools, conventions or verification;
-  for example, run the repository's configured checks before proposing a commit. Never encode product
-  properties in standards, agent instructions or skills, or check settings; use unit completion conditions.
+  Standards and check settings change only how agents work: process, tools, conventions or verification.
+  Never encode product properties in standards, agent instructions or skills, or check settings;
+  use unit completion conditions.
 - `dismissed`: source `entries` and a reason for each entry that needs no correction.
 - `escapes`: one trace for every `kind: escape` entry, including dismissals: `entry`, `stage`
   (`requirements`, `plan`, `routing`, `quality`, `check`, or `none` for a genuine gap in the request),

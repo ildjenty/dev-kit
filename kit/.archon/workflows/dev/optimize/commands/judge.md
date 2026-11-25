@@ -22,7 +22,12 @@ when necessary evidence is absent. The writer's explanation is a hypothesis, not
   mutates_checkout: false. Reject unintended edits or silently changed owner instructions.
 - harness: apply the fixed standards for changing principles, checks and the harness, especially
   guarantees versus execution, maintenance and false-positive burden. Reconcile real convention
-  conflicts using keep/adapt/take with evidence. Never weaken security, data-loss or authority
+  conflicts using keep/adapt/take with evidence. A rule is mechanically checkable when a command or
+  file/config fact can decide compliance. Writing such a rule as prose in standards, AGENTS.md,
+  CLAUDE.md or skills in a binding change is blocking. Existing commands belong in
+  `.devkit/config.json` checks; commands not yet available require creation and check registration
+  in the creating unit's completion conditions. Prose bindings are only for work rules needing judgment.
+  Never weaken security, data-loss or authority
   blocking. Review verification results, every base-check failure and all limitations; no failure
   may be hidden by omission or treated as verified. Check that the concise summary is sufficient
   and owner_points contains the decisions authority.md reserves for the owner. The owner approves

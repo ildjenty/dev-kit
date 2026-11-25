@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/ildjenty/dev-kit/internal/checks"
 	"github.com/ildjenty/dev-kit/internal/cli"
 	"github.com/ildjenty/dev-kit/internal/concerns"
 	"github.com/ildjenty/dev-kit/internal/config"
@@ -214,7 +215,7 @@ func machineCheck(ctx record.ContextData, artifacts string, env cli.Env) (doc, e
 		return nil, err
 	}
 	problems = append(problems, workflowErrors...)
-	results, baseErrors, err := checkBase(ctx, current, logs, env)
+	results, baseErrors, err := checks.RunOnBase(ctx.Cwd, ctx.BaseBranch, current.Checks, logs, env.Environ)
 	if err != nil {
 		return nil, err
 	}

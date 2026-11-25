@@ -7,6 +7,7 @@ all documents named by `judge_materials`. Read the existing decision records in 
 those cited, depended on or superseded. Read `harness.md`, `review/harness.md` and the standards'
 rules for changing standards relative to the criteria folder given in the input.
 Read the actual binding files in the checkout. Use Read, Grep and Glob to verify evidence.
+Read `verification.json` and its logs in the same artifacts folder when checks changed.
 The machine owns schema, graph, reference, path scope and clean proposal commit checks.
 
 Return exactly one criterion for each aspect:
@@ -40,6 +41,11 @@ Return exactly one criterion for each aspect:
   A product data shape, invariant or feature rule in a binding edit is a blocking finding, even if
   repeated in an Issue draft. Decisions about agent work that must bind agents use the edited mechanisms. Apply the
   standards' rules for changing standards and harness, including evidence and ongoing burden.
+  A rule is mechanically checkable when a command or file/config fact can decide compliance.
+  Writing such a rule as prose in standards, AGENTS.md, CLAUDE.md or skills in a binding change is
+  blocking. Existing commands belong in `.devkit/config.json` checks; commands not yet available
+  require creation and check registration in the creating unit's completion conditions.
+  Prose bindings are only for work rules needing judgment.
   A choice recorded only for people needs no binding edit. Delivery never consumes decision records.
 - `issues`: each unit fits one PR and has observable completion conditions without requiring a
   decision record. Every required product property appears as a testable completion condition in

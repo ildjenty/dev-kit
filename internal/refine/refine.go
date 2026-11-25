@@ -556,6 +556,11 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 	if head != baseline["commit"] {
 		errors = append(errors, "writer changed HEAD; only refine check may commit")
 	}
+	c, err := config.Load(ctx.Cwd)
+	if err != nil {
+		errors = append(errors, err.Error())
+		return errors, nil
+	}
 	data, err := decisions.List(ctx.Cwd)
 	if err != nil {
 		return nil, err
@@ -620,11 +625,6 @@ func draftErrors(ctx record.ContextData, artifacts string, value any) ([]string,
 				errors = append(errors, "missing citation "+id)
 			}
 		}
-	}
-	c, err := config.Load(ctx.Cwd)
-	if err != nil {
-		errors = append(errors, err.Error())
-		return errors, nil
 	}
 	raw, err := json.Marshal(input["config"])
 	if err != nil {
@@ -818,7 +818,7 @@ func materialize(ctx record.ContextData, draft, input doc) (doc, error) {
 	}
 	return doc{"draft": draft, "mapping": mapping, "decision_ids": ids, "topic": input["topic"], "memo": input["memo"], "base_commit": input["proposal_base"], "ready": false}, nil
 }
-func check(ctx record.ContextData, artifacts string) (doc, error) {
+func check(ctx record.ContextData, artifacts string, env cli.Env) (doc, error) {
 	artifacts = resolve(ctx.Cwd, artifacts)
 	draft, err := readDraft(artifacts)
 	if err != nil {
@@ -828,6 +828,7 @@ func check(ctx record.ContextData, artifacts string) (doc, error) {
 	if err != nil {
 		return nil, err
 	}
+	var verification doc
 	if len(errors) == 0 {
 		options, err := resultOptions(ctx)
 		if err != nil {
@@ -836,6 +837,13 @@ func check(ctx record.ContextData, artifacts string) (doc, error) {
 		if _, err = record.BuildResult(ctx.Dir, "refine", doc{"outcome": "pass"}, options); err != nil {
 			return nil, err
 		}
+		verification, err = verifyChecks(ctx, artifacts, obj(draft), env)
+		if err != nil {
+			return nil, err
+		}
+		errors = append(errors, stringsOf(verification["errors"])...)
+	}
+	if len(errors) == 0 {
 		committed, p, err := proposal.CommittedErrors(ctx, draft)
 		if err != nil {
 			return nil, err
@@ -851,6 +859,9 @@ func check(ctx record.ContextData, artifacts string) (doc, error) {
 			content, err := materialize(ctx, obj(draft), input)
 			if err != nil {
 				return nil, err
+			}
+			if verification != nil {
+				content["verification"] = verification
 			}
 			paths, err := changes(ctx.Cwd)
 			if err != nil {
@@ -884,6 +895,17 @@ func round(ctx record.ContextData, artifacts string, judgment any) (doc, error) 
 	errors, e := draftErrors(ctx, artifacts, d)
 	if e != nil {
 		return nil, e
+	}
+	checked, e := readJSON(file(artifacts, "check.json"))
+	if e != nil && !os.IsNotExist(e) {
+		return nil, e
+	}
+	if e == nil && checked["valid"] != true {
+		problems := stringsOf(checked["errors"])
+		if len(problems) == 0 {
+			problems = append(problems, "machine check did not pass")
+		}
+		errors = append(errors, problems...)
 	}
 	committed, proposal, e := proposal.CommittedErrors(ctx, d)
 	if e != nil {
@@ -1225,7 +1247,7 @@ func Commands() []cli.Command {
 				case "prepare":
 					out, err = prepare(ctx, env, artifacts, env.Getenv("INPUTS_OWNER_WORDS"), env.Getenv("INPUTS_SUPPLEMENT"), env.Getenv("INPUTS_MEMO"), env.Getenv("INPUTS_TOPIC"))
 				case "check":
-					out, err = check(ctx, artifacts)
+					out, err = check(ctx, artifacts, env)
 				case "round":
 					var judgment any
 					judgment = doc{}

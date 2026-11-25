@@ -109,6 +109,37 @@ func compareBase(g *gitx.Git, selected []config.Check, results []Result, dir str
 	return nil
 }
 
+func RunOnBase(cwd, base string, selected []config.Check, logs string, env []string) (results []Result, problems []string, err error) {
+	results, problems = []Result{}, []string{}
+	temp, err := os.MkdirTemp("", "devkit-checks-base-")
+	if err != nil {
+		return nil, nil, err
+	}
+	defer func() { err = errors.Join(err, os.RemoveAll(temp)) }()
+	worktree := filepath.Join(temp, "worktree")
+	if _, err = gitx.Run(cwd, "worktree", "add", "--detach", "--quiet", worktree, base); err != nil {
+		return nil, nil, err
+	}
+	defer func() {
+		_, e := gitx.Run(cwd, "worktree", "remove", "--force", "--force", worktree)
+		err = errors.Join(err, e)
+	}()
+	if err = PrepareWorktree(cwd, worktree, logs, 1, env); err != nil {
+		return results, []string{"base preparation: " + err.Error()}, nil
+	}
+	for _, check := range selected {
+		r, e := RunCheck(check, CheckOptions{Cwd: worktree, Dir: logs, Round: 1, Env: env})
+		if e != nil {
+			return nil, nil, e
+		}
+		results = append(results, r)
+		if r.Status != "pass" {
+			problems = append(problems, fmt.Sprintf("check %s on base: %s; log: %s", r.Name, r.Status, r.Log))
+		}
+	}
+	return results, problems, nil
+}
+
 func PrepareWorktree(settingsRoot, worktree, out string, round int, env []string) error {
 	var settings struct {
 		Worktree struct {

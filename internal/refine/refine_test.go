@@ -126,7 +126,7 @@ func (r *fixture) errors(d doc) string {
 }
 func (r *fixture) round(j doc) doc {
 	r.t.Helper()
-	testutil.Must(check(r.ctx, r.artifacts))
+	testutil.Must(check(r.ctx, r.artifacts, cli.Env{Environ: os.Environ()}))
 	v, e := round(r.ctx, r.artifacts, j)
 
 	testutil.OK(r.t, e)
@@ -190,10 +190,10 @@ func TestProposalCommitContainsProposedDecisionsAndBindingOnly(t *testing.T) {
 	d["bindings"] = []doc{{"path": "CLAUDE.md", "decision": "N1", "reason": "Enforce the staff audience"}}
 	r.put("CLAUDE.md", "Serve employees only.\n")
 	r.writeDraft(d)
-	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts))["valid"], true)
+	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts, cli.Env{Environ: os.Environ()}))["valid"], true)
 	head := r.git("rev-parse", "HEAD")
 	testutil.Equal(t, r.git("rev-parse", "HEAD^"), before)
-	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts))["valid"], true)
+	testutil.Equal(t, testutil.Must(check(r.ctx, r.artifacts, cli.Env{Environ: os.Environ()}))["valid"], true)
 	testutil.Equal(t, r.git("rev-parse", "HEAD"), head)
 	testutil.Equal(t, r.data().Decisions[0]["status"], "proposed")
 	changed := strings.Split(r.git("show", "--format=", "--name-only", "HEAD"), "\n")

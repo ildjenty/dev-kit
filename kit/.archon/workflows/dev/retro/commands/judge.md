@@ -38,6 +38,11 @@ Apply the named criteria documents and return the aspects `traceability`, `evide
 Under `mechanism`, check that every standard or check-setting change concerns how agents work:
 process, tools, conventions or verification. A product data shape, invariant or feature rule in
 such a binding change is a blocking finding, even if repeated in an Issue draft.
+A rule is mechanically checkable when a command or file/config fact can decide compliance.
+Writing such a rule as prose in standards, AGENTS.md, CLAUDE.md or skills in a binding change is
+blocking. Existing commands belong in `.devkit/config.json` checks; commands not yet available
+require creation and check registration in the creating unit's completion conditions.
+Prose binding changes are only for work rules needing judgment.
 
 Return an object matching the supplied judgment schema and node output format: `criteria` contains
 exactly one row per aspect, with `aspect`, `verdict` (pass, fail, not_assessed), `checked` and

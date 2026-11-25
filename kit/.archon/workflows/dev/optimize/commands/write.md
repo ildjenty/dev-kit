@@ -44,6 +44,14 @@ Read, do not change. Collect each fact with where you found it.
 
 Start from the current files and keep what already fits. For each change, keep the evidence.
 
+A command or file/config fact that decides compliance makes a rule mechanically checkable: never
+write it as prose in standards, AGENTS.md, CLAUDE.md or skills. Register existing commands as checks
+with `name`, `command`, `timeout_seconds` and applicable `paths`. If a command does not exist yet,
+make its creation and registration a completion condition of the unit that creates it; do not
+invent a command or replace it with prose. For example, the foundation unit registers the type
+check and automated tests as checks in `.devkit/config.json`, with tests using only local PostgreSQL
+and running without external credentials or network. Prose bindings are only for work rules needing judgment.
+
 **`.devkit/config.json`**
 
 - `language`: as observed.
